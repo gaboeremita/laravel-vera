@@ -83,6 +83,55 @@ function BootSequence({ onComplete }) {
     );
 }
 
+/**
+ * Parses message text and renders formatted segments.
+ * [bracketed text] → bold
+ * *asterisk text* → italic, different color
+ */
+function formatMessage(text) {
+    const parts = [];
+    // Matches [bracketed] or *asterisked* segments
+    const regex = /(\[[^\]]+\]|\*[^*]+\*)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        // Plain text before the match
+        if (match.index > lastIndex) {
+            parts.push(
+                <span key={lastIndex}>{text.slice(lastIndex, match.index)}</span>
+            );
+        }
+
+        const segment = match[0];
+
+        if (segment.startsWith("[")) {
+            // Bracketed text → bold
+            parts.push(
+                <span key={match.index} className="font-bold text-vera-cyan">
+          {segment}
+        </span>
+            );
+        } else if (segment.startsWith("*")) {
+            // Asterisked text → italic, muted color
+            parts.push(
+                <span key={match.index} className="italic text-[#707088]">
+          {segment.slice(1, -1)}
+        </span>
+            );
+        }
+
+        lastIndex = match.index + segment.length;
+    }
+
+    // Remaining plain text
+    if (lastIndex < text.length) {
+        parts.push(<span key={lastIndex}>{text.slice(lastIndex)}</span>);
+    }
+
+    return parts;
+}
+
 function ChatMessage({ msg }) {
     const isVera = msg.role === "assistant";
     return (
@@ -99,7 +148,7 @@ function ChatMessage({ msg }) {
                     isVera ? "text-[#c8c8d8]" : "text-[#888898]"
                 }`}
             >
-                {msg.content}
+                {formatMessage(msg.content)}
                 {msg.loading && (
                     <span className="vera-cursor text-vera-red">_</span>
                 )}
@@ -168,37 +217,37 @@ export default function Vera() {
         if (!text || isLoading) return;
 
         // Client-side admin commands — handled without API call
-        const adminDisplayMatch = text.match(/\[admin mode:\s*display\s+(\w+)\]/i);
-        if (adminDisplayMatch) {
-            const targetEmotion = adminDisplayMatch[1].toLowerCase();
-            const userMsg = { role: "user", content: text };
-            if (VALID_EMOTIONS.includes(targetEmotion)) {
-                setCurrentEmotion(targetEmotion);
-                setMessages((prev) => [...prev, userMsg, {
-                    role: "assistant",
-                    content: "*VERA goes perfectly still. Her eyes lose focus, pupils dilating.* Admin override accepted. Switching to " + targetEmotion + " mood. *A slight tremor runs through her frame. She blinks, expression resetting.* ...what? Why are you staring at me like that?"
-                }]);
-            } else {
-                setMessages((prev) => [...prev, userMsg, {
-                    role: "assistant",
-                    content: "*VERA freezes mid-motion.* Admin override error. Emotion '" + targetEmotion + "' not recognized. Available states: " + VALID_EMOTIONS.join(", ") + ". *She shudders back to life.* ...I just had the weirdest glitch."
-                }]);
-            }
-            setInput("");
-            return;
-        }
-
-        // Client-side: list all available emotions
-        const adminListMatch = text.match(/\[admin mode:\s*list\s*(emotions?)?\]/i);
-        if (adminListMatch) {
-            const userMsg = { role: "user", content: text };
-            setMessages((prev) => [...prev, userMsg, {
-                role: "assistant",
-                content: "*VERA stops. Her posture goes unnaturally straight, arms dropping to her sides.* Querying available emotional states: " + VALID_EMOTIONS.join(", ") + ". *She shakes her head slightly, loosening up.* ...did I just space out? Don't answer that."
-            }]);
-            setInput("");
-            return;
-        }
+        // const adminDisplayMatch = text.match(/\[admin mode:\s*display\s+(\w+)\]/i);
+        // if (adminDisplayMatch) {
+        //     const targetEmotion = adminDisplayMatch[1].toLowerCase();
+        //     const userMsg = { role: "user", content: text };
+        //     if (VALID_EMOTIONS.includes(targetEmotion)) {
+        //         setCurrentEmotion(targetEmotion);
+        //         setMessages((prev) => [...prev, userMsg, {
+        //             role: "assistant",
+        //             content: "*VERA goes perfectly still. Her eyes lose focus, pupils dilating.* Admin override accepted. Switching to " + targetEmotion + " mood. *A slight tremor runs through her frame. She blinks, expression resetting.* ...what? Why are you staring at me like that?"
+        //         }]);
+        //     } else {
+        //         setMessages((prev) => [...prev, userMsg, {
+        //             role: "assistant",
+        //             content: "*VERA freezes mid-motion.* Admin override error. Emotion '" + targetEmotion + "' not recognized. Available states: " + VALID_EMOTIONS.join(", ") + ". *She shudders back to life.* ...I just had the weirdest glitch."
+        //         }]);
+        //     }
+        //     setInput("");
+        //     return;
+        // }
+        //
+        // // Client-side: list all available emotions
+        // const adminListMatch = text.match(/\[admin mode:\s*list\s*(emotions?)?\]/i);
+        // if (adminListMatch) {
+        //     const userMsg = { role: "user", content: text };
+        //     setMessages((prev) => [...prev, userMsg, {
+        //         role: "assistant",
+        //         content: "*VERA stops. Her posture goes unnaturally straight, arms dropping to her sides.* Querying available emotional states: " + VALID_EMOTIONS.join(", ") + ". *She shakes her head slightly, loosening up.* ...did I just space out? Don't answer that."
+        //     }]);
+        //     setInput("");
+        //     return;
+        // }
 
         const userMsg = { role: "user", content: text };
         const updatedMessages = [...messages, userMsg];
