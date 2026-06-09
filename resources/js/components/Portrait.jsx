@@ -1,6 +1,21 @@
 import { useState, useEffect } from "react";
 
-export default function Portrait({ emotion, images }) {
+const EXPRESSION_IMAGES = {
+    amused: "/images/vera/amused.png",
+    angry: "/images/vera/angry.jpg",
+    annoyed: "/images/vera/annoyed.png",
+    confused: "/images/vera/confused.png",
+    content: "/images/vera/content.png",
+    embarrassed: "/images/vera/embarrassed.png",
+    flirty: "/images/vera/flirty.png",
+    happy: "/images/vera/happy.png",
+    neutral: "/images/vera/neutral.jpeg",
+    sad: "/images/vera/sad.jpeg",
+    sultry: "/images/vera/sultry.jpg",
+    surprised: "/images/vera/surprised.jpg",
+};
+
+export default function Portrait({ emotion }) {
 	const [playingVideo, setPlayingVideo] = useState(false);
 
 	useEffect(() => {
@@ -25,7 +40,7 @@ export default function Portrait({ emotion, images }) {
 		);
 	}
 
-	const src = images[emotion] || images.neutral;
+	const src = EXPRESSION_IMAGES[emotion] || EXPRESSION_IMAGES.neutral;
 
 	return (
 		<div className="relative w-full h-full overflow-hidden vera-portrait-bg">
