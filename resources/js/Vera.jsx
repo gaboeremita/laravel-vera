@@ -1,7 +1,19 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
-// IMAGE MAP PLACEHOLDER — will be replaced with actual data
-const EXPRESSION_IMAGES = {};
+const EXPRESSION_IMAGES = {
+    amused: "/images/vera/amused.png",
+    angry: "/images/vera/angry.jpg",
+    annoyed: "/images/vera/annoyed.png",
+    confused: "/images/vera/confused.png",
+    content: "/images/vera/content.png",
+    embarrassed: "/images/vera/embarrassed.png",
+    flirty: "/images/vera/flirty.png",
+    happy: "/images/vera/happy.png",
+    neutral: "/images/vera/neutral.jpeg",
+    sad: "/images/vera/sad.jpeg",
+    sultry: "/images/vera/sultry.jpg",
+    surprised: "/images/vera/surprised.jpg",
+};
 
 const VALID_EMOTIONS = Object.keys(EXPRESSION_IMAGES);
 
