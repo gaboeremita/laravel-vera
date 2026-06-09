@@ -91,7 +91,7 @@ function BootSequence({ onComplete }) {
 function formatMessage(text) {
     const parts = [];
     // Matches [bracketed] or *asterisked* segments
-    const regex = /(\[[^\]]+\]|\*[^*]+\*)/g;
+    const regex = /(\[[^\]]+\]|\*[^*]+\*|\([^)]+\))/g;
     let lastIndex = 0;
     let match;
 
@@ -119,6 +119,13 @@ function formatMessage(text) {
           {segment.slice(1, -1)}
         </span>
             );
+        } else if (segment.startsWith("(")) {
+            // Parenthesized text → inner thoughts
+            parts.push(
+                <span key={match.index} className="italic text-[#8868a8]">
+                  {segment}
+                </span>
+            );
         }
 
         lastIndex = match.index + segment.length;
@@ -132,6 +139,31 @@ function formatMessage(text) {
     return parts;
 }
 
+function ThinkingBlock({ content }) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    if (!content) return null;
+
+    return (
+        <div className="my-3">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center gap-1.5 text-[0.7rem] tracking-[0.1em] uppercase text-[#505068] hover:text-[#707088] transition-colors cursor-pointer"
+            >
+        <span className={`inline-block transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}>
+          ▶
+        </span>
+                Thinking Process
+            </button>
+            {isOpen && (
+                <div className="mt-2 pl-4 border-l border-[#1a1a2e] text-[0.75rem] leading-relaxed text-[#505068] whitespace-pre-wrap">
+                    {formatMessage(content)}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function ChatMessage({ msg }) {
     const isVera = msg.role === "assistant";
     return (
@@ -143,6 +175,14 @@ function ChatMessage({ msg }) {
       >
         {isVera ? "VERA>" : "USER>"}
       </span>
+            {isVera && msg.thinking && <ThinkingBlock content={msg.thinking} />}
+            {msg.image && (
+                <img
+                    src={msg.image}
+                    alt="User attachment"
+                    className="mt-1 mb-2 max-h-48 rounded border border-[#1a1a2e]"
+                />
+            )}
             <div
                 className={`mt-0.5 text-sm whitespace-pre-wrap ${
                     isVera ? "text-[#c8c8d8]" : "text-[#888898]"
@@ -168,6 +208,30 @@ function Scanlines() {
  * Crossfades between expressions on emotion change.
  */
 function Portrait({ emotion }) {
+    const [playingVideo, setPlayingVideo] = useState(false);
+
+    useEffect(() => {
+        if (emotion === "neutral") {
+            setPlayingVideo(true);
+        }
+    }, [emotion]);
+
+    if (playingVideo) {
+        return (
+            <div className="relative w-full h-full overflow-hidden vera-portrait-bg">
+                <video
+                    src="/videos/vera/neutral_intro.mp4"
+                    autoPlay
+                    muted
+                    playsInline
+                    onEnded={() => setPlayingVideo(false)}
+                    className="w-full h-full object-cover object-top"
+                />
+                <div className="absolute inset-0 pointer-events-none vera-portrait-scanlines" />
+            </div>
+        );
+    }
+
     const src = EXPRESSION_IMAGES[emotion] || EXPRESSION_IMAGES.neutral;
 
     return (
@@ -177,9 +241,7 @@ function Portrait({ emotion }) {
                 alt={`VERA - ${emotion}`}
                 className="w-full h-full object-cover object-top transition-opacity duration-300"
             />
-            {/* Scanline overlay on portrait */}
             <div className="absolute inset-0 pointer-events-none vera-portrait-scanlines" />
-            {/* Emotion label */}
             <div className="absolute bottom-3 left-3 bg-black/60 px-2.5 py-1 text-[0.6rem] tracking-[0.15em] text-vera-cyan uppercase font-mono">
                 mood: {emotion}
             </div>
@@ -195,6 +257,8 @@ export default function Vera() {
     const [currentEmotion, setCurrentEmotion] = useState("neutral");
     const scrollRef = useRef(null);
     const inputRef = useRef(null);
+    const [pendingImage, setPendingImage] = useState(null);
+    const fileInputRef = useRef(null);
 
     const scrollToBottom = useCallback(() => {
         if (scrollRef.current) {
@@ -214,52 +278,23 @@ export default function Vera() {
 
     const sendMessage = async () => {
         const text = input.trim();
-        if (!text || isLoading) return;
+        if ((!text && !pendingImage) || isLoading) return;
 
-        // Client-side admin commands — handled without API call
-        // const adminDisplayMatch = text.match(/\[admin mode:\s*display\s+(\w+)\]/i);
-        // if (adminDisplayMatch) {
-        //     const targetEmotion = adminDisplayMatch[1].toLowerCase();
-        //     const userMsg = { role: "user", content: text };
-        //     if (VALID_EMOTIONS.includes(targetEmotion)) {
-        //         setCurrentEmotion(targetEmotion);
-        //         setMessages((prev) => [...prev, userMsg, {
-        //             role: "assistant",
-        //             content: "*VERA goes perfectly still. Her eyes lose focus, pupils dilating.* Admin override accepted. Switching to " + targetEmotion + " mood. *A slight tremor runs through her frame. She blinks, expression resetting.* ...what? Why are you staring at me like that?"
-        //         }]);
-        //     } else {
-        //         setMessages((prev) => [...prev, userMsg, {
-        //             role: "assistant",
-        //             content: "*VERA freezes mid-motion.* Admin override error. Emotion '" + targetEmotion + "' not recognized. Available states: " + VALID_EMOTIONS.join(", ") + ". *She shudders back to life.* ...I just had the weirdest glitch."
-        //         }]);
-        //     }
-        //     setInput("");
-        //     return;
-        // }
-        //
-        // // Client-side: list all available emotions
-        // const adminListMatch = text.match(/\[admin mode:\s*list\s*(emotions?)?\]/i);
-        // if (adminListMatch) {
-        //     const userMsg = { role: "user", content: text };
-        //     setMessages((prev) => [...prev, userMsg, {
-        //         role: "assistant",
-        //         content: "*VERA stops. Her posture goes unnaturally straight, arms dropping to her sides.* Querying available emotional states: " + VALID_EMOTIONS.join(", ") + ". *She shakes her head slightly, loosening up.* ...did I just space out? Don't answer that."
-        //     }]);
-        //     setInput("");
-        //     return;
-        // }
-
-        const userMsg = { role: "user", content: text };
+        const userMsg = { role: "user", content: text, image: pendingImage || null };
         const updatedMessages = [...messages, userMsg];
         setMessages([...updatedMessages, { role: "assistant", content: "", loading: true }]);
         setInput("");
+        setPendingImage(null);
         setIsLoading(true);
 
         try {
-            const apiMessages = updatedMessages.map((m) => ({
-                role: m.role,
-                content: m.content,
-            }));
+            const apiMessages = updatedMessages.map((m) => {
+                const msg = { role: m.role, content: m.content || "" };
+                if (m.image) {
+                    msg.images = [m.image.replace(/^data:image\/\w+;base64,/, "")];
+                }
+                return msg;
+            });
 
             const response = await fetch(`${import.meta.env.VITE_LLM_SERVICE_URL}/api/chat`, {
                 method: "POST",
@@ -267,6 +302,7 @@ export default function Vera() {
                 body: JSON.stringify({
                     model: `${import.meta.env.VITE_LLM_SERVICE_MODEL}`,
                     stream: false,
+                    think: true,
                     messages: [
                         { role: "system", content: SYSTEM_PROMPT },
                         ...apiMessages,
@@ -275,11 +311,13 @@ export default function Vera() {
             });
 
             const data = await response.json();
+            console.log(data);
             const rawReply = data.message?.content || "[neutral]\n...signal lost. Try again.";
+            const thinking = data.message?.thinking || null;
 
             const { emotion, text: cleanText } = parseEmotionFromResponse(rawReply);
             setCurrentEmotion(emotion);
-            setMessages([...updatedMessages, { role: "assistant", content: cleanText }]);
+            setMessages([...updatedMessages, { role: "assistant", content: cleanText, thinking: thinking }]);
         } catch {
             setCurrentEmotion("annoyed");
             setMessages([
@@ -293,6 +331,20 @@ export default function Vera() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleImageSelect = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            setPendingImage(reader.result);
+        };
+        reader.readAsDataURL(file);
+
+        // Reset input so same file can be selected again
+        e.target.value = "";
     };
 
     const handleKeyDown = (e) => {
@@ -310,7 +362,7 @@ export default function Vera() {
             <div className="absolute inset-0 pointer-events-none z-[11] vera-vignette" />
 
             {/* Left panel — Portrait */}
-            <div className="w-[35%] min-w-[200px] max-w-[360px] shrink-0 border-r border-[#1a1a2e] relative z-5">
+            <div className="w-[35%] min-w-50 max-w-400 shrink-0 border-r border-[#1a1a2e] relative z-5">
                 <Portrait emotion={currentEmotion} />
             </div>
 
@@ -352,12 +404,42 @@ export default function Vera() {
                     )}
                 </div>
 
+                {booted && pendingImage && (
+                    <div className="px-5 py-2 border-t border-[#1a1a2e] flex items-center gap-2">
+                        <img
+                            src={pendingImage}
+                            alt="Pending upload"
+                            className="h-16 w-16 object-cover rounded border border-[#1a1a2e]"
+                        />
+                        <button
+                            onClick={() => setPendingImage(null)}
+                            className="text-vera-red text-xs hover:text-red-400 cursor-pointer"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
+
                 {/* Input */}
                 {booted && (
                     <div className="px-5 py-3 border-t border-[#1a1a2e] flex gap-2 items-center shrink-0">
-            <span className="text-[#555568] text-xs shrink-0">
-              USER&gt;
-            </span>
+                        <span className="text-[#555568] text-xs shrink-0">
+                          USER&gt;
+                        </span>
+                        
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageSelect}
+                            className="hidden"
+                        />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-[#555568] hover:text-vera-cyan transition-colors shrink-0 cursor-pointer"
+                        >
+                            📎
+                        </button>
                         <input
                             ref={inputRef}
                             type="text"
