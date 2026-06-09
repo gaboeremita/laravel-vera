@@ -1,9 +1,72 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-
+/* Custom theme colors referenced as text-vera-cyan, bg-vera-red, etc. */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-vera-cyan: #00ffc8;
+    --color-vera-red: #ff3e3e;
+}
+
+/* CRT scanline overlay — repeating horizontal lines */
+.vera-scanlines {
+    background: repeating-linear-gradient(
+            0deg,
+            rgba(0, 255, 200, 0.02) 0px,
+            rgba(0, 255, 200, 0.02) 1px,
+            transparent 1px,
+            transparent 3px
+    );
+}
+
+/* Portrait-specific scanlines — heavier opacity */
+.vera-portrait-scanlines {
+    background: repeating-linear-gradient(
+            0deg,
+            rgba(0, 0, 0, 0.15) 0px,
+            rgba(0, 0, 0, 0.15) 1px,
+            transparent 1px,
+            transparent 3px
+    );
+}
+
+/* Portrait background gradient */
+.vera-portrait-bg {
+    background: linear-gradient(180deg, #2a1050 0%, #0a2a2a 100%);
+}
+
+/* CRT vignette — darkened edges */
+.vera-vignette {
+    background: radial-gradient(
+            ellipse at center,
+            transparent 50%,
+            rgba(0, 0, 0, 0.6) 100%
+    );
+}
+
+/* VERA title text glow */
+.vera-glow {
+    text-shadow: 0 0 20px rgba(0, 255, 200, 0.3);
+}
+
+/* Blinking cursor animation */
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+.vera-cursor {
+    animation: blink 0.8s step-end infinite;
+}
+
+/* Custom scrollbar styling */
+.vera-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.vera-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.vera-scrollbar::-webkit-scrollbar-thumb {
+    background: #1a1a2e;
+    border-radius: 2px;
 }
