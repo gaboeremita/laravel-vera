@@ -4,11 +4,17 @@ import promptConfig from "../../../vera_prompt.json";
  * Assembles the full system prompt string from the structured prompt.json config.
  * Each section maps to a key in the JSON file — edit the JSON to change VERA's behavior.
  */
-export function buildSystemPrompt() {
+export function buildSystemPrompt(currentMetrics = null) {
 	const sections = [];
 
 	sections.push(promptConfig.identity);
-	sections.push(promptConfig.appearance);
+
+	// Appearance — general statements + detailed description
+	const appearanceGeneral = promptConfig.appearance.general.join(" ");
+	const descriptionParts = Object.entries(promptConfig.appearance.description)
+		.map(([key, traits]) => `${key}: ${traits.join(", ")}`)
+		.join(". ");
+	sections.push(`${appearanceGeneral}\n\nPhysical description: ${descriptionParts}`);
 
 	// Emotion tags with dynamic list from config
 	const emotionList = promptConfig.emotion_tags.available.join(", ");
@@ -41,6 +47,15 @@ export function buildSystemPrompt() {
 		`ADMIN MODE (${promptConfig.admin_mode.name}):\n${promptConfig.admin_mode.rules.map((rule, i) => `${i + 1}. ${rule}`).join("\n")}`
 	);
 
+	// Image handling
+	sections.push(
+		`Image Handling:\n${promptConfig.image_handling.map((rule) => `- ${rule}`).join("\n")}`
+	);
+
+	if (currentMetrics) {
+		sections.push(buildMetricsContext(currentMetrics));
+	}
+
 	return sections.join("\n\n");
 }
 
@@ -57,4 +72,22 @@ export function getAvailableEmotions() {
  */
 export function getSecretTrigger() {
 	return promptConfig.secret_trigger.phrase;
+}
+
+export function buildMetricsContext(currentMetrics) {
+	const { metrics } = promptConfig;
+	const lines = [];
+
+	for (const [key, config] of Object.entries(metrics)) {
+		if (key === "instructions") continue;
+		const value = currentMetrics[key] ?? config.start;
+		const threshold = Object.entries(config.thresholds)
+			.find(([range]) => {
+				const [min, max] = range.split("-").map(Number);
+				return value >= min && value <= max;
+			});
+		lines.push(`${key}: ${value}/100 — ${threshold?.[1] || ""}`);
+	}
+
+	return `${metrics.instructions}\n\nCurrent emotional state:\n${lines.join("\n")}`;
 }
