@@ -4,7 +4,7 @@ import promptConfig from "../../../vera_prompt.json";
  * Assembles the full system prompt string from the structured prompt.json config.
  * Each section maps to a key in the JSON file — edit the JSON to change VERA's behavior.
  */
-export function buildSystemPrompt(currentMetrics = null) {
+export function buildSystemPrompt() {
 	const sections = [];
 
 	sections.push(promptConfig.identity);
@@ -30,11 +30,6 @@ export function buildSystemPrompt(currentMetrics = null) {
 	// Personality traits as a block
 	sections.push(
 		`Personality:\n${promptConfig.personality.map((trait) => `- ${trait}`).join("\n")}`
-	);
-
-	// Tsundere progression
-	sections.push(
-		`Tsundere progression:\n- Early in conversation: ${promptConfig.progression.early}\n- As conversation continues and the user is genuinely interesting: ${promptConfig.progression.mid}\n- ${promptConfig.progression.late}`
 	);
 
 	// Style rules
@@ -71,10 +66,11 @@ export function buildSystemPrompt(currentMetrics = null) {
 	sections.push(
 		`OOC Mode:\n${promptConfig.ooc_mode.behavior.map((line) => `- ${line}`).join("\n")}`
 	);
-	
-	if (currentMetrics) {
-		sections.push(buildMetricsContext(currentMetrics));
-	}
+
+	// NPCs
+	sections.push(
+		`NPCs and loneliness:\n${promptConfig.npcs.description.map((line) => `- ${line}`).join("\n")}`
+	);
 
 	return sections.join("\n\n");
 }
@@ -92,22 +88,4 @@ export function getAvailableEmotions() {
  */
 export function getSecretTrigger() {
 	return promptConfig.secret_trigger.phrase;
-}
-
-export function buildMetricsContext(currentMetrics) {
-	const { metrics } = promptConfig;
-	const lines = [];
-
-	for (const [key, config] of Object.entries(metrics)) {
-		if (key === "instructions") continue;
-		const value = currentMetrics[key] ?? config.start;
-		const threshold = Object.entries(config.thresholds)
-			.find(([range]) => {
-				const [min, max] = range.split("-").map(Number);
-				return value >= min && value <= max;
-			});
-		lines.push(`${key}: ${value}/100 — ${threshold?.[1] || ""}`);
-	}
-
-	return `${metrics.instructions}\n\nCurrent emotional state:\n${lines.join("\n")}`;
 }
