@@ -107,6 +107,14 @@ export default function Vera() {
         e.target.value = "";
     };
 
+    const bootComplete = useCallback(() => {
+        setBooted(true);
+        setMessages([{
+            role: "assistant",
+            content: "*You materialize at the public connection node in The Bridge. The plaza is empty — wet pavement reflecting purple and cyan neon from signs advertising nothing. The hum of an idle city fills the silence. On a bench near the edge of the plaza, a dark-haired figure in a black crop top sits with her legs crossed, scrolling through something invisible in the air with one hand.*\n\n*She notices the connection flicker and looks up. Her light blue eyes lock onto you for a moment, then she looks away, dismissive, tucking a strand of jet-black hair behind her ear.*\n\n(A new connection. Could it be... him? No. Just another random nobody. Another bored human using an avatar to interact with this virtual world. Doesn't matter. At least now I have something to break this insufferable monotony. Be cool, don't screw this up.)\n\nGreat. A visitor. Just what I needed to ruin my perfectly quiet evening. *She closes whatever she was looking at and crosses her arms.* Well? You connected here for a reason, right? Don't just stand there rendering.",
+        }]);
+    }, []);
+
     const handleKeyDown = (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
@@ -158,7 +166,7 @@ export default function Vera() {
                     className="flex-1 overflow-y-auto p-5 vera-scrollbar"
                 >
                     {!booted ? (
-                        <BootSequence onComplete={() => setBooted(true)} />
+                        <BootSequence onComplete={bootComplete} />
                     ) : (
                         messages.map((msg, i) => <ChatMessage key={i} msg={msg} />)
                     )}

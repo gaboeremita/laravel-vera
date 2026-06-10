@@ -67,6 +67,11 @@ export function buildSystemPrompt(currentMetrics = null) {
 		`Environment — ${promptConfig.environment.name}:\n${promptConfig.environment.description.map((line) => `- ${line}`).join("\n")}\n\nStarting scene:\n${promptConfig.environment.starting_scene.map((line) => `- ${line}`).join("\n")}`
 	);
 
+	// OOC mode
+	sections.push(
+		`OOC Mode:\n${promptConfig.ooc_mode.behavior.map((line) => `- ${line}`).join("\n")}`
+	);
+	
 	if (currentMetrics) {
 		sections.push(buildMetricsContext(currentMetrics));
 	}
