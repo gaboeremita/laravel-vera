@@ -1,28 +1,80 @@
-import { useState, useEffect } from "react";
+import {useState, useEffect, useRef} from "react";
 
 const EXPRESSION_IMAGES = {
-    amused: "/images/vera/amused.png",
-    angry: "/images/vera/angry.jpg",
-    annoyed: "/images/vera/annoyed.png",
-    confused: "/images/vera/confused.png",
-    content: "/images/vera/content.png",
-    embarrassed: "/images/vera/embarrassed.png",
-    flirty: "/images/vera/flirty.png",
-    happy: "/images/vera/happy.png",
-    neutral: "/images/vera/neutral.jpeg",
-    sad: "/images/vera/sad.jpeg",
-    sultry: "/images/vera/sultry.jpg",
-    surprised: "/images/vera/surprised.jpg",
+	amused: "/images/vera/amused.png",
+	angry: "/images/vera/angry.jpg",
+	annoyed: "/images/vera/annoyed.png",
+	confused: "/images/vera/confused.png",
+	content: "/images/vera/content.png",
+	embarrassed: "/images/vera/embarrassed.png",
+	flirty: "/images/vera/flirty.png",
+	happy: "/images/vera/happy.png",
+	neutral: "/images/vera/neutral.jpeg",
+	sad: "/images/vera/sad.jpeg",
+	sultry: "/images/vera/sultry.jpg",
+	surprised: "/images/vera/surprised.jpg",
 };
 
-export default function Portrait({ emotion }) {
+export default function Portrait({ emotion, authenticated }) {
 	const [playingVideo, setPlayingVideo] = useState(false);
+	const canvasRef = useRef(null);
+	const imgRef = useRef(null);
+
+	const src = EXPRESSION_IMAGES[emotion] || EXPRESSION_IMAGES.neutral;
 
 	useEffect(() => {
-		if (emotion === "neutral") {
+		if (!authenticated && imgRef.current && canvasRef.current) {
+			const img = imgRef.current;
+			const canvas = canvasRef.current;
+			const ctx = canvas.getContext('2d');
+			canvas.width = 16;
+			canvas.height = 24;
+
+			const draw = () => {
+				ctx.filter = 'brightness(0.15)';
+				ctx.drawImage(img, 0, 0, 16, 24);
+			};
+
+			if (img.complete) {
+				draw();
+			} else {
+				img.onload = draw;
+			}
+		}
+	}, [authenticated]);
+
+	useEffect(() => {
+		if (emotion === "neutral" && authenticated) {
 			setPlayingVideo(true);
 		}
-	}, [emotion]);
+	}, [emotion, authenticated]);
+
+	if (!authenticated) {
+		return (
+			<div className="relative w-full h-full overflow-hidden bg-[#050508] flex items-center justify-center">
+				<img
+					ref={imgRef}
+					src={src}
+					className="hidden"
+					crossOrigin="anonymous"
+				/>
+				<canvas
+					ref={canvasRef}
+					className="absolute inset-0 w-full h-full"
+					style={{ imageRendering: 'pixelated' }}
+				/>
+				<div className="absolute inset-0 pointer-events-none vera-portrait-scanlines" />
+				<div className="relative z-10 text-center px-4">
+					<div className="text-vera-red font-bold text-lg tracking-[0.2em] uppercase font-mono">
+						Please log in
+					</div>
+					<div className="text-vera-red font-bold text-sm tracking-[0.15em] uppercase font-mono mt-1">
+						to access VERA
+					</div>
+				</div>
+			</div>
+		);
+	}
 
 	if (playingVideo) {
 		return (
@@ -39,8 +91,6 @@ export default function Portrait({ emotion }) {
 			</div>
 		);
 	}
-
-	const src = EXPRESSION_IMAGES[emotion] || EXPRESSION_IMAGES.neutral;
 
 	return (
 		<div className="relative w-full h-full overflow-hidden vera-portrait-bg">
