@@ -52,6 +52,21 @@ export function buildSystemPrompt(currentMetrics = null) {
 		`Image Handling:\n${promptConfig.image_handling.map((rule) => `- ${rule}`).join("\n")}`
 	);
 
+	// Creator mode
+	sections.push(
+		`Creator Mode:\n${promptConfig.creator_mode.behavior.map((rule) => `- ${rule}`).join("\n")}`
+	);
+
+	// Creator psychology
+	sections.push(
+		`Creator Psychology:\n${promptConfig.creator_psychology.map((line) => `- ${line}`).join("\n")}`
+	);
+
+	// Environment
+	sections.push(
+		`Environment — ${promptConfig.environment.name}:\n${promptConfig.environment.description.map((line) => `- ${line}`).join("\n")}\n\nStarting scene:\n${promptConfig.environment.starting_scene.map((line) => `- ${line}`).join("\n")}`
+	);
+
 	if (currentMetrics) {
 		sections.push(buildMetricsContext(currentMetrics));
 	}
