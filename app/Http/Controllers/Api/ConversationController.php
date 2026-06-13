@@ -98,4 +98,15 @@ class ConversationController extends Controller
 			'thinking' => $thinking,
 		]);
 	}
+
+	public function destroy(Request $request, string $id): JsonResponse
+	{
+		$conversation = $request->user()
+			->conversations()
+			->findOrFail($id);
+
+		$conversation->delete();
+
+		return response()->json(['message' => 'Conversation deleted']);
+	}
 }
