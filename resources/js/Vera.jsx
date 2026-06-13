@@ -77,8 +77,7 @@ export default function Vera() {
                 return msg;
             });
 
-            const response = await api.post('/api/chat', {
-                conversation_id: conversationId,
+            const response = await api.post(`/api/conversations/${conversationId}/messages`, {
                 messages: [
                     { role: "system", content: SYSTEM_PROMPT },
                     ...apiMessages,

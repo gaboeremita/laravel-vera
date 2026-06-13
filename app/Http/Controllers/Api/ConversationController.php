@@ -41,28 +41,23 @@ class ConversationController extends Controller
 		return response()->json($conversation, 201);
 	}
 
-	public function sendMessage(Request $request): JsonResponse
+	public function sendMessage(Request $request, string $id): JsonResponse
 	{
 		$validated = $request->validate([
-			'conversation_id' => ['nullable', 'exists:conversations,id'],
 			'messages' => ['required', 'array'],
 			'messages.*.role' => ['required', 'string'],
 			'messages.*.content' => ['nullable', 'string'],
 			'messages.*.images' => ['sometimes', 'array'],
 		]);
 
-		$user = $request->user();
-
-		// Find existing or create new conversation
-		$lastUserMessage = collect($validated['messages'])->last(fn ($m) => $m['role'] === 'user');
-
-		$conversation = $validated['conversation_id']
-			? $user->conversations()->findOrFail($validated['conversation_id'])
-			: $user->conversations()->create([
-				'title' => str($lastUserMessage['content'] ?? 'New chat')->limit(50)->toString(),
-			]);
+		// Get conversation scoped to authenticated user
+		$conversation = $request->user()
+			->conversations()
+			->findOrFail($id);
 
 		// Save user message
+		$lastUserMessage = collect($validated['messages'])->last(fn ($m) => $m['role'] === 'user');
+
 		if ($lastUserMessage) {
 			$conversation->messages()->create([
 				'role' => 'user',
