@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Contracts\LlmProvider;
+use App\Services\LlmProviders\LlmManager;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +13,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+		$this->app->bind(LlmProvider::class, function () {
+			return (new LlmManager())->resolve();
+		});
     }
 
     /**
