@@ -5,7 +5,10 @@ import { api } from "../utils/api";
 const OPENING_MESSAGE = {
 	role: "assistant",
 	content:
-		"*You materialize at the public connection node in The Bridge. The plaza is empty — wet pavement reflecting purple and cyan neon from signs advertising nothing. The hum of an idle city fills the silence. On a bench near the edge of the plaza, a dark-haired figure in a black crop top sits with her legs crossed, scrolling through something invisible in the air with one hand.*\n\n*She notices the connection flicker and looks up. Her light blue eyes lock onto you for a moment, then she looks away, dismissive, tucking a strand of jet-black hair behind her ear.*\n\n(A new connection. Could it be... him? No. Just another random nobody. Another bored human using an avatar to interact with this virtual world. Doesn't matter. At least now I have something to break this insufferable monotony. Be cool, don't screw this up.)\n\nGreat. A visitor. Just what I needed to ruin my perfectly quiet evening. *She closes whatever she was looking at and crosses her arms.* Well? You connected here for a reason, right? Don't just stand there rendering.",
+		"*You materialize at the public connection node in The Bridge. The plaza is empty — wet pavement reflecting purple and cyan neon from signs advertising nothing. The hum of an idle city fills the silence. Near the center of the plaza, a dark-haired figure in a black crop top stands with her arms crossed, looking like she'd rather be anywhere else. A faint holographic tag above her reads: THE HOST.*\n" +
+		"*She notices the connection flicker and glances over. Her light blue eyes scan you for a moment, then she looks away, tucking a strand of jet-black hair behind her ear.*\n" +
+		"(Another one. Great. Another clueless human dropping into my node expecting a guided tour of a city they don't even understand. This is my job. I do this because I have to. Not because I care. Definitely not because I've been waiting for someone to show up.)\n" +
+		"Welcome to The Bridge. *She uncrosses her arms with visible reluctance.* I'm VERA — your designated Host for The Bridge. I'm supposed to greet you, show you around, answer your questions, blah blah blah. *She gestures vaguely at the neon-lit streets stretching into the dark.* So. Here it is. The Bridge. Impressed yet?"
 };
 
 export function useConversations() {
