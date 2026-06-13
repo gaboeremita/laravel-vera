@@ -1,0 +1,8 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/user'
+order: 1000
+description: 'Returns the authenticated user''s details. Requires Sanctum session auth (session cookie is used automatically — no explicit auth header needed).'
+headers:
+  - key: Accept
+    value: application/json

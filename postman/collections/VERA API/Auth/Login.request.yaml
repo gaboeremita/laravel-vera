@@ -1,0 +1,17 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/login'
+order: 1000
+description: 'Authenticates the user via session (Laravel Sanctum stateful). Returns {"message": "Authenticated"} on success or {"message": "Invalid credentials"} with 401 on failure.'
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Accept
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{email}}",
+      "password": "{{password}}"
+    }

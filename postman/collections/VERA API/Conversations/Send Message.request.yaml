@@ -1,0 +1,25 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/conversations/{{conversationId}}/messages'
+order: 4000
+description: 'Sends a message to the conversation. Saves the user message, calls the Ollama LLM, saves the assistant response, and returns {conversation_id, content, thinking}. The conversation_id in the body is optional — if null, a new conversation is created. messages is an array of {role, content, images?}. Requires Sanctum session auth.'
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Accept
+    value: application/json
+pathVariables:
+  - key: conversationId
+    value: '{{conversationId}}'
+body:
+  type: json
+  content: |-
+    {
+      "conversation_id": null,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello, how are you?"
+        }
+      ]
+    }

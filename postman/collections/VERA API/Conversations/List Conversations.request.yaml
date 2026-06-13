@@ -1,0 +1,8 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/conversations'
+order: 1000
+description: 'Returns all conversations for the authenticated user, ordered by most recently updated. Each item has id, title, updated_at. Requires Sanctum session auth.'
+headers:
+  - key: Accept
+    value: application/json

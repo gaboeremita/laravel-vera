@@ -1,0 +1,8 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/logout'
+order: 2000
+description: 'Logs out the current session user. Returns {"message": "Logged out"}.'
+headers:
+  - key: Accept
+    value: application/json
