@@ -22,6 +22,7 @@ export default function Vera() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [loginStep, setLoginStep] = useState('email');
     const [loginEmail, setLoginEmail] = useState('');
+    const [conversationId, setConversationId] = useState(null);
 
     const scrollToBottom = useCallback(() => {
         if (scrollRef.current) {
@@ -77,6 +78,7 @@ export default function Vera() {
             });
 
             const response = await api.post('/api/chat', {
+                conversation_id: conversationId,
                 messages: [
                     { role: "system", content: SYSTEM_PROMPT },
                     ...apiMessages,
@@ -84,6 +86,7 @@ export default function Vera() {
             });
 
             const data = await response.json();
+            setConversationId(data.conversation_id);
             const rawReply = data.content || "[neutral]\n...signal lost. Try again.";
             const thinking = data.thinking || null;
 
