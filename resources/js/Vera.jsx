@@ -76,29 +76,16 @@ export default function Vera() {
                 return msg;
             });
 
-            const response = await fetch(
-                `${import.meta.env.VITE_LLM_SERVICE_URL}/api/chat`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        model: import.meta.env.VITE_LLM_SERVICE_MODEL,
-                        stream: false,
-                        think: true,
-                        messages: [
-                            { role: "system", content: SYSTEM_PROMPT },
-                            ...apiMessages,
-                        ],
-                    }),
-                },
-            );
+            const response = await api.post('/api/chat', {
+                messages: [
+                    { role: "system", content: SYSTEM_PROMPT },
+                    ...apiMessages,
+                ],
+            });
 
             const data = await response.json();
-            console.log(data);
-            const rawReply =
-                data.message?.content ||
-                "[neutral]\n...signal lost. Try again.";
-            const thinking = data.message?.thinking || null;
+            const rawReply = data.content || "[neutral]\n...signal lost. Try again.";
+            const thinking = data.thinking || null;
 
             const { emotion, text: cleanText } =
                 parseEmotionFromResponse(rawReply);
