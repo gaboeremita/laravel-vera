@@ -6,6 +6,7 @@ use Database\Factories\MessageFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Message extends Model
 {
@@ -25,4 +26,9 @@ class Message extends Model
     {
         return $this->belongsTo(Conversation::class);
     }
+
+	public function image(): MorphOne
+	{
+		return $this->morphOne(Image::class, 'imageable');
+	}
 }

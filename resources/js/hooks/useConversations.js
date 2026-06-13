@@ -59,7 +59,7 @@ export function useConversations() {
 				role: msg.role,
 				content: msg.content,
 				thinking: msg.thinking,
-				image: msg.image,
+				image: msg.image_url,
 			})));
 		} catch {
 			setMessages([{
