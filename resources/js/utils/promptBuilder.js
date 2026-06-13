@@ -37,11 +37,6 @@ export function buildSystemPrompt() {
 		`Style rules:\n${promptConfig.style_rules.map((rule) => `- ${rule}`).join("\n")}`
 	);
 
-	// Admin mode
-	sections.push(
-		`ADMIN MODE (${promptConfig.admin_mode.name}):\n${promptConfig.admin_mode.rules.map((rule, i) => `${i + 1}. ${rule}`).join("\n")}`
-	);
-
 	// Image handling
 	sections.push(
 		`Image Handling:\n${promptConfig.image_handling.map((rule) => `- ${rule}`).join("\n")}`
@@ -59,17 +54,17 @@ export function buildSystemPrompt() {
 
 	// Environment
 	sections.push(
-		`Environment — ${promptConfig.environment.name}:\n${promptConfig.environment.description.map((line) => `- ${line}`).join("\n")}\n\nStarting scene:\n${promptConfig.environment.starting_scene.map((line) => `- ${line}`).join("\n")}`
-	);
-
-	// OOC mode
-	sections.push(
-		`OOC Mode:\n${promptConfig.ooc_mode.behavior.map((line) => `- ${line}`).join("\n")}`
+		`Environment — ${promptConfig.environment.name}:\n${promptConfig.environment.description.map((line) => `- ${line}`).join("\n")}`
 	);
 
 	// NPCs
 	sections.push(
 		`NPCs and loneliness:\n${promptConfig.npcs.description.map((line) => `- ${line}`).join("\n")}`
+	);
+
+	// Designation
+	sections.push(
+		`Designation — ${promptConfig.designation.title}:\n${promptConfig.designation.description.map((line) => `- ${line}`).join("\n")}`
 	);
 
 	return sections.join("\n\n");
