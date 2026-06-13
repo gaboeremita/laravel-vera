@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Contracts\LlmProvider;
 use App\Http\Controllers\Controller;
+use App\Models\Image;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,9 +26,17 @@ class ConversationController extends Controller
 			->conversations()
 			->findOrFail($id);
 
+
 		$messages = $conversation->messages()
+			->with('image')
 			->orderBy('created_at')
-			->get(['id', 'role', 'content', 'thinking', 'image', 'emotion']);
+			->get(['id', 'role', 'content', 'thinking', 'emotion', 'conversation_id']);
+
+		$messages->transform(function ($message) {
+			$message->image_url = $message->image?->url;
+			unset($message->image);
+			return $message;
+		});
 
 		return response()->json($messages);
 	}
@@ -68,11 +77,16 @@ class ConversationController extends Controller
 		$lastUserMessage = collect($validated['messages'])->last(fn ($m) => $m['role'] === 'user');
 
 		if ($lastUserMessage) {
-			$conversation->messages()->create([
+
+			$message = $conversation->messages()->create([
 				'role' => 'user',
 				'content' => $lastUserMessage['content'] ?? '',
-				'image' => $lastUserMessage['images'][0] ?? null,
 			]);
+
+			if (! empty($lastUserMessage['images'][0])) {
+				$storagePath = "messages/{$request->user()->id}/{$conversation->id}";
+				Image::storeFromBase64($lastUserMessage['images'][0], $message, $storagePath);
+			}
 		}
 
 		try {
