@@ -70,3 +70,23 @@
     background: #1a1a2e;
     border-radius: 2px;
 }
+
+/* Underline indicator animation — scales from center */
+@keyframes underline-in {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
+}
+
+.animate-underline-in {
+    animation: underline-in 0.15s ease-out forwards;
+    transform-origin: center;
+}
+
+/* Underline color variants for the conversation list */
+.bg-vera-cyan { background-color: #00ffc8; }
+.bg-vera-red { background-color: #ff3e3e; }
+.bg-green-400 { background-color: #4ade80; }

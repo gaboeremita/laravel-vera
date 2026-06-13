@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
+import { Trash2 } from "lucide-react";
+import TerminalModal from "./TerminalModal";
+import { api } from "../utils/api";
 
-// Format timestamp into relative time (e.g. "2m ago", "3d ago")
 function timeAgo(dateString) {
 	const now = new Date();
 	const date = new Date(dateString);
@@ -12,38 +14,76 @@ function timeAgo(dateString) {
 	return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-export default function ConversationList({ conversations, onSelect, onNew }) {
-	const [activeIndex, setActiveIndex] = useState(0);
+// Animated underline indicator
+function ActiveUnderline({ color = "vera-cyan" }) {
+	return (
+		<span
+			className={`absolute bottom-0 left-0 right-0 h-[1px] bg-${color} animate-underline-in`}
+		/>
+	);
+}
+
+export default function ConversationList({ conversations, onSelect, onNew, onDelete }) {
+	const [activeRow, setActiveRow] = useState(0);
+	const [activeColumn, setActiveColumn] = useState("select");
+	const [pendingDeleteId, setPendingDeleteId] = useState(null);
 	const listRef = useRef(null);
 
+	useEffect(() => {
+		listRef.current?.focus();
+	}, []);
+
+	useEffect(() => {
+		if (activeRow >= conversations.length) {
+			setActiveColumn("select");
+		}
+	}, [activeRow, conversations.length]);
+
 	const handleKeyDown = (e) => {
-		// Total items = conversations + the "new conversation" option
+		if (pendingDeleteId) return;
+
 		const total = conversations.length + 1;
 
 		if (e.key === "ArrowUp") {
 			e.preventDefault();
-			setActiveIndex((prev) => (prev - 1 + total) % total);
+			setActiveRow((prev) => (prev - 1 + total) % total);
 		} else if (e.key === "ArrowDown") {
 			e.preventDefault();
-			setActiveIndex((prev) => (prev + 1) % total);
+			setActiveRow((prev) => (prev + 1) % total);
+		} else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+			e.preventDefault();
+			if (activeRow < conversations.length) {
+				setActiveColumn((prev) => prev === "select" ? "delete" : "select");
+			}
 		} else if (e.key === "Enter") {
 			e.preventDefault();
-			if (activeIndex < conversations.length) {
-				onSelect(conversations[activeIndex].id);
+			if (activeRow < conversations.length) {
+				if (activeColumn === "delete") {
+					setPendingDeleteId(conversations[activeRow].id);
+				} else {
+					onSelect(conversations[activeRow].id);
+				}
 			} else {
 				onNew();
 			}
 		}
 	};
 
-	// Focus the list on mount so keyboard navigation works immediately
-	useEffect(() => {
-		listRef.current?.focus();
-	}, []);
-	
+	const handleDelete = async (id) => {
+		try {
+			await api.delete(`/api/conversations/${id}`);
+			setPendingDeleteId(null);
+			onDelete(id);
+		} catch {
+			setPendingDeleteId(null);
+		}
+	};
+
+	const isRowActive = (i) => activeRow === i;
+
 	return (
 		<div
-			className="p-6 focus:outline-none"
+			className="p-6 focus:outline-none relative"
 			tabIndex={0}
 			onKeyDown={handleKeyDown}
 			ref={listRef}
@@ -56,48 +96,103 @@ export default function ConversationList({ conversations, onSelect, onNew }) {
 			</div>
 
 			{conversations.map((conv, i) => (
-				<button
+				<div
 					key={conv.id}
-					onClick={() => onSelect(conv.id)}
-					onMouseEnter={() => setActiveIndex(i)}
-					className={`w-full text-left px-2 py-1.5 flex items-center gap-3 text-[0.8rem] font-mono cursor-pointer transition-colors ${
-						activeIndex === i
-							? "text-vera-cyan"
-							: "text-[#555568]"
+					onMouseEnter={() => setActiveRow(i)}
+					className={`flex items-center gap-3 px-2 py-1.5 text-[0.8rem] font-mono transition-colors duration-150 ${
+						isRowActive(i) ? "text-vera-cyan" : "text-[#555568]"
 					}`}
 				>
-                    <span className="w-4 shrink-0">
-                        {activeIndex === i ? "›" : " "}
-                    </span>
-					<span className="w-5 shrink-0">{i + 1}.</span>
-					<span className="truncate flex-1">
+                <span className="w-4 shrink-0">
+                    {isRowActive(i) ? "›" : " "}
+                </span>
+
+					{/* Conversation title */}
+					<button
+						onClick={() => onSelect(conv.id)}
+						onMouseEnter={() => setActiveColumn("select")}
+						className="flex-1 text-left cursor-pointer min-w-0"
+					>
+						{i + 1}.{" "}
+						<span className={`pb-0.5 border-b-2 transition-all duration-150 ${
+							isRowActive(i) && activeColumn === "select"
+								? "border-vera-cyan"
+								: "border-transparent"
+						}`}>
                         {conv.title || "Untitled"}
                     </span>
-					<span className="text-[0.65rem] text-[#303045] shrink-0">
-                        {timeAgo(conv.updated_at)}
-                    </span>
-				</button>
+					</button>
+
+					{/* Timestamp */}
+					<span className={`text-[0.65rem] shrink-0 transition-colors duration-150 ${
+						isRowActive(i) ? "text-[#505068]" : "text-[#303045]"
+					}`}>
+                    {timeAgo(conv.updated_at)}
+                </span>
+
+					{/* Delete action */}
+					<button
+						onClick={() => setPendingDeleteId(conv.id)}
+						onMouseEnter={() => setActiveColumn("delete")}
+						className={`shrink-0 cursor-pointer pb-0.5 border-b-2 transition-all duration-150 ${
+							isRowActive(i) && activeColumn === "delete"
+								? "text-vera-red border-vera-red"
+								: isRowActive(i)
+									? "text-vera-red border-transparent"
+									: "text-vera-red/30 border-transparent"
+						}`}
+					>
+						<Trash2 size={14} />
+					</button>
+				</div>
 			))}
 
 			{/* New conversation option */}
 			<button
 				onClick={onNew}
-				onMouseEnter={() => setActiveIndex(conversations.length)}
-				className={`w-full text-left px-2 py-1.5 flex items-center gap-3 text-[0.8rem] font-mono cursor-pointer transition-colors mt-2 ${
-					activeIndex === conversations.length
-						? "text-vera-red"
-						: "text-[#555568]"
+				onMouseEnter={() => {
+					setActiveRow(conversations.length);
+					setActiveColumn("select");
+				}}
+				className={`w-full text-left px-2 py-1.5 flex items-center gap-3 text-[0.8rem] font-mono cursor-pointer transition-colors duration-150 mt-2 ${
+					activeRow === conversations.length
+						? "text-green-400"
+						: "text-green-400/40"
 				}`}
 			>
-                <span className="w-4 shrink-0">
-                    {activeIndex === conversations.length ? "›" : " "}
+            <span className="w-4 shrink-0">
+                {activeRow === conversations.length ? "›" : " "}
+            </span>
+				<span>+{" "}
+					<span className={`pb-0.5 border-b-2 transition-all duration-150 ${
+						activeRow === conversations.length
+							? "border-green-400"
+							: "border-transparent"
+					}`}>
+                    New conversation
                 </span>
-				<span>+ New conversation</span>
+            </span>
 			</button>
 
 			<div className="text-[#303045] text-[0.65rem] mt-6 tracking-[0.1em]">
-				Enter to select · ↑↓ to navigate
+				Enter to select · ↑↓ navigate · ←→ select/delete
 			</div>
+
+			{/* Delete confirmation modal */}
+			{pendingDeleteId && (
+				<TerminalModal
+					title="Delete conversation"
+					message="This conversation will be permanently erased from The Bridge. Are you sure?"
+					options={[
+						{ label: "DELETE", value: "confirm", destructive: true },
+						{ label: "CANCEL", value: "cancel", cancel: true },
+					]}
+					onSelect={(value) => {
+						if (value === "confirm") handleDelete(pendingDeleteId);
+						else setPendingDeleteId(null);
+					}}
+				/>
+			)}
 		</div>
 	);
 }

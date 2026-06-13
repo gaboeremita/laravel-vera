@@ -32,6 +32,7 @@ export default function Vera() {
         fetchConversations,
         selectConversation,
         createNewConversation,
+        removeConversation
     } = useConversations();
 
     const scrollToBottom = useCallback(() => {
@@ -267,6 +268,7 @@ export default function Vera() {
                             conversations={conversations}
                             onSelect={selectConversation}
                             onNew={createNewConversation}
+                            onDelete={removeConversation}
                         />
                     ) : (
                         messages.map((msg, i) => <ChatMessage key={i} msg={msg} />)

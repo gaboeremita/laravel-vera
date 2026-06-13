@@ -66,6 +66,11 @@ export function useConversations() {
 		}
 	};
 
+	// Remove a conversation from the local list after deletion
+	const removeConversation = (id) => {
+		setConversations((prev) => prev.filter((c) => c.id !== id));
+	};
+
 	return {
 		conversations,
 		conversationId,
@@ -75,5 +80,6 @@ export function useConversations() {
 		fetchConversations,
 		selectConversation,
 		createNewConversation,
+		removeConversation
 	};
 }
