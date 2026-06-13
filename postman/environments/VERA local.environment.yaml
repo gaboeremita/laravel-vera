@@ -1,0 +1,7 @@
+name: VERA local
+values:
+  - key: baseUrl
+    value: ''
+  - key: X-XSRF-TOKEN
+    value: ''
+color: 0

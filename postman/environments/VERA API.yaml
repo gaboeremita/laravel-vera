@@ -1,0 +1,12 @@
+$kind: environment
+name: VERA API
+variables:
+  - key: baseUrl
+    value: 'http://localhost:8000'
+    type: default
+  - key: email
+    value: ''
+    type: default
+  - key: password
+    value: ''
+    type: secret

@@ -7,9 +7,41 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
-class ChatController extends Controller
+class ConversationController extends Controller
 {
-	public function send(Request $request): JsonResponse
+	public function index(Request $request): JsonResponse
+	{
+		$conversations = $request->user()
+			->conversations()
+			->orderByDesc('updated_at')
+			->get(['id', 'title', 'updated_at']);
+
+		return response()->json($conversations);
+	}
+
+	public function show(Request $request, int $id): JsonResponse
+	{
+		$conversation = $request->user()
+			->conversations()
+			->findOrFail($id);
+
+		$messages = $conversation->messages()
+			->orderBy('created_at')
+			->get(['id', 'role', 'content', 'thinking', 'image', 'emotion']);
+
+		return response()->json($messages);
+	}
+
+	public function store(Request $request): JsonResponse
+	{
+		$conversation = $request->user()
+			->conversations()
+			->create(['title' => 'New conversation']);
+
+		return response()->json($conversation, 201);
+	}
+
+	public function sendMessage(Request $request): JsonResponse
 	{
 		$validated = $request->validate([
 			'conversation_id' => ['nullable', 'exists:conversations,id'],

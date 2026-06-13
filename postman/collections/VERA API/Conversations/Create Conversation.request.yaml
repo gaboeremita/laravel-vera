@@ -1,0 +1,8 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/api/conversations'
+order: 2000
+description: 'Creates a new conversation for the authenticated user. Title defaults to "New conversation". Returns 201 with the created conversation. Requires Sanctum session auth.'
+headers:
+  - key: Accept
+    value: application/json

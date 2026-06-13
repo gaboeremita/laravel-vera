@@ -1,0 +1,29 @@
+$kind: collection
+name: VERA API
+variables:
+  baseUrl: http://localhost:8000
+  email: ""
+  password: ""
+  conversationId: ""
+  X-XSRF-TOKEN: ""
+scripts:
+  - type: http:beforeRequest
+    code: |-
+      pm.sendRequest({
+          url: pm.environment.get('baseUrl') + '/sanctum/csrf-cookie',
+          method: 'GET'
+      }, function (error, response) {
+          if (!error) {
+              var xsrfCookie = pm.cookies.get('XSRF-TOKEN');
+              if (xsrfCookie) {
+                  pm.environment.set('xsrf-token', decodeURIComponent(xsrfCookie));
+              }
+          }
+      })
+    language: text/javascript
+auth:
+  - id: 21bd57d2-f201-467f-a1a6-9b165d0d9a90
+    type: bearer
+    name: Bearer Token
+    credentials:
+      token: "{{X-XSRF-TOKEN}}"

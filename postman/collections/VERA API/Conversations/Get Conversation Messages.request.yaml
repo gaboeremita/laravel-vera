@@ -1,0 +1,11 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/api/conversations/{{conversationId}}/messages'
+order: 3000
+description: 'Returns all messages for a given conversation, ordered by created_at. Each message has id, role, content, thinking, image, emotion. Requires Sanctum session auth.'
+headers:
+  - key: Accept
+    value: application/json
+pathVariables:
+  - key: conversationId
+    value: '{{conversationId}}'
