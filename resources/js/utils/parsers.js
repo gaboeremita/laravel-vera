@@ -1,18 +1,35 @@
-import { getAvailableEmotions } from "./promptBuilder";
-
-const VALID_EMOTIONS = getAvailableEmotions();
-
 /**
- * Parses VERA's response to extract the emotion tag and clean message text.
- * Returns neutral as default if no valid tag is found.
+ * Parses VERA's response to extract the emotion tag, intimate state, and clean text.
+ * Falls back to [seduced] in intimate state, [neutral] otherwise.
  */
-export function parseEmotionFromResponse(text) {
-    const match = text.match(/^\[([a-z]+)\]/);
-    if (match && VALID_EMOTIONS.includes(match[1])) {
-        return {
-            emotion: match[1],
-            text: text.slice(match[0].length).trim(),
-        };
+export function parseEmotionFromResponse(text, validEmotions = []) {
+    let remaining = text;
+    let emotion = null;
+
+    // Grab the emotion tag first
+    const emotionMatch = remaining.match(/^\[([a-z]+)\]/);
+    if (emotionMatch) {
+        remaining = remaining.slice(emotionMatch[0].length);
+        if (validEmotions.includes(emotionMatch[1])) {
+            emotion = emotionMatch[1];
+        }
     }
-    return { emotion: "neutral", text: text.trim() };
+
+    // Check for [intimate] tag immediately after
+    const intimateMatch = remaining.match(/^\[intimate\]/);
+    const intimate = !!intimateMatch;
+    if (intimateMatch) {
+        remaining = remaining.slice(intimateMatch[0].length);
+    }
+
+    // Default based on state
+    if (!emotion) {
+        emotion = intimate ? "seduced" : "neutral";
+    }
+
+    return {
+        emotion,
+        intimate,
+        text: remaining.trim(),
+    };
 }

@@ -1,26 +1,12 @@
 import {useState, useEffect, useRef} from "react";
 
-const EXPRESSION_IMAGES = {
-	amused: "/images/vera/amused.png",
-	angry: "/images/vera/angry.jpg",
-	annoyed: "/images/vera/annoyed.png",
-	confused: "/images/vera/confused.png",
-	content: "/images/vera/content.png",
-	embarrassed: "/images/vera/embarrassed.png",
-	flirty: "/images/vera/flirty.png",
-	happy: "/images/vera/happy.png",
-	neutral: "/images/vera/neutral.jpeg",
-	sad: "/images/vera/sad.jpeg",
-	sultry: "/images/vera/sultry.jpg",
-	surprised: "/images/vera/surprised.jpg",
-};
-
-export default function Portrait({ emotion, authenticated }) {
+export default function Portrait({ emotion, authenticated, getImageUrl, getVideoUrl }) {
 	const [playingVideo, setPlayingVideo] = useState(false);
 	const canvasRef = useRef(null);
 	const imgRef = useRef(null);
 
-	const src = EXPRESSION_IMAGES[emotion] || EXPRESSION_IMAGES.neutral;
+	const src = getImageUrl(emotion) || getImageUrl('neutral');
+	const videoSrc = getVideoUrl(emotion);
 
 	useEffect(() => {
 		if (!authenticated && imgRef.current && canvasRef.current) {
@@ -44,10 +30,10 @@ export default function Portrait({ emotion, authenticated }) {
 	}, [authenticated]);
 
 	useEffect(() => {
-		if (emotion === "neutral" && authenticated) {
+		if (videoSrc && emotion === "neutral" && authenticated) {
 			setPlayingVideo(true);
 		}
-	}, [emotion, authenticated]);
+	}, [emotion, authenticated, videoSrc]);
 
 	if (!authenticated) {
 		return (
@@ -76,11 +62,11 @@ export default function Portrait({ emotion, authenticated }) {
 		);
 	}
 
-	if (playingVideo) {
+	if (playingVideo && videoSrc) {
 		return (
 			<div className="relative w-full h-full overflow-hidden vera-portrait-bg">
 				<video
-					src="/videos/vera/neutral_intro.mp4"
+					src={videoSrc}
 					autoPlay
 					muted
 					playsInline
