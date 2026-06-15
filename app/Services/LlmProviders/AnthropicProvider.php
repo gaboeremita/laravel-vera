@@ -59,7 +59,7 @@ class AnthropicProvider implements LlmProvider
 			->post("{$this->url}/messages", $body);
 
 		if ($response->failed()) {
-			throw new \RuntimeException('Anthropic service unavailable');
+			throw new \RuntimeException($response->body());
 		}
 
 		$data = $response->json();

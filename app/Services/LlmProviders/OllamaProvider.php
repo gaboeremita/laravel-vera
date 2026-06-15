@@ -27,7 +27,7 @@ class OllamaProvider implements LlmProvider
 			]);
 
 		if ($response->failed()) {
-			throw new \RuntimeException('Ollama service unavailable');
+			throw new \RuntimeException($response->body());
 		}
 
 		$data = $response->json();

@@ -4,7 +4,7 @@ return [
 	'default' => env('AI_PROVIDER', 'ollama'),
 
 	'defaults' => [
-		'timeout' => (int) env('AI_TIMEOUT', 120),
+		'timeout' => (int) env('AI_TIMEOUT', 600),
 		'stream' => (bool) env('AI_STREAM', false),
 	],
 
