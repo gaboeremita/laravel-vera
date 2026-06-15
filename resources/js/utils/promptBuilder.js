@@ -4,7 +4,7 @@ import promptConfig from "../../../vera_prompt.json";
  * Assembles the full system prompt string from the structured prompt.json config.
  * Each section maps to a key in the JSON file — edit the JSON to change VERA's behavior.
  */
-export function buildSystemPrompt() {
+export function buildSystemPrompt(emotionNames = []) {
 	const sections = [];
 
 	sections.push(promptConfig.identity);
@@ -16,8 +16,8 @@ export function buildSystemPrompt() {
 		.join(". ");
 	sections.push(`${appearanceGeneral}\n\nPhysical description: ${descriptionParts}`);
 
-	// Emotion tags with dynamic list from config
-	const emotionList = promptConfig.emotion_tags.available.join(", ");
+	// Emotion tags — list now comes from the parameter, rule and example stay in JSON
+	const emotionList = emotionNames.join(", ");
 	sections.push(
 		`CRITICAL RULE — EMOTION TAGS:\n${promptConfig.emotion_tags.rule}\nAvailable emotions: ${emotionList}.\nExample:\n${promptConfig.emotion_tags.example}`
 	);
@@ -52,6 +52,11 @@ export function buildSystemPrompt() {
 		`Creator Psychology:\n${promptConfig.creator_psychology.map((line) => `- ${line}`).join("\n")}`
 	);
 
+	// Intimate mode
+	sections.push(
+		`Intimate Mode:\n${promptConfig.intimate_mode.description.map((line) => `- ${line}`).join("\n")}`
+	);
+
 	// Environment
 	sections.push(
 		`Environment — ${promptConfig.environment.name}:\n${promptConfig.environment.description.map((line) => `- ${line}`).join("\n")}`
@@ -68,14 +73,6 @@ export function buildSystemPrompt() {
 	);
 
 	return sections.join("\n\n");
-}
-
-/**
- * Returns the list of available emotions from the config.
- * Used by the component to validate emotion tags in responses.
- */
-export function getAvailableEmotions() {
-	return promptConfig.emotion_tags.available;
 }
 
 /**

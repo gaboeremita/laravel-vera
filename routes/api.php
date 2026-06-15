@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\EmotionController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -11,4 +12,5 @@ Route::middleware('auth:sanctum')->group(function () {
 	Route::get('/conversations/{id}/messages', [ConversationController::class, 'show']);
 	Route::post('/conversations', [ConversationController::class, 'store']);
 	Route::delete('/conversations/{id}', [ConversationController::class, 'destroy']);
+	Route::get('/emotions', [EmotionController::class, 'index']);
 });

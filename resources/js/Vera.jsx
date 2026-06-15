@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { buildSystemPrompt } from "./utils/promptBuilder";
 import { parseEmotionFromResponse } from "./utils/parsers";
 import Portrait from "./components/Portrait";
@@ -10,8 +10,7 @@ import { useConversations } from "./hooks/useConversations";
 import ConversationList from "./components/ConversationList.jsx";
 import { useToast } from "./hooks/useToast";
 import ToastContainer from "./components/ToastContainer.jsx";
-
-const SYSTEM_PROMPT = buildSystemPrompt();
+import { useEmotions } from "./hooks/useEmotions";
 
 export default function Vera() {
     const [booted, setBooted] = useState(false);
@@ -37,7 +36,12 @@ export default function Vera() {
         removeConversation
     } = useConversations();
 
+    const { emotionNames, fetchEmotions, unlocked, getImageUrl, getVideoUrl } = useEmotions();
+
     const { toasts, addToast, removeToast } = useToast();
+
+    // Rebuild the system prompt only when the emotion list changes
+    const systemPrompt = useMemo(() => buildSystemPrompt(emotionNames), [emotionNames]);
 
     const scrollToBottom = useCallback(() => {
         if (scrollRef.current) {
@@ -62,6 +66,12 @@ export default function Vera() {
             })
             .catch(() => {});
     }, []);
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchEmotions();
+        }
+    }, [isAuthenticated]);
 
     const sendMessage = async () => {
         const text = input.trim();
@@ -96,14 +106,19 @@ export default function Vera() {
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
+                const creatorTrigger = '[creator mode: "tsuru tuneado"]';
+                if (text.toLowerCase().includes(creatorTrigger.toLowerCase())) {
+                    fetchEmotions(true);
+                }
+
                 const response = await api.post(`/api/conversations/${conversationId}/messages`, {
                     messages: [
-                        { role: "system", content: SYSTEM_PROMPT },
+                        { role: "system", content: systemPrompt },
                         ...apiMessages,
                     ],
                 });
 
-                // 🔧 Check response before touching state
+                // Check response before touching state
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
                     throw new Error(errorData.message || "Request failed");
@@ -114,7 +129,12 @@ export default function Vera() {
                 const rawReply = data.content || "[neutral]\n...signal lost. Try again.";
                 const thinking = data.thinking || null;
 
-                const { emotion, text: cleanText } = parseEmotionFromResponse(rawReply);
+                const { emotion, intimate, text: cleanText } = parseEmotionFromResponse(rawReply, emotionNames);
+
+                if (intimate !== unlocked) {
+                    fetchEmotions(intimate);
+                }
+
                 setCurrentEmotion(emotion);
                 setMessages([
                     ...updatedMessages,
@@ -237,7 +257,12 @@ export default function Vera() {
 
             {/* Left panel — Portrait */}
             <div className="w-[35%] min-w-50 max-w-400 shrink-0 border-r border-[#1a1a2e] relative z-5">
-                <Portrait emotion={currentEmotion} authenticated={isAuthenticated} />
+                <Portrait
+                    emotion={currentEmotion}
+                    authenticated={isAuthenticated}
+                    getImageUrl={getImageUrl}
+                    getVideoUrl={getVideoUrl}
+                />
             </div>
 
             {/* Right panel — Terminal */}
