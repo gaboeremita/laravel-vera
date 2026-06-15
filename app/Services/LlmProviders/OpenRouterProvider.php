@@ -43,7 +43,7 @@ class OpenRouterProvider implements LlmProvider
 			->post("{$this->url}/chat/completions", $payload);
 
 		if ($response->failed()) {
-			throw new \RuntimeException('OpenRouter service unavailable');
+			throw new \RuntimeException('Open Router: ' . $response->body());
 		}
 
 		$data = $response->json();
