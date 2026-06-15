@@ -47,6 +47,11 @@ class OpenRouterProvider implements LlmProvider
 		}
 
 		$data = $response->json();
+
+		if (isset($data['error'])) {
+			throw new \RuntimeException('Open Router: ' . ($data['error']['message'] ?? 'Unknown error'));
+		}
+
 		$choice = $data['choices'][0]['message'] ?? [];
 
 		return new LlmResponse(

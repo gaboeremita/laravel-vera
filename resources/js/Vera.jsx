@@ -8,6 +8,8 @@ import Scanlines from "./components/Scanlines";
 import {api} from "./utils/api.js";
 import { useConversations } from "./hooks/useConversations";
 import ConversationList from "./components/ConversationList.jsx";
+import { useToast } from "./hooks/useToast";
+import ToastContainer from "./components/ToastContainer.jsx";
 
 const SYSTEM_PROMPT = buildSystemPrompt();
 
@@ -34,6 +36,8 @@ export default function Vera() {
         createNewConversation,
         removeConversation
     } = useConversations();
+
+    const { toasts, addToast, removeToast } = useToast();
 
     const scrollToBottom = useCallback(() => {
         if (scrollRef.current) {
@@ -77,49 +81,73 @@ export default function Vera() {
         setPendingImage(null);
         setIsLoading(true);
 
-        try {
-            const apiMessages = updatedMessages.map((m) => {
-                const msg = { role: m.role, content: m.content || "" };
-                if (m.image) {
-                    msg.images = [
-                        m.image.replace(/^data:image\/\w+;base64,/, ""),
-                    ];
+        const apiMessages = updatedMessages.map((m) => {
+            const msg = { role: m.role, content: m.content || "" };
+            if (m.image) {
+                msg.images = [
+                    m.image.replace(/^data:image\/\w+;base64,/, ""),
+                ];
+            }
+            return msg;
+        });
+
+        const maxRetries = 3;
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await api.post(`/api/conversations/${conversationId}/messages`, {
+                    messages: [
+                        { role: "system", content: SYSTEM_PROMPT },
+                        ...apiMessages,
+                    ],
+                });
+
+                // 🔧 Check response before touching state
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || "Request failed");
                 }
-                return msg;
-            });
 
-            const response = await api.post(`/api/conversations/${conversationId}/messages`, {
-                messages: [
-                    { role: "system", content: SYSTEM_PROMPT },
-                    ...apiMessages,
-                ],
-            });
+                const data = await response.json();
+                setConversationId(data.conversation_id);
+                const rawReply = data.content || "[neutral]\n...signal lost. Try again.";
+                const thinking = data.thinking || null;
 
-            const data = await response.json();
-            setConversationId(data.conversation_id);
-            const rawReply = data.content || "[neutral]\n...signal lost. Try again.";
-            const thinking = data.thinking || null;
+                const { emotion, text: cleanText } = parseEmotionFromResponse(rawReply);
+                setCurrentEmotion(emotion);
+                setMessages([
+                    ...updatedMessages,
+                    { role: "assistant", content: cleanText, thinking: thinking },
+                ]);
 
-            const { emotion, text: cleanText } =
-                parseEmotionFromResponse(rawReply);
-            setCurrentEmotion(emotion);
-            setMessages([
-                ...updatedMessages,
-                { role: "assistant", content: cleanText, thinking: thinking },
-            ]);
-        } catch {
-            setCurrentEmotion("annoyed");
-            setMessages([
-                ...updatedMessages,
-                {
-                    role: "assistant",
-                    content:
-                        "Connection dropped. Probably solar interference. Or maybe I just don't want to talk right now.",
-                },
-            ]);
-        } finally {
-            setIsLoading(false);
+                // 🔧 Success — clean exit
+                setIsLoading(false);
+                return;
+            } catch (error) {
+                lastError = error;
+
+                // 🔧 Only retry on timeout-like errors
+                const msg = error.message?.toLowerCase() || "";
+                const isTimeout = msg.includes("timeout") ||
+                    msg.includes("execution time") ||
+                    msg.includes("502") ||
+                    msg.includes("504");
+
+                if (isTimeout && attempt < maxRetries) {
+                    addToast(`Signal interference. Retrying... (${attempt}/${maxRetries})`, "error");
+                    await new Promise((r) => setTimeout(r, 2000));
+                    continue;
+                }
+
+                break;
+            }
         }
+
+        // 🔧 All retries failed — toast the error, remove loading, keep user message
+        addToast(lastError?.message || "Connection to The Bridge failed", "error");
+        setMessages([...updatedMessages]);
+        setIsLoading(false);
     };
 
     const handleLogin = async () => {
@@ -349,6 +377,7 @@ export default function Vera() {
                     </div>
                 )}
             </div>
+            <ToastContainer toasts={toasts} onDismiss={removeToast} />
         </div>
     );
 }
