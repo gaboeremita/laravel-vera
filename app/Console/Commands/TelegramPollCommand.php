@@ -218,7 +218,9 @@ class TelegramPollCommand extends Command
 			$history[$lastIndex]['images'] = [$image];
 		}
 
-		$systemPrompt = (new PromptDirector())->build();
+		$systemPrompt = (new PromptDirector())
+			->except(["emotion tags"])
+			->build();
 
 		try {
 			$llm = app(LlmProvider::class);

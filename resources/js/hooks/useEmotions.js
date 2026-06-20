@@ -4,15 +4,12 @@ import { api } from "../utils/api";
 export function useEmotions() {
 	const [emotions, setEmotions] = useState([]);
 	const [emotionsLoaded, setEmotionsLoaded] = useState(false);
-	const [unlocked, setUnlocked] = useState(false);
 
-	const fetchEmotions = async (unlock = false) => {
+	const fetchEmotions = async () => {
 		try {
-			const param = unlock ? '?unlocked=true' : '';
-			const res = await api.get(`/api/emotions${param}`);
+			const res = await api.get(`/api/emotions`);
 			const data = await res.json();
 			setEmotions(data);
-			setUnlocked(unlock);
 			setEmotionsLoaded(true);
 		} catch {
 			setEmotionsLoaded(true);
@@ -33,7 +30,6 @@ export function useEmotions() {
 		emotions,
 		emotionNames,
 		emotionsLoaded,
-		unlocked,
 		fetchEmotions,
 		getImageUrl,
 		getVideoUrl,

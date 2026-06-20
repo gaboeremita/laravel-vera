@@ -61,4 +61,19 @@ class PromptDirector
 
 		return $builder->build();
 	}
+
+	/**
+	 * Merge additional data into a config section.
+	 * Creates the section if it doesn't exist, merges if it does.
+	 */
+	public function append(string $key, mixed $value): static
+	{
+		if (isset($this->config[$key]) && is_array($this->config[$key]) && is_array($value)) {
+			$this->config[$key] = array_merge($this->config[$key], $value);
+		} else {
+			$this->config[$key] = $value;
+		}
+
+		return $this;
+	}
 }
