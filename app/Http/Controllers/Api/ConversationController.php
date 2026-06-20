@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\LlmProvider;
 use App\Directors\PromptDirector;
 use App\Http\Controllers\Controller;
+use App\Models\Emotion;
 use App\Models\Image;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -90,7 +91,14 @@ class ConversationController extends Controller
 			}
 		}
 
-		$systemPrompt = (new PromptDirector())->build();
+		$emotions = [
+			'regular' => Emotion::where('restricted', false)->pluck('name')->toArray(),
+			'intimate' => Emotion::where('restricted', true)->pluck('name')->toArray(),
+		];
+
+		$systemPrompt = (new PromptDirector())
+			->append('emotion tags', ['available emotions' => $emotions])
+			->build();
 
 		try {
 			$llm = app(LlmProvider::class);

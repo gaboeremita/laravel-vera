@@ -12,9 +12,6 @@ class EmotionController extends Controller
 	{
 		$query = Emotion::with(['image', 'video']);
 
-		// Swap the emotion set based on unlocked state
-		$query->where('restricted', request()->boolean('unlocked'));
-
 		return response()->json(
 			$query->get()->map(fn (Emotion $emotion) => [
 				'name' => $emotion->name,
