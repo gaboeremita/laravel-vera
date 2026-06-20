@@ -7,7 +7,7 @@
 
 ## Overview
 
-VERA is a full-stack web application that wraps a local LLM (via Ollama) in a highly stylized, character-driven interface. The user talks to VERA — a fictional AI persona living in a cyberpunk city called The Bridge — and she responds with dynamically changing expressions, styled text, and personality-driven replies. The entire inference pipeline runs locally on the machine; no cloud AI calls are made.
+VERA is a full-stack web application that wraps a local or remote LLM in a highly stylized, character-driven interface. The user talks to VERA — a fictional AI persona living in a cyberpunk city called The Bridge — and she responds with dynamically changing expressions, styled text, and personality-driven replies. The LLM backend is pluggable: Ollama (local), OpenRouter, and Anthropic are all supported.
 
 ---
 
@@ -18,7 +18,7 @@ VERA is a full-stack web application that wraps a local LLM (via Ollama) in a hi
 | Backend | Laravel 13 (PHP 8.4) |
 | Frontend | React 19 via Vite |
 | Styling | Tailwind CSS v4 |
-| LLM Runtime | Ollama (local, HTTP API) |
+| LLM Runtime | Ollama / OpenRouter / Anthropic |
 | Database | MySQL |
 | Auth | Laravel Sanctum (SPA / cookie-based) |
 | Dev Environment | Laravel Herd (macOS) |
@@ -30,21 +30,28 @@ VERA is a full-stack web application that wraps a local LLM (via Ollama) in a hi
 ```
 Browser (React SPA)
     |
-    |-- GET  /sanctum/csrf-cookie   (Sanctum handshake)
-    |-- POST /login                 (AuthController)
-    |-- GET  /api/user              (auth check on load)
-    |-- POST /api/chat              (ChatController → Ollama)
+    |-- GET  /sanctum/csrf-cookie         (Sanctum handshake)
+    |-- POST /login                       (AuthController)
+    |-- GET  /api/user                    (auth check on load)
+    |-- GET  /api/emotions                (EmotionController)
+    |-- GET  /api/conversations           (ConversationController@index)
+    |-- POST /api/conversations           (ConversationController@store)
+    |-- GET  /api/conversations/{id}/messages   (ConversationController@show)
+    |-- POST /api/conversations/{id}/messages   (ConversationController@sendMessage)
+    |-- DELETE /api/conversations/{id}    (ConversationController@destroy)
     |
 Laravel Backend (API)
     |
     |-- Sanctum session auth (cookie + CSRF)
-    |-- ChatController proxies to Ollama HTTP API
-    |-- Persists conversations + messages to MySQL
+    |-- ConversationController proxies to LLM via LlmProvider contract
+    |-- PromptDirector assembles system prompt from vera_prompt.json
+    |-- Persists conversations, messages, images to MySQL / disk
     |
-Ollama (localhost:11434)
+LLM (resolved by LlmManager)
     |
-    |-- /api/chat  (model: gemma4 or configured model)
-    |-- stream: false, think: true
+    |-- OllamaProvider   → localhost:11434
+    |-- OpenRouterProvider → openrouter.ai API
+    |-- AnthropicProvider  → anthropic API
 ```
 
 The SPA pattern means Laravel serves a single Blade view (`welcome`) which loads the React bundle. All subsequent interaction is via JSON API calls. Laravel never renders HTML for the chat itself.
@@ -61,9 +68,14 @@ The SPA pattern means Laravel serves a single Blade view (`welcome`) which loads
 - `POST /logout` — `AuthController@logout`
 
 **`routes/api.php`**
-- All routes behind `auth:sanctum` middleware
-- `GET /api/user` — returns authenticated user (used for session check on page load)
-- `POST /api/chat` — `ChatController@send`
+All routes behind `auth:sanctum` middleware:
+- `GET /api/user` — returns authenticated user
+- `GET /api/emotions` — `EmotionController@index` (supports `?unlocked=true`)
+- `GET /api/conversations` — `ConversationController@index`
+- `POST /api/conversations` — `ConversationController@store`
+- `DELETE /api/conversations/{id}` — `ConversationController@destroy`
+- `GET /api/conversations/{id}/messages` — `ConversationController@show`
+- `POST /api/conversations/{id}/messages` — `ConversationController@sendMessage`
 
 ### Controllers
 
@@ -72,35 +84,114 @@ The SPA pattern means Laravel serves a single Blade view (`welcome`) which loads
 - Logout invalidates session and regenerates CSRF token
 - Returns JSON responses only (no redirects)
 
-**`ChatController`** (`app/Http/Controllers/Api/`)
-The core backend controller. On each `POST /api/chat`:
+**`ConversationController`** (`app/Http/Controllers/Api/`)
+The core backend controller. Replaces the old `ChatController`. Handles full conversation lifecycle:
 
-1. Validates incoming payload: `conversation_id` (nullable), `messages[]` array with role/content/images
-2. Finds or creates a `Conversation` record for the authenticated user
-3. Saves the latest user message (with optional base64 image) to the `messages` table
-4. Proxies the full messages array to Ollama's `/api/chat` endpoint with `think: true` enabled
-5. Extracts `content` and `thinking` from Ollama's response
-6. Saves the assistant reply (with thinking block) to the `messages` table
-7. Returns `conversation_id`, `content`, and `thinking` to the frontend
+- `index` — returns all conversations for the authenticated user (id, title, updated_at)
+- `store` — creates a new empty conversation
+- `destroy` — deletes a conversation (and cascades to messages)
+- `show` — returns all messages for a conversation, with image URLs resolved from storage
+- `sendMessage` — the main chat endpoint:
+  1. Validates `messages[]` array (role/content/images)
+  2. Finds the conversation by `{id}` (scoped to user)
+  3. Saves the last user message; stores any attached image via `Image::storeFromBase64()`
+  4. Builds the system prompt via `(new PromptDirector())->build()`
+  5. Resolves the LLM provider via the `LlmProvider` binding and calls `chat()`
+  6. Saves the assistant reply (content + thinking) to the messages table
+  7. Returns `conversation_id`, `content`, `thinking`
 
-Note: the system prompt is assembled and injected by the frontend (via `promptBuilder.js`) and passed as the first message in the array. The backend treats it as just another message.
+**`EmotionController`** (`app/Http/Controllers/Api/`)
+- `index` — returns the emotion set filtered by `restricted` flag
+  - `?unlocked=false` (default) → standard expressions
+  - `?unlocked=true` → alternate/restricted expressions
+  - Each emotion includes `name`, `image_url`, `video_url` resolved from storage
+
+**`VoiceController`** (`app/Http/Controllers/Api/`)
+- Stub. Not yet implemented.
+
+### LLM Provider System
+
+The LLM layer uses a contract + manager pattern:
+
+**`App\Contracts\LlmProvider`**
+```php
+interface LlmProvider {
+    public function chat(array $messages): LlmResponse;
+}
+```
+
+**`App\DTOs\LlmResponse`**
+Unified return type: `content` (string) + `thinking` (nullable string).
+
+**`App\Services\LlmProviders\LlmManager`**
+Reads `config('ai.default')` and resolves the correct provider instance. Supported providers:
+- `ollama` → `OllamaProvider` (local HTTP, think: true supported)
+- `openrouter` → `OpenRouterProvider` (remote, reasoning tokens)
+- `anthropic` → `AnthropicProvider` (remote, extended thinking)
+
+Bound in `AppServiceProvider`:
+```php
+$this->app->bind(LlmProvider::class, fn() => (new LlmManager())->resolve());
+```
+
+**`config/ai.php`**
+Defines `default`, `defaults` (timeout, stream), and per-provider `providers` config blocks read from `.env`.
+
+### Prompt System (Backend)
+
+The system prompt is now assembled entirely on the backend — the frontend never sees or sends it.
+
+**`App\Builders\PromptBuilder`**
+Renders `vera_prompt.json` sections recursively into a natural language string. Strings are used as-is, sequential arrays become comma-separated lists, associative arrays become labeled sub-sections.
+
+**`App\Directors\PromptDirector`**
+Reads `vera_prompt.json`, supports `only([...])` and `except([...])` to filter sections, then delegates to `PromptBuilder`. Called on every `sendMessage` request.
 
 ### Models & Database
 
 **`User`** — standard Laravel user, has many `Conversation`s
 
 **`Conversation`**
-- `user_id`, `title` (auto-generated from first message, truncated to 50 chars)
+- `user_id`, `title`
 - Has many `Message`s
 
 **`Message`**
-- `conversation_id`, `role` (`user` | `assistant`), `content`, `thinking`, `image`, `emotion`
-- The `thinking` column stores the LLM's internal reasoning (when supported by the model)
-- The `image` column stores a single base64 image string per message
-- `emotion` is defined in the schema but not yet populated by the controller
+- `conversation_id`, `role` (`user` | `assistant`), `content`, `thinking`, `emotion`
+- Has one `Image` (polymorphic morph)
+- The `thinking` column stores the LLM's internal reasoning chain
+- `emotion` is defined in the schema but not yet written by the controller
 
-### AI Configuration (`config/ai.php`)
-Reads `OLLAMA_URL` and `OLLAMA_MODEL` from `.env`. The controller calls `config('ai.ollama.url')` and `config('ai.ollama.model')` — clean separation from hardcoded values.
+**`Image`**
+- Polymorphic (`imageable_type`, `imageable_id`) — attaches to `Message` or `Emotion`
+- `path`, `disk`, `mime_type`, `size`
+- `url` accessor resolves the storage URL via `Storage::disk($this->disk)->url($this->path)`
+- `Image::storeFromBase64()` static helper: decodes base64, detects MIME type by magic bytes, writes to `storage/public`, creates the record
+
+**`Video`**
+- Polymorphic (`videoable_type`, `videoable_id`) — attaches to `Emotion`
+- `path`, `disk`, `mime_type`, `size`
+- `url` accessor same as Image
+
+**`Emotion`**
+- `name`, `restricted` (boolean)
+- `restricted = false` → standard expression set shown by default
+- `restricted = true` → alternate expression set shown when `unlocked`
+- Has one `Image`, has one `Video` (polymorphic)
+
+### Artisan Commands
+
+**`SyncEmotions`** (`php artisan emotions:sync`)
+Seeds or updates `Emotion` records from config. Run after initial setup or when adding expressions.
+
+**`TelegramPollCommand`** (`php artisan telegram:poll`)
+Long-polls the Telegram Bot API for incoming messages, passes them through the LLM pipeline, and replies via `TelegramService`.
+
+### Telegram Integration
+
+**`App\Services\TelegramService`**
+Wrapper around the Telegram Bot HTTP API:
+- `getUpdates(offset, timeout)` — long-poll for new messages (timeout + 5s HTTP timeout to avoid premature disconnect)
+- `sendMessage(chatId, text)` — send a reply
 
 ---
 
@@ -113,7 +204,7 @@ Reads `OLLAMA_URL` and `OLLAMA_MODEL` from `.env`. The controller calls `config(
 
 ### State Machine in `Vera.jsx`
 
-The main component owns the entire application state. It operates across three sequential phases:
+The main component owns the entire application state across three sequential phases:
 
 ```
 Phase 1: Unauthenticated
@@ -124,20 +215,20 @@ Phase 1: Unauthenticated
 
 Phase 2: Authenticated, not yet booted
   - <BootSequence /> plays a terminal startup animation
-  - On complete: bootComplete() fires, sets booted=true, injects the hardcoded opening scene message
+  - On complete: bootComplete() fires, sets booted=true, injects opening scene message
 
 Phase 3: Booted — active chat
-  - Full chat interface: message list, input bar, image attachment
-  - Each message sent goes to POST /api/chat
-  - Response parsed for emotion tag → Portrait swaps image
-  - conversation_id persisted in state for continued conversations
+  - Full chat interface: conversation sidebar, message list, input bar, image attachment
+  - Each message sent goes to POST /api/conversations/{id}/messages
+  - Response parsed for emotion tag → Portrait swaps expression
+  - Conversation list managed via useConversations hook
 ```
 
 **Key state:**
 - `isAuthenticated` — checked on mount via `GET /api/user`
 - `booted` — controls BootSequence / chat visibility
 - `messages[]` — local message history (role, content, image, thinking, loading)
-- `conversationId` — tracks current backend conversation for persistence
+- `conversationId` — tracks current backend conversation
 - `currentEmotion` — drives Portrait expression
 - `pendingImage` — base64 image staged before send
 
@@ -145,74 +236,56 @@ Phase 3: Booted — active chat
 
 **`Portrait.jsx`**
 Three rendering modes:
-1. **Unauthenticated**: renders the neutral image onto a `<canvas>` at 16x24 pixels with `brightness(0.15)` — a deliberately degraded, pixelated lockscreen effect
-2. **Video intro**: on first `neutral` emotion after auth, plays `neutral_intro.mp4` before switching to static image
-3. **Authenticated**: renders the emotion-mapped static image with a scanline overlay and a `mood: {emotion}` label
+1. **Unauthenticated**: renders the neutral image onto a `<canvas>` at 16x24 pixels with `brightness(0.15)` — deliberately degraded pixelated lockscreen
+2. **Video intro**: on first `neutral` emotion after auth, plays a short video before switching to static image
+3. **Authenticated**: renders the emotion-mapped image from the emotion set fetched via `useEmotions`, with a scanline overlay and `mood: {emotion}` label
 
-Emotion-to-image map is hardcoded in the component as `EXPRESSION_IMAGES` — 12 expressions total.
+**`ConversationList.jsx`**
+Sidebar component. Lists all conversations with timestamps. Supports selecting (loads history), creating, and deleting conversations. Wired to `useConversations`.
 
 **`ChatMessage.jsx`**
-Renders a single message. Differentiates VERA (red label, light text) from USER (grey label, muted text). Renders thinking blocks via `ThinkingBlock`, image attachments inline, and passes content through `formatMessage()`.
+Renders a single message. Differentiates VERA (red label) from USER (grey label). Renders thinking blocks via `ThinkingBlock`, image attachments inline via URL, and passes content through `formatMessage()`.
 
 **`ThinkingBlock.jsx`**
-Collapsible component that displays the LLM's `thinking` content (the model's internal chain-of-thought). Hidden by default, expandable by click.
+Collapsible component displaying the LLM's `thinking` chain-of-thought. Hidden by default.
 
 **`BootSequence.jsx`**
-An animated terminal boot sequence. Purely presentational — fires `onComplete` callback when animation finishes.
+Animated terminal boot sequence. Fires `onComplete` callback when done.
+
+**`TerminalModal.jsx`**
+Reusable modal component styled in the terminal aesthetic.
+
+**`ToastContainer.jsx`**
+Renders active toast notifications. Wired to `useToast`.
 
 **`Scanlines.jsx`**
-A full-viewport overlay component that renders the CRT scanline effect. Purely CSS-driven, pointer-events disabled.
+Full-viewport CRT scanline overlay. Purely CSS, pointer-events disabled.
+
+### Hooks
+
+**`useConversations.js`**
+Manages conversation list state: fetches from `GET /api/conversations`, exposes create/delete actions, tracks the active conversation ID, and loads message history via `GET /api/conversations/{id}/messages`.
+
+**`useEmotions.js`**
+Fetches the emotion set from `GET /api/emotions` (supports `?unlocked=true`). Returns a map of emotion name → `{ image_url, video_url }`.
+
+**`useToast.js`**
+Toast notification state: add/remove toasts with auto-dismiss.
 
 ### Utilities
 
 **`api.js`**
-Thin fetch wrapper. Sets `credentials: 'include'` and `Accept: application/json` on all requests. Handles CSRF cookie fetch for Sanctum separately. No error handling at this layer — callers handle failures.
-
-**`promptBuilder.js`**
-Reads `vera_prompt.json` at build time (imported as a JS module) and assembles a single system prompt string. Each section of the JSON maps to a block of natural language instructions. This is what gets injected as the first message in every chat request.
-
-Exports three functions:
-- `buildSystemPrompt()` — full assembled system prompt
-- `getAvailableEmotions()` — array of valid emotion tag strings
-- `getSecretTrigger()` — the hidden trigger phrase from config
+Thin fetch wrapper. Sets `credentials: 'include'` and `Accept: application/json`. Handles CSRF cookie fetch for Sanctum separately.
 
 **`parsers.js`**
-Single function: `parseEmotionFromResponse(text)`. Strips the leading `[emotion]` tag from VERA's response using a regex, validates it against the emotion list from config, and returns `{ emotion, text }`. Falls back to `neutral` if no valid tag found.
+`parseEmotionFromResponse(text)` — strips the leading `[emotion]` tag, validates against the known emotion names, returns `{ emotion, text }`. Falls back to `neutral`.
 
 **`formatMessage.jsx`**
-Parses message text into React elements with visual formatting:
+Parses message text into React elements:
 - `*text*` → italic, muted grey (action/emote)
 - `(text)` → italic, purple (inner thought)
 - `[text]` → bold cyan (bracketed annotation)
 - Everything else → plain span
-
----
-
-## The Prompt System
-
-VERA's entire personality, rules, and world are defined in `vera_prompt.json` at the project root. This is the central configuration file for the character.
-
-```
-vera_prompt.json
-  ├── identity          — who VERA is
-  ├── appearance        — physical description
-  ├── emotion_tags      — available expressions + tagging rules
-  ├── personality       — behavioral traits list
-  ├── style_rules       — response formatting rules
-  ├── admin_mode        — Westworld Protocol override behavior
-  ├── creator_mode      — password-protected creator recognition
-  ├── ooc_mode          — out-of-character silent direction
-  ├── creator_psychology — internal conflicts about the creator
-  ├── environment       — The Bridge worldbuilding
-  ├── npcs              — other AIs, loneliness context
-  ├── image_handling    — how VERA reacts to images
-  ├── secret_trigger    — hidden phrase that changes behavior
-  └── metrics           — affection/trust/patience (pending)
-```
-
-`promptBuilder.js` imports this file directly and compiles it into a multi-section natural language string at bundle time. The result is a static constant (`SYSTEM_PROMPT`) set once when the React app loads.
-
-**Implication**: changing VERA's personality requires editing `vera_prompt.json` and rebuilding the frontend bundle. The backend never reads this file.
 
 ---
 
@@ -221,15 +294,16 @@ vera_prompt.json
 ```
 1. User types message, hits Enter
 2. Vera.jsx: append user message to local state, show loading cursor
-3. Vera.jsx: POST /api/chat
-   - body: { conversation_id, messages: [system_prompt, ...history, user_msg] }
-4. ChatController: validate → find/create Conversation → save user Message
-5. ChatController: HTTP POST to Ollama /api/chat (120s timeout)
-6. Ollama: runs inference, returns { message: { content, thinking } }
-7. ChatController: save assistant Message to DB → return JSON to frontend
-8. Vera.jsx: parseEmotionFromResponse(content) → extract [tag] + clean text
-9. Vera.jsx: setCurrentEmotion(emotion) → Portrait swaps image
-10. Vera.jsx: render ChatMessage with formatted text + thinking block
+3. Vera.jsx: POST /api/conversations/{id}/messages
+   - body: { messages: [...history, user_msg] }  (NO system prompt — backend adds it)
+4. ConversationController: validate → find Conversation → save user Message + Image
+5. PromptDirector: reads vera_prompt.json → builds system prompt string
+6. LlmManager: resolves configured provider
+7. LlmProvider.chat([system_prompt, ...messages]) → LlmResponse
+8. ConversationController: save assistant Message → return JSON to frontend
+9. Vera.jsx: parseEmotionFromResponse(content) → extract [tag] + clean text
+10. Vera.jsx: setCurrentEmotion(emotion) → Portrait swaps expression
+11. Vera.jsx: render ChatMessage with formatted text + thinking block
 ```
 
 ---
@@ -246,29 +320,25 @@ VERA uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
 5. Logout: POST /logout → session invalidated server-side
 ```
 
-The login flow is rendered entirely within the chat terminal — the user types email and password into the same input field used for chatting, with the terminal displaying `> Enter email:` / `> Enter password:` prompts. The portrait shows a pixelated lockscreen during this state.
+The login flow is rendered entirely within the chat terminal — the user types email and password into the same input field used for chatting.
 
 ---
 
 ## Current Limitations & Planned Work
 
 ### Known Gaps
-- **System prompt lives on the frontend** — the full character prompt is assembled in JS and sent with every request. A malicious client could omit it entirely or send a different one. Moving prompt assembly to the backend is listed as planned work.
-- **No conversation history loading** — on page reload, `messages[]` state is lost. The DB stores everything, but there's no endpoint to fetch prior messages. The `conversationId` resets to `null` on reload, so the next message starts a new conversation.
-- **Emotion not persisted** — the `emotion` column exists on `messages` but `ChatController` never writes to it. Emotion state is frontend-only.
-- **Image storage** — images are stored as raw base64 strings in the `image` column, which will bloat the database quickly at scale.
+- **Emotion not persisted** — the `emotion` column exists on `messages` but `ConversationController` never writes to it. Emotion is frontend-only.
+- **VoiceController is a stub** — voice input/output not yet implemented.
+- **No metrics system** — the `metrics` section in `vera_prompt.json` exists but affection/trust/patience values are not tracked or used for expression gating yet.
 
-### Planned Features (from README)
-- Conversation management UI (list, switch, delete)
-- Load conversation history from DB on session resume
+### Planned Features
 - Affection/trust/comfort/patience metrics system
 - Expression gating based on relationship metrics
 - Voice input/output (Web Speech API + TTS)
 - Local image generation (ComfyUI/Stable Diffusion)
 - Multiple character support
-- Video loop expressions
-- Alternate outfit system
-- NPC interaction system
+- Alternate outfit system (unlockable at relationship thresholds)
+- NPC interaction system for The Bridge
 
 ---
 
@@ -277,34 +347,67 @@ The login flow is rendered entirely within the chat terminal — the user types 
 ```
 laravel-vera/
 ├── app/
+│   ├── Builders/
+│   │   └── PromptBuilder.php               renders vera_prompt.json to text
+│   ├── Console/Commands/
+│   │   ├── SyncEmotions.php                seeds emotion records
+│   │   └── TelegramPollCommand.php         Telegram bot long-poll loop
+│   ├── Contracts/
+│   │   └── LlmProvider.php                 interface: chat(messages): LlmResponse
+│   ├── Directors/
+│   │   └── PromptDirector.php              reads JSON, filters sections, builds prompt
+│   ├── DTOs/
+│   │   └── LlmResponse.php                 content + thinking
 │   ├── Http/Controllers/
 │   │   ├── Auth/AuthController.php         login/logout
-│   │   └── Api/ChatController.php          Ollama proxy + DB persistence
-│   └── Models/
-│       ├── User.php
-│       ├── Conversation.php                belongs to User, has many Messages
-│       └── Message.php                     role/content/thinking/image/emotion
+│   │   └── Api/
+│   │       ├── ConversationController.php  CRUD + sendMessage
+│   │       ├── EmotionController.php       serve emotions (locked/unlocked)
+│   │       └── VoiceController.php         stub
+│   ├── Models/
+│   │   ├── User.php
+│   │   ├── Conversation.php                belongs to User, has many Messages
+│   │   ├── Message.php                     role/content/thinking/emotion, morphOne Image
+│   │   ├── Emotion.php                     name/restricted, morphOne Image, morphOne Video
+│   │   ├── Image.php                       polymorphic, disk-stored, url accessor
+│   │   └── Video.php                       polymorphic, disk-stored, url accessor
+│   ├── Providers/
+│   │   └── AppServiceProvider.php          binds LlmProvider via LlmManager
+│   └── Services/
+│       ├── LlmProviders/
+│       │   ├── LlmManager.php              resolves provider from config
+│       │   ├── OllamaProvider.php
+│       │   ├── OpenRouterProvider.php
+│       │   └── AnthropicProvider.php
+│       └── TelegramService.php             getUpdates + sendMessage
 ├── config/
-│   └── ai.php                              OLLAMA_URL + OLLAMA_MODEL
+│   └── ai.php                              default provider + per-provider config
 ├── database/
-│   ├── migrations/                         users, conversations, messages tables
-│   └── factories/                          User, Conversation, Message factories
+│   ├── migrations/                         users, conversations, messages, images, emotions, videos
+│   └── factories/                          User, Conversation, Message, Emotion factories
 ├── routes/
 │   ├── web.php                             SPA entry + auth routes
-│   └── api.php                             /user + /chat (sanctum protected)
+│   └── api.php                             conversations, emotions, user (sanctum protected)
 ├── resources/js/
 │   ├── app.jsx                             React mount
-│   ├── Vera.jsx                            Root component + all state
+│   ├── Vera.jsx                            root component + all state
 │   ├── components/
-│   │   ├── Portrait.jsx                    Expression display (3 render modes)
-│   │   ├── ChatMessage.jsx                 Message rendering
-│   │   ├── ThinkingBlock.jsx               Collapsible LLM reasoning
-│   │   ├── BootSequence.jsx                Terminal boot animation
+│   │   ├── Portrait.jsx                    expression display (3 render modes)
+│   │   ├── ChatMessage.jsx                 message rendering
+│   │   ├── ThinkingBlock.jsx               collapsible LLM reasoning
+│   │   ├── BootSequence.jsx                terminal boot animation
+│   │   ├── ConversationList.jsx            sidebar: list/create/delete conversations
+│   │   ├── TerminalModal.jsx               reusable terminal-style modal
+│   │   ├── ToastContainer.jsx              toast notification display
 │   │   └── Scanlines.jsx                   CRT overlay
+│   ├── hooks/
+│   │   ├── useConversations.js             conversation list + history loading
+│   │   ├── useEmotions.js                  emotion set fetching (locked/unlocked)
+│   │   └── useToast.js                     toast state
 │   └── utils/
-│       ├── api.js                          Fetch wrapper (Sanctum-aware)
-│       ├── promptBuilder.js                JSON → system prompt string
-│       ├── parsers.js                      Emotion tag extraction
-│       └── formatMessage.jsx               Text → styled React elements
+│       ├── api.js                          fetch wrapper (Sanctum-aware)
+│       ├── parsers.js                      emotion tag extraction
+│       └── formatMessage.jsx               text → styled React elements
+├── storage/app/public/                     emotion images/videos + user-uploaded images
 └── vera_prompt.json                        VERA's entire personality + world config
 ```
