@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Contracts\LlmProvider;
+use App\Directors\PromptDirector;
 use App\Http\Controllers\Controller;
 use App\Models\Image;
 use Illuminate\Http\JsonResponse;
@@ -65,7 +66,7 @@ class ConversationController extends Controller
 	{
 		$validated = $request->validate([
 			'messages' => ['required', 'array'],
-			'messages.*.role' => ['required', 'string'],
+			'messages.*.role' => ['required', 'string', 'in:user,assistant'],
 			'messages.*.content' => ['nullable', 'string'],
 			'messages.*.images' => ['sometimes', 'array'],
 		]);
@@ -89,9 +90,14 @@ class ConversationController extends Controller
 			}
 		}
 
+		$systemPrompt = (new PromptDirector())->build();
+
 		try {
 			$llm = app(LlmProvider::class);
-			$response = $llm->chat($validated['messages']);
+			$response = $llm->chat([
+				['role' => 'system', 'content' => $systemPrompt],
+				...$validated['messages'],
+			]);
 		} catch (\RuntimeException $e) {
 			return response()->json(['message' => $e->getMessage()], 502);
 		}

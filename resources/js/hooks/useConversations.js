@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../utils/api";
+import { parseEmotionFromResponse } from "../utils/parsers";
 
 // Opening scene shown when a new conversation is created
 const OPENING_MESSAGE = {
@@ -50,22 +51,30 @@ export function useConversations() {
 	};
 
 	// Load messages for a selected conversation
-	const selectConversation = async (id) => {
+	const selectConversation = async (id, emotionNames = []) => {
 		try {
 			const res = await api.get(`/api/conversations/${id}/messages`);
 			const data = await res.json();
 			setConversationId(id);
-			setMessages(data.map(msg => ({
-				role: msg.role,
-				content: msg.content,
-				thinking: msg.thinking,
-				image: msg.image_url,
-			})));
+
+			let lastEmotion = null;
+
+			setMessages(data.map(msg => {
+				if (msg.role === 'assistant') {
+					const { emotion, text } = parseEmotionFromResponse(msg.content, emotionNames);
+					lastEmotion = emotion;
+					return { role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
+				}
+				return { role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+			}));
+
+			return lastEmotion;
 		} catch {
 			setMessages([{
 				role: "assistant",
 				content: "Memory corruption detected. Couldn't load that conversation.",
 			}]);
+			return null;
 		}
 	};
 
