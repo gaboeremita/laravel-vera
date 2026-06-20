@@ -9,204 +9,212 @@ use Illuminate\Support\Facades\Storage;
 
 class SyncEmotions extends Command
 {
-	protected $signature = 'vera:sync-emotions';
-	protected $description = 'Sync emotions from the source directory — adds new, removes missing';
+    protected $signature = 'vera:sync-emotions';
 
-	private const BASE_DIR = 'emotions';
-	private const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
-	private const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov'];
+    protected $description = 'Sync emotions from the source directory — adds new, removes missing';
 
-	public function handle(): int
-	{
-		$basePath = storage_path('app/private/' . self::BASE_DIR);
+    private const BASE_DIR = 'emotions';
 
-		if (! File::isDirectory($basePath . '/images')) {
-			$this->error("Directory not found: {$basePath}/images");
-			$this->info('Create it and drop your emotion images there.');
-			return self::FAILURE;
-		}
+    private const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 
-		// Collect all emotion names present in the source directories
-		$sourceNames = $this->collectSourceNames($basePath);
+    private const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov'];
 
-		// Add new emotions
-		$this->syncImages($basePath . '/images', restricted: false);
-		$this->syncImages($basePath . '/images/restricted', restricted: true);
-		$this->syncVideos($basePath . '/videos', restricted: false);
-		$this->syncVideos($basePath . '/videos/restricted', restricted: true);
+    public function handle(): int
+    {
+        $basePath = storage_path('app/private/'.self::BASE_DIR);
 
-		// Remove emotions that no longer have source files
-		$this->purgeOrphans($sourceNames);
+        if (! File::isDirectory($basePath.'/images')) {
+            $this->error("Directory not found: {$basePath}/images");
+            $this->info('Create it and drop your emotion images there.');
 
-		return self::SUCCESS;
-	}
+            return self::FAILURE;
+        }
 
-	/**
-	 * Collect all emotion names from image files in the source directories.
-	 * Only images count — an emotion must have an image to exist.
-	 */
-	private function collectSourceNames(string $basePath): array
-	{
-		$names = [];
+        // Collect all emotion names present in the source directories
+        $sourceNames = $this->collectSourceNames($basePath);
 
-		$dirs = [
-			$basePath . '/images',
-			$basePath . '/images/restricted',
-		];
+        // Add new emotions
+        $this->syncImages($basePath.'/images', restricted: false);
+        $this->syncImages($basePath.'/images/restricted', restricted: true);
+        $this->syncVideos($basePath.'/videos', restricted: false);
+        $this->syncVideos($basePath.'/videos/restricted', restricted: true);
 
-		foreach ($dirs as $dir) {
-			if (! File::isDirectory($dir)) {
-				continue;
-			}
+        // Remove emotions that no longer have source files
+        $this->purgeOrphans($sourceNames);
 
-			foreach (File::files($dir) as $file) {
-				$extension = strtolower($file->getExtension());
+        return self::SUCCESS;
+    }
 
-				if (in_array($extension, self::IMAGE_EXTENSIONS)) {
-					$names[] = pathinfo($file->getFilename(), PATHINFO_FILENAME);
-				}
-			}
-		}
+    /**
+     * Collect all emotion names from image files in the source directories.
+     * Only images count — an emotion must have an image to exist.
+     */
+    private function collectSourceNames(string $basePath): array
+    {
+        $names = [];
 
-		return $names;
-	}
+        $dirs = [
+            $basePath.'/images',
+            $basePath.'/images/restricted',
+        ];
 
-	private function syncImages(string $path, bool $restricted): void
-	{
-		if (! File::isDirectory($path)) {
-			return;
-		}
+        foreach ($dirs as $dir) {
+            if (! File::isDirectory($dir)) {
+                continue;
+            }
 
-		$label = $restricted ? 'restricted images' : 'images';
-		$this->info("Syncing {$label}...");
-		$added = 0;
-		$skipped = 0;
+            foreach (File::files($dir) as $file) {
+                $extension = strtolower($file->getExtension());
 
-		foreach (File::files($path) as $file) {
-			$extension = strtolower($file->getExtension());
+                if (in_array($extension, self::IMAGE_EXTENSIONS)) {
+                    $names[] = pathinfo($file->getFilename(), PATHINFO_FILENAME);
+                }
+            }
+        }
 
-			if (! in_array($extension, self::IMAGE_EXTENSIONS)) {
-				continue;
-			}
+        return $names;
+    }
 
-			$name = pathinfo($file->getFilename(), PATHINFO_FILENAME);
+    private function syncImages(string $path, bool $restricted): void
+    {
+        if (! File::isDirectory($path)) {
+            return;
+        }
 
-			if (Emotion::where('name', $name)->exists()) {
-				$this->line("  Skipped: {$name} (already exists)");
-				$skipped++;
-				continue;
-			}
+        $label = $restricted ? 'restricted images' : 'images';
+        $this->info("Syncing {$label}...");
+        $added = 0;
+        $skipped = 0;
 
-			$subdir = $restricted ? 'images/restricted' : 'images';
-			$storagePath = self::BASE_DIR . '/' . $subdir . '/' . $file->getFilename();
-			Storage::disk('public')->put($storagePath, File::get($file));
+        foreach (File::files($path) as $file) {
+            $extension = strtolower($file->getExtension());
 
-			$emotion = Emotion::create([
-				'name' => $name,
-				'restricted' => $restricted,
-			]);
+            if (! in_array($extension, self::IMAGE_EXTENSIONS)) {
+                continue;
+            }
 
-			$emotion->image()->create([
-				'path' => $storagePath,
-				'disk' => 'public',
-				'mime_type' => File::mimeType($file->getPathname()),
-				'size' => $file->getSize(),
-			]);
+            $name = pathinfo($file->getFilename(), PATHINFO_FILENAME);
 
-			$this->info("  Added: {$name}" . ($restricted ? ' [restricted]' : ''));
-			$added++;
-		}
+            $emotion = Emotion::where('name', $name)->first();
 
-		$this->info("  Total — Added: {$added}, Skipped: {$skipped}");
-		$this->newLine();
-	}
+            if ($emotion?->image) {
+                $skipped++;
 
-	private function syncVideos(string $path, bool $restricted): void
-	{
-		if (! File::isDirectory($path)) {
-			return;
-		}
+                continue;
+            }
 
-		$label = $restricted ? 'restricted videos' : 'videos';
-		$this->info("Syncing {$label}...");
-		$added = 0;
-		$skipped = 0;
-		$orphaned = 0;
+            $subdir = $restricted ? 'images/restricted' : 'images';
+            $storagePath = self::BASE_DIR.'/'.$subdir.'/'.$file->getFilename();
+            Storage::disk('public')->put($storagePath, File::get($file));
 
-		foreach (File::files($path) as $file) {
-			$extension = strtolower($file->getExtension());
+            $emotion ??= Emotion::create([
+                'name' => $name,
+                'restricted' => $restricted,
+            ]);
 
-			if (! in_array($extension, self::VIDEO_EXTENSIONS)) {
-				continue;
-			}
+            $emotion->image()->create([
+                'path' => $storagePath,
+                'disk' => 'public',
+                'mime_type' => File::mimeType($file->getPathname()),
+                'size' => $file->getSize(),
+            ]);
 
-			$name = pathinfo($file->getFilename(), PATHINFO_FILENAME);
-			$emotion = Emotion::where('name', $name)->first();
+            $this->info("  Added: {$name}".($restricted ? ' [restricted]' : ''));
+            $added++;
+        }
 
-			if (! $emotion) {
-				$this->warn("  Orphaned: {$file->getFilename()} (no emotion '{$name}' exists)");
-				$orphaned++;
-				continue;
-			}
+        $this->info("  Total — Added: {$added}, Skipped: {$skipped}");
+        $this->newLine();
+    }
 
-			if ($emotion->video) {
-				$this->line("  Skipped: {$name} (video already exists)");
-				$skipped++;
-				continue;
-			}
+    private function syncVideos(string $path, bool $restricted): void
+    {
+        if (! File::isDirectory($path)) {
+            return;
+        }
 
-			$subdir = $restricted ? 'videos/restricted' : 'videos';
-			$storagePath = self::BASE_DIR . '/' . $subdir . '/' . $file->getFilename();
-			Storage::disk('public')->put($storagePath, File::get($file));
+        $label = $restricted ? 'restricted videos' : 'videos';
+        $this->info("Syncing {$label}...");
+        $added = 0;
+        $skipped = 0;
+        $orphaned = 0;
 
-			$emotion->video()->create([
-				'path' => $storagePath,
-				'disk' => 'public',
-				'mime_type' => File::mimeType($file->getPathname()),
-				'size' => $file->getSize(),
-			]);
+        foreach (File::files($path) as $file) {
+            $extension = strtolower($file->getExtension());
 
-			$this->info("  Added video: {$name}" . ($restricted ? ' [restricted]' : ''));
-			$added++;
-		}
+            if (! in_array($extension, self::VIDEO_EXTENSIONS)) {
+                continue;
+            }
 
-		$this->info("  Total — Added: {$added}, Skipped: {$skipped}, Orphaned: {$orphaned}");
-	}
+            $name = pathinfo($file->getFilename(), PATHINFO_FILENAME);
+            $emotion = Emotion::where('name', $name)->first();
 
-	/**
-	 * Remove emotions from the DB that no longer have a source image file.
-	 * Also cleans up their stored files from public storage.
-	 */
-	private function purgeOrphans(array $sourceNames): void
-	{
-		$this->newLine();
-		$this->info('Checking for orphaned emotions...');
-		$removed = 0;
+            if (! $emotion) {
+                $this->warn("  Orphaned: {$file->getFilename()} (no emotion '{$name}' exists)");
+                $orphaned++;
 
-		$dbEmotions = Emotion::all();
+                continue;
+            }
 
-		foreach ($dbEmotions as $emotion) {
-			if (in_array($emotion->name, $sourceNames)) {
-				continue;
-			}
+            if ($emotion->video) {
+                $this->line("  Skipped: {$name} (video already exists)");
+                $skipped++;
 
-			// Delete stored image file
-			if ($emotion->image) {
-				Storage::disk($emotion->image->disk)->delete($emotion->image->path);
-				$emotion->image->delete();
-			}
+                continue;
+            }
 
-			// Delete stored video file
-			if ($emotion->video) {
-				Storage::disk($emotion->video->disk)->delete($emotion->video->path);
-				$emotion->video->delete();
-			}
+            $subdir = $restricted ? 'videos/restricted' : 'videos';
+            $storagePath = self::BASE_DIR.'/'.$subdir.'/'.$file->getFilename();
+            Storage::disk('public')->put($storagePath, File::get($file));
 
-			$this->warn("  Removed: {$emotion->name}");
-			$emotion->delete();
-			$removed++;
-		}
+            $emotion->video()->create([
+                'path' => $storagePath,
+                'disk' => 'public',
+                'mime_type' => File::mimeType($file->getPathname()),
+                'size' => $file->getSize(),
+            ]);
 
-		$this->info("  Orphans removed: {$removed}");
-	}
+            $this->info("  Added video: {$name}".($restricted ? ' [restricted]' : ''));
+            $added++;
+        }
+
+        $this->info("  Total — Added: {$added}, Skipped: {$skipped}, Orphaned: {$orphaned}");
+    }
+
+    /**
+     * Remove emotions from the DB that no longer have a source image file.
+     * Also cleans up their stored files from public storage.
+     */
+    private function purgeOrphans(array $sourceNames): void
+    {
+        $this->newLine();
+        $this->info('Checking for orphaned emotions...');
+        $removed = 0;
+
+        $dbEmotions = Emotion::all();
+
+        foreach ($dbEmotions as $emotion) {
+            if (in_array($emotion->name, $sourceNames)) {
+                continue;
+            }
+
+            // Delete stored image file
+            if ($emotion->image) {
+                Storage::disk($emotion->image->disk)->delete($emotion->image->path);
+                $emotion->image->delete();
+            }
+
+            // Delete stored video file
+            if ($emotion->video) {
+                Storage::disk($emotion->video->disk)->delete($emotion->video->path);
+                $emotion->video->delete();
+            }
+
+            $this->warn("  Removed: {$emotion->name}");
+            $emotion->delete();
+            $removed++;
+        }
+
+        $this->info("  Orphans removed: {$removed}");
+    }
 }

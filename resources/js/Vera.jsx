@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { buildSystemPrompt } from "./utils/promptBuilder";
 import { parseEmotionFromResponse } from "./utils/parsers";
 import Portrait from "./components/Portrait";
 import ChatMessage from "./components/ChatMessage";
@@ -39,9 +38,6 @@ export default function Vera() {
     const { emotionNames, fetchEmotions, unlocked, getImageUrl, getVideoUrl } = useEmotions();
 
     const { toasts, addToast, removeToast } = useToast();
-
-    // Rebuild the system prompt only when the emotion list changes
-    const systemPrompt = useMemo(() => buildSystemPrompt(emotionNames), [emotionNames]);
 
     const scrollToBottom = useCallback(() => {
         if (scrollRef.current) {
@@ -93,7 +89,7 @@ export default function Vera() {
 
         const apiMessages = updatedMessages.map((m) => {
             const msg = { role: m.role, content: m.content || "" };
-            if (m.image) {
+            if (m.image && m.image.startsWith("data:")) {
                 msg.images = [
                     m.image.replace(/^data:image\/\w+;base64,/, ""),
                 ];
@@ -112,10 +108,7 @@ export default function Vera() {
                 }
 
                 const response = await api.post(`/api/conversations/${conversationId}/messages`, {
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        ...apiMessages,
-                    ],
+                    messages: apiMessages,
                 });
 
                 // Check response before touching state
@@ -319,7 +312,10 @@ export default function Vera() {
                     ) : !conversationId ? (
                         <ConversationList
                             conversations={conversations}
-                            onSelect={selectConversation}
+                            onSelect={async (id) => {
+                                const emotion = await selectConversation(id, emotionNames);
+                                if (emotion) setCurrentEmotion(emotion);
+                            }}
                             onNew={createNewConversation}
                             onDelete={removeConversation}
                         />

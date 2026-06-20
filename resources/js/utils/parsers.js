@@ -10,7 +10,7 @@ export function parseEmotionFromResponse(text, validEmotions = []) {
     const emotionMatch = remaining.match(/^\[([a-z]+)\]/);
     if (emotionMatch) {
         remaining = remaining.slice(emotionMatch[0].length);
-        if (validEmotions.includes(emotionMatch[1])) {
+        if (validEmotions.length === 0 || validEmotions.includes(emotionMatch[1])) {
             emotion = emotionMatch[1];
         }
     }
