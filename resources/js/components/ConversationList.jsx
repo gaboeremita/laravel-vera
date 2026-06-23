@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil } from "lucide-react";
 import TerminalModal from "./TerminalModal";
 import { api } from "../utils/api";
 
@@ -23,11 +23,14 @@ function ActiveUnderline({ color = "vera-cyan" }) {
 	);
 }
 
-export default function ConversationList({ conversations, onSelect, onNew, onDelete }) {
+export default function ConversationList({ conversations, onSelect, onNew, onDelete, onRename }) {
 	const [activeRow, setActiveRow] = useState(0);
 	const [activeColumn, setActiveColumn] = useState("select");
 	const [pendingDeleteId, setPendingDeleteId] = useState(null);
+	const [editingId, setEditingId] = useState(null);
+	const [editingTitle, setEditingTitle] = useState("");
 	const listRef = useRef(null);
+	const editInputRef = useRef(null);
 
 	useEffect(() => {
 		listRef.current?.focus();
@@ -53,13 +56,19 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 		} else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
 			e.preventDefault();
 			if (activeRow < conversations.length) {
-				setActiveColumn((prev) => prev === "select" ? "delete" : "select");
+				const columns = ["select", "edit", "delete"];
+				const dir = e.key === "ArrowRight" ? 1 : -1;
+				const currentIdx = columns.indexOf(activeColumn);
+				const nextIdx = (currentIdx + dir + columns.length) % columns.length;
+				setActiveColumn(columns[nextIdx]);
 			}
 		} else if (e.key === "Enter") {
 			e.preventDefault();
 			if (activeRow < conversations.length) {
 				if (activeColumn === "delete") {
 					setPendingDeleteId(conversations[activeRow].id);
+				} else if (activeColumn === "edit") {
+					startEditing(conversations[activeRow]);
 				} else {
 					onSelect(conversations[activeRow].id);
 				}
@@ -78,6 +87,37 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 			setPendingDeleteId(null);
 		}
 	};
+
+	// Enter inline edit mode for a conversation
+	const startEditing = (conv) => {
+		setEditingId(conv.id);
+		setEditingTitle(conv.title || "");
+	};
+
+	// Cancel editing and refocus the list
+	const cancelEditing = () => {
+		setEditingId(null);
+		setEditingTitle("");
+		// Return focus to the list for keyboard nav
+		setTimeout(() => listRef.current?.focus(), 0);
+	};
+
+	// Save the edited title
+	const saveEditing = () => {
+		const trimmed = editingTitle.trim();
+		if (trimmed && editingId) {
+			onRename(editingId, trimmed);
+		}
+		cancelEditing();
+	};
+
+	// Focus the edit input when editing begins
+	useEffect(() => {
+		if (editingId && editInputRef.current) {
+			editInputRef.current.focus();
+			editInputRef.current.select();
+		}
+	}, [editingId]);
 
 	const isRowActive = (i) => activeRow === i;
 
@@ -107,20 +147,57 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
                     {isRowActive(i) ? "›" : " "}
                 </span>
 
-					{/* Conversation title */}
+					{/* Conversation title — inline editable */}
+					{editingId === conv.id ? (
+						<input
+							ref={editInputRef}
+							type="text"
+							value={editingTitle}
+							onChange={(e) => setEditingTitle(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") {
+									e.preventDefault();
+									saveEditing();
+								} else if (e.key === "Escape") {
+									e.preventDefault();
+									cancelEditing();
+								}
+								e.stopPropagation();
+							}}
+							onBlur={saveEditing}
+							className="flex-1 bg-transparent border-b border-vera-cyan text-vera-cyan font-mono text-[0.8rem] outline-none caret-vera-cyan"
+							maxLength={100}
+						/>
+					) : (
+						<button
+							onClick={() => onSelect(conv.id)}
+							onMouseEnter={() => setActiveColumn("select")}
+							className="flex-1 text-left cursor-pointer min-w-0"
+						>
+							{i + 1}.{" "}
+							<span className={`pb-0.5 border-b-2 transition-all duration-150 ${
+								isRowActive(i) && activeColumn === "select"
+									? "border-vera-cyan"
+									: "border-transparent"
+							}`}>
+								{conv.title || "Untitled"}
+							</span>
+						</button>
+					)}
+
+					{/* Edit — pencil next to name */}
 					<button
-						onClick={() => onSelect(conv.id)}
-						onMouseEnter={() => setActiveColumn("select")}
-						className="flex-1 text-left cursor-pointer min-w-0"
+						onClick={() => startEditing(conv)}
+						onMouseEnter={() => setActiveColumn("edit")}
+						className={`shrink-0 cursor-pointer pb-0.5 border-b-2 transition-all duration-150 ${
+							isRowActive(i) && activeColumn === "edit"
+								? "text-vera-cyan border-vera-cyan"
+								: isRowActive(i)
+									? "text-vera-cyan/50 border-transparent"
+									: "text-vera-cyan/20 border-transparent"
+						}`}
 					>
-						{i + 1}.{" "}
-						<span className={`pb-0.5 border-b-2 transition-all duration-150 ${
-							isRowActive(i) && activeColumn === "select"
-								? "border-vera-cyan"
-								: "border-transparent"
-						}`}>
-                        {conv.title || "Untitled"}
-                    </span>
+						<Pencil size={14} />
 					</button>
 
 					{/* Timestamp */}
@@ -175,7 +252,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 			</button>
 
 			<div className="text-[#303045] text-[0.65rem] mt-6 tracking-[0.1em]">
-				Enter to select · ↑↓ navigate · ←→ select/delete
+				Enter to select · ↑↓ navigate · ←→ select/rename/delete
 			</div>
 
 			{/* Delete confirmation modal */}

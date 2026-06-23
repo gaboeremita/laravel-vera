@@ -39,4 +39,9 @@ export const api = {
         request("/logout", {
             method: "POST",
         }),
+    patch: (url, data) =>
+        request(url, {
+            method: "PATCH",
+            body: JSON.stringify(data),
+        }),
 };

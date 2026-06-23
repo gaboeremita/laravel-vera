@@ -122,4 +122,20 @@ class ConversationController extends Controller
 			'thinking' => $response->thinking,
 		]);
 	}
+
+	// Update conversation title
+	public function update(Request $request, int $id): JsonResponse
+	{
+		$validated = $request->validate([
+			'title' => ['required', 'string', 'max:100'],
+		]);
+
+		$conversation = $request->user()
+			->conversations()
+			->findOrFail($id);
+
+		$conversation->update($validated);
+
+		return response()->json($conversation);
+	}
 }
