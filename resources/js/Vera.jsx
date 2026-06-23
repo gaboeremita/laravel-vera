@@ -262,25 +262,40 @@ export default function Vera() {
             {/* Right panel — Terminal */}
             <div className="flex-1 flex flex-col relative z-5 min-w-0">
                 {/* Header */}
-                <div className="px-5 py-3 border-b border-[#1a1a2e] flex justify-between items-center shrink-0">
+                <div className="px-5 py-3 border-b border-[#1a1a2e] flex justify-between items-end shrink-0">
                     <div>
                         <span className="text-vera-red text-[0.6rem] tracking-[0.25em] font-bold">
                             MODEL VR-09
                         </span>
-                        <div className="text-vera-cyan text-xl font-bold tracking-[0.15em] mt-0.5 vera-glow">
+                        <div className="text-vera-cyan text-xl font-bold tracking-[0.15em] mt-0.5 vera-glow leading-none">
                             V E R A
                         </div>
                     </div>
-                    <div className="text-right">
-                        <div
-                            className={`text-[0.6rem] tracking-[0.15em] ${
-                                booted ? "text-vera-cyan" : "text-vera-red"
-                            }`}
-                        >
-                            {booted ? "● ONLINE" : "○ BOOTING"}
-                        </div>
-                        <div className="text-[#303045] text-[0.55rem] mt-0.5">
-                            OBSYNTH TRACE: 0.003ppm
+                    <div className="flex items-center gap-6">
+                        {/* Back to conversation list */}
+                        {booted && conversationId && (
+                            <button
+                                onClick={() => {
+                                    setConversationId(null);
+                                    setMessages([]);
+                                    fetchConversations();
+                                }}
+                                className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.65rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-3 py-1"
+                            >
+                                ← ALL CONVERSATIONS
+                            </button>
+                        )}
+                        <div className="text-right">
+                            <div
+                                className={`text-[0.6rem] tracking-[0.15em] ${
+                                    booted ? "text-vera-cyan" : "text-vera-red"
+                                }`}
+                            >
+                                {booted ? "● ONLINE" : "○ BOOTING"}
+                            </div>
+                            <div className="text-[#7070a0] text-[0.55rem] mt-0.5">
+                                OBSYNTH TRACE: 0.003ppm
+                            </div>
                         </div>
                     </div>
                 </div>
