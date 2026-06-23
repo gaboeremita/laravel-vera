@@ -28,6 +28,7 @@ export default function Vera() {
     const {
         conversations,
         conversationId,
+        conversationTitle,
         messages,
         setMessages,
         setConversationId,
@@ -276,13 +277,21 @@ export default function Vera() {
             <div className="flex-1 flex flex-col relative z-5 min-w-0">
                 {/* Header */}
                 <div className="px-5 py-3 border-b border-[#1a1a2e] flex justify-between items-end shrink-0">
-                    <div>
-                        <span className="text-vera-red text-[0.6rem] tracking-[0.25em] font-bold">
-                            MODEL VR-09
-                        </span>
-                        <div className="text-vera-cyan text-xl font-bold tracking-[0.15em] mt-0.5 vera-glow leading-none">
-                            V E R A
+                    <div className="flex items-end gap-4">
+                        <div>
+                            <span className="text-vera-red text-[0.6rem] tracking-[0.25em] font-bold">
+                                MODEL VR-09
+                            </span>
+                            <div className="text-vera-cyan text-xl font-bold tracking-[0.15em] mt-0.5 vera-glow leading-none">
+                                V E R A
+                            </div>
                         </div>
+                        {/* Current conversation title */}
+                        {booted && conversationId && conversationTitle && (
+                            <span className="text-[#7070a0] text-sm tracking-[0.05em] font-mono truncate max-w-xs leading-none">
+                                // {conversationTitle}
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-6">
                         {/* Back to conversation list */}
@@ -293,17 +302,20 @@ export default function Vera() {
                                     setMessages([]);
                                     fetchConversations();
                                 }}
-                                className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.65rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-3 py-1"
+                                className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
                             >
                                 ← ALL CONVERSATIONS
                             </button>
                         )}
                         <div className="text-right">
-                            <div className={`text-[0.6rem] tracking-[0.15em] ${status.color}`}>
+                            <div className={`text-[0.75rem] tracking-[0.15em] ${status.color}`}>
                                 <span className={status.blink ? "vera-cursor" : ""}>{status.dot}</span> {status.label}
                             </div>
-                            <div className="text-[#7070a0] text-[0.55rem] mt-0.5">
-                                OBSYNTH TRACE: 0.003ppm
+                            <div className="text-[#7070a0] text-[0.65rem] mt-0.5">
+                                {conversationId
+                                    ? `MESSAGES: ${messages.filter(m => m.role !== "system").length}`
+                                    : `CONVERSATIONS: ${conversations.length}`
+                                }
                             </div>
                         </div>
                     </div>

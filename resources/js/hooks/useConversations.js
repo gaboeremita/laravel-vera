@@ -16,6 +16,7 @@ export function useConversations() {
 	const [conversations, setConversations] = useState([]);
 	const [conversationId, setConversationId] = useState(null);
 	const [messages, setMessages] = useState([]);
+	const conversationTitle = conversations.find(c => c.id === conversationId)?.title || null;
 
 	// Fetch all conversations for the logged-in user
 	const fetchConversations = async () => {
@@ -96,6 +97,7 @@ export function useConversations() {
 
 	return {
 		conversations,
+		conversationTitle,
 		conversationId,
 		messages,
 		setMessages,
