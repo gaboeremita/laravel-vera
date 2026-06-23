@@ -83,6 +83,17 @@ export function useConversations() {
 		setConversations((prev) => prev.filter((c) => c.id !== id));
 	};
 
+	const renameConversation = async (id, title) => {
+		try {
+			await api.patch(`/api/conversations/${id}`, { title });
+			setConversations((prev) =>
+				prev.map((c) => (c.id === id ? { ...c, title } : c))
+			);
+		} catch(error) {
+			console.error('Failed to rename conversation:', error);
+		}
+	};
+
 	return {
 		conversations,
 		conversationId,
@@ -92,6 +103,7 @@ export function useConversations() {
 		fetchConversations,
 		selectConversation,
 		createNewConversation,
-		removeConversation
+		removeConversation,
+		renameConversation
 	};
 }

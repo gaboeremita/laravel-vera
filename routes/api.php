@@ -12,5 +12,6 @@ Route::middleware('auth:sanctum')->group(function () {
 	Route::get('/conversations/{id}/messages', [ConversationController::class, 'show']);
 	Route::post('/conversations', [ConversationController::class, 'store']);
 	Route::delete('/conversations/{id}', [ConversationController::class, 'destroy']);
+	Route::patch('/conversations/{id}', [ConversationController::class, 'update']);
 	Route::get('/emotions', [EmotionController::class, 'index']);
 });

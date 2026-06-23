@@ -32,7 +32,8 @@ export default function Vera() {
         fetchConversations,
         selectConversation,
         createNewConversation,
-        removeConversation
+        removeConversation,
+        renameConversation
     } = useConversations();
 
     const { emotionNames, fetchEmotions, unlocked, getImageUrl, getVideoUrl } = useEmotions();
@@ -134,13 +135,13 @@ export default function Vera() {
                     { role: "assistant", content: cleanText, thinking: thinking },
                 ]);
 
-                // 🔧 Success — clean exit
+                // Success — clean exit
                 setIsLoading(false);
                 return;
             } catch (error) {
                 lastError = error;
 
-                // 🔧 Only retry on timeout-like errors
+                // Only retry on timeout-like errors
                 const msg = error.message?.toLowerCase() || "";
                 const isTimeout = msg.includes("timeout") ||
                     msg.includes("execution time") ||
@@ -157,7 +158,7 @@ export default function Vera() {
             }
         }
 
-        // 🔧 All retries failed — toast the error, remove loading, keep user message
+        // All retries failed — toast the error, remove loading, keep user message
         addToast(lastError?.message || "Connection to The Bridge failed", "error");
         setMessages([...updatedMessages]);
         setIsLoading(false);
@@ -318,6 +319,7 @@ export default function Vera() {
                             }}
                             onNew={createNewConversation}
                             onDelete={removeConversation}
+                            onRename={renameConversation}
                         />
                     ) : (
                         messages.map((msg, i) => <ChatMessage key={i} msg={msg} />)
