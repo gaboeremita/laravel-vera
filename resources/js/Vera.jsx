@@ -23,6 +23,8 @@ export default function Vera() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [loginStep, setLoginStep] = useState('email');
     const [loginEmail, setLoginEmail] = useState('');
+    const [hasError, setHasError] = useState(false);
+
     const {
         conversations,
         conversationId,
@@ -45,6 +47,15 @@ export default function Vera() {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, []);
+
+    const status = (() => {
+        if (!isAuthenticated) return { label: "OFFLINE", color: "text-purple-400", dot: "○", blink: false };
+        if (hasError) return { label: "ERROR", color: "text-vera-red", dot: "●", blink: false };
+        if (!booted) return { label: "BOOTING", color: "text-amber-400", dot: "●", blink: true };
+        if (isLoading) return { label: "THINKING", color: "text-indigo-400", dot: "●", blink: true };
+        if (!conversationId) return { label: "WAITING", color: "text-blue-400", dot: "●", blink: false };
+        return { label: "READY", color: "text-green-400", dot: "●", blink: false };
+    })();
 
     useEffect(() => {
         scrollToBottom();
@@ -130,6 +141,7 @@ export default function Vera() {
                 }
 
                 setCurrentEmotion(emotion);
+                setHasError(false);
                 setMessages([
                     ...updatedMessages,
                     { role: "assistant", content: cleanText, thinking: thinking },
@@ -140,6 +152,7 @@ export default function Vera() {
                 return;
             } catch (error) {
                 lastError = error;
+                setHasError(true);
 
                 // Only retry on timeout-like errors
                 const msg = error.message?.toLowerCase() || "";
@@ -286,12 +299,8 @@ export default function Vera() {
                             </button>
                         )}
                         <div className="text-right">
-                            <div
-                                className={`text-[0.6rem] tracking-[0.15em] ${
-                                    booted ? "text-vera-cyan" : "text-vera-red"
-                                }`}
-                            >
-                                {booted ? "● ONLINE" : "○ BOOTING"}
+                            <div className={`text-[0.6rem] tracking-[0.15em] ${status.color}`}>
+                                <span className={status.blink ? "vera-cursor" : ""}>{status.dot}</span> {status.label}
                             </div>
                             <div className="text-[#7070a0] text-[0.55rem] mt-0.5">
                                 OBSYNTH TRACE: 0.003ppm
