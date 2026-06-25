@@ -42,6 +42,14 @@ export default function ConversationsPage() {
 			<Header
 				status={{ label: 'WAITING', color: 'text-blue-400', dot: '●', blink: false }}
 				counter={`CONVERSATIONS: ${conversations.length}`}
+				actions={
+					<button
+						onClick={() => navigate('/lorebook')}
+						className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+					>
+						LOREBOOK
+					</button>
+				}
 			>
 				<span className="text-[#7070a0] text-sm tracking-[0.05em]">
 					// Conversations

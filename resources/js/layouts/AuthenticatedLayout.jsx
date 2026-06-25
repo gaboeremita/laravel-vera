@@ -10,9 +10,12 @@ import ToastContainer from '../components/ToastContainer.jsx';
 
 export default function AuthenticatedLayout() {
 	const [authState, setAuthState] = useState('checking');
-	const [booted, setBooted] = useState(false);
+	const [booted, setBooted] = useState(() => {
+		return sessionStorage.getItem('vera-booted') === 'true';
+	});
 	const [currentEmotion, setCurrentEmotion] = useState('neutral');
 	const [conversations, setConversations] = useState([]);
+	
 
 	const { emotionNames, fetchEmotions, getImageUrl, getVideoUrl, unlocked } = useEmotions();
 	const { toasts, addToast, removeToast } = useToast();
@@ -23,6 +26,9 @@ export default function AuthenticatedLayout() {
 				if (res.ok) {
 					setAuthState('authenticated');
 					fetchEmotions();
+					if (sessionStorage.getItem('vera-booted') === 'true') {
+						fetchConversations();
+					}
 				} else {
 					setAuthState('unauthenticated');
 				}
@@ -42,6 +48,7 @@ export default function AuthenticatedLayout() {
 
 	const bootComplete = useCallback(() => {
 		setBooted(true);
+		sessionStorage.setItem('vera-booted', 'true');
 		fetchConversations();
 	}, []);
 
