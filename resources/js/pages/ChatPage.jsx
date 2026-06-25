@@ -190,7 +190,7 @@ export default function ChatPage() {
 						onClick={() => navigate('/conversations')}
 						className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
 					>
-						← ALL CONVERSATIONS
+						← CONVERSATIONS
 					</button>
 				}
 			>
