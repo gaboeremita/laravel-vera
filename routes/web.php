@@ -9,3 +9,7 @@ Route::get('/', function () {
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout']);
+
+Route::get('/{any}', function () {
+	return view('welcome');
+})->where('any', '.*');
