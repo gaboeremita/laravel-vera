@@ -50,8 +50,11 @@ class LorebookController extends Controller
 			$lorebook = auth()->user()
 				->lorebooks()
 				->updateOrCreate(
-					['name' => $validated['name']],
-					['description' => $validated['description']],
+					['user_id' => auth()->id()],
+					[
+						'name' => $validated['name'],
+						'description' => $validated['description'],
+					],
 				);
 
 			$incomingIds = collect($validated['entries'])

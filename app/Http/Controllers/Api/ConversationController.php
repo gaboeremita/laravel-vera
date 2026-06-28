@@ -106,7 +106,8 @@ class ConversationController extends Controller
 		$lorebook = $request->user()->lorebooks()->first();
 
 		$director = (new PromptDirector())
-			->append('emotion tags', ['available emotions' => $emotions]);
+			->append('emotion tags', ['available emotions' => $emotions])
+			->except(['opening_message']);
 
 		if ($lorebook && !empty($lastUserMessage['content'])) {
 			$director->withRetrieval($lastUserMessage['content'], $lorebook->id);

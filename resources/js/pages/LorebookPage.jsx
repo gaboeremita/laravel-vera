@@ -14,6 +14,7 @@ export default function LorebookPage() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
 	const [deleteIndex, setDeleteIndex] = useState(null);
+	const allCollapsed = entries.every((e) => e.collapsed);
 
 	useEffect(() => {
 		const load = async () => {
@@ -34,6 +35,7 @@ export default function LorebookPage() {
 						content: entry.content,
 						keywords: (entry.keywords ?? []).join(', '),
 						tags: (entry.tags ?? []).map((t) => t.name).join(', '),
+						collapsed: true,
 					})));
 				}
 			} catch(e) {
@@ -190,9 +192,20 @@ export default function LorebookPage() {
 				{/* Entries */}
 				<div>
 					<div className="flex items-center justify-between mb-3">
-                        <span className="text-[#555568] text-[0.7rem] tracking-[0.15em] uppercase">
-                            Entries ({entries.length})
-                        </span>
+						<span className="text-[#555568] text-[0.7rem] tracking-[0.15em] uppercase">
+							Entries ({entries.length})
+						</span>
+						{entries.length > 0 && (
+							<button
+								onClick={() => {
+									const newState = !allCollapsed;
+									setEntries((prev) => prev.map((e) => ({ ...e, collapsed: newState })));
+								}}
+								className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+							>
+								{allCollapsed ? 'EXPAND ALL' : 'COLLAPSE ALL'}
+							</button>
+						)}
 					</div>
 
 					<AnimatePresence initial={false}>
