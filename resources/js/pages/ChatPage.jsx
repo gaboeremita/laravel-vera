@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
+import { Pencil } from 'lucide-react';
 import { api } from '../utils/api.js';
 import { parseEmotionFromResponse } from '../utils/parsers.js';
 import ChatMessage from '../components/ChatMessage.jsx';
@@ -14,6 +15,7 @@ export default function ChatPage() {
 		addToast,
 		fetchEmotions,
 		unlocked,
+		setConversations,
 		conversations,
 	} = useOutletContext();
 
@@ -25,8 +27,47 @@ export default function ChatPage() {
 	const scrollRef = useRef(null);
 	const inputRef = useRef(null);
 	const fileInputRef = useRef(null);
+	const editInputRef = useRef(null);
+	const [isEditingTitle, setIsEditingTitle] = useState(false);
+	const [editTitleValue, setEditTitleValue] = useState('');
 
 	const conversationTitle = conversations.find((c) => c.id === Number(id))?.title || '';
+
+	const startEditingTitle = () => {
+		setEditTitleValue(conversationTitle);
+		setIsEditingTitle(true);
+	};
+
+	const cancelEditingTitle = () => {
+		setIsEditingTitle(false);
+		setEditTitleValue('');
+	};
+
+	const saveTitle = async () => {
+		const trimmed = editTitleValue.trim();
+		if (!trimmed || trimmed === conversationTitle) {
+			cancelEditingTitle();
+			return;
+		}
+
+		try {
+			await api.patch(`/api/conversations/${id}`, { title: trimmed });
+			setConversations((prev) =>
+				prev.map((c) => (c.id === Number(id) ? { ...c, title: trimmed } : c))
+			);
+		} catch {
+			addToast('Failed to rename conversation', 'error');
+		}
+
+		cancelEditingTitle();
+	};
+
+	useEffect(() => {
+		if (isEditingTitle && editInputRef.current) {
+			editInputRef.current.focus();
+			editInputRef.current.select();
+		}
+	}, [isEditingTitle]);
 
 	// Load conversation messages
 	useEffect(() => {
@@ -202,9 +243,39 @@ export default function ChatPage() {
 					</>
 				}
 			>
-				<span className="text-[#7070a0] text-sm tracking-[0.05em] truncate max-w-xs">
-					// {conversationTitle}
-				</span>
+				{isEditingTitle ? (
+					<input
+						ref={editInputRef}
+						type="text"
+						value={editTitleValue}
+						onChange={(e) => setEditTitleValue(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === 'Enter') {
+								e.preventDefault();
+								saveTitle();
+							} else if (e.key === 'Escape') {
+								e.preventDefault();
+								cancelEditingTitle();
+							}
+							e.stopPropagation();
+						}}
+						onBlur={saveTitle}
+						maxLength={100}
+						className="bg-transparent border-b border-vera-cyan text-[#7070a0] text-sm font-mono tracking-[0.05em] outline-none caret-vera-cyan max-w-xs"
+					/>
+				) : (
+					<span className="flex items-center gap-2">
+						<span className="text-[#7070a0] text-sm tracking-[0.05em] truncate max-w-xs">
+							// {conversationTitle}
+						</span>
+						<button
+							onClick={startEditingTitle}
+							className="text-[#7070a0]/30 hover:text-vera-cyan transition-colors cursor-pointer"
+						>
+							<Pencil size={12} />
+						</button>
+					</span>
+				)}
 			</Header>
 
 			<div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4">
