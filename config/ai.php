@@ -11,14 +11,15 @@ return [
 	'providers' => [
 		'ollama' => [
 			'url' => env('OLLAMA_URL'),
-			'model' => env('OLLAMA_MODEL'),
+			'llm_model' => env('OLLAMA_LLM_MODEL'),
 			'think' => (bool) env('OLLAMA_THINK', true),
+			'embedding_model' => env('OLLAMA_EMBEDDING_MODEL')
 		],
 
 		'openrouter' => [
 			'url' => env('OPENROUTER_URL'),
 			'key' => env('OPENROUTER_API_KEY'),
-			'model' => env('OPENROUTER_MODEL'),
+			'llm_model' => env('OPENROUTER_LLM_MODEL'),
 			'max_tokens' => (int) env('OPENROUTER_MAX_TOKENS', 4096),
 			'reasoning' => [
 				'enabled' => (bool) env('OPENROUTER_REASONING', false),
@@ -29,7 +30,7 @@ return [
 		'anthropic' => [
 			'url' => env('ANTHROPIC_URL'),
 			'key' => env('ANTHROPIC_API_KEY'),
-			'model' => env('ANTHROPIC_MODEL'),
+			'llm_model' => env('ANTHROPIC_LLM_MODEL'),
 			'version' => env('ANTHROPIC_VERSION', '2023-06-01'),
 			'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 4096),
 			'thinking' => [

@@ -49,6 +49,13 @@ class ConversationController extends Controller
 			->conversations()
 			->create(['title' => 'New conversation']);
 
+		$prompt = json_decode(file_get_contents(base_path('vera_prompt.json')), true);
+
+		$conversation->messages()->create([
+			'role' => 'assistant',
+			'content' => $prompt['opening_message'] ?? '',
+		]);
+
 		return response()->json($conversation, 201);
 	}
 
@@ -96,9 +103,16 @@ class ConversationController extends Controller
 			'intimate' => Emotion::where('restricted', true)->pluck('name')->toArray(),
 		];
 
-		$systemPrompt = (new PromptDirector())
-			->append('emotion tags', ['available emotions' => $emotions])
-			->build();
+		$lorebook = $request->user()->lorebooks()->first();
+
+		$director = (new PromptDirector())
+			->append('emotion tags', ['available emotions' => $emotions]);
+
+		if ($lorebook && !empty($lastUserMessage['content'])) {
+			$director->withRetrieval($lastUserMessage['content'], $lorebook->id);
+		}
+
+		$systemPrompt = $director->build();
 
 		try {
 			$llm = app(LlmProvider::class);

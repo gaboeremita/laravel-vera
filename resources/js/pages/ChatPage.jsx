@@ -186,12 +186,20 @@ export default function ChatPage() {
 				status={status}
 				counter={`MESSAGES: ${messages.filter((m) => m.role !== 'system').length}`}
 				actions={
-					<button
-						onClick={() => navigate('/conversations')}
-						className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
-					>
-						← CONVERSATIONS
-					</button>
+					<>
+						<button
+							onClick={() => navigate('/lorebook')}
+							className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+						>
+							LOREBOOK
+						</button>
+						<button
+							onClick={() => navigate('/conversations')}
+							className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+						>
+							← CONVERSATIONS
+						</button>
+					</>
 				}
 			>
 				<span className="text-[#7070a0] text-sm tracking-[0.05em] truncate max-w-xs">
