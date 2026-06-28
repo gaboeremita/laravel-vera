@@ -23,14 +23,14 @@ class LlmManager
 		return match ($name) {
 			'ollama' => new OllamaProvider(
 				url: $config['url'],
-				model: $config['model'],
+				model: $config['llm_model'],
 				timeout: $timeout,
 				stream: $stream,
 				think: $config['think'],
 			),
 			'openrouter' => new OpenRouterProvider(
 				url: $config['url'],
-				model: $config['model'],
+				model: $config['llm_model'],
 				key: $config['key'],
 				timeout: $timeout,
 				stream: $stream,
@@ -40,7 +40,7 @@ class LlmManager
 			),
 			'anthropic' => new AnthropicProvider(
 				url: $config['url'],
-				model: $config['model'],
+				model: $config['llm_model'],
 				key: $config['key'],
 				version: $config['version'],
 				timeout: $timeout,

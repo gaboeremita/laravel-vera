@@ -36,4 +36,14 @@ class User extends Authenticatable
 	{
 		return $this->hasMany(Conversation::class);
 	}
+
+	public function lorebooks(): HasMany
+	{
+		return $this->hasMany(Lorebook::class);
+	}
+
+	public function tags(): HasMany
+	{
+		return $this->hasMany(Tag::class);
+	}
 }

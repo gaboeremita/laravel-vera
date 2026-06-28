@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\EmotionController;
+use App\Http\Controllers\Api\LorebookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -14,4 +15,6 @@ Route::middleware('auth:sanctum')->group(function () {
 	Route::delete('/conversations/{id}', [ConversationController::class, 'destroy']);
 	Route::patch('/conversations/{id}', [ConversationController::class, 'update']);
 	Route::get('/emotions', [EmotionController::class, 'index']);
+	Route::get('/lorebook', [LorebookController::class, 'show']);
+	Route::post('/lorebook', [LorebookController::class, 'save']);
 });
