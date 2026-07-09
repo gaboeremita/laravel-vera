@@ -218,8 +218,12 @@ class TelegramPollCommand extends Command
 			$history[$lastIndex]['images'] = [$image];
 		}
 
-		$lorebook = $this->user->lorebooks()->first();
 		$director = new PromptDirector();
+		$lorebook = $this->user->lorebooks()->first();
+
+		if ($lorebook && !empty($text)) {
+			$director->withRetrieval($text, $lorebook->id);
+		}
 
 		$systemPrompt = $director
 			->except(["emotion tags", "opening_message"])
