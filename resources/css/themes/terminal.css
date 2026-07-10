@@ -1,0 +1,62 @@
+/* ==========================================================================
+   Theme: Terminal
+   The platform's original skin — a CRT terminal in a purple-cyan cyberpunk
+   city. Colors lifted directly from the shipped app.css (--color-vera-cyan,
+   --color-vera-red) and Tailwind classes in the React components. Sharp
+   corners everywhere (a terminal doesn't round), glow instead of blur for
+   shadows, heavy uppercase letter-spacing on labels.
+   ========================================================================== */
+
+[data-theme="terminal"] {
+  --font-display: "Instrument Sans", system-ui, sans-serif;
+  --font-sans: "Instrument Sans", system-ui, sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, monospace;
+  --weight-heading: 700;
+  --weight-label: 700;
+
+  --bg-0: #0a0a0f;
+  --bg-1: #0f0f1a;
+  --bg-2: #13131f;
+  --bg-3: #1a1a2e;
+
+  --border-1: #1a1a2e;
+  --border-2: #2a2a3e;
+
+  --fg-1: #c8c8d8;
+  --fg-2: #888898;
+  --fg-3: #555568;
+
+  --accent: #00ffc8;
+  --accent-hover: #33ffd4;
+  --accent-fg: #05050a;
+  --accent-soft: rgba(0, 255, 200, 0.1);
+
+  --accent-2: #ff3e3e;
+  --accent-3: #818cf8;
+
+  --success: #4ade80;
+  --danger: #ff3e3e;
+  --warning: #fbbf24;
+  --info: #60a5fa;
+
+  --chat-user-bg: transparent;
+  --chat-user-fg: #888898;
+  --chat-assistant-bg: transparent;
+  --chat-assistant-fg: #c8c8d8;
+  --chat-label-user: #555568;
+  --chat-label-assistant: #ff3e3e;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-full: 999px;
+
+  --shadow-sm: 0 0 8px rgba(0, 255, 200, 0.12);
+  --shadow-md: 0 0 20px rgba(0, 255, 200, 0.16);
+  --shadow-lg: 0 0 40px rgba(0, 255, 200, 0.22);
+
+  --focus-ring: 0 0 0 1px #00ffc8, 0 0 12px rgba(0, 255, 200, 0.4);
+
+  --scanline-color: rgba(0, 255, 200, 0.02);
+  --vignette-color: rgba(0, 0, 0, 0.6);
+}

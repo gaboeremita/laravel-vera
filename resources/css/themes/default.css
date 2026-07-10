@@ -1,0 +1,79 @@
+/* ==========================================================================
+   Theme: Default
+   Clean, quiet, minimal. The platform's default look — light by default,
+   with a dark variant via [data-mode="dark"]. Blue-leaning neutral accent,
+   restrained. This is what a fresh workspace looks like before anyone
+   picks a persona theme.
+   ========================================================================== */
+
+:root,
+[data-theme="default"] {
+  --font-display: "Manrope", system-ui, sans-serif;
+  --font-sans: "Manrope", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --weight-heading: 700;
+  --weight-label: 600;
+
+  --bg-0: oklch(98% 0.002 90);
+  --bg-1: oklch(100% 0 0);
+  --bg-2: oklch(96% 0.003 90);
+  --bg-3: oklch(93% 0.004 90);
+
+  --border-1: oklch(90% 0.003 90);
+  --border-2: oklch(82% 0.004 90);
+
+  --fg-1: oklch(20% 0.005 90);
+  --fg-2: oklch(38% 0.006 90);
+  --fg-3: oklch(58% 0.006 90);
+
+  --accent: oklch(52% 0.16 258);
+  --accent-hover: oklch(46% 0.17 258);
+  --accent-fg: oklch(99% 0 0);
+  --accent-soft: oklch(52% 0.16 258 / 0.1);
+
+  --success: oklch(55% 0.14 150);
+  --danger: oklch(55% 0.18 25);
+  --warning: oklch(70% 0.15 80);
+  --info: oklch(55% 0.12 230);
+
+  --chat-user-bg: var(--bg-2);
+  --chat-user-fg: var(--fg-1);
+  --chat-assistant-bg: transparent;
+  --chat-assistant-fg: var(--fg-1);
+  --chat-label-user: var(--fg-3);
+  --chat-label-assistant: var(--accent);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  --shadow-sm: 0 1px 2px oklch(20% 0 0 / 0.06);
+  --shadow-md: 0 6px 16px oklch(20% 0 0 / 0.08);
+  --shadow-lg: 0 16px 40px oklch(20% 0 0 / 0.12);
+
+  --focus-ring: 0 0 0 3px oklch(52% 0.16 258 / 0.35);
+}
+
+[data-theme="default"][data-mode="dark"] {
+  --bg-0: oklch(16% 0.004 260);
+  --bg-1: oklch(20% 0.005 260);
+  --bg-2: oklch(24% 0.006 260);
+  --bg-3: oklch(28% 0.007 260);
+
+  --border-1: oklch(30% 0.006 260);
+  --border-2: oklch(40% 0.008 260);
+
+  --fg-1: oklch(96% 0.003 260);
+  --fg-2: oklch(80% 0.006 260);
+  --fg-3: oklch(60% 0.008 260);
+
+  --accent: oklch(72% 0.15 258);
+  --accent-hover: oklch(78% 0.14 258);
+  --accent-fg: oklch(14% 0.01 260);
+  --accent-soft: oklch(72% 0.15 258 / 0.16);
+
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-md: 0 6px 16px oklch(0% 0 0 / 0.4);
+  --shadow-lg: 0 16px 40px oklch(0% 0 0 / 0.5);
+}

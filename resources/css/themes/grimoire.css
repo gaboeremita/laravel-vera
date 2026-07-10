@@ -1,0 +1,57 @@
+/* ==========================================================================
+   Theme: Grimoire
+   A warm, parchment-and-ink storybook register — the sibling to the terminal
+   theme for a fantasy-flavored companion. Cream/sepia surfaces, deep
+   burgundy + aged-gold accents, soft organic corners, engraved display
+   serif over a readable body serif, typewriter mono for "written" artifacts.
+   ========================================================================== */
+
+[data-theme="grimoire"] {
+  --font-display: "Cinzel", "Spectral", serif;
+  --font-sans: "Spectral", Georgia, serif;
+  --font-mono: "Cutive Mono", "Courier New", monospace;
+  --weight-heading: 600;
+  --weight-label: 600;
+
+  --bg-0: oklch(94% 0.02 75);
+  --bg-1: oklch(97% 0.015 75);
+  --bg-2: oklch(90% 0.025 72);
+  --bg-3: oklch(86% 0.03 68);
+
+  --border-1: oklch(78% 0.03 70);
+  --border-2: oklch(65% 0.045 65);
+
+  --fg-1: oklch(24% 0.02 40);
+  --fg-2: oklch(38% 0.03 40);
+  --fg-3: oklch(55% 0.03 45);
+
+  --accent: oklch(42% 0.13 30);
+  --accent-hover: oklch(36% 0.14 30);
+  --accent-fg: oklch(98% 0.01 75);
+  --accent-soft: oklch(42% 0.13 30 / 0.1);
+
+  --accent-2: oklch(58% 0.11 70);
+
+  --success: oklch(48% 0.12 145);
+  --danger: oklch(45% 0.17 25);
+  --warning: oklch(60% 0.14 75);
+  --info: oklch(50% 0.08 240);
+
+  --chat-user-bg: var(--bg-2);
+  --chat-user-fg: var(--fg-1);
+  --chat-assistant-bg: oklch(97% 0.02 75);
+  --chat-assistant-fg: var(--fg-1);
+  --chat-label-user: var(--fg-3);
+  --chat-label-assistant: var(--accent);
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+
+  --shadow-sm: 0 2px 6px oklch(30% 0.05 40 / 0.16);
+  --shadow-md: 0 8px 20px oklch(30% 0.05 40 / 0.18);
+  --shadow-lg: 0 20px 44px oklch(30% 0.05 40 / 0.22);
+
+  --focus-ring: 0 0 0 3px oklch(58% 0.11 70 / 0.45);
+}
