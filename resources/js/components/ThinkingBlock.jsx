@@ -10,7 +10,7 @@ export default function ThinkingBlock({ content }) {
         <div className="my-3">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-1.5 text-[0.7rem] tracking-[0.1em] uppercase text-[#505068] hover:text-[#707088] transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 text-[0.7rem] tracking-[0.1em] uppercase text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
             >
         <span className={`inline-block transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}>
           ▶
@@ -18,7 +18,7 @@ export default function ThinkingBlock({ content }) {
                 Thinking Process
             </button>
             {isOpen && (
-                <div className="mt-2 pl-4 border-l border-[#1a1a2e] text-[0.75rem] leading-relaxed text-[#505068] whitespace-pre-wrap">
+                <div className="mt-2 pl-4 border-l border-line-1 text-[0.75rem] leading-relaxed text-fg-3 whitespace-pre-wrap">
                     {formatMessage(content)}
                 </div>
             )}

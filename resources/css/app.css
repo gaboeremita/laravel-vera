@@ -1,93 +1,63 @@
 @import "styles.css";
 @import "tailwindcss";
 
-/* Custom theme colors referenced as text-vera-cyan, bg-vera-red, etc. */
 @theme {
-    --color-vera-cyan: #00ffc8;
-    --color-vera-red: #ff3e3e;
+    --color-bg-0: var(--bg-0);
+    --color-bg-1: var(--bg-1);
+    --color-bg-2: var(--bg-2);
+    --color-bg-3: var(--bg-3);
+
+    --color-fg-1: var(--fg-1);
+    --color-fg-2: var(--fg-2);
+    --color-fg-3: var(--fg-3);
+
+    --color-line-1: var(--border-1);
+    --color-line-2: var(--border-2);
+
+    --color-accent: var(--accent);
+    --color-accent-hover: var(--accent-hover);
+    --color-accent-fg: var(--accent-fg);
+    --color-accent-soft: var(--accent-soft);
+    --color-accent-3: var(--accent-3);
+
+    --color-danger: var(--danger);
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-info: var(--info);
+
+    --color-chat-user-bg: var(--chat-user-bg);
+    --color-chat-user-fg: var(--chat-user-fg);
+    --color-chat-assistant-bg: var(--chat-assistant-bg);
+    --color-chat-assistant-fg: var(--chat-assistant-fg);
+    --color-chat-label-user: var(--chat-label-user);
+    --color-chat-label-assistant: var(--chat-label-assistant);
+
+    /* Fonts */
+    --font-display: var(--font-display);
+    --font-sans: var(--font-sans);
+    --font-mono: var(--font-mono);
+
+    /* Radii */
+    --radius-sm: var(--radius-sm);
+    --radius-md: var(--radius-md);
+    --radius-lg: var(--radius-lg);
+    --radius-full: var(--radius-full);
+
+    /* Shadows */
+    --shadow-sm: var(--shadow-sm);
+    --shadow-md: var(--shadow-md);
+    --shadow-lg: var(--shadow-lg);
+
+    /* Focus */
+    --shadow-focus: var(--focus-ring);
 }
 
-/* CRT scanline overlay — repeating horizontal lines */
-.vera-scanlines {
-    background: repeating-linear-gradient(
-            0deg,
-            rgba(0, 255, 200, 0.02) 0px,
-            rgba(0, 255, 200, 0.02) 1px,
-            transparent 1px,
-            transparent 3px
-    );
-}
-
-/* Portrait-specific scanlines — heavier opacity */
-.vera-portrait-scanlines {
-    background: repeating-linear-gradient(
-            0deg,
-            rgba(0, 0, 0, 0.15) 0px,
-            rgba(0, 0, 0, 0.15) 1px,
-            transparent 1px,
-            transparent 3px
-    );
-}
-
-/* Portrait background gradient */
-.vera-portrait-bg {
-    background: linear-gradient(180deg, #2a1050 0%, #0a2a2a 100%);
-}
-
-/* CRT vignette — darkened edges */
-.vera-vignette {
-    background: radial-gradient(
-            ellipse at center,
-            transparent 50%,
-            rgba(0, 0, 0, 0.6) 100%
-    );
-}
-
-/* VERA title text glow */
-.vera-glow {
-    text-shadow: 0 0 20px rgba(0, 255, 200, 0.3);
-}
-
-/* Blinking cursor animation */
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-}
-
-.vera-cursor {
-    animation: blink 0.8s step-end infinite;
-}
-
-/* Custom scrollbar styling */
-.vera-scrollbar::-webkit-scrollbar {
-    width: 4px;
-}
-
-.vera-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.vera-scrollbar::-webkit-scrollbar-thumb {
-    background: #1a1a2e;
-    border-radius: 2px;
-}
-
-/* Underline indicator animation — scales from center */
 @keyframes underline-in {
-    from {
-        transform: scaleX(0);
-    }
-    to {
-        transform: scaleX(1);
-    }
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
 }
 
 .animate-underline-in {
     animation: underline-in 0.15s ease-out forwards;
     transform-origin: center;
 }
-
-/* Underline color variants for the conversation list */
-.bg-vera-cyan { background-color: #00ffc8; }
-.bg-vera-red { background-color: #ff3e3e; }
-.bg-green-400 { background-color: #4ade80; }

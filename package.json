@@ -20,6 +20,15 @@
         "vite": "^8.0.0"
     },
     "dependencies": {
+        "@fontsource-variable/ibm-plex-sans": "^5.2.8",
+        "@fontsource-variable/instrument-sans": "^5.2.8",
+        "@fontsource-variable/jetbrains-mono": "^5.2.8",
+        "@fontsource-variable/manrope": "^5.2.8",
+        "@fontsource/cinzel": "^5.2.8",
+        "@fontsource/cutive-mono": "^5.2.8",
+        "@fontsource/ibm-plex-mono": "^5.2.7",
+        "@fontsource/share-tech-mono": "^5.2.7",
+        "@fontsource/spectral": "^5.2.8",
         "framer-motion": "^12.42.0",
         "lucide-react": "^1.18.0",
         "react": "^19.2.7",

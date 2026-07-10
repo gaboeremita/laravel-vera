@@ -59,4 +59,49 @@
 
   --scanline-color: rgba(0, 255, 200, 0.02);
   --vignette-color: rgba(0, 0, 0, 0.6);
+
+  & .viewport-overlay {
+    background: repeating-linear-gradient(
+            0deg,
+            var(--scanline-color) 0px,
+            var(--scanline-color) 1px,
+            transparent 1px,
+            transparent 3px
+    );
+  }
+
+  & .viewport-ambient {
+    background: radial-gradient(ellipse at center, transparent 50%, var(--vignette-color) 100%);
+  }
+
+  & .portrait-overlay {
+    background: repeating-linear-gradient(
+            0deg,
+            rgba(0, 0, 0, 0.15) 0px,
+            rgba(0, 0, 0, 0.15) 1px,
+            transparent 1px,
+            transparent 3px
+    );
+  }
+
+  & .portrait-bg {
+    background: linear-gradient(180deg, #2a1050 0%, #0a2a2a 100%);
+  }
+
+  & .text-emphasis {
+    text-shadow: 0 0 20px var(--accent-soft);
+  }
+
+  & .cursor-effect {
+    animation: blink 0.8s step-end infinite;
+  }
+
+  & .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+  & .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  & .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border-1); border-radius: 2px; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }

@@ -38,13 +38,13 @@ export default function BootSequence({ onComplete }) {
                     className={`mb-1 text-[0.8rem] ${
                         line === "" ? "opacity-0" : "opacity-100"
                     } ${
-                        line.startsWith("WARNING") ? "text-vera-red" : "text-vera-cyan"
+                        line.startsWith("WARNING") ? "text-danger" : "text-accent"
                     }`}
                 >
                     {line}
                 </div>
             ))}
-            <span className="vera-cursor text-vera-cyan">_</span>
+            <span className="cursor-effect text-accent">_</span>
         </div>
     );
 }

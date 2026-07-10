@@ -15,7 +15,7 @@ function timeAgo(dateString) {
 }
 
 // Animated underline indicator
-function ActiveUnderline({ color = "vera-cyan" }) {
+function ActiveUnderline({ color = "accent" }) {
 	return (
 		<span
 			className={`absolute bottom-0 left-0 right-0 h-[1px] bg-${color} animate-underline-in`}
@@ -128,7 +128,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 			onKeyDown={handleKeyDown}
 			ref={listRef}
 		>
-			<div className="text-vera-cyan text-[0.8rem] font-bold tracking-[0.15em] uppercase mb-1">
+			<div className="text-accent text-[0.8rem] font-bold tracking-[0.15em] uppercase mb-1">
 				Select conversation
 			</div>
 			<div className="text-[#1a1a2e] text-[0.7rem] mb-4">
@@ -140,7 +140,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 					key={conv.id}
 					onMouseEnter={() => setActiveRow(i)}
 					className={`flex items-center gap-3 px-2 py-1.5 text-[0.8rem] font-mono transition-colors duration-150 ${
-						isRowActive(i) ? "text-vera-cyan" : "text-[#555568]"
+						isRowActive(i) ? "text-accent" : "text-fg-3"
 					}`}
 				>
                 <span className="w-4 shrink-0">
@@ -165,7 +165,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 								e.stopPropagation();
 							}}
 							onBlur={saveEditing}
-							className="flex-1 bg-transparent border-b border-vera-cyan text-vera-cyan font-mono text-[0.8rem] outline-none caret-vera-cyan"
+							className="flex-1 bg-transparent border-b border-accent text-accent font-mono text-[0.8rem] outline-none caret-accent"
 							maxLength={100}
 						/>
 					) : (
@@ -177,7 +177,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 							{i + 1}.{" "}
 							<span className={`pb-0.5 border-b-2 transition-all duration-150 ${
 								isRowActive(i) && activeColumn === "select"
-									? "border-vera-cyan"
+									? "border-accent"
 									: "border-transparent"
 							}`}>
 								{conv.title || "Untitled"}
@@ -191,10 +191,10 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 						onMouseEnter={() => setActiveColumn("edit")}
 						className={`shrink-0 cursor-pointer pb-0.5 border-b-2 transition-all duration-150 ${
 							isRowActive(i) && activeColumn === "edit"
-								? "text-vera-cyan border-vera-cyan"
+								? "text-accent border-accent"
 								: isRowActive(i)
-									? "text-vera-cyan/50 border-transparent"
-									: "text-vera-cyan/20 border-transparent"
+									? "text-accent/50 border-transparent"
+									: "text-accent/20 border-transparent"
 						}`}
 					>
 						<Pencil size={14} />
@@ -202,7 +202,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 
 					{/* Timestamp */}
 					<span className={`text-[0.65rem] shrink-0 transition-colors duration-150 ${
-						isRowActive(i) ? "text-[#505068]" : "text-[#303045]"
+						isRowActive(i) ? "text-fg-3" : "text-fg-3"
 					}`}>
                     {timeAgo(conv.updated_at)}
                 </span>
@@ -213,10 +213,10 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 						onMouseEnter={() => setActiveColumn("delete")}
 						className={`shrink-0 cursor-pointer pb-0.5 border-b-2 transition-all duration-150 ${
 							isRowActive(i) && activeColumn === "delete"
-								? "text-vera-red border-vera-red"
+								? "text-danger border-danger"
 								: isRowActive(i)
-									? "text-vera-red border-transparent"
-									: "text-vera-red/30 border-transparent"
+									? "text-danger border-transparent"
+									: "text-danger/30 border-transparent"
 						}`}
 					>
 						<Trash2 size={14} />
@@ -233,8 +233,8 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 				}}
 				className={`w-full text-left px-2 py-1.5 flex items-center gap-3 text-[0.8rem] font-mono cursor-pointer transition-colors duration-150 mt-2 ${
 					activeRow === conversations.length
-						? "text-green-400"
-						: "text-green-400/40"
+						? "text-success"
+						: "text-success/40"
 				}`}
 			>
             <span className="w-4 shrink-0">
@@ -243,7 +243,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 				<span>+{" "}
 					<span className={`pb-0.5 border-b-2 transition-all duration-150 ${
 						activeRow === conversations.length
-							? "border-green-400"
+							? "border-success"
 							: "border-transparent"
 					}`}>
                     New conversation
@@ -251,7 +251,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
             </span>
 			</button>
 
-			<div className="text-[#303045] text-[0.65rem] mt-6 tracking-[0.1em]">
+			<div className="text-fg-3 text-[0.65rem] mt-6 tracking-[0.1em]">
 				Enter to select · ↑↓ navigate · ←→ select/rename/delete
 			</div>
 

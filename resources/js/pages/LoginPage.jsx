@@ -81,11 +81,11 @@ export default function LoginPage() {
 	};
 
 	return (
-		<div className="w-full h-screen bg-[#0a0a0f] font-mono flex relative overflow-hidden">
+		<div className="w-full h-screen bg-bg-0 font-mono flex relative overflow-hidden">
 			<Scanlines />
-			<div className="absolute inset-0 pointer-events-none z-[11] vera-vignette" />
+			<div className="absolute inset-0 pointer-events-none z-[11] viewport-ambient" />
 
-			<div className="w-[35%] min-w-50 max-w-400 shrink-0 border-r border-[#1a1a2e] relative z-5">
+			<div className="w-[35%] min-w-50 max-w-400 shrink-0 border-r border-line-1 relative z-5">
 				<Portrait
 					emotion="neutral"
 					authenticated={false}
@@ -96,19 +96,19 @@ export default function LoginPage() {
 
 			<div className="flex-1 flex flex-col relative z-5 min-w-0">
 				<Header
-					status={{ label: 'OFFLINE', color: 'text-purple-400', dot: '○', blink: false }}
+					status={{ label: 'OFFLINE', color: 'text-fg-3', dot: '○', blink: false }}
 				/>
 
 				<div className="flex-1 overflow-y-auto p-6">
 					{messages.map((msg, i) => (
-						<div key={i} className="mb-1 text-[0.8rem] text-vera-cyan">
+						<div key={i} className="mb-1 text-[0.8rem] text-accent">
 							{msg.content}
 						</div>
 					))}
 				</div>
 
-				<div className="px-5 py-3 border-t border-[#1a1a2e] flex gap-2 items-center shrink-0">
-                    <span className="text-vera-cyan text-xs shrink-0 whitespace-nowrap">
+				<div className="px-5 py-3 border-t border-line-1 flex gap-2 items-center shrink-0">
+                    <span className="text-accent text-xs shrink-0 whitespace-nowrap">
                         {loginStep === 'password' ? '> Enter password:' : '> Enter email:'}
                     </span>
 					<input
@@ -118,7 +118,7 @@ export default function LoginPage() {
 						onChange={(e) => setInput(e.target.value)}
 						onKeyDown={handleKeyDown}
 						disabled={loginStep === 'authenticating'}
-						className="flex-1 bg-transparent border-none outline-none text-[#a0a0b0] font-mono text-sm caret-vera-cyan placeholder:text-[#2a2a3e]"
+						className="flex-1 bg-transparent border-none outline-none text-fg-1 font-mono text-sm caret-accent placeholder:text-line-2"
 						placeholder={loginStep === 'password' ? 'Enter password...' : 'Enter email...'}
 					/>
 				</div>

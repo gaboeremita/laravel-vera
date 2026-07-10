@@ -6,17 +6,17 @@ export default function ToastContainer({ toasts, onDismiss }) {
 			{toasts.map((toast) => (
 				<div
 					key={toast.id}
-					className={`flex items-start gap-3 px-4 py-3 font-mono text-[0.75rem] border bg-[#0a0a0f]/95 backdrop-blur-sm ${
+					className={`flex items-start gap-3 px-4 py-3 font-mono text-[0.75rem] border bg-bg-0/95 backdrop-blur-sm ${
 						toast.type === "error"
-							? "border-vera-red text-vera-red"
-							: "border-vera-cyan text-vera-cyan"
+							? "border-danger text-danger"
+							: "border-accent text-accent"
 					}`}
 				>
                     <span className="shrink-0 mt-0.5 tracking-[0.15em] uppercase text-[0.6rem] font-bold">
                         {toast.type === "error" ? "ERR" : "SYS"}
                     </span>
 
-					<span className="flex-1 text-[#c8c8d8] leading-relaxed">
+					<span className="flex-1 text-fg-1 leading-relaxed">
                         {toast.message}
                     </span>
 
@@ -24,8 +24,8 @@ export default function ToastContainer({ toasts, onDismiss }) {
 						onClick={() => onDismiss(toast.id)}
 						className={`shrink-0 cursor-pointer text-[0.7rem] transition-colors ${
 							toast.type === "error"
-								? "text-vera-red/50 hover:text-vera-red"
-								: "text-vera-cyan/50 hover:text-vera-cyan"
+								? "text-danger/50 hover:text-danger"
+								: "text-accent/50 hover:text-accent"
 						}`}
 					>
 						✕

@@ -216,9 +216,9 @@ export default function ChatPage() {
 	};
 
 	const status = (() => {
-		if (hasError) return { label: 'ERROR', color: 'text-vera-red', dot: '●', blink: false };
-		if (isLoading) return { label: 'THINKING', color: 'text-indigo-400', dot: '●', blink: true };
-		return { label: 'READY', color: 'text-green-400', dot: '●', blink: false };
+		if (hasError) return { label: 'ERROR', color: 'text-danger', dot: '●', blink: false };
+		if (isLoading) return { label: 'THINKING', color: 'text-accent-3', dot: '●', blink: true };
+		return { label: 'READY', color: 'text-success', dot: '●', blink: false };
 	})();
 
 	return (
@@ -230,13 +230,13 @@ export default function ChatPage() {
 					<>
 						<button
 							onClick={() => navigate('/lorebook')}
-							className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+							className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
 						>
 							LOREBOOK
 						</button>
 						<button
 							onClick={() => navigate('/conversations')}
-							className="bg-indigo-500/15 border border-indigo-400 text-indigo-400 hover:bg-indigo-500/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+							className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
 						>
 							← CONVERSATIONS
 						</button>
@@ -261,16 +261,16 @@ export default function ChatPage() {
 						}}
 						onBlur={saveTitle}
 						maxLength={100}
-						className="bg-transparent border-b border-vera-cyan text-[#7070a0] text-sm font-mono tracking-[0.05em] outline-none caret-vera-cyan max-w-xs"
+						className="bg-transparent border-b border-accent text-fg-2 text-sm font-mono tracking-[0.05em] outline-none caret-accent max-w-xs"
 					/>
 				) : (
 					<span className="flex items-center gap-2">
-						<span className="text-[#7070a0] text-sm tracking-[0.05em] truncate max-w-xs">
+						<span className="text-fg-2 text-sm tracking-[0.05em] truncate max-w-xs">
 							// {conversationTitle}
 						</span>
 						<button
 							onClick={startEditingTitle}
-							className="text-[#7070a0]/30 hover:text-vera-cyan transition-colors cursor-pointer"
+							className="text-fg-2/30 hover:text-accent transition-colors cursor-pointer"
 						>
 							<Pencil size={12} />
 						</button>
@@ -285,23 +285,23 @@ export default function ChatPage() {
 			</div>
 
 			{pendingImage && (
-				<div className="px-5 py-2 border-t border-[#1a1a2e] flex items-center gap-2">
+				<div className="px-5 py-2 border-t border-line-1 flex items-center gap-2">
 					<img
 						src={pendingImage}
 						alt="Pending upload"
-						className="h-16 w-16 object-cover rounded border border-[#1a1a2e]"
+						className="h-16 w-16 object-cover rounded border border-line-1"
 					/>
 					<button
 						onClick={() => setPendingImage(null)}
-						className="text-vera-red text-xs hover:text-red-400 cursor-pointer"
+						className="text-danger text-xs hover:text-danger cursor-pointer"
 					>
 						✕
 					</button>
 				</div>
 			)}
 
-			<div className="px-5 py-3 border-t border-[#1a1a2e] flex gap-2 items-center shrink-0">
-				<span className="text-[#555568] text-xs shrink-0">USER&gt;</span>
+			<div className="px-5 py-3 border-t border-line-1 flex gap-2 items-center shrink-0">
+				<span className="text-fg-3 text-xs shrink-0">USER&gt;</span>
 				<input
 					ref={fileInputRef}
 					type="file"
@@ -311,7 +311,7 @@ export default function ChatPage() {
 				/>
 				<button
 					onClick={() => fileInputRef.current?.click()}
-					className="text-[#555568] hover:text-vera-cyan transition-colors shrink-0 cursor-pointer"
+					className="text-fg-3 hover:text-accent transition-colors shrink-0 cursor-pointer"
 				>
 					📎
 				</button>
@@ -323,15 +323,15 @@ export default function ChatPage() {
 					onKeyDown={handleKeyDown}
 					disabled={isLoading}
 					placeholder={isLoading ? 'VERA is processing...' : 'Type something...'}
-					className="flex-1 bg-transparent border-none outline-none text-[#a0a0b0] font-mono text-sm caret-vera-cyan placeholder:text-[#2a2a3e]"
+					className="flex-1 bg-transparent border-none outline-none text-fg-1 font-mono text-sm caret-accent placeholder:text-line-2"
 				/>
 				<button
 					onClick={sendMessage}
 					disabled={isLoading || !input.trim()}
 					className={`bg-transparent border font-mono text-[0.7rem] px-3 py-1.5 tracking-[0.1em] transition-all shrink-0 ${
 						isLoading || !input.trim()
-							? 'border-[#2a2a3e] text-[#2a2a3e] cursor-default'
-							: 'border-[#2a2a3e] text-vera-cyan cursor-pointer'
+							? 'border-line-2 text-[#2a2a3e] cursor-default'
+							: 'border-line-2 text-accent cursor-pointer'
 					}`}
 				>
 					SEND

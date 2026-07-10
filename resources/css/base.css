@@ -18,16 +18,6 @@
   --space-7: 3rem;      /* 48px */
   --space-8: 4rem;      /* 64px */
 
-  /* Type scale (sizes — family + weight come from theme tokens) */
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.9375rem;
-  --text-md: 1.0625rem;
-  --text-lg: 1.25rem;
-  --text-xl: 1.5rem;
-  --text-2xl: 1.875rem;
-  --text-3xl: 2.5rem;
-
   --leading-tight: 1.2;
   --leading-normal: 1.5;
   --leading-relaxed: 1.7;

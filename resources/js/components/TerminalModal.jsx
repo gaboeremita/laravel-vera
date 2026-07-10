@@ -33,12 +33,12 @@ export default function TerminalModal({ title, message, options, onSelect }) {
 				ref={modalRef}
 				tabIndex={0}
 				onKeyDown={handleKeyDown}
-				className="border border-[#1a1a2e] bg-[#0a0a0f] p-6 max-w-sm w-full focus:outline-none"
+				className="border border-line-1 bg-bg-0 p-6 max-w-sm w-full focus:outline-none"
 			>
-				<div className="text-vera-red text-[0.7rem] font-bold tracking-[0.2em] uppercase mb-3">
+				<div className="text-danger text-[0.7rem] font-bold tracking-[0.2em] uppercase mb-3">
 					{title}
 				</div>
-				<div className="text-[#888898] text-[0.8rem] mb-5">
+				<div className="text-fg-2 text-[0.8rem] mb-5">
 					{message}
 				</div>
 				<div className="flex gap-4">
@@ -50,16 +50,16 @@ export default function TerminalModal({ title, message, options, onSelect }) {
 							className={`font-mono text-[0.75rem] px-4 py-1.5 border tracking-[0.1em] cursor-pointer transition-colors ${
 								activeIndex === i
 									? opt.destructive
-										? "border-vera-red text-vera-red"
-										: "border-vera-cyan text-vera-cyan"
-									: "border-[#1a1a2e] text-[#555568]"
+										? "border-danger text-danger"
+										: "border-accent text-accent"
+									: "border-line-1 text-fg-3"
 							}`}
 						>
 							{opt.label}
 						</button>
 					))}
 				</div>
-				<div className="text-[#303045] text-[0.6rem] mt-4 tracking-[0.1em]">
+				<div className="text-fg-3 text-[0.6rem] mt-4 tracking-[0.1em]">
 					←→ to navigate · Enter to confirm · Esc to cancel
 				</div>
 			</div>

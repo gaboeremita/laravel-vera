@@ -54,4 +54,29 @@
   --shadow-lg: 0 20px 44px oklch(30% 0.05 40 / 0.22);
 
   --focus-ring: 0 0 0 3px oklch(58% 0.11 70 / 0.45);
+
+  & .viewport-ambient {
+    background: radial-gradient(ellipse at center, transparent 40%, oklch(24% 0.02 40 / 0.5) 100%);
+  }
+
+  & .portrait-bg {
+    background: linear-gradient(180deg, oklch(30% 0.04 40) 0%, oklch(20% 0.03 60) 100%);
+  }
+
+  & .text-emphasis {
+    text-shadow: 0 1px 2px oklch(24% 0.02 40 / 0.4);
+  }
+
+  & .cursor-effect {
+    animation: fade-pulse 2s ease-in-out infinite;
+  }
+
+  & .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+  & .custom-scrollbar::-webkit-scrollbar-track { background: var(--bg-2); }
+  & .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+}
+
+@keyframes fade-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }

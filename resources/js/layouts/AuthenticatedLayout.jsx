@@ -56,11 +56,11 @@ export default function AuthenticatedLayout() {
 	if (authState === 'unauthenticated') return <Navigate to="/login" replace />;
 
 	return (
-		<div className="w-full h-screen bg-[#0a0a0f] font-mono flex relative overflow-hidden">
+		<div className="w-full h-screen bg-bg-0 font-mono flex relative overflow-hidden">
 			<Scanlines />
-			<div className="absolute inset-0 pointer-events-none z-[11] vera-vignette" />
+			<div className="absolute inset-0 pointer-events-none z-[11] viewport-ambient" />
 
-			<div className="w-[35%] min-w-50 max-w-400 shrink-0 border-r border-[#1a1a2e] relative z-5">
+			<div className="w-[35%] min-w-50 max-w-400 shrink-0 border-r border-line-1 relative z-5">
 				<Portrait
 					emotion={currentEmotion}
 					authenticated={true}

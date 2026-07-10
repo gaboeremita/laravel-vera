@@ -23,21 +23,21 @@ export function formatMessage(text) {
         if (segment.startsWith("[")) {
             // Bracketed text → bold
             parts.push(
-                <span key={match.index} className="font-bold text-vera-cyan">
+                <span key={match.index} className="font-bold text-accent">
           {segment}
         </span>
             );
         } else if (segment.startsWith("*")) {
             // Asterisked text → italic, muted color
             parts.push(
-                <span key={match.index} className="italic text-[#707088]">
+                <span key={match.index} className="italic text-fg-2">
           {segment.slice(1, -1)}
         </span>
             );
         } else if (segment.startsWith("(")) {
             // Parenthesized text → inner thoughts
             parts.push(
-                <span key={match.index} className="italic text-[#8868a8]">
+                <span key={match.index} className="italic text-accent-3">
                   {segment}
                 </span>
             );
