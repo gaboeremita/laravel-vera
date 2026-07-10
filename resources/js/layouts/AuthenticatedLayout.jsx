@@ -56,7 +56,7 @@ export default function AuthenticatedLayout() {
 	if (authState === 'unauthenticated') return <Navigate to="/login" replace />;
 
 	return (
-		<div className="w-full h-screen bg-bg-0 font-mono flex relative overflow-hidden">
+		<div className="w-full h-screen bg-bg-0  flex relative overflow-hidden">
 			<Scanlines />
 			<div className="absolute inset-0 pointer-events-none z-[11] viewport-ambient" />
 

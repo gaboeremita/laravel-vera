@@ -51,10 +51,10 @@ export default function Portrait({ emotion, authenticated, getImageUrl, getVideo
 				/>
 				<div className="absolute inset-0 pointer-events-none portrait-overlay" />
 				<div className="relative z-10 text-center px-4">
-					<div className="text-danger font-bold text-lg tracking-[0.2em] uppercase font-mono">
+					<div className="text-danger font-bold text-lg tracking-[0.2em] uppercase ">
 						Please log in
 					</div>
-					<div className="text-danger font-bold text-sm tracking-[0.15em] uppercase font-mono mt-1">
+					<div className="text-danger font-bold text-sm tracking-[0.15em] uppercase  mt-1">
 						to access VERA
 					</div>
 				</div>
@@ -86,7 +86,7 @@ export default function Portrait({ emotion, authenticated, getImageUrl, getVideo
 				className="w-full h-full object-cover object-top transition-opacity duration-300"
 			/>
 			<div className="absolute inset-0 pointer-events-none portrait-overlay" />
-			<div className="absolute bottom-3 left-3 bg-black/60 px-2.5 py-1 text-[0.6rem] tracking-[0.15em] text-accent uppercase font-mono">
+			<div className="absolute bottom-3 left-3 bg-black/60 px-2.5 py-1 text-[0.6rem] tracking-[0.15em] text-accent uppercase ">
 				mood: {emotion}
 			</div>
 		</div>

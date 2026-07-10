@@ -9,8 +9,8 @@
 
 [data-theme="terminal"] {
   --font-display: "Instrument Sans", system-ui, sans-serif;
-  --font-sans: "Instrument Sans", system-ui, sans-serif;
-  --font-mono: "Share Tech Mono", ui-monospace, monospace;
+  --font-secondary: "Instrument Sans", system-ui, sans-serif;
+  --font-primary: "Share Tech Mono", ui-monospace, monospace;
   --weight-heading: 700;
   --weight-label: 700;
 

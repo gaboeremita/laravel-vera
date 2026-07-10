@@ -122,7 +122,7 @@ export default function LorebookPage() {
 					actions={
 						<button
 							onClick={() => navigate('/conversations')}
-							className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+							className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em]  cursor-pointer transition-colors px-4 py-1.5"
 						>
 							← CONVERSATIONS
 						</button>
@@ -145,7 +145,7 @@ export default function LorebookPage() {
 				actions={
 					<button
 						onClick={() => navigate(-1)}
-						className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+						className="button-primary"
 					>
 						← PREVIOUS PAGE
 					</button>
@@ -166,7 +166,7 @@ export default function LorebookPage() {
 							value={name}
 							onChange={(e) => setName(e.target.value)}
 							maxLength={100}
-							className="w-full bg-bg-1 border border-line-1 text-accent text-sm font-mono px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors"
 							placeholder="e.g. The Bridge Universe"
 						/>
 					</div>
@@ -178,7 +178,7 @@ export default function LorebookPage() {
 							value={description}
 							onChange={(e) => setDescription(e.target.value)}
 							rows={3}
-							className="w-full bg-bg-1 border border-line-1 text-accent text-sm font-mono px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none"
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none"
 							placeholder="Describe this lorebook..."
 						/>
 					</div>
@@ -201,7 +201,7 @@ export default function LorebookPage() {
 									const newState = !allCollapsed;
 									setEntries((prev) => prev.map((e) => ({ ...e, collapsed: newState })));
 								}}
-								className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+								className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em]  cursor-pointer transition-colors px-4 py-1.5"
 							>
 								{allCollapsed ? 'EXPAND ALL' : 'COLLAPSE ALL'}
 							</button>
@@ -244,7 +244,7 @@ export default function LorebookPage() {
 											e.stopPropagation();
 											setDeleteIndex(index);
 										}}
-										className="text-danger text-[0.7rem] tracking-[0.1em] font-mono cursor-pointer hover:text-danger transition-colors"
+										className="text-danger text-[0.7rem] tracking-[0.1em]  cursor-pointer hover:text-danger transition-colors"
 									>
 										DELETE
 									</button>
@@ -270,7 +270,7 @@ export default function LorebookPage() {
 														value={entry.title}
 														onChange={(e) => updateEntry(index, 'title', e.target.value)}
 														maxLength={100}
-														className="w-full bg-bg-1 border border-line-1 text-accent text-sm font-mono px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+														className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors"
 														placeholder="e.g. The Bridge"
 													/>
 												</div>
@@ -283,7 +283,7 @@ export default function LorebookPage() {
 														value={entry.content}
 														onChange={(e) => updateEntry(index, 'content', e.target.value)}
 														rows={5}
-														className="w-full bg-bg-1 border border-line-1 text-accent text-sm font-mono px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none"
+														className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none"
 														placeholder="The lore content that will be embedded and injected into prompts..."
 													/>
 												</div>
@@ -297,7 +297,7 @@ export default function LorebookPage() {
 														type="text"
 														value={entry.keywords}
 														onChange={(e) => updateEntry(index, 'keywords', e.target.value)}
-														className="w-full bg-bg-1 border border-line-1 text-accent text-sm font-mono px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+														className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors"
 														placeholder="e.g. Bridge, city, digital"
 													/>
 												</div>
@@ -311,7 +311,7 @@ export default function LorebookPage() {
 														type="text"
 														value={entry.tags}
 														onChange={(e) => updateEntry(index, 'tags', e.target.value)}
-														className="w-full bg-bg-1 border border-line-1 text-accent text-sm font-mono px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+														className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors"
 														placeholder="e.g. location, worldbuilding"
 													/>
 												</div>
@@ -330,7 +330,7 @@ export default function LorebookPage() {
 
 						<button
 							onClick={addEntry}
-							className="w-full border border-dashed border-line-1 text-success text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer hover:border-success/50 hover:bg-green-400/5 transition-colors py-3 mt-4"
+							className="w-full border border-dashed border-line-1 text-success text-[0.75rem] tracking-[0.1em]  cursor-pointer hover:border-success/50 hover:bg-green-400/5 transition-colors py-3 mt-4"
 						>
 							+ ADD ENTRY
 						</button>
@@ -343,7 +343,7 @@ export default function LorebookPage() {
 				<button
 					onClick={save}
 					disabled={isSaving || !name.trim() || !description.trim()}
-					className={`w-full font-mono text-[0.75rem] tracking-[0.1em] py-2 transition-colors ${
+					className={`w-full  button-success ${
 						isSaving || !name.trim() || !description.trim()
 							? 'bg-[#1a1a2e] text-fg-3 cursor-default'
 							: 'bg-accent/10 border border-accent text-accent hover:bg-accent/20 cursor-pointer'
@@ -364,7 +364,7 @@ export default function LorebookPage() {
 						<div className="flex gap-3 justify-end">
 							<button
 								onClick={() => setDeleteIndex(null)}
-								className="bg-transparent border border-line-1 text-fg-3 text-[0.75rem] tracking-[0.1em] font-mono px-4 py-1.5 cursor-pointer hover:text-accent transition-colors"
+								className="bg-transparent border border-line-1 text-fg-3 text-[0.75rem] tracking-[0.1em]  px-4 py-1.5 cursor-pointer hover:text-accent transition-colors"
 							>
 								CANCEL
 							</button>
@@ -373,7 +373,7 @@ export default function LorebookPage() {
 									removeEntry(deleteIndex);
 									setDeleteIndex(null);
 								}}
-								className="bg-transparent border border-danger text-danger text-[0.75rem] tracking-[0.1em] font-mono px-4 py-1.5 cursor-pointer hover:bg-danger/10 transition-colors"
+								className="bg-transparent border border-danger text-danger text-[0.75rem] tracking-[0.1em]  px-4 py-1.5 cursor-pointer hover:bg-danger/10 transition-colors"
 							>
 								CONFIRM
 							</button>

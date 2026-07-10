@@ -230,13 +230,13 @@ export default function ChatPage() {
 					<>
 						<button
 							onClick={() => navigate('/lorebook')}
-							className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+							className="button-primary"
 						>
 							LOREBOOK
 						</button>
 						<button
 							onClick={() => navigate('/conversations')}
-							className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+							className="button-primary"
 						>
 							← CONVERSATIONS
 						</button>
@@ -261,7 +261,7 @@ export default function ChatPage() {
 						}}
 						onBlur={saveTitle}
 						maxLength={100}
-						className="bg-transparent border-b border-accent text-fg-2 text-sm font-mono tracking-[0.05em] outline-none caret-accent max-w-xs"
+						className="bg-transparent border-b border-accent text-fg-2 text-sm  tracking-[0.05em] outline-none caret-accent max-w-xs"
 					/>
 				) : (
 					<span className="flex items-center gap-2">
@@ -323,12 +323,12 @@ export default function ChatPage() {
 					onKeyDown={handleKeyDown}
 					disabled={isLoading}
 					placeholder={isLoading ? 'VERA is processing...' : 'Type something...'}
-					className="flex-1 bg-transparent border-none outline-none text-fg-1 font-mono text-sm caret-accent placeholder:text-line-2"
+					className="flex-1 bg-transparent border-none outline-none text-fg-1  text-sm caret-accent placeholder:text-line-2"
 				/>
 				<button
 					onClick={sendMessage}
 					disabled={isLoading || !input.trim()}
-					className={`bg-transparent border font-mono text-[0.7rem] px-3 py-1.5 tracking-[0.1em] transition-all shrink-0 ${
+					className={`bg-transparent border  text-[0.7rem] px-3 py-1.5 tracking-[0.1em] transition-all shrink-0 ${
 						isLoading || !input.trim()
 							? 'border-line-2 text-[#2a2a3e] cursor-default'
 							: 'border-line-2 text-accent cursor-pointer'

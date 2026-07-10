@@ -6,7 +6,7 @@ export default function ToastContainer({ toasts, onDismiss }) {
 			{toasts.map((toast) => (
 				<div
 					key={toast.id}
-					className={`flex items-start gap-3 px-4 py-3 font-mono text-[0.75rem] border bg-bg-0/95 backdrop-blur-sm ${
+					className={`flex items-start gap-3 px-4 py-3  text-[0.75rem] border bg-bg-0/95 backdrop-blur-sm ${
 						toast.type === "error"
 							? "border-danger text-danger"
 							: "border-accent text-accent"

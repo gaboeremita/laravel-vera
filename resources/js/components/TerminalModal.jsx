@@ -47,7 +47,7 @@ export default function TerminalModal({ title, message, options, onSelect }) {
 							key={opt.value}
 							onClick={() => onSelect(opt.value)}
 							onMouseEnter={() => setActiveIndex(i)}
-							className={`font-mono text-[0.75rem] px-4 py-1.5 border tracking-[0.1em] cursor-pointer transition-colors ${
+							className={` text-[0.75rem] px-4 py-1.5 border tracking-[0.1em] cursor-pointer transition-colors ${
 								activeIndex === i
 									? opt.destructive
 										? "border-danger text-danger"

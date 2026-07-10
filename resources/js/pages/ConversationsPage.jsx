@@ -45,7 +45,7 @@ export default function ConversationsPage() {
 				actions={
 					<button
 						onClick={() => navigate('/lorebook')}
-						className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em] font-mono cursor-pointer transition-colors px-4 py-1.5"
+						className="button-primary"
 					>
 						LOREBOOK
 					</button>

@@ -34,8 +34,8 @@
 
     /* Fonts */
     --font-display: var(--font-display);
-    --font-sans: var(--font-sans);
-    --font-mono: var(--font-mono);
+    --font-primary: var(--font-sans);
+    --font-secondary: var(--font-secondary);
 
     /* Radii */
     --radius-sm: var(--radius-sm);
@@ -52,6 +52,10 @@
     --shadow-focus: var(--focus-ring);
 }
 
+body {
+    font-family: var(--font-primary), sans-serif;
+}
+
 @keyframes underline-in {
     from { transform: scaleX(0); }
     to { transform: scaleX(1); }
@@ -60,4 +64,8 @@
 .animate-underline-in {
     animation: underline-in 0.15s ease-out forwards;
     transform-origin: center;
+}
+
+button, select, input, textarea {
+    border-radius: var(--radius-md);
 }

@@ -3,11 +3,14 @@
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\EmotionController;
 use App\Http\Controllers\Api\LorebookController;
+use App\Http\Controllers\Api\SettingsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', fn (Request $request) => $request->user());
+	Route::get('/settings', [SettingsController::class, 'show']);
+	Route::put('/settings', [SettingsController::class, 'update']);
     Route::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage']);
 	Route::get('/conversations', [ConversationController::class, 'index']);
 	Route::get('/conversations/{id}/messages', [ConversationController::class, 'show']);

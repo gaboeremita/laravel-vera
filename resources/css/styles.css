@@ -1,4 +1,5 @@
 @import "base.css";
+@import "components.css";
 @import "themes/default.css";
 @import "themes/slate.css";
 @import "themes/terminal.css";

@@ -9,8 +9,8 @@
 :root,
 [data-theme="default"] {
   --font-display: "Manrope", system-ui, sans-serif;
-  --font-sans: "Manrope", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-primary: "Manrope", system-ui, sans-serif;
+  --font-secondary: "Lora", serif;
   --weight-heading: 700;
   --weight-label: 600;
 

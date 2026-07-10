@@ -8,8 +8,8 @@
 
 [data-theme="grimoire"] {
   --font-display: "Cinzel", "Spectral", serif;
-  --font-sans: "Spectral", Georgia, serif;
-  --font-mono: "Cutive Mono", "Courier New", monospace;
+  --font-primary: "Spectral", Georgia, serif;
+  --font-secondary:  "Nunito", sans-serif;
   --weight-heading: 600;
   --weight-label: 600;
 

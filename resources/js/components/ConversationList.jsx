@@ -139,7 +139,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 				<div
 					key={conv.id}
 					onMouseEnter={() => setActiveRow(i)}
-					className={`flex items-center gap-3 px-2 py-1.5 text-[0.8rem] font-mono transition-colors duration-150 ${
+					className={`flex items-center gap-3 px-2 py-1.5 text-[0.8rem]  transition-colors duration-150 ${
 						isRowActive(i) ? "text-accent" : "text-fg-3"
 					}`}
 				>
@@ -165,7 +165,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 								e.stopPropagation();
 							}}
 							onBlur={saveEditing}
-							className="flex-1 bg-transparent border-b border-accent text-accent font-mono text-[0.8rem] outline-none caret-accent"
+							className="flex-1 bg-transparent border-b border-accent text-accent  text-[0.8rem] outline-none caret-accent"
 							maxLength={100}
 						/>
 					) : (
@@ -231,7 +231,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 					setActiveRow(conversations.length);
 					setActiveColumn("select");
 				}}
-				className={`w-full text-left px-2 py-1.5 flex items-center gap-3 text-[0.8rem] font-mono cursor-pointer transition-colors duration-150 mt-2 ${
+				className={`w-full text-left px-2 py-1.5 flex items-center gap-3 text-[0.8rem]  cursor-pointer transition-colors duration-150 mt-2 ${
 					activeRow === conversations.length
 						? "text-success"
 						: "text-success/40"

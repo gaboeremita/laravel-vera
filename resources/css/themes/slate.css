@@ -7,8 +7,8 @@
 
 [data-theme="slate"] {
   --font-display: "IBM Plex Sans", system-ui, sans-serif;
-  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-primary: "IBM Plex Sans", system-ui, sans-serif;
+  --font-secondary: "IBM Plex Serif", Georgia, serif;
   --weight-heading: 600;
   --weight-label: 600;
 

@@ -81,7 +81,7 @@ export default function LoginPage() {
 	};
 
 	return (
-		<div className="w-full h-screen bg-bg-0 font-mono flex relative overflow-hidden">
+		<div className="w-full h-screen bg-bg-0  flex relative overflow-hidden">
 			<Scanlines />
 			<div className="absolute inset-0 pointer-events-none z-[11] viewport-ambient" />
 
@@ -118,7 +118,7 @@ export default function LoginPage() {
 						onChange={(e) => setInput(e.target.value)}
 						onKeyDown={handleKeyDown}
 						disabled={loginStep === 'authenticating'}
-						className="flex-1 bg-transparent border-none outline-none text-fg-1 font-mono text-sm caret-accent placeholder:text-line-2"
+						className="flex-1 bg-transparent border-none outline-none text-fg-1  text-sm caret-accent placeholder:text-line-2"
 						placeholder={loginStep === 'password' ? 'Enter password...' : 'Enter email...'}
 					/>
 				</div>
