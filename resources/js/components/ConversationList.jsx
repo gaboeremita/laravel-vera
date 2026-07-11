@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Trash2, Pencil } from "lucide-react";
+import { route } from 'ziggy-js';
 import TerminalModal from "./TerminalModal";
 import { api } from "../utils/api";
 
@@ -80,7 +81,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 
 	const handleDelete = async (id) => {
 		try {
-			await api.delete(`/api/conversations/${id}`);
+			await api.delete(route('conversations.destroy', { assistant: 1, id }));
 			setPendingDeleteId(null);
 			onDelete(id);
 		} catch {

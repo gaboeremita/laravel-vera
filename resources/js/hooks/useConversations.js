@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { route } from 'ziggy-js';
 import { api } from "../utils/api";
 import { parseEmotionFromResponse } from "../utils/parsers";
 
@@ -21,7 +22,7 @@ export function useConversations() {
 	// Fetch all conversations for the logged-in user
 	const fetchConversations = async () => {
 		try {
-			const res = await api.get('/api/conversations');
+			const res = await api.get(route('conversations.index', { assistant: 1 }));
 			const data = await res.json();
 			setConversations(data);
 
@@ -39,7 +40,7 @@ export function useConversations() {
 	// Create a new conversation and show the opening message
 	const createNewConversation = async () => {
 		try {
-			const res = await api.post('/api/conversations');
+			const res = await api.post(route('conversations.store', { assistant: 1 }));
 			const data = await res.json();
 			setConversationId(data.id);
 			setMessages([OPENING_MESSAGE]);
@@ -54,7 +55,7 @@ export function useConversations() {
 	// Load messages for a selected conversation
 	const selectConversation = async (id, emotionNames = []) => {
 		try {
-			const res = await api.get(`/api/conversations/${id}/messages`);
+			const res = await api.get(route('conversations.show', { assistant: 1, id }));
 			const data = await res.json();
 			setConversationId(id);
 
@@ -86,7 +87,7 @@ export function useConversations() {
 
 	const renameConversation = async (id, title) => {
 		try {
-			await api.patch(`/api/conversations/${id}`, { title });
+			await api.patch(route('conversations.update', { assistant: 1, id }), { title });
 			setConversations((prev) =>
 				prev.map((c) => (c.id === id ? { ...c, title } : c))
 			);

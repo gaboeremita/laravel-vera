@@ -43,8 +43,9 @@ return [
 	'telegram' => [
 		'url' => env('TELEGRAM_URL'),
 		'token' => env('TELEGRAM_BOT_TOKEN'),
-		'user_id' => (int) env('TELEGRAM_USER_ID', 1),
+		'user_id' => (int) env('TELEGRAM_USER_ID'),
 		'poll_timeout' => (int) env('TELEGRAM_POLL_TIMEOUT', 30),
 		'chat_id' => (int) env('TELEGRAM_CHAT_ID'),
+		'assistant_id' => (int) env('TELEGRAM_ASSISTANT_ID')
 	],
 ];

@@ -9,6 +9,8 @@ import ConversationsPage from './pages/ConversationsPage.jsx';
 import ChatPage from './pages/ChatPage.jsx';
 import LorebookPage from './pages/LorebookPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import { Ziggy } from './ziggy.js';
+globalThis.Ziggy = Ziggy;
 
 createRoot(document.getElementById('root')).render(
     <StrictMode>

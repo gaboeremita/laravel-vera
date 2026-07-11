@@ -16,16 +16,15 @@ class PromptDirector
 	/** @var string[]|null */
 	private ?array $excludedKeys = null;
 
-	public function __construct(?string $path = null)
+	public function __construct(array $config)
 	{
-		$path = $path ?? base_path('vera_prompt.json');
-		$this->config = json_decode(file_get_contents($path), true);
+		$this->config = $config;
 	}
 
 	/**
 	 * Restrict which sections to include in the prompt.
 	 *
-	 * @param  string[]  $keys
+	 * @param string[] $keys
 	 */
 	public function only(array $keys): static
 	{
@@ -37,7 +36,7 @@ class PromptDirector
 	/**
 	 * Exclude specific sections from the prompt.
 	 *
-	 * @param  string[]  $keys
+	 * @param string[] $keys
 	 */
 	public function except(array $keys): static
 	{

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Pencil } from 'lucide-react';
+import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { parseEmotionFromResponse } from '../utils/parsers.js';
 import ChatMessage from '../components/ChatMessage.jsx';
@@ -51,7 +52,7 @@ export default function ChatPage() {
 		}
 
 		try {
-			await api.patch(`/api/conversations/${id}`, { title: trimmed });
+			await api.patch(route('conversations.update', { assistant: 1, id }), { title: trimmed });
 			setConversations((prev) =>
 				prev.map((c) => (c.id === Number(id) ? { ...c, title: trimmed } : c))
 			);
@@ -73,7 +74,7 @@ export default function ChatPage() {
 	useEffect(() => {
 		const loadMessages = async () => {
 			try {
-				const res = await api.get(`/api/conversations/${id}/messages`);
+				const res = await api.get(route('conversations.show', { assistant: 1, id }));
 				if (!res.ok) {
 					navigate('/conversations', { replace: true });
 					return;
@@ -148,7 +149,7 @@ export default function ChatPage() {
 					fetchEmotions(true);
 				}
 
-				const response = await api.post(`/api/conversations/${id}/messages`, {
+				const response = await api.post(route('conversations.sendMessage', { assistant: 1, id }), {
 					messages: apiMessages,
 				});
 

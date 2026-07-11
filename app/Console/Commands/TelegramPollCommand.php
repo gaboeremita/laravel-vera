@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Contracts\LlmProvider;
 use App\Directors\PromptDirector;
+use App\Models\Assistant;
+use App\Models\AssistantUser;
 use App\Models\User;
 use App\Services\TelegramService;
 use Illuminate\Console\Command;
@@ -19,6 +21,8 @@ class TelegramPollCommand extends Command
 	private ?int $activeConversationId = null;
 
 	private User $user;
+	private AssistantUser $assistantUser;
+	private Assistant $assistant;
 
 	public function handle(): int
 	{
@@ -30,6 +34,11 @@ class TelegramPollCommand extends Command
 		);
 
 		$this->user = User::findOrFail($config['user_id']);
+
+		$this->assistantUser = AssistantUser::where('user_id', $this->user->id)
+			->where('assistant_id', $config['assistant_id'])
+			->firstOrFail();
+		$this->assistant = $this->assistantUser->assistant;
 		$this->info('VERA Telegram bot started. Listening...');
 
 		$offset = 0;
@@ -103,7 +112,7 @@ class TelegramPollCommand extends Command
 
 	private function commandList(int $chatId): void
 	{
-		$conversations = $this->user->conversations()
+		$conversations = $this->assistantUser->conversations()
 			->orderByDesc('updated_at')
 			->get(['id', 'title', 'updated_at']);
 
@@ -124,7 +133,7 @@ class TelegramPollCommand extends Command
 
 	private function commandNew(int $chatId): void
 	{
-		$conversation = $this->user->conversations()->create([
+		$conversation = $this->assistantUser->conversations()->create([
 			'title' => 'New conversation',
 		]);
 
@@ -140,7 +149,7 @@ class TelegramPollCommand extends Command
 			return;
 		}
 
-		$conversation = $this->user->conversations()->find($this->activeConversationId);
+		$conversation = $this->assistantUser->conversations()->find($this->activeConversationId);
 
 		if (! $conversation) {
 			$this->telegram->sendMessage($chatId, 'Active conversation not found.');
@@ -191,22 +200,20 @@ class TelegramPollCommand extends Command
 			$this->commandNew($chatId);
 		}
 
-		$conversation = $this->user->conversations()->find($this->activeConversationId);
+		$conversation = $this->assistantUser->conversations()->find($this->activeConversationId);
 
 		if (! $conversation) {
 			$this->commandNew($chatId);
-			$conversation = $this->user->conversations()->find($this->activeConversationId);
+			$conversation = $this->assistantUser->conversations()->find($this->activeConversationId);
 		}
 
 		$this->telegram->sendTypingAction($chatId);
 
-		// Save user message
 		$conversation->messages()->create([
 			'role' => 'user',
 			'content' => $text,
 		]);
 
-		// Load full conversation history from DB
 		$history = $conversation->messages()
 			->orderBy('created_at')
 			->get(['role', 'content'])
@@ -218,7 +225,8 @@ class TelegramPollCommand extends Command
 			$history[$lastIndex]['images'] = [$image];
 		}
 
-		$director = new PromptDirector();
+		// Load prompt from assistant
+		$director = new PromptDirector($this->assistant->prompt);
 		$lorebook = $this->user->lorebooks()->first();
 
 		if ($lorebook && !empty($text)) {
@@ -226,13 +234,9 @@ class TelegramPollCommand extends Command
 		}
 
 		$systemPrompt = $director
-			->except(["emotion tags", "opening_message"])
+			->except(['emotion tags', 'opening_message'])
 			->build();
 
-		if ($lorebook && !empty($lastUserMessage['content'])) {
-			$director->withRetrieval($lastUserMessage['content'], $lorebook->id);
-		}
-		
 		try {
 			$llm = app(LlmProvider::class);
 			$response = $llm->chat([
@@ -240,13 +244,12 @@ class TelegramPollCommand extends Command
 				...$history,
 			]);
 		} catch (\RuntimeException $e) {
-			$this->telegram->sendMessage($chatId, 'Connection to The Bridge failed. Try again.');
+			$this->telegram->sendMessage($chatId, 'Connection failed. Try again.');
 			$this->error("LLM error: {$e->getMessage()}");
 
 			return;
 		}
 
-		// Strip emotion tag and persist it separately
 		$content = $response->content;
 		$emotion = 'neutral';
 
@@ -262,7 +265,6 @@ class TelegramPollCommand extends Command
 			'emotion' => $emotion,
 		]);
 
-		// Auto-title from first user message
 		if ($conversation->title === 'New conversation') {
 			$conversation->update([
 				'title' => str($text)->limit(50)->toString(),
@@ -282,7 +284,7 @@ class TelegramPollCommand extends Command
 			return;
 		}
 
-		$latest = $this->user->conversations()
+		$latest = $this->assistantUser->conversations()
 			->orderByDesc('updated_at')
 			->first();
 

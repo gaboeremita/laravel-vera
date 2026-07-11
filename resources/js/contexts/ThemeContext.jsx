@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { route } from 'ziggy-js';
 import { api } from '../utils/api';
 
 const ThemeContext = createContext();
@@ -8,7 +9,7 @@ export function ThemeProvider({ children }) {
 	const [availableThemes, setAvailableThemes] = useState([]);
 
 	useEffect(() => {
-		api.get('/api/settings')
+		api.get(route('settings.show'))
 			.then((res) => res.json())
 			.then((data) => {
 				setAvailableThemes(data.available_themes);

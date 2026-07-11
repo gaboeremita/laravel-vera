@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
+import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { useEmotions } from '../hooks/useEmotions.js';
 import { useToast } from '../hooks/useToast.js';
@@ -21,7 +22,7 @@ export default function AuthenticatedLayout() {
 	const { toasts, addToast, removeToast } = useToast();
 
 	useEffect(() => {
-		api.get('/api/user')
+		api.get(route('user.show'))
 			.then((res) => {
 				if (res.ok) {
 					setAuthState('authenticated');
@@ -38,7 +39,7 @@ export default function AuthenticatedLayout() {
 
 	const fetchConversations = async () => {
 		try {
-			const res = await api.get('/api/conversations');
+			const res = await api.get(route('conversations.index', { assistant: 1 }));
 			const data = await res.json();
 			setConversations(data);
 		} catch {

@@ -12,6 +12,7 @@
 
         <!-- Styles / Scripts -->
         @viteReactRefresh
+        @routes
         @vite(['resources/css/app.css', 'resources/js/app.jsx'])
     </head>
     <body>

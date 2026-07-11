@@ -5,16 +5,21 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\LlmProvider;
 use App\Directors\PromptDirector;
 use App\Http\Controllers\Controller;
-use App\Models\Emotion;
 use App\Models\Image;
+use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ConversationController extends Controller
 {
-	public function index(Request $request): JsonResponse
+	use ResolvesAssistantUser;
+
+	public function index(Request $request, int $assistant): JsonResponse
 	{
-		$conversations = $request->user()
+
+		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+		$conversations = $assistantUser
 			->conversations()
 			->orderByDesc('updated_at')
 			->get(['id', 'title', 'updated_at']);
@@ -22,12 +27,13 @@ class ConversationController extends Controller
 		return response()->json($conversations);
 	}
 
-	public function show(Request $request, int $id): JsonResponse
+	public function show(Request $request, int $assistant, int $id): JsonResponse
 	{
-		$conversation = $request->user()
+		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+		$conversation = $assistantUser
 			->conversations()
 			->findOrFail($id);
-
 
 		$messages = $conversation->messages()
 			->with('image')
@@ -43,9 +49,11 @@ class ConversationController extends Controller
 		return response()->json($messages);
 	}
 
-	public function store(Request $request): JsonResponse
+	public function store(Request $request, int $assistant): JsonResponse
 	{
-		$conversation = $request->user()
+		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+		$conversation = $assistantUser
 			->conversations()
 			->create(['title' => 'New conversation']);
 
@@ -59,9 +67,11 @@ class ConversationController extends Controller
 		return response()->json($conversation, 201);
 	}
 
-	public function destroy(Request $request, int $id): JsonResponse
+	public function destroy(Request $request, int $assistant, int $id): JsonResponse
 	{
-		$conversation = $request->user()
+		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+		$conversation = $assistantUser
 			->conversations()
 			->findOrFail($id);
 
@@ -70,7 +80,22 @@ class ConversationController extends Controller
 		return response()->json(['message' => 'Conversation deleted']);
 	}
 
-	public function sendMessage(Request $request, int $id): JsonResponse
+	public function update(Request $request, int $assistant, int $id): JsonResponse
+	{
+		$validated = $request->validate([
+			'title' => ['required', 'string', 'max:100'],
+		]);
+
+		$conversation = $this->resolveAssistantUser($request, $assistant)
+			->conversations()
+			->findOrFail($id);
+
+		$conversation->update($validated);
+
+		return response()->json($conversation);
+	}
+
+	public function sendMessage(Request $request, int $assistant, int $id): JsonResponse
 	{
 		$validated = $request->validate([
 			'messages' => ['required', 'array'],
@@ -79,14 +104,15 @@ class ConversationController extends Controller
 			'messages.*.images' => ['sometimes', 'array'],
 		]);
 
-		$conversation = $request->user()
+		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+		$conversation = $assistantUser
 			->conversations()
 			->findOrFail($id);
 
 		$lastUserMessage = collect($validated['messages'])->last(fn ($m) => $m['role'] === 'user');
 
 		if ($lastUserMessage) {
-
 			$message = $conversation->messages()->create([
 				'role' => 'user',
 				'content' => $lastUserMessage['content'] ?? '',
@@ -98,18 +124,20 @@ class ConversationController extends Controller
 			}
 		}
 
+		$assistantModel = $assistantUser->assistant;
+
 		$emotions = [
-			'regular' => Emotion::where('restricted', false)->pluck('name')->toArray(),
-			'intimate' => Emotion::where('restricted', true)->pluck('name')->toArray(),
+			'regular' => $assistantModel->emotions()->where('restricted', false)->pluck('name')->toArray(),
+			'intimate' => $assistantModel->emotions()->where('restricted', true)->pluck('name')->toArray(),
 		];
 
 		$lorebook = $request->user()->lorebooks()->first();
 
-		$director = (new PromptDirector())
+		$director = (new PromptDirector($assistantModel->prompt))
 			->append('emotion tags', ['available emotions' => $emotions])
 			->except(['opening_message']);
 
-		if ($lorebook && !empty($lastUserMessage['content'])) {
+		if ($lorebook && ! empty($lastUserMessage['content'])) {
 			$director->withRetrieval($lastUserMessage['content'], $lorebook->id);
 		}
 
@@ -136,21 +164,5 @@ class ConversationController extends Controller
 			'content' => $response->content,
 			'thinking' => $response->thinking,
 		]);
-	}
-
-	// Update conversation title
-	public function update(Request $request, int $id): JsonResponse
-	{
-		$validated = $request->validate([
-			'title' => ['required', 'string', 'max:100'],
-		]);
-
-		$conversation = $request->user()
-			->conversations()
-			->findOrFail($id);
-
-		$conversation->update($validated);
-
-		return response()->json($conversation);
 	}
 }

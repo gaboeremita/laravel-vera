@@ -1,4 +1,5 @@
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { route } from 'ziggy-js';
 import ConversationList from '../components/ConversationList.jsx';
 import Header from '../components/Header.jsx';
 import { api } from '../utils/api.js';
@@ -13,7 +14,7 @@ export default function ConversationsPage() {
 
 	const handleNew = async () => {
 		try {
-			const res = await api.post('/api/conversations');
+			const res = await api.post(route('conversations.store', { assistant: 1 }));
 			const data = await res.json();
 			setConversations((prev) => [data, ...prev]);
 			navigate(`/conversations/${data.id}`);
@@ -28,7 +29,7 @@ export default function ConversationsPage() {
 
 	const handleRename = async (id, title) => {
 		try {
-			await api.patch(`/api/conversations/${id}`, { title });
+			await api.patch(route('conversations.update', { assistant: 1, id }), { title });
 			setConversations((prev) =>
 				prev.map((c) => (c.id === id ? { ...c, title } : c))
 			);
@@ -51,8 +52,8 @@ export default function ConversationsPage() {
 					</button>
 				}
 			>
-				<span className="text-fg-2 text-sm tracking-[0.05em]">
-					// Conversations
+				<span className="text-fg-2 text-lg tracking-[0.05em]">
+					Conversations
 				</span>
 			</Header>
 

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import Portrait from '../components/Portrait.jsx';
 import Scanlines from '../components/Scanlines.jsx';
@@ -14,7 +15,7 @@ export default function LoginPage() {
 	const navigate = useNavigate();
 
 	useEffect(() => {
-		api.get('/api/user').then((res) => {
+		api.get(route('user.show')).then((res) => {
 			if (res.ok) navigate('/conversations', { replace: true });
 		}).catch(() => {});
 	}, []);

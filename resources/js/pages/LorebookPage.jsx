@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,7 +20,7 @@ export default function LorebookPage() {
 	useEffect(() => {
 		const load = async () => {
 			try {
-				const res = await api.get('/api/lorebook');
+				const res = await api.get(route('lorebook.show'));
 
 				// if (!res.ok) {
 				// 	throw new Error('Failed to load lorebook');
@@ -87,7 +88,7 @@ export default function LorebookPage() {
 				})),
 			};
 
-			const res = await api.post('/api/lorebook', payload);
+			const res = await api.post(route('lorebook.save'), payload);
 
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));

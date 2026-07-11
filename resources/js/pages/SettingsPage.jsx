@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import Header from '../components/Header';
 import { useNavigate } from 'react-router-dom';
+import { route } from 'ziggy-js';
 import { api } from '../utils/api';
 
 export default function SettingsPage() {
@@ -14,7 +15,7 @@ export default function SettingsPage() {
 
 	const handleSave = async () => {
 		setIsSaving(true);
-		await api.put('/api/settings', { theme: selectedTheme });
+		await api.put(route('settings.update'), { theme: selectedTheme });
 		setTheme(selectedTheme);
 		setIsSaving(false);
 	};

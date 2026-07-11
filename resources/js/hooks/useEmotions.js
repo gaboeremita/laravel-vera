@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { route } from 'ziggy-js';
 import { api } from "../utils/api";
 
 export function useEmotions() {
@@ -7,7 +8,7 @@ export function useEmotions() {
 
 	const fetchEmotions = async () => {
 		try {
-			const res = await api.get(`/api/emotions`);
+			const res = await api.get(route('emotions.index'));
 			const data = await res.json();
 			setEmotions(data);
 			setEmotionsLoaded(true);

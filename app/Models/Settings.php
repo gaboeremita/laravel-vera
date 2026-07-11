@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'data'])]
+#[Fillable(['user_id', 'data', 'assistant_id'])]
 class Settings extends Model
 {
     protected function casts(): array
@@ -20,4 +20,9 @@ class Settings extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+	public function assistant(): BelongsTo
+	{
+		return $this->belongsTo(Assistant::class);
+	}
 }
