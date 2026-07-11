@@ -185,9 +185,7 @@ export default function LorebookPage() {
 				</div>
 
 				{/* Divider */}
-				<div className="text-[#1a1a2e] text-[0.7rem]">
-					─────────────────────────────────
-				</div>
+				<hr className="border-t border-line-1" />
 
 				{/* Entries */}
 				<div>
@@ -201,7 +199,7 @@ export default function LorebookPage() {
 									const newState = !allCollapsed;
 									setEntries((prev) => prev.map((e) => ({ ...e, collapsed: newState })));
 								}}
-								className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em]  cursor-pointer transition-colors px-4 py-1.5"
+								className="button-primary"
 							>
 								{allCollapsed ? 'EXPAND ALL' : 'COLLAPSE ALL'}
 							</button>

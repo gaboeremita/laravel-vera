@@ -26,4 +26,9 @@ class Emotion extends Model
 	{
 		return $this->morphOne(Video::class, 'videoable');
 	}
+
+	public function assistant(): BelongsTo
+	{
+		return $this->belongsTo(Assistant::class);
+	}
 }
