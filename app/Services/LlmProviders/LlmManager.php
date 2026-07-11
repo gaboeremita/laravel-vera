@@ -3,53 +3,59 @@
 namespace App\Services\LlmProviders;
 
 use App\Contracts\LlmProvider;
-use InvalidArgumentException;
+use App\Enums\AiProviderFormat;
+use App\Models\AiModel;
+use App\Models\AiProvider;
+use App\Models\AssistantUser;
 
 class LlmManager
 {
-	public function resolve(?string $name = null): LlmProvider
+	public function forAssistantUser(AssistantUser $assistantUser): LlmProvider
 	{
-		$name = $name ?? config('ai.default');
-		$config = config("ai.providers.{$name}");
-		$defaults = config('ai.defaults');
+		$selectedModelId = $assistantUser->settings?->data['ai_model_id'] ?? null;
 
-		if (! $config) {
-			throw new InvalidArgumentException("LLM provider [{$name}] is not configured.");
+		if ($selectedModelId) {
+			$aiModel = AiModel::with('provider')->findOrFail($selectedModelId);
+			return $this->fromModel($aiModel);
 		}
 
-		$timeout = $defaults['timeout'];
-		$stream = $defaults['stream'];
+		return $this->fromConfig();
+	}
 
-		return match ($name) {
-			'ollama' => new OllamaProvider(
-				url: $config['url'],
-				model: $config['llm_model'],
-				timeout: $timeout,
-				stream: $stream,
-				think: $config['think'],
-			),
-			'openrouter' => new OpenRouterProvider(
-				url: $config['url'],
-				model: $config['llm_model'],
-				key: $config['key'],
-				timeout: $timeout,
-				stream: $stream,
-				maxTokens: $config['max_tokens'],
-				reasoningEnabled: $config['reasoning']['enabled'],
-				reasoningMaxTokens: $config['reasoning']['max_tokens'],
-			),
-			'anthropic' => new AnthropicProvider(
-				url: $config['url'],
-				model: $config['llm_model'],
-				key: $config['key'],
-				version: $config['version'],
-				timeout: $timeout,
-				stream: $stream,
-				maxTokens: $config['max_tokens'],
-				thinkingEnabled: $config['thinking']['enabled'],
-				thinkingBudget: $config['thinking']['budget_tokens'],
-			),
-			default => throw new InvalidArgumentException("Unknown LLM provider [{$name}]."),
-		};
+	public function fromModel(AiModel $aiModel): LlmProvider
+	{
+		$class = $aiModel->provider->format->providerClass();
+
+		return $class::fromModel($aiModel);
+	}
+
+	public function fromConfig(): LlmProvider
+	{
+		$config = config('ai.default');
+
+		if (! $config || ! $config['url']) {
+			throw new \InvalidArgumentException('No default LLM provider configured.');
+		}
+
+		$format = AiProviderFormat::from($config['format'] ?? 'generic');
+		$class = $format->providerClass();
+
+		$aiProvider = new AiProvider([
+			'url' => $config['url'],
+			'api_key' => $config['key'] ?? '',
+			'format' => $format,
+			'config_schema' => [
+				'thinking_key' => $config['config']['thinking_key'] ?? null,
+			],
+		]);
+
+		$aiModel = new AiModel([
+			'name' => $config['model'],
+			'thinking' => $config['thinking'] ?? false,
+			'config' => $config['config'] ?? [],
+		]);
+		$aiModel->setRelation('provider', $aiProvider);
+
+		return $class::fromModel($aiModel);
 	}
 }

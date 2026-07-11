@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Contracts\LlmProvider;
 use App\Directors\PromptDirector;
 use App\Http\Controllers\Controller;
 use App\Models\Image;
+use App\Services\LlmProviders\LlmManager;
 use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -144,7 +144,7 @@ class ConversationController extends Controller
 		$systemPrompt = $director->build();
 
 		try {
-			$llm = app(LlmProvider::class);
+			$llm = (new LlmManager())->forAssistantUser($assistantUser);
 			$response = $llm->chat([
 				['role' => 'system', 'content' => $systemPrompt],
 				...$validated['messages'],

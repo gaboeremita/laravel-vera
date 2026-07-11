@@ -54,6 +54,11 @@ class User extends Authenticatable
 		return $this->hasMany(Tag::class);
 	}
 
+	public function aiProviders(): HasMany
+	{
+		return $this->hasMany(AiProvider::class);
+	}
+
 	public function assistants(): BelongsToMany
 	{
 		return $this->belongsToMany(Assistant::class)

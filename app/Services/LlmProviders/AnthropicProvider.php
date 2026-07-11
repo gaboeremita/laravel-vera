@@ -4,17 +4,23 @@ namespace App\Services\LlmProviders;
 
 use App\Contracts\LlmProvider;
 use App\DTOs\LlmResponse;
+use App\Models\AiModel;
 use Illuminate\Support\Facades\Http;
 
 class AnthropicProvider implements LlmProvider
 {
+
+	private const string DEFAULT_VERSION = '2023-06-01';
+	private const int DEFAULT_MAX_TOKENS = 4096;
+	private const int DEFAULT_THINKING_BUDGET = 10000;
+	private const int DEFAULT_TIMEOUT = 120;
+
 	public function __construct(
 		private readonly string $url,
 		private readonly string $model,
 		private readonly string $key,
 		private readonly string $version,
 		private readonly int $timeout,
-		private readonly bool $stream,
 		private readonly int $maxTokens,
 		private readonly bool $thinkingEnabled,
 		private readonly int $thinkingBudget,
@@ -36,7 +42,7 @@ class AnthropicProvider implements LlmProvider
 		$body = [
 			'model' => $this->model,
 			'max_tokens' => $this->maxTokens,
-			'stream' => $this->stream,
+			'stream' => config('ai.stream', false),
 			'messages' => $chatMessages,
 		];
 
@@ -111,5 +117,22 @@ class AnthropicProvider implements LlmProvider
 			'role' => $message['role'],
 			'content' => $parts,
 		];
+	}
+
+	public static function fromModel(AiModel $aiModel): static
+	{
+		$provider = $aiModel->provider;
+		$config = $aiModel->config ?? [];
+
+		return new static(
+			url: $provider->url,
+			model: $aiModel->name,
+			key: $provider->api_key,
+			version: $config['version'] ?? self::DEFAULT_VERSION,
+			timeout: $config['timeout'] ?? config('ai.defaults.timeout', self::DEFAULT_TIMEOUT),
+			maxTokens: $config['max_tokens'] ?? self::DEFAULT_MAX_TOKENS,
+			thinkingEnabled: $aiModel->thinking,
+			thinkingBudget: $config['thinking_budget'] ?? self::DEFAULT_THINKING_BUDGET,
+		);
 	}
 }

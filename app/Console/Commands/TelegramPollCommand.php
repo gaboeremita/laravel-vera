@@ -2,11 +2,11 @@
 
 namespace App\Console\Commands;
 
-use App\Contracts\LlmProvider;
 use App\Directors\PromptDirector;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\User;
+use App\Services\LlmProviders\LlmManager;
 use App\Services\TelegramService;
 use Illuminate\Console\Command;
 
@@ -238,7 +238,7 @@ class TelegramPollCommand extends Command
 			->build();
 
 		try {
-			$llm = app(LlmProvider::class);
+			$llm = (new LlmManager())->forAssistantUser($this->assistantUser);
 			$response = $llm->chat([
 				['role' => 'system', 'content' => $systemPrompt],
 				...$history,

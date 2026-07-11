@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\AiModelController;
+use App\Http\Controllers\Api\AiProviderController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\EmotionController;
 use App\Http\Controllers\Api\LorebookController;
@@ -20,6 +22,15 @@ Route::middleware('auth:sanctum')->group(function () {
 		Route::delete('/conversations/{id}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
 		Route::patch('/conversations/{id}', [ConversationController::class, 'update'])->name('conversations.update');
 	});
+
+	Route::get('/ai-providers', [AiProviderController::class, 'index'])->name('ai-providers.index');
+	Route::post('/ai-providers', [AiProviderController::class, 'store'])->name('ai-providers.store');
+	Route::patch('/ai-providers/{id}', [AiProviderController::class, 'update'])->name('ai-providers.update');
+	Route::delete('/ai-providers/{id}', [AiProviderController::class, 'destroy'])->name('ai-providers.destroy');
+
+	Route::post('/ai-providers/{provider}/models', [AiModelController::class, 'store'])->name('ai-models.store');
+	Route::patch('/ai-providers/{provider}/models/{model}', [AiModelController::class, 'update'])->name('ai-models.update');
+	Route::delete('/ai-providers/{provider}/models/{model}', [AiModelController::class, 'destroy'])->name('ai-models.destroy');
 
 	Route::get('/emotions', [EmotionController::class, 'index'])->name('emotions.index');
 	Route::get('/lorebook', [LorebookController::class, 'show'])->name('lorebook.show');

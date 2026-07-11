@@ -15,14 +15,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-		$this->app->bind(LlmProvider::class, function () {
-			return (new LlmManager())->resolve();
-		});
 
 		$this->app->bind(EmbeddingProvider::class, function () {
 			return new OllamaEmbeddingProvider(
-				baseUrl: config('ai.providers.ollama.url'),
-				model: config('ai.providers.ollama.embedding_model'),
+				baseUrl: config('ai.embedding.url'),
+				model: config('ai.embedding.model'),
 			);
 		});
     }

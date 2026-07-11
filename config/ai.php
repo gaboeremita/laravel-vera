@@ -1,43 +1,27 @@
 <?php
 
 return [
-	'default' => env('AI_PROVIDER', 'ollama'),
 
-	'defaults' => [
-		'timeout' => (int) env('AI_TIMEOUT', 600),
-		'stream' => (bool) env('AI_STREAM', false),
+	'stream' => (bool) env('AI_STREAM', false),
+
+	'default' => [
+		'url' => env('AI_DEFAULT_URL'),
+		'key' => env('AI_DEFAULT_API_KEY', ''),
+		'model' => env('AI_DEFAULT_MODEL'),
+		'format' => env('AI_DEFAULT_FORMAT', 'generic'),
+		'thinking' => (bool) env('AI_DEFAULT_THINKING', false),
+		'config' => [
+			'max_tokens' => (int) env('AI_DEFAULT_MAX_TOKENS', 4096),
+			'thinking_budget' => (int) env('AI_DEFAULT_THINKING_BUDGET', 10000),
+			'thinking_key' => env('AI_DEFAULT_THINKING_KEY', 'reasoning'),
+			'timeout' => (int) env('AI_DEFAULT_TIMEOUT', 600),
+			'version' => env('AI_DEFAULT_VERSION', '2023-06-01'),
+		],
 	],
 
-	'providers' => [
-		'ollama' => [
-			'url' => env('OLLAMA_URL'),
-			'llm_model' => env('OLLAMA_LLM_MODEL'),
-			'think' => (bool) env('OLLAMA_THINK', true),
-			'embedding_model' => env('OLLAMA_EMBEDDING_MODEL')
-		],
-
-		'openrouter' => [
-			'url' => env('OPENROUTER_URL'),
-			'key' => env('OPENROUTER_API_KEY'),
-			'llm_model' => env('OPENROUTER_LLM_MODEL'),
-			'max_tokens' => (int) env('OPENROUTER_MAX_TOKENS', 4096),
-			'reasoning' => [
-				'enabled' => (bool) env('OPENROUTER_REASONING', false),
-				'max_tokens' => (int) env('OPENROUTER_REASONING_MAX_TOKENS', 10000),
-			],
-		],
-
-		'anthropic' => [
-			'url' => env('ANTHROPIC_URL'),
-			'key' => env('ANTHROPIC_API_KEY'),
-			'llm_model' => env('ANTHROPIC_LLM_MODEL'),
-			'version' => env('ANTHROPIC_VERSION', '2023-06-01'),
-			'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 4096),
-			'thinking' => [
-				'enabled' => (bool) env('ANTHROPIC_THINKING', true),
-				'budget_tokens' => (int) env('ANTHROPIC_THINKING_BUDGET', 10000),
-			],
-		],
+	'embedding' => [
+		'url' => env('AI_EMBEDDING_URL'),
+		'model' => env('AI_EMBEDDING_MODEL'),
 	],
 
 	'telegram' => [
