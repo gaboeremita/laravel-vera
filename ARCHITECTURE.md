@@ -86,6 +86,10 @@ All routes behind `auth:sanctum` middleware:
 | GET | `/api/emotions` | `EmotionController@index` |
 | GET | `/api/lorebook` | `LorebookController@show` |
 | POST | `/api/lorebook` | `LorebookController@save` |
+| GET | `/api/assistants/{assistant}/prompt` | `AssistantPromptController@show` |
+| POST | `/api/assistants/{assistant}/prompt` | `AssistantPromptController@store` |
+| PUT | `/api/assistants/{assistant}/prompt` | `AssistantPromptController@update` |
+| DELETE | `/api/assistants/{assistant}/prompt` | `AssistantPromptController@destroy` |
 | GET | `/api/assistants/{assistant}/conversations` | `ConversationController@index` |
 | POST | `/api/assistants/{assistant}/conversations` | `ConversationController@store` |
 | GET | `/api/assistants/{assistant}/conversations/{id}/messages` | `ConversationController@show` |
@@ -136,6 +140,15 @@ CRUD for `AiModel` records nested under a provider. Manages `name`, `endpoint`, 
 
 **`EmotionController`**
 Returns the emotion set for the active assistant filtered by `restricted` flag. `?unlocked=true` returns alternate expressions.
+
+**`AssistantPromptController`**
+Manages the `prompt` JSON on an `Assistant` record, scoped to the authenticated user via `ResolvesAssistantUser`:
+- `show` — returns the current prompt JSON
+- `store` — creates the prompt (409 if one already exists); validated by `ValidPromptStructure`
+- `update` — replaces the prompt; validated by `ValidPromptStructure`
+- `destroy` — clears the prompt (sets to `[]`)
+
+`ValidPromptStructure` is a custom validation rule that enforces the prompt tree structure: top-level must be an associative array; each value must be a string, a sequential array of strings, or a nested associative array (recursive).
 
 **`LorebookController`**
 Reads and saves the user's lorebook (entries with tags). Injected into the system prompt via RAG at request time.
@@ -285,6 +298,9 @@ Main chat interface:
 **`LorebookPage`**
 Lorebook editor. Displays `EntryAccordion` components for each lore entry.
 
+**`PromptPage`**
+Visual prompt editor for the active assistant. Renders the prompt JSON as an interactive tree of `PromptNode` components. Supports adding, renaming, and deleting sections at any depth. Each node can be a string, list of strings, or nested object. Changes are saved via `PUT /api/assistants/{assistant}/prompt` (or `POST` if no prompt exists yet). The entire prompt can also be deleted from this page.
+
 **`SettingsPage`**
 Theme selector. Fetches available themes from `GET /api/settings`, applies selection via `PUT /api/settings`.
 
@@ -325,6 +341,16 @@ Three rendering modes:
 - Loads providers from `GET /api/ai-providers` and active model from `GET /api/settings` in parallel
 - Full CRUD: `addProvider`, `saveProvider`, `deleteProvider`, `addModel`, `saveModel`, `deleteModel`
 - `activeModelId` state + `selectModel(modelId)` — calls `PUT /api/settings/model`; `null` deselects
+
+**`usePrompt(assistantId, addToast)`**
+- Loads the assistant's prompt JSON from `GET /api/assistants/{assistant}/prompt`
+- Manages the prompt tree in local state via `structuredClone` for immutable updates
+- `setValueAtPath(path, value)` — update any leaf node by path array
+- `addKey(parentPath, key, type)` — add a string, list, or object node
+- `removeKey(path)` / `renameKey(path, newKey)` — structural edits (rename preserves key order)
+- `addListItem(path)` / `removeListItem(path, index)` / `updateListItem(path, index, value)` — list management
+- `save()` — POST (create) or PUT (update) depending on whether a prompt exists
+- `destroy()` — DELETE and reset local state to null
 
 **`useConversations`** — list + history loading for the active assistant
 **`useEmotions`** — fetches emotion name → `{ image_url, video_url }` map
@@ -413,6 +439,7 @@ laravel-vera/
 │   │   └── Api/
 │   │       ├── AiProviderController.php        provider CRUD
 │   │       ├── AiModelController.php           model CRUD
+│   │       ├── AssistantPromptController.php   prompt CRUD (show/store/update/destroy)
 │   │       ├── ConversationController.php      CRUD + sendMessage
 │   │       ├── EmotionController.php           serve emotions (locked/unlocked)
 │   │       ├── LorebookController.php          lorebook read/save
@@ -454,6 +481,7 @@ laravel-vera/
 │   │   ├── ConversationsPage.jsx
 │   │   ├── ChatPage.jsx
 │   │   ├── LorebookPage.jsx
+│   │   ├── PromptPage.jsx
 │   │   ├── SettingsPage.jsx
 │   │   └── ProvidersPage.jsx
 │   ├── components/
@@ -473,6 +501,7 @@ laravel-vera/
 │   ├── hooks/
 │   │   ├── useConversations.js                 list + history loading
 │   │   ├── useEmotions.js                      emotion map (locked/unlocked)
+│   │   ├── usePrompt.js                        prompt tree CRUD + save/destroy
 │   │   ├── useProviders.js                     provider/model CRUD + activeModelId
 │   │   └── useToast.js                         toast state
 │   └── utils/

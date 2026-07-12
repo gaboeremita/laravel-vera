@@ -158,6 +158,7 @@ laravel-vera/
 │   │   └── Api/
 │   │       ├── AiProviderController.php      # CRUD for AI providers
 │   │       ├── AiModelController.php         # CRUD for AI models
+│   │       ├── AssistantPromptController.php # Prompt CRUD (show/store/update/destroy)
 │   │       ├── ConversationController.php    # CRUD + message sending
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
 │   │       ├── LorebookController.php        # Lorebook read/save
@@ -208,6 +209,7 @@ laravel-vera/
 │   │   ├── ConversationsPage.jsx             # Conversation list
 │   │   ├── ChatPage.jsx                      # Main chat interface
 │   │   ├── LorebookPage.jsx                  # Lorebook editor
+│   │   ├── PromptPage.jsx                    # Visual prompt editor
 │   │   ├── SettingsPage.jsx                  # Theme selection
 │   │   └── ProvidersPage.jsx                 # AI provider/model management
 │   ├── components/
@@ -227,6 +229,7 @@ laravel-vera/
 │   ├── hooks/
 │   │   ├── useConversations.js               # Conversation CRUD state
 │   │   ├── useEmotions.js                    # Emotion set fetching
+│   │   ├── usePrompt.js                      # Prompt tree CRUD + save/destroy
 │   │   ├── useProviders.js                   # Provider/model CRUD + active model state
 │   │   └── useToast.js                       # Toast notification state
 │   └── utils/
@@ -250,6 +253,7 @@ laravel-vera/
 - **Text formatting** — actions in italics, inner thoughts in purple, OOC in bold cyan
 - **Boot sequence** — animated startup with the assistant's opening message
 - **Structured prompt system** — JSON-based assistant configuration, assembled on the backend
+- **Visual prompt editor** — add, edit, rename, and delete prompt sections at any depth via the UI (`/prompt`)
 - **DB-driven LLM provider management** — add/edit/delete providers and models via the UI; active model selected per-user
 - **Multi-format LLM support** — OpenAI-compatible (`generic`) and Anthropic formats
 - **Config fallback** — if no model is selected in the UI, the `.env` default is used
