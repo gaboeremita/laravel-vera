@@ -4,14 +4,14 @@ AI-powered conversational interface with dynamic visual expression system, built
 
 ## Overview
 
-VERA is a local-first AI companion application featuring a cyberpunk CRT terminal aesthetic, dynamic character expressions that respond to conversational context, and a structured personality system driven by a configurable JSON prompt. The application runs entirely on your machine — all LLM inference happens locally through Ollama, or via OpenRouter/Anthropic if configured.
+VERA is a local-first AI companion application featuring a cyberpunk CRT terminal aesthetic, dynamic character expressions that respond to conversational context, and a structured personality system driven by a configurable JSON prompt. LLM providers are managed through the UI — any OpenAI-compatible API or Anthropic can be configured without touching config files.
 
 ## Tech Stack
 
 - **Backend:** Laravel 13 (PHP 8.4)
-- **Frontend:** React (via Vite)
-- **LLM:** Ollama (local), OpenRouter, or Anthropic (configurable)
-- **Database:** MySQL
+- **Frontend:** React 19 (via Vite, React Router)
+- **LLM:** Any OpenAI-compatible API or Anthropic — configured via the Providers UI
+- **Database:** PostgreSQL
 - **Styling:** Tailwind CSS v4
 - **Auth:** Laravel Sanctum (SPA mode)
 - **Dev Environment:** Laravel Herd (macOS)
@@ -21,9 +21,8 @@ VERA is a local-first AI companion application featuring a cyberpunk CRT termina
 - PHP 8.4+
 - Composer
 - Node.js & npm
-- MySQL
-- [Ollama](https://ollama.ai) installed and running (or API keys for OpenRouter/Anthropic)
-- A pulled model (e.g. `ollama pull gemma3`)
+- PostgreSQL
+- An LLM API endpoint (OpenRouter, Anthropic, a local Ollama-compatible server, etc.)
 
 ## Installation
 
@@ -51,8 +50,7 @@ php artisan migrate
 php artisan emotions:sync
 
 # Create your user
-php artisan tinker
-# > User::create(['name' => 'YourName', 'email' => 'you@email.com', 'password' => bcrypt('yourpassword')]);
+php artisan tinker --execute 'User::create(["name" => "YourName", "email" => "you@email.com", "password" => bcrypt("yourpassword")]);'
 
 # Start development
 npm run dev
@@ -69,46 +67,50 @@ If using Laravel Herd, add the site through Herd's UI. Otherwise run `php artisa
 APP_URL=https://laravel-vera.test
 
 # Database
-DB_CONNECTION=mysql
-DB_DATABASE=laravel_vera
+DB_CONNECTION=pgsql
+DB_DATABASE=vera
 
 # Sanctum
 SANCTUM_STATEFUL_DOMAINS=laravel-vera.test
 
-# LLM Provider (ollama | openrouter | anthropic)
-AI_DEFAULT_PROVIDER=ollama
-
-# Ollama
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=gemma3:latest
-
-# OpenRouter (optional)
-OPENROUTER_KEY=
-OPENROUTER_MODEL=
-
-# Anthropic (optional)
-ANTHROPIC_KEY=
-ANTHROPIC_MODEL=
+# Default LLM provider (fallback if no model is selected in the UI)
+AI_DEFAULT_URL=https://openrouter.ai/api/v1/chat/completions
+AI_DEFAULT_API_KEY=
+AI_DEFAULT_MODEL=google/gemma-3-27b-it
+AI_DEFAULT_FORMAT=generic        # generic (OpenAI-compatible) | anthropic
+AI_DEFAULT_THINKING=false
+AI_DEFAULT_MAX_TOKENS=4096
+AI_DEFAULT_TIMEOUT=600
+AI_STREAM=false
 
 # Telegram (optional)
 TELEGRAM_URL=https://api.telegram.org
-TELEGRAM_TOKEN=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_USER_ID=
+TELEGRAM_CHAT_ID=
+TELEGRAM_ASSISTANT_ID=
 ```
 
-### Ollama
+### LLM Providers
 
-Verify Ollama is running:
+Providers and models are managed through the **Providers** page in the UI (`/providers`). Each provider has:
 
-```bash
-curl http://localhost:11434
-# Should return: "Ollama is running"
-```
+- A base URL (any OpenAI-compatible endpoint, or Anthropic)
+- An API key (encrypted at rest)
+- A format (`generic` for OpenAI-compatible APIs, `anthropic` for the Anthropic API)
+
+Each model has:
+- An endpoint/model identifier (e.g. `google/gemma-4-26b-a4b-it`)
+- Optional thinking toggle and thinking budget
+- Per-model config (JSON) and prompt override
+
+The active model is selected per-user via the **SELECT** button in the Providers UI. If no model is selected, the fallback config from `.env` is used.
 
 ### Prompt Configuration
 
 VERA's personality, appearance, environment, and behavioral rules are defined in `vera_prompt.json` at the project root. This file is read at request time by the backend `PromptDirector`, which assembles it into the system prompt sent with each LLM request.
 
-Key sections in the prompt config:
+Key sections:
 
 | Section | Purpose |
 |---|---|
@@ -125,7 +127,7 @@ Key sections in the prompt config:
 | `image_handling` | How she reacts to user-sent images |
 | `secret_trigger` | Hidden phrase that alters behavior |
 | `style_rules` | Response length, formatting, emotional range |
-| `metrics` | Affection, trust, comfort, patience tracking (pending implementation) |
+| `metrics` | Affection, trust, comfort, patience tracking (pending) |
 
 ## Project Structure
 
@@ -143,53 +145,84 @@ laravel-vera/
 │   │   └── PromptDirector.php                # Reads vera_prompt.json, builds system prompt
 │   ├── DTOs/
 │   │   └── LlmResponse.php                   # Unified response: content + thinking
+│   ├── Enums/
+│   │   └── AiProviderFormat.php              # generic | anthropic
 │   ├── Http/Controllers/
 │   │   ├── Auth/
 │   │   │   └── AuthController.php            # Login/logout
 │   │   └── Api/
+│   │       ├── AiProviderController.php      # CRUD for AI providers
+│   │       ├── AiModelController.php         # CRUD for AI models
 │   │       ├── ConversationController.php    # CRUD + message sending
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
-│   │       └── VoiceController.php           # Voice (stub)
+│   │       ├── LorebookController.php        # Lorebook read/save
+│   │       ├── SettingsController.php        # Theme + active model selection
+│   │       └── VoiceController.php           # Stub
 │   ├── Models/
 │   │   ├── User.php
+│   │   ├── Assistant.php                     # Multi-assistant support
+│   │   ├── AssistantUser.php                 # Pivot: user ↔ assistant
+│   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model)
+│   │   ├── AiProvider.php                    # DB-managed LLM provider
+│   │   ├── AiModel.php                       # DB-managed LLM model
 │   │   ├── Conversation.php
 │   │   ├── Message.php
 │   │   ├── Emotion.php                       # Expression name + restricted flag
+│   │   ├── Lorebook.php
+│   │   ├── LoreEntry.php
+│   │   ├── Tag.php
 │   │   ├── Image.php                         # Polymorphic, stored on disk
 │   │   └── Video.php                         # Polymorphic, stored on disk
 │   ├── Providers/
-│   │   └── AppServiceProvider.php            # Binds LlmProvider via LlmManager
+│   │   └── AppServiceProvider.php
 │   └── Services/
 │       ├── LlmProviders/
-│       │   ├── LlmManager.php                # Resolves provider from config
-│       │   ├── OllamaProvider.php
-│       │   ├── OpenRouterProvider.php
+│       │   ├── LlmManager.php                # Resolves provider: DB model → config fallback
+│       │   ├── GenericProvider.php           # OpenAI-compatible API
 │       │   └── AnthropicProvider.php
 │       └── TelegramService.php               # Telegram API wrapper
 ├── config/
-│   └── ai.php                                # LLM provider config (default, providers, defaults)
+│   └── ai.php                                # Default LLM config + telegram config
 ├── database/migrations/
 │   ├── create_conversations_table.php
 │   ├── create_messages_table.php
 │   ├── create_images_table.php
 │   ├── create_emotions_table.php
-│   └── create_videos_table.php
+│   ├── create_videos_table.php
+│   ├── create_ai_providers_table.php
+│   ├── create_ai_models_table.php
+│   └── create_settings_table.php
 ├── resources/js/
-│   ├── app.jsx                               # React entry point
-│   ├── app.css                               # Custom CSS (CRT effects, animations)
-│   ├── Vera.jsx                              # Main application component
+│   ├── app.jsx                               # React entry + React Router routes
+│   ├── contexts/
+│   │   └── ThemeContext.jsx                  # Global theme state
+│   ├── layouts/
+│   │   └── AuthenticatedLayout.jsx           # Shared layout for protected routes
+│   ├── pages/
+│   │   ├── LoginPage.jsx
+│   │   ├── ConversationsPage.jsx             # Conversation list
+│   │   ├── ChatPage.jsx                      # Main chat interface
+│   │   ├── LorebookPage.jsx                  # Lorebook editor
+│   │   ├── SettingsPage.jsx                  # Theme selection
+│   │   └── ProvidersPage.jsx                 # AI provider/model management
 │   ├── components/
-│   │   ├── Portrait.jsx                      # Expression display with pixelated login state
-│   │   ├── ChatMessage.jsx                   # Message rendering with formatting
-│   │   ├── ThinkingBlock.jsx                 # Collapsible LLM thinking display
+│   │   ├── common/
+│   │   │   ├── Accordion.jsx                 # Reusable collapsible accordion
+│   │   │   └── ConfirmationModal.jsx         # Terminal-style confirmation modal
+│   │   ├── ModelAccordion.jsx                # Model config + select/deselect
+│   │   ├── ProviderAccordion.jsx             # Provider config + nested models
+│   │   ├── EntryAccordion.jsx                # Lorebook entry accordion
+│   │   ├── Portrait.jsx                      # Expression display
+│   │   ├── ChatMessage.jsx                   # Message rendering
+│   │   ├── ThinkingBlock.jsx                 # Collapsible LLM reasoning
 │   │   ├── BootSequence.jsx                  # Terminal boot animation
-│   │   ├── ConversationList.jsx              # Sidebar list of conversations
-│   │   ├── TerminalModal.jsx                 # Reusable modal in terminal style
+│   │   ├── ConversationList.jsx              # Sidebar conversation list
 │   │   ├── ToastContainer.jsx                # Toast notification display
 │   │   └── Scanlines.jsx                     # CRT scanline overlay
 │   ├── hooks/
 │   │   ├── useConversations.js               # Conversation CRUD state
-│   │   ├── useEmotions.js                    # Emotion set fetching (locked/unlocked)
+│   │   ├── useEmotions.js                    # Emotion set fetching
+│   │   ├── useProviders.js                   # Provider/model CRUD + active model state
 │   │   └── useToast.js                       # Toast notification state
 │   └── utils/
 │       ├── api.js                            # API wrapper (fetch with auth)
@@ -204,22 +237,25 @@ laravel-vera/
 ### Implemented
 
 - **Terminal-style CRT interface** with scanlines, vignette, and monospace aesthetic
+- **Multi-theme support** — theme selection via Settings page, stored per-user in the DB
 - **Dynamic expression system** — emotion images and videos served from the database
 - **Restricted emotion set** — alternate expressions unlocked based on relationship state
-- **Authentication** — Sanctum SPA auth with terminal-style login flow and pixelated portrait lockscreen
-- **Image sending** — attach and send images for VERA to analyze (stored on disk, not in DB)
+- **Authentication** — Sanctum SPA auth with terminal-style login flow
+- **Image sending** — attach and send images for VERA to analyze (stored on disk)
 - **Thinking display** — collapsible view of the LLM's reasoning process
 - **Text formatting** — actions in italics, inner thoughts in purple, OOC in bold cyan
 - **Boot sequence** — animated terminal startup with hardcoded opening message
-- **Portrait video support** — short intro video before neutral expression
 - **Admin mode (Westworld Protocol)** — diagnostic override with freeze/amnesia behavior
 - **Creator mode** — password-protected creator recognition
 - **OOC mode** — silent out-of-character direction to the LLM
 - **Structured prompt system** — JSON-based character configuration, assembled on the backend
-- **Multiple LLM providers** — Ollama, OpenRouter, Anthropic; switchable via config
-- **Conversation persistence** — messages stored in MySQL
-- **Conversation management UI** — list, create, and delete conversations
-- **Conversation history loading** — prior messages fetched from DB on conversation select
+- **DB-driven LLM provider management** — add/edit/delete providers and models via the UI; active model selected per-user
+- **Multi-format LLM support** — OpenAI-compatible (`generic`) and Anthropic formats
+- **Config fallback** — if no model is selected in the UI, the `.env` default is used
+- **Multi-assistant architecture** — conversations scoped to assistants via `AssistantUser` pivot
+- **Conversation persistence** — messages stored in PostgreSQL
+- **Conversation management UI** — list, create, delete, and rename conversations
+- **Lorebook** — editable knowledge base injected into the system prompt
 - **Toast notifications** — non-intrusive feedback for UI actions
 - **Telegram integration** — long-poll bot for interacting with VERA via Telegram
 
@@ -227,12 +263,11 @@ laravel-vera/
 
 - Affection/trust/comfort/patience metrics system
 - Expression gating based on relationship metrics
-- Voice output (TTS integration — ElevenLabs or local via Bark/Kokoro)
+- Voice output (TTS integration)
 - Voice input (Web Speech API)
-- Local image generation (ComfyUI/Stable Diffusion integration)
-- Multiple character support with browser-based character creation
-- Video loop expressions (replace static images with short animated clips)
-- Alternate outfit system (unlockable at relationship thresholds)
+- Local image generation (ComfyUI/Stable Diffusion)
+- Video loop expressions
+- Alternate outfit system
 - NPC interaction system for The Bridge
 
 ## Expression System
