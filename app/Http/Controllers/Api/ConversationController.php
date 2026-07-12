@@ -57,11 +57,9 @@ class ConversationController extends Controller
 			->conversations()
 			->create(['title' => 'New conversation']);
 
-		$prompt = json_decode(file_get_contents(base_path('vera_prompt.json')), true);
-
 		$conversation->messages()->create([
 			'role' => 'assistant',
-			'content' => $prompt['opening_message'] ?? '',
+			'content' => $assistantUser->assistant->opening_message ?? '',
 		]);
 
 		return response()->json($conversation, 201);

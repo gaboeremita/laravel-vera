@@ -4,7 +4,7 @@ AI-powered conversational interface with dynamic visual expression system, built
 
 ## Overview
 
-VERA is a local-first AI companion application featuring a cyberpunk CRT terminal aesthetic, dynamic character expressions that respond to conversational context, and a structured personality system driven by a configurable JSON prompt. LLM providers are managed through the UI — any OpenAI-compatible API or Anthropic can be configured without touching config files.
+VERA is a local-first multi-AI companion platform. Each assistant has its own personality, expression set, and prompt — all configured in the database. LLM providers and models are managed through the UI with no config file changes required. The interface supports multiple themes, selectable per-user and persisted in the database.
 
 ## Tech Stack
 
@@ -106,28 +106,42 @@ Each model has:
 
 The active model is selected per-user via the **SELECT** button in the Providers UI. If no model is selected, the fallback config from `.env` is used.
 
+### Theming
+
+VERA supports multiple themes, selectable per-user via the Settings page (`/settings`) and persisted in the database.
+
+Available themes are defined in the `Theme` enum (`app/Enums/Theme.php`):
+
+| Value | Description |
+|---|---|
+| `default` | Clean, minimal, light/dark |
+| `terminal` | Classic green-on-black CRT terminal |
+| `slate` | Cool blue-grey dark theme |
+| `grimoire` | Dark, arcane, warm-toned |
+
+Each theme is a CSS file under `resources/css/themes/` that declares a set of semantic CSS custom properties scoped to `[data-theme="<value>"]`. The active theme is applied by `ThemeContext` as a `data-theme` attribute on `<html>`.
+
+**To add a new theme:**
+1. Create `resources/css/themes/<name>.css` defining all required CSS tokens under `[data-theme="<name>"]` (use an existing theme file as reference)
+2. Import it in `resources/css/styles.css`
+3. Add a new case to `app/Enums/Theme.php`
+
+The `SettingsController@show` endpoint returns `available_themes` by reading `Theme::cases()`, so the new option will appear in the UI automatically.
+
 ### Prompt Configuration
 
-VERA's personality, appearance, environment, and behavioral rules are defined in `vera_prompt.json` at the project root. This file is read at request time by the backend `PromptDirector`, which assembles it into the system prompt sent with each LLM request.
+Each assistant's prompt is stored as a JSON object in the `prompt` column of the `Assistant` model (database-driven). At request time, `PromptDirector` receives this JSON, filters sections as needed, and assembles it into the system prompt via `PromptBuilder`. Available emotions are injected automatically from the assistant's emotion set.
 
-Key sections:
+The structure of the prompt JSON is flexible — any key becomes a section in the assembled system prompt. Common sections used by the default assistant:
 
 | Section | Purpose |
 |---|---|
-| `identity` | Who VERA is — name, origin, nature |
-| `appearance` | Physical description and outfit |
-| `emotion_tags` | Available expressions and tagging rules |
+| `identity` | Who the assistant is — name, origin, nature |
+| `appearance` | Physical description |
 | `personality` | Behavioral traits and conversational style |
-| `environment` | The Bridge — the cyberpunk city she inhabits |
-| `npcs` | How she relates to other AIs in the world |
-| `admin_mode` | Westworld Protocol — override/diagnostic system |
-| `creator_mode` | Password-protected creator recognition |
-| `ooc_mode` | Out-of-character direction to the LLM |
-| `creator_psychology` | Internal conflicts around her creator |
-| `image_handling` | How she reacts to user-sent images |
-| `secret_trigger` | Hidden phrase that alters behavior |
+| `environment` | The world the assistant inhabits |
 | `style_rules` | Response length, formatting, emotional range |
-| `metrics` | Affection, trust, comfort, patience tracking (pending) |
+| `opening_message` | First message shown when a conversation is created (read from `Assistant->opening_message`) |
 
 ## Project Structure
 
@@ -236,7 +250,6 @@ laravel-vera/
 
 ### Implemented
 
-- **Terminal-style CRT interface** with scanlines, vignette, and monospace aesthetic
 - **Multi-theme support** — theme selection via Settings page, stored per-user in the DB
 - **Dynamic expression system** — emotion images and videos served from the database
 - **Restricted emotion set** — alternate expressions unlocked based on relationship state

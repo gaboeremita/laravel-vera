@@ -116,10 +116,12 @@ Full conversation lifecycle, scoped to `assistants/{assistant}`:
 - `sendMessage`:
   1. Validates `messages[]` array (role/content/images)
   2. Saves the last user message; stores any attached image via `Image::storeFromBase64()`
-  3. Builds system prompt via `PromptDirector`
-  4. Resolves the LLM provider via `LlmManager::forAssistantUser()`
-  5. Calls `chat()`, saves the assistant reply (content + thinking)
-  6. Returns `conversation_id`, `content`, `thinking`
+  3. Loads the `Assistant` model and its emotion set
+  4. Builds system prompt via `PromptDirector($assistant->prompt)` — prompt comes from the DB, not a file
+  5. Injects available emotions and runs RAG retrieval against the user's lorebook if available
+  6. Resolves the LLM provider via `LlmManager::forAssistantUser()`
+  7. Calls `chat()`, saves the assistant reply (content + thinking)
+  8. Returns `conversation_id`, `content`, `thinking`
 
 **`AiProviderController`**
 CRUD for `AiProvider` records. API key is encrypted at rest and never returned in responses (`has_key` boolean appended instead). Validates `format` against the `AiProviderFormat` enum.
@@ -181,13 +183,15 @@ Defines the config-based fallback (`default`) and auxiliary config blocks (`embe
 
 ### Prompt System
 
-The system prompt is assembled entirely on the backend.
+The system prompt is assembled entirely on the backend from data stored in the database.
 
 **`App\Builders\PromptBuilder`**
-Renders `vera_prompt.json` sections recursively into natural language. Strings pass through as-is, sequential arrays become comma-separated lists, associative arrays become labeled sub-sections.
+Renders a prompt config array recursively into natural language. Strings pass through as-is, sequential arrays become comma-separated lists, associative arrays become labeled sub-sections.
 
 **`App\Directors\PromptDirector`**
-Reads `vera_prompt.json`, supports `only([...])` and `except([...])` filtering, delegates to `PromptBuilder`. Called on every `sendMessage` request.
+Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `only([...])`, `except([...])`, and `append(key, value)` for injecting dynamic data (e.g. emotion tags, retrieved lore). Called on every `sendMessage` request. Also supports `withRetrieval()` for RAG — embedding the user's message and retrieving semantically similar lore entries.
+
+> `vera_prompt.json` is no longer used. All prompt data — including `opening_message` — comes from the `Assistant` model.
 
 ### Models & Database
 
@@ -257,7 +261,13 @@ The app uses React Router. `app.jsx` defines all routes:
 
 ### Theme System
 
-`ThemeContext` holds the active theme string. It fetches the current theme from `GET /api/settings` on mount and applies it as a `data-theme` attribute on `<html>`. Theme changes call `PUT /api/settings`.
+Themes are defined by the `Theme` enum (`app/Enums/Theme.php`): `default`, `terminal`, `slate`, `grimoire`. Each maps to a CSS file under `resources/css/themes/` that declares semantic CSS custom properties (colors, fonts, radii, shadows) scoped to `[data-theme="<value>"]`. Layout and spacing tokens defined in `base.css` are theme-independent so switching themes never causes a reflow — only a re-skin.
+
+`ThemeContext` (React) holds the active theme string. On mount it fetches `GET /api/settings`, reads `selected_theme`, and sets `document.documentElement.setAttribute('data-theme', theme)`. Theme changes call `PUT /api/settings` with the new value and update the attribute immediately.
+
+`SettingsController@show` returns `available_themes` by calling `array_column(Theme::cases(), 'value')`, so any new case added to the enum automatically appears as an option in the UI without further changes.
+
+The selected theme is stored in the `data` JSON column of the `Settings` model, scoped to the user + assistant pair. The `update` method merges the theme key rather than overwriting the entire data object, preserving other settings (e.g. `ai_model_id`).
 
 ### Pages
 
@@ -338,15 +348,19 @@ Three rendering modes:
 3. ChatPage: POST /api/assistants/{assistant}/conversations/{id}/messages
    body: { messages: [...history, user_msg] }  — no system prompt, backend adds it
 4. ConversationController: validate → find Conversation → save user Message + Image
-5. PromptDirector: reads vera_prompt.json → builds system prompt string
-6. LlmManager::forAssistantUser(): checks Settings for ai_model_id
+5. Load Assistant model → fetch its emotion set from DB
+6. PromptDirector($assistant->prompt): prompt JSON comes from DB, not a file
+   → inject emotion tags via append()
+   → run RAG via withRetrieval() if lorebook exists
+   → build system prompt string
+7. LlmManager::forAssistantUser(): checks Settings for ai_model_id
    → if set: load AiModel + AiProvider → instantiate GenericProvider or AnthropicProvider
    → if not set: fromConfig() builds provider from config/ai.php
-7. LlmProvider.chat([system_prompt, ...messages]) → LlmResponse
-8. ConversationController: save assistant Message → return JSON
-9. ChatPage: parseEmotionFromResponse(content) → extract [tag] + clean text
-10. ChatPage: setCurrentEmotion(emotion) → Portrait swaps expression
-11. ChatPage: render ChatMessage with formatted text + thinking block
+8. LlmProvider.chat([system_prompt, ...messages]) → LlmResponse
+9. ConversationController: save assistant Message → return JSON
+10. ChatPage: parseEmotionFromResponse(content) → extract [tag] + clean text
+11. ChatPage: setCurrentEmotion(emotion) → Portrait swaps expression
+12. ChatPage: render ChatMessage with formatted text + thinking block
 ```
 
 ---
