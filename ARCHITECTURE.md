@@ -45,6 +45,7 @@ Browser (React SPA — React Router)
     |-- GET|POST|PATCH|DELETE /api/ai-providers
     |-- POST|PATCH|DELETE /api/ai-providers/{provider}/models
     |-- GET|POST /api/lorebook
+    |-- GET|POST|PUT|DELETE /api/assistants/{assistant}/prompt
     |
 Laravel Backend (API)
     |
@@ -263,6 +264,7 @@ The app uses React Router. `app.jsx` defines all routes:
 /conversations            → ConversationsPage     (authenticated)
 /conversations/:id        → ChatPage              (authenticated)
 /lorebook                 → LorebookPage          (authenticated)
+/prompt                   → PromptPage            (authenticated)
 /settings                 → SettingsPage          (authenticated)
 /providers                → ProvidersPage         (authenticated)
 *                         → redirect to /conversations
@@ -461,6 +463,7 @@ laravel-vera/
 │   │   ├── Image.php                           polymorphic, disk-stored, url accessor
 │   │   └── Video.php                           polymorphic, disk-stored, url accessor
 │   ├── Providers/AppServiceProvider.php
+│   ├── Rules/ValidPromptStructure.php          validates prompt tree (string/list/nested object)
 │   └── Services/
 │       ├── LlmProviders/
 │       │   ├── LlmManager.php                  forAssistantUser() / fromConfig()
@@ -490,6 +493,7 @@ laravel-vera/
 │   │   │   └── ConfirmationModal.jsx           modal with configurable options
 │   │   ├── ModelAccordion.jsx                  model form + select/deselect in header
 │   │   ├── ProviderAccordion.jsx               provider form + nested models
+│   │   ├── PromptNode.jsx                      recursive prompt tree node editor
 │   │   ├── EntryAccordion.jsx                  lorebook entry form
 │   │   ├── Portrait.jsx                        expression display (3 render modes)
 │   │   ├── ChatMessage.jsx                     message rendering
