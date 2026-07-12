@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 
-export default function TerminalModal({ title, message, options, onSelect }) {
+export default function ConfirmationModal({ title, message, options, onSelect }) {
 	const [activeIndex, setActiveIndex] = useState(0);
 	const modalRef = useRef(null);
 

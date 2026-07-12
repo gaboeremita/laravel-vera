@@ -15,99 +15,103 @@ class GenericProvider implements LlmProvider
 		private readonly ?string $apiKey = null,
 		private readonly bool $thinking = false,
 		private readonly ?string $thinkingKey = null,
+		private readonly ?string $thinkingParam = null,
+		private readonly bool $stream = false,
 		private readonly array $config = [],
 	) {}
 
-	public static function fromModel(AiModel $aiModel): static
-	{
-		$provider = $aiModel->provider;
-		$schema = $provider->config_schema ?? [];
+    public static function fromModel(AiModel $aiModel): static
+    {
+        $provider = $aiModel->provider;
+        $schema = $provider->config_schema ?? [];
 
-		return new static(
-			url: $provider->url,
-			model: $aiModel->name,
-			apiKey: $provider->api_key,
-			thinking: $aiModel->thinking,
-			thinkingKey: $schema['thinking_key'] ?? null,
-			config: $aiModel->config ?? [],
-		);
-	}
+        return new static(
+            url: $provider->url,
+            model: $aiModel->endpoint,
+            apiKey: $provider->api_key,
+            thinking: $aiModel->thinking,
+            thinkingKey: data_get($schema, 'thinking_key.default'),
+            config: $aiModel->config ?? [],
+        );
+    }
 
-	public function chat(array $messages): LlmResponse
-	{
-		$formattedMessages = array_map([$this, 'formatMessage'], $messages);
+    public function chat(array $messages): LlmResponse
+    {
+        $formattedMessages = array_map([$this, 'formatMessage'], $messages);
 
-		$payload = [
-			'model' => $this->model,
-			'stream' => config('ai.stream', false),
-			'messages' => $formattedMessages,
-		];
+        $payload = [
+            'model' => $this->model,
+            'stream' => config('ai.stream', false),
+            'messages' => $formattedMessages,
+        ];
 
-		if (isset($this->config['max_tokens'])) {
-			$payload['max_tokens'] = $this->config['max_tokens'];
-		}
+        if (isset($this->config['max_tokens'])) {
+            $payload['max_tokens'] = $this->config['max_tokens'];
+        }
+
+		$thinkingParam = $this->thinkingParam ?? 'reasoning';
 
 		if ($this->thinking && isset($this->config['thinking_budget'])) {
-			$payload['reasoning'] = [
+			$payload[$thinkingParam] = [
 				'max_tokens' => $this->config['thinking_budget'],
 			];
 		}
 
-		$headers = [];
-		if ($this->apiKey) {
-			$headers['Authorization'] = "Bearer {$this->apiKey}";
-		}
+        $headers = [];
+        if ($this->apiKey) {
+            $headers['Authorization'] = "Bearer {$this->apiKey}";
+        }
 
-		$timeout = $this->config['timeout'] ?? config('ai.defaults.timeout', 600);
+        $timeout = $this->config['timeout'] ?? config('ai.defaults.timeout', 600);
 
-		$response = Http::timeout($timeout)
-			->withHeaders($headers)
-			->post($this->url, $payload);
+        $response = Http::timeout($timeout)
+            ->withHeaders($headers)
+            ->post($this->url, $payload);
 
-		if ($response->failed()) {
-			throw new \RuntimeException('LLM request failed: ' . $response->body());
-		}
+        if ($response->failed()) {
+            throw new \RuntimeException('LLM request failed: '.$response->body());
+        }
 
-		$data = $response->json();
+        $data = $response->json();
 
-		if (isset($data['error'])) {
-			throw new \RuntimeException('LLM error: ' . ($data['error']['message'] ?? 'Unknown error'));
-		}
+        if (isset($data['error'])) {
+            throw new \RuntimeException('LLM error: '.($data['error']['message'] ?? 'Unknown error'));
+        }
 
-		$choice = $data['choices'][0]['message'] ?? [];
-		$thinkingKey = $this->thinkingKey ?? 'reasoning';
+        $choice = $data['choices'][0]['message'] ?? [];
+        $thinkingKey = $this->thinkingKey ?? 'reasoning';
 
-		return new LlmResponse(
-			content: $choice['content'] ?? '',
-			thinking: $choice[$thinkingKey] ?? null,
-		);
-	}
+        return new LlmResponse(
+            content: $choice['content'] ?? '',
+            thinking: $choice[$thinkingKey] ?? null,
+        );
+    }
 
-	private function formatMessage(array $message): array
-	{
-		if (empty($message['images'])) {
-			return [
-				'role' => $message['role'],
-				'content' => $message['content'] ?? '',
-			];
-		}
+    private function formatMessage(array $message): array
+    {
+        if (empty($message['images'])) {
+            return [
+                'role' => $message['role'],
+                'content' => $message['content'] ?? '',
+            ];
+        }
 
-		$parts = [];
+        $parts = [];
 
-		if (! empty($message['content'])) {
-			$parts[] = ['type' => 'text', 'text' => $message['content']];
-		}
+        if (! empty($message['content'])) {
+            $parts[] = ['type' => 'text', 'text' => $message['content']];
+        }
 
-		foreach ($message['images'] as $image) {
-			$parts[] = [
-				'type' => 'image_url',
-				'image_url' => ['url' => "data:image/jpeg;base64,{$image}"],
-			];
-		}
+        foreach ($message['images'] as $image) {
+            $parts[] = [
+                'type' => 'image_url',
+                'image_url' => ['url' => "data:image/jpeg;base64,{$image}"],
+            ];
+        }
 
-		return [
-			'role' => $message['role'],
-			'content' => $parts,
-		];
-	}
+        return [
+            'role' => $message['role'],
+            'content' => $parts,
+        ];
+    }
 }

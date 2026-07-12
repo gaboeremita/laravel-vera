@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Trash2, Pencil } from "lucide-react";
 import { route } from 'ziggy-js';
-import TerminalModal from "./TerminalModal";
+import ConfirmationModal from "./common/ConfirmationModal.jsx";
 import { api } from "../utils/api";
 
 function timeAgo(dateString) {
@@ -258,7 +258,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 
 			{/* Delete confirmation modal */}
 			{pendingDeleteId && (
-				<TerminalModal
+				<ConfirmationModal
 					title="Delete conversation"
 					message="This conversation will be permanently erased from The Bridge. Are you sure?"
 					options={[

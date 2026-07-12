@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AiProvider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,11 +20,13 @@ class AiProviderController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'url' => ['required', 'string', 'url', 'max:255'],
-            'api_key' => ['required', 'string'],
+            'api_key' => ['nullable', 'string'],
             'prompt' => ['nullable', 'string'],
+            'config_schema' => ['nullable', 'array'],
         ]);
 
         $provider = $request->user()
@@ -46,6 +47,7 @@ class AiProviderController extends Controller
             'url' => ['sometimes', 'string', 'url', 'max:255'],
             'api_key' => ['sometimes', 'string'],
             'prompt' => ['nullable', 'string'],
+            'config_schema' => ['nullable', 'array'],
         ]);
 
         $provider->update($validated);

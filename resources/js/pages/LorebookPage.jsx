@@ -3,7 +3,9 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
+import EntryAccordion from "../components/EntryAccordion.jsx";
+import ConfirmationModal from "../components/common/ConfirmationModal.jsx";
 
 export default function LorebookPage() {
 	const navigate = useNavigate();
@@ -209,116 +211,13 @@ export default function LorebookPage() {
 
 					<AnimatePresence initial={false}>
 						{entries.map((entry, index) => (
-							<motion.div
+							<EntryAccordion
 								key={entry.id ?? entry.uid}
-								initial={{ opacity: 0, height: 0, scaleY: 0.95 }}
-								animate={{ opacity: 1, height: 'auto', scaleY: 1 }}
-								exit={{ opacity: 0, height: 0, scaleY: 0.95 }}
-								transition={{ duration: 0.25, ease: 'easeOut' }}
-								style={{ originY: 0, overflow: 'hidden' }}
-								className="border border-line-1 mb-4"
-							>
-								{/* Accordion header — always visible */}
-								<button
-									onClick={() => updateEntry(index, 'collapsed', !entry.collapsed)}
-									className="w-full px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-bg-1 transition-colors"
-								>
-									<div className="flex items-center gap-3">
-										<motion.span
-											animate={{ rotate: entry.collapsed ? 0 : 90 }}
-											transition={{ duration: 0.2 }}
-											className="text-fg-3 text-xs"
-										>
-											▶
-										</motion.span>
-										<span className="text-fg-3 text-[0.65rem] tracking-[0.15em]">
-											ENTRY {index + 1}
-										</span>
-										<span className="text-accent text-sm truncate max-w-md">
-    										{entry.collapsed ? (entry.title || 'Untitled') : ''}
-										</span>
-									</div>
-									<button
-										onClick={(e) => {
-											e.stopPropagation();
-											setDeleteIndex(index);
-										}}
-										className="text-danger text-[0.7rem] tracking-[0.1em]  cursor-pointer hover:text-danger transition-colors"
-									>
-										DELETE
-									</button>
-								</button>
-
-								{/* Accordion body — collapsible */}
-								<AnimatePresence initial={false}>
-									{!entry.collapsed && (
-										<motion.div
-											initial={{ height: 0, opacity: 0 }}
-											animate={{ height: 'auto', opacity: 1 }}
-											exit={{ height: 0, opacity: 0 }}
-											transition={{ duration: 0.2, ease: 'easeOut' }}
-											style={{ overflow: 'hidden' }}
-										>
-											<div className="px-4 pb-4 space-y-3">
-												<div>
-													<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
-														Title
-													</label>
-													<input
-														type="text"
-														value={entry.title}
-														onChange={(e) => updateEntry(index, 'title', e.target.value)}
-														maxLength={100}
-														className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors"
-														placeholder="e.g. The Bridge"
-													/>
-												</div>
-
-												<div>
-													<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
-														Content
-													</label>
-													<textarea
-														value={entry.content}
-														onChange={(e) => updateEntry(index, 'content', e.target.value)}
-														rows={5}
-														className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none"
-														placeholder="The lore content that will be embedded and injected into prompts..."
-													/>
-												</div>
-
-												<div>
-													<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
-														Keywords
-														<span className="text-fg-3 ml-2 normal-case">comma-separated</span>
-													</label>
-													<input
-														type="text"
-														value={entry.keywords}
-														onChange={(e) => updateEntry(index, 'keywords', e.target.value)}
-														className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors"
-														placeholder="e.g. Bridge, city, digital"
-													/>
-												</div>
-
-												<div>
-													<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
-														Tags
-														<span className="text-fg-3 ml-2 normal-case">comma-separated</span>
-													</label>
-													<input
-														type="text"
-														value={entry.tags}
-														onChange={(e) => updateEntry(index, 'tags', e.target.value)}
-														className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors"
-														placeholder="e.g. location, worldbuilding"
-													/>
-												</div>
-											</div>
-										</motion.div>
-									)}
-								</AnimatePresence>
-							</motion.div>
+								entry={entry}
+								index={index}
+								onUpdate={(field, value) => updateEntry(index, field, value)}
+								onDelete={() => setDeleteIndex(index)}
+							/>
 						))}
 
 						{entries.length === 0 && (
@@ -352,33 +251,20 @@ export default function LorebookPage() {
 				</button>
 			</div>
 			{deleteIndex !== null && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-					<div className="border border-line-1 bg-bg-0 p-6 max-w-sm w-full mx-4 space-y-4">
-						<p className="text-accent text-sm">
-							Delete entry "{entries[deleteIndex]?.title || `Entry ${deleteIndex + 1}`}"?
-						</p>
-						<p className="text-fg-3 text-xs">
-							This won't take effect until you save.
-						</p>
-						<div className="flex gap-3 justify-end">
-							<button
-								onClick={() => setDeleteIndex(null)}
-								className="bg-transparent border border-line-1 text-fg-3 text-[0.75rem] tracking-[0.1em]  px-4 py-1.5 cursor-pointer hover:text-accent transition-colors"
-							>
-								CANCEL
-							</button>
-							<button
-								onClick={() => {
-									removeEntry(deleteIndex);
-									setDeleteIndex(null);
-								}}
-								className="bg-transparent border border-danger text-danger text-[0.75rem] tracking-[0.1em]  px-4 py-1.5 cursor-pointer hover:bg-danger/10 transition-colors"
-							>
-								CONFIRM
-							</button>
-						</div>
-					</div>
-				</div>
+				<ConfirmationModal
+					title="Delete entry"
+					message={`Delete entry "${entries[deleteIndex]?.title || `Entry ${deleteIndex + 1}`}"?`}
+					options={[
+						{ label: 'DELETE', value: 'confirm', destructive: true },
+						{ label: 'CANCEL', value: 'cancel', cancel: true },
+					]}
+					onSelect={(value) => {
+						if (value === 'confirm') {
+							removeEntry(deleteIndex);
+						}
+						setDeleteIndex(null);
+					}}
+				/>
 			)}
 		</>
 	);

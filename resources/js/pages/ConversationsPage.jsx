@@ -44,12 +44,20 @@ export default function ConversationsPage() {
 				status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
 				counter={`CONVERSATIONS: ${conversations.length}`}
 				actions={
-					<button
-						onClick={() => navigate('/lorebook')}
-						className="button-primary"
-					>
-						LOREBOOK
-					</button>
+					<div className="flex gap-2">
+						<button
+							onClick={() => navigate('/providers')}
+							className="button-primary"
+						>
+							PROVIDERS
+						</button>
+						<button
+							onClick={() => navigate('/lorebook')}
+							className="button-primary"
+						>
+							LOREBOOK
+						</button>
+					</div>
 				}
 			>
 				<span className="text-fg-2 text-lg tracking-[0.05em]">

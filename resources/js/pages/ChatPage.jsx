@@ -236,6 +236,12 @@ export default function ChatPage() {
 							LOREBOOK
 						</button>
 						<button
+							onClick={() => navigate('/providers')}
+							className="button-primary"
+						>
+							PROVIDERS
+						</button>
+						<button
 							onClick={() => navigate('/conversations')}
 							className="button-primary"
 						>

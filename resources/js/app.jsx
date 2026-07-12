@@ -10,6 +10,7 @@ import ChatPage from './pages/ChatPage.jsx';
 import LorebookPage from './pages/LorebookPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import { Ziggy } from './ziggy.js';
+import ProvidersPage from './pages/ProvidersPage.jsx';
 globalThis.Ziggy = Ziggy;
 
 createRoot(document.getElementById('root')).render(
@@ -23,6 +24,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/conversations/:id" element={<ChatPage />} />
                         <Route path="/lorebook" element={<LorebookPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/providers" element={<ProvidersPage />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/conversations" replace />} />
                 </Routes>

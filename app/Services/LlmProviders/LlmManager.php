@@ -7,12 +7,17 @@ use App\Enums\AiProviderFormat;
 use App\Models\AiModel;
 use App\Models\AiProvider;
 use App\Models\AssistantUser;
+use App\Models\Settings;
 
 class LlmManager
 {
 	public function forAssistantUser(AssistantUser $assistantUser): LlmProvider
 	{
-		$selectedModelId = $assistantUser->settings?->data['ai_model_id'] ?? null;
+		$settings = Settings::where('user_id', $assistantUser->user_id)
+			->where('assistant_id', $assistantUser->assistant_id)
+			->first();
+
+		$selectedModelId = $settings?->data['ai_model_id'] ?? null;
 
 		if ($selectedModelId) {
 			$aiModel = AiModel::with('provider')->findOrFail($selectedModelId);
@@ -51,6 +56,7 @@ class LlmManager
 
 		$aiModel = new AiModel([
 			'name' => $config['model'],
+			'endpoint' => $config['model'],
 			'thinking' => $config['thinking'] ?? false,
 			'config' => $config['config'] ?? [],
 		]);
