@@ -1,13 +1,13 @@
 # VERA — Architecture Analysis
 
 > Volatile Emotional Response Architecture
-> A local-first AI companion with a cyberpunk CRT terminal aesthetic.
+> A local-first multi-AI platform with a dynamic expression system.
 
 ---
 
 ## Overview
 
-VERA is a full-stack web application that wraps a local or remote LLM in a highly stylized, character-driven interface. The user talks to VERA — a fictional AI persona living in a cyberpunk city called The Bridge — and she responds with dynamically changing expressions, styled text, and personality-driven replies. LLM providers and models are managed entirely through the UI and stored in the database. A config-based fallback is used when no model is selected.
+VERA is a full-stack web application that connects users to AI assistants through a stylized, character-driven interface. Each assistant is fully configured in the database — its personality, prompt, expression set, and opening message are all data-driven with no hardcoded content. LLM providers and models are managed through the UI. A config-based fallback is used when no model is selected.
 
 ---
 
@@ -50,7 +50,7 @@ Laravel Backend (API)
     |
     |-- Sanctum session auth (cookie + CSRF)
     |-- ConversationController proxies to LLM via LlmProvider contract
-    |-- PromptDirector assembles system prompt from vera_prompt.json
+    |-- PromptDirector assembles system prompt from Assistant->prompt (DB)
     |-- LlmManager resolves provider: user Settings → AiModel → AiProvider → GenericProvider or AnthropicProvider
     |-- Falls back to config/ai.php if no model selected
     |-- Persists conversations, messages, images to PostgreSQL / disk
@@ -109,7 +109,7 @@ Standard Sanctum SPA login: validates credentials, calls `Auth::attempt()`, rege
 Full conversation lifecycle, scoped to `assistants/{assistant}`:
 
 - `index` — conversations for the authenticated user under the given assistant
-- `store` — creates a new empty conversation
+- `store` — creates a new conversation; seeds the first message from `Assistant->opening_message`
 - `destroy` — deletes a conversation (cascades to messages)
 - `update` — renames a conversation
 - `show` — returns all messages with image URLs resolved from storage
@@ -117,7 +117,7 @@ Full conversation lifecycle, scoped to `assistants/{assistant}`:
   1. Validates `messages[]` array (role/content/images)
   2. Saves the last user message; stores any attached image via `Image::storeFromBase64()`
   3. Loads the `Assistant` model and its emotion set
-  4. Builds system prompt via `PromptDirector($assistant->prompt)` — prompt comes from the DB, not a file
+  4. Builds system prompt via `PromptDirector($assistant->prompt)` — prompt comes from the DB
   5. Injects available emotions and runs RAG retrieval against the user's lorebook if available
   6. Resolves the LLM provider via `LlmManager::forAssistantUser()`
   7. Calls `chat()`, saves the assistant reply (content + thinking)
@@ -135,10 +135,10 @@ CRUD for `AiModel` records nested under a provider. Manages `name`, `endpoint`, 
 - `selectModel` — saves `ai_model_id` into settings data, or clears it (nullable)
 
 **`EmotionController`**
-Returns the emotion set filtered by `restricted` flag. `?unlocked=true` returns alternate expressions.
+Returns the emotion set for the active assistant filtered by `restricted` flag. `?unlocked=true` returns alternate expressions.
 
 **`LorebookController`**
-Reads and saves the user's lorebook (entries with tags). Injected into the system prompt at request time.
+Reads and saves the user's lorebook (entries with tags). Injected into the system prompt via RAG at request time.
 
 ### LLM Provider System
 
@@ -191,11 +191,9 @@ Renders a prompt config array recursively into natural language. Strings pass th
 **`App\Directors\PromptDirector`**
 Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `only([...])`, `except([...])`, and `append(key, value)` for injecting dynamic data (e.g. emotion tags, retrieved lore). Called on every `sendMessage` request. Also supports `withRetrieval()` for RAG — embedding the user's message and retrieving semantically similar lore entries.
 
-> `vera_prompt.json` is no longer used. All prompt data — including `opening_message` — comes from the `Assistant` model.
-
 ### Models & Database
 
-**`User`** — standard Laravel user; has many `Conversation`s, belongs to many `Assistant`s via `AssistantUser`
+**`User`** — standard Laravel user; belongs to many `Assistant`s via `AssistantUser`
 
 **`Assistant`**
 - `name`, `slug`, `description`, `prompt` (JSON), `opening_message`
@@ -230,7 +228,7 @@ Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `on
 
 **`Image`** — polymorphic (`imageable_type/id`), disk-stored, `url` accessor
 **`Video`** — polymorphic (`videoable_type/id`), disk-stored, `url` accessor
-**`Emotion`** — `name`, `restricted`; has one `Image`, has one `Video`
+**`Emotion`** — `name`, `restricted`; has one `Image`, has one `Video`; scoped to an `Assistant`
 **`Lorebook`** — belongs to `User`; has many `LoreEntry`s
 **`LoreEntry`** — content, belongs to many `Tag`s
 
@@ -272,7 +270,7 @@ The selected theme is stored in the `data` JSON column of the `Settings` model, 
 ### Pages
 
 **`LoginPage`**
-Terminal-style login. Email → password → authenticate. Calls `getCsrfCookie()` then `POST /login`.
+Email → password → authenticate. Calls `getCsrfCookie()` then `POST /login`.
 
 **`ConversationsPage`**
 Lists conversations for the active assistant. Create, select (navigate to `/conversations/:id`), delete, rename.
@@ -310,14 +308,14 @@ Model config form (name, endpoint, thinking, prompt, config) inside an `Accordio
 
 **`Portrait`**
 Three rendering modes:
-1. **Unauthenticated** — pixelated, dark canvas lockscreen
-2. **Video intro** — plays short video on first `neutral` emotion after auth
+1. **Unauthenticated** — pixelated, dark canvas lock screen
+2. **Video intro** — plays a short video on the first `neutral` emotion after auth
 3. **Authenticated** — emotion-mapped image from `useEmotions` with scanline overlay and mood label
 
-**`ChatMessage`** — renders a single message; differentiates VERA / USER, handles thinking blocks and images
+**`ChatMessage`** — renders a single message; differentiates assistant / user labels, handles thinking blocks and images
 **`ThinkingBlock`** — collapsible chain-of-thought display
-**`BootSequence`** — animated terminal boot, fires `onComplete` callback
-**`ConfirmationModal`** — terminal-style modal with configurable options
+**`BootSequence`** — animated startup sequence, fires `onComplete` callback
+**`ConfirmationModal`** — modal with configurable options
 **`ConversationList`** — sidebar list with create/delete/rename
 **`ToastContainer`** / **`Scanlines`** — toast display and CRT overlay
 
@@ -349,7 +347,7 @@ Three rendering modes:
    body: { messages: [...history, user_msg] }  — no system prompt, backend adds it
 4. ConversationController: validate → find Conversation → save user Message + Image
 5. Load Assistant model → fetch its emotion set from DB
-6. PromptDirector($assistant->prompt): prompt JSON comes from DB, not a file
+6. PromptDirector($assistant->prompt): prompt JSON comes from DB
    → inject emotion tags via append()
    → run RAG via withRetrieval() if lorebook exists
    → build system prompt string
@@ -367,7 +365,7 @@ Three rendering modes:
 
 ## Authentication Flow
 
-VERA uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
+The app uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
 
 ```
 1. Page load → AuthenticatedLayout checks GET /api/user
@@ -387,18 +385,13 @@ VERA uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
 
 - **Emotion not persisted** — the `emotion` column exists on `messages` but is never written. Emotion state is frontend-only.
 - **VoiceController is a stub** — voice input/output not implemented.
-- **No metrics system** — `vera_prompt.json` has a `metrics` section but affection/trust/patience values are not tracked or used for expression gating.
-- **assistant_id hardcoded to 1** — Settings queries are currently scoped to `assistant_id = 1` pending proper multi-assistant UI.
+- **assistant_id hardcoded to 1** — Settings queries are currently scoped to `assistant_id = 1` pending a proper multi-assistant UI.
 
 ### Planned Features
 
-- Affection/trust/comfort/patience metrics system
-- Expression gating based on relationship metrics
 - Voice input/output (Web Speech API + TTS)
 - Local image generation (ComfyUI/Stable Diffusion)
-- Multiple character support with full multi-assistant UI
-- Alternate outfit system
-- NPC interaction system for The Bridge
+- Full multi-assistant UI (assistant switcher, creation flow)
 
 ---
 
@@ -407,12 +400,12 @@ VERA uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
 ```
 laravel-vera/
 ├── app/
-│   ├── Builders/PromptBuilder.php              renders vera_prompt.json to text
+│   ├── Builders/PromptBuilder.php              assembles system prompt from assistant config
 │   ├── Console/Commands/
 │   │   ├── SyncEmotions.php                    seeds emotion records
 │   │   └── TelegramPollCommand.php             Telegram bot long-poll loop
 │   ├── Contracts/LlmProvider.php               interface: chat() + fromModel()
-│   ├── Directors/PromptDirector.php            reads JSON, filters, builds prompt
+│   ├── Directors/PromptDirector.php            reads assistant prompt config, filters, builds
 │   ├── DTOs/LlmResponse.php                    content + thinking
 │   ├── Enums/AiProviderFormat.php              generic | anthropic → provider class
 │   ├── Http/Controllers/
@@ -466,14 +459,14 @@ laravel-vera/
 │   ├── components/
 │   │   ├── common/
 │   │   │   ├── Accordion.jsx                   label/title/badge/actions/collapsed
-│   │   │   └── ConfirmationModal.jsx           terminal-style modal
+│   │   │   └── ConfirmationModal.jsx           modal with configurable options
 │   │   ├── ModelAccordion.jsx                  model form + select/deselect in header
 │   │   ├── ProviderAccordion.jsx               provider form + nested models
 │   │   ├── EntryAccordion.jsx                  lorebook entry form
 │   │   ├── Portrait.jsx                        expression display (3 render modes)
 │   │   ├── ChatMessage.jsx                     message rendering
 │   │   ├── ThinkingBlock.jsx                   collapsible LLM reasoning
-│   │   ├── BootSequence.jsx                    terminal boot animation
+│   │   ├── BootSequence.jsx                    startup animation
 │   │   ├── ConversationList.jsx                sidebar list
 │   │   ├── ToastContainer.jsx                  toast display
 │   │   └── Scanlines.jsx                       CRT overlay
@@ -486,6 +479,5 @@ laravel-vera/
 │       ├── api.js                              fetch wrapper (Sanctum-aware)
 │       ├── parsers.js                          emotion tag extraction
 │       └── formatMessage.jsx                   text → styled React elements
-├── storage/app/public/                         emotion images/videos + user uploads
-└── vera_prompt.json                            VERA's entire personality + world config
+└── storage/app/public/                         emotion images/videos + user uploads
 ```

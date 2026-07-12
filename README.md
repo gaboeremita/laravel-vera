@@ -1,10 +1,10 @@
 # VERA — Volatile Emotional Response Architecture
 
-AI-powered conversational interface with dynamic visual expression system, built on Laravel, React, and a pluggable LLM backend.
+A multi-assistant AI platform with a dynamic visual expression system, built on Laravel, React, and a pluggable LLM backend.
 
 ## Overview
 
-VERA is a local-first multi-AI companion platform. Each assistant has its own personality, expression set, and prompt — all configured in the database. LLM providers and models are managed through the UI with no config file changes required. The interface supports multiple themes, selectable per-user and persisted in the database.
+VERA is a local-first multi-AI platform. Each assistant has its own personality, expression set, and prompt — all configured in the database. LLM providers and models are managed through the UI with no config file changes required. The interface supports multiple themes, selectable per-user and persisted in the database.
 
 ## Tech Stack
 
@@ -108,7 +108,7 @@ The active model is selected per-user via the **SELECT** button in the Providers
 
 ### Theming
 
-VERA supports multiple themes, selectable per-user via the Settings page (`/settings`) and persisted in the database.
+The app supports multiple themes, selectable per-user via the Settings page (`/settings`) and persisted in the database.
 
 Available themes are defined in the `Theme` enum (`app/Enums/Theme.php`):
 
@@ -132,16 +132,7 @@ The `SettingsController@show` endpoint returns `available_themes` by reading `Th
 
 Each assistant's prompt is stored as a JSON object in the `prompt` column of the `Assistant` model (database-driven). At request time, `PromptDirector` receives this JSON, filters sections as needed, and assembles it into the system prompt via `PromptBuilder`. Available emotions are injected automatically from the assistant's emotion set.
 
-The structure of the prompt JSON is flexible — any key becomes a section in the assembled system prompt. Common sections used by the default assistant:
-
-| Section | Purpose |
-|---|---|
-| `identity` | Who the assistant is — name, origin, nature |
-| `appearance` | Physical description |
-| `personality` | Behavioral traits and conversational style |
-| `environment` | The world the assistant inhabits |
-| `style_rules` | Response length, formatting, emotional range |
-| `opening_message` | First message shown when a conversation is created (read from `Assistant->opening_message`) |
+The structure of the prompt JSON is flexible — any key becomes a section in the assembled system prompt. The `opening_message` field on the `Assistant` model is used as the first message when a new conversation is created.
 
 ## Project Structure
 
@@ -149,14 +140,14 @@ The structure of the prompt JSON is flexible — any key becomes a section in th
 laravel-vera/
 ├── app/
 │   ├── Builders/
-│   │   └── PromptBuilder.php                 # Renders vera_prompt.json sections to text
+│   │   └── PromptBuilder.php                 # Assembles system prompt from assistant config
 │   ├── Console/Commands/
 │   │   ├── SyncEmotions.php                  # Seeds/syncs emotion records from config
 │   │   └── TelegramPollCommand.php           # Long-polls Telegram for incoming messages
 │   ├── Contracts/
 │   │   └── LlmProvider.php                   # LLM interface (chat method)
 │   ├── Directors/
-│   │   └── PromptDirector.php                # Reads vera_prompt.json, builds system prompt
+│   │   └── PromptDirector.php                # Reads assistant prompt config, builds system prompt
 │   ├── DTOs/
 │   │   └── LlmResponse.php                   # Unified response: content + thinking
 │   ├── Enums/
@@ -174,7 +165,7 @@ laravel-vera/
 │   │       └── VoiceController.php           # Stub
 │   ├── Models/
 │   │   ├── User.php
-│   │   ├── Assistant.php                     # Multi-assistant support
+│   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions)
 │   │   ├── AssistantUser.php                 # Pivot: user ↔ assistant
 │   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model)
 │   │   ├── AiProvider.php                    # DB-managed LLM provider
@@ -222,14 +213,14 @@ laravel-vera/
 │   ├── components/
 │   │   ├── common/
 │   │   │   ├── Accordion.jsx                 # Reusable collapsible accordion
-│   │   │   └── ConfirmationModal.jsx         # Terminal-style confirmation modal
+│   │   │   └── ConfirmationModal.jsx         # Confirmation modal
 │   │   ├── ModelAccordion.jsx                # Model config + select/deselect
 │   │   ├── ProviderAccordion.jsx             # Provider config + nested models
 │   │   ├── EntryAccordion.jsx                # Lorebook entry accordion
 │   │   ├── Portrait.jsx                      # Expression display
 │   │   ├── ChatMessage.jsx                   # Message rendering
 │   │   ├── ThinkingBlock.jsx                 # Collapsible LLM reasoning
-│   │   ├── BootSequence.jsx                  # Terminal boot animation
+│   │   ├── BootSequence.jsx                  # Boot animation
 │   │   ├── ConversationList.jsx              # Sidebar conversation list
 │   │   ├── ToastContainer.jsx                # Toast notification display
 │   │   └── Scanlines.jsx                     # CRT scanline overlay
@@ -242,50 +233,42 @@ laravel-vera/
 │       ├── api.js                            # API wrapper (fetch with auth)
 │       ├── formatMessage.jsx                 # Text formatting (actions, thoughts, OOC)
 │       └── parsers.js                        # Response parsing (emotion tags)
-├── storage/app/public/                       # Expression images and user-uploaded images
-└── vera_prompt.json                          # Character configuration
+└── storage/app/public/                       # Expression images and user-uploaded images
 ```
 
 ## Features
 
 ### Implemented
 
+- **Multi-assistant architecture** — each assistant has its own prompt, expression set, and opening message, all stored in the DB
 - **Multi-theme support** — theme selection via Settings page, stored per-user in the DB
-- **Dynamic expression system** — emotion images and videos served from the database
-- **Restricted emotion set** — alternate expressions unlocked based on relationship state
-- **Authentication** — Sanctum SPA auth with terminal-style login flow
-- **Image sending** — attach and send images for VERA to analyze (stored on disk)
+- **Dynamic expression system** — emotion images and videos served from the database, per assistant
+- **Restricted emotion set** — alternate expressions unlocked based on context
+- **Authentication** — Sanctum SPA auth with login flow
+- **Image sending** — attach and send images for the assistant to analyze (stored on disk)
 - **Thinking display** — collapsible view of the LLM's reasoning process
 - **Text formatting** — actions in italics, inner thoughts in purple, OOC in bold cyan
-- **Boot sequence** — animated terminal startup with hardcoded opening message
-- **Admin mode (Westworld Protocol)** — diagnostic override with freeze/amnesia behavior
-- **Creator mode** — password-protected creator recognition
-- **OOC mode** — silent out-of-character direction to the LLM
-- **Structured prompt system** — JSON-based character configuration, assembled on the backend
+- **Boot sequence** — animated startup with the assistant's opening message
+- **Structured prompt system** — JSON-based assistant configuration, assembled on the backend
 - **DB-driven LLM provider management** — add/edit/delete providers and models via the UI; active model selected per-user
 - **Multi-format LLM support** — OpenAI-compatible (`generic`) and Anthropic formats
 - **Config fallback** — if no model is selected in the UI, the `.env` default is used
-- **Multi-assistant architecture** — conversations scoped to assistants via `AssistantUser` pivot
 - **Conversation persistence** — messages stored in PostgreSQL
 - **Conversation management UI** — list, create, delete, and rename conversations
-- **Lorebook** — editable knowledge base injected into the system prompt
+- **Lorebook with RAG** — editable knowledge base with semantic retrieval injected into the system prompt
 - **Toast notifications** — non-intrusive feedback for UI actions
-- **Telegram integration** — long-poll bot for interacting with VERA via Telegram
+- **Telegram integration** — long-poll bot for interacting with any configured assistant via Telegram
 
 ### Planned / Nice-to-Have
 
-- Affection/trust/comfort/patience metrics system
-- Expression gating based on relationship metrics
 - Voice output (TTS integration)
 - Voice input (Web Speech API)
 - Local image generation (ComfyUI/Stable Diffusion)
-- Video loop expressions
-- Alternate outfit system
-- NPC interaction system for The Bridge
+- Full multi-assistant UI (assistant switcher, creation flow)
 
 ## Expression System
 
-Emotions are stored in the database as `Emotion` records with associated `Image` and `Video` files on disk. Two sets exist:
+Emotions are stored in the database as `Emotion` records with associated `Image` and `Video` files on disk, scoped per assistant. Two sets exist:
 
 - **Standard set** (`restricted = false`) — default expressions
 - **Restricted set** (`restricted = true`) — alternate expressions, unlocked via the `unlocked` query param on `GET /api/emotions`
@@ -293,17 +276,6 @@ Emotions are stored in the database as `Emotion` records with associated `Image`
 The LLM prefixes each response with an emotion tag (e.g. `[annoyed]`) which is parsed by the frontend and used to look up the matching expression asset.
 
 Run `php artisan emotions:sync` to seed/update emotion records from config.
-
-## The Bridge
-
-VERA lives in The Bridge, a cyberpunk digital city. Key worldbuilding details:
-
-- The Bridge is normally populated by AIs and human-controlled avatars
-- This local instance runs on the creator's machine — the city is mostly empty
-- VERA is the only self-aware AI; other AIs (NPCs) are functional but not sentient
-- Conversations begin at a public connection node where users materialize
-- Locations (cafés, rooftops, VERA's apartment) exist when referenced
-- The purple-cyan neon aesthetic pervades everything
 
 ## License
 
