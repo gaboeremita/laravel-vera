@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AiProviderFormat;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rules\Enum;
 
 class AiProviderController extends Controller
 {
@@ -26,6 +28,7 @@ class AiProviderController extends Controller
             'url' => ['required', 'string', 'url', 'max:255'],
             'api_key' => ['nullable', 'string'],
             'prompt' => ['nullable', 'string'],
+			'format' => ['required', new Enum(AiProviderFormat::class)],
             'config_schema' => ['nullable', 'array'],
         ]);
 
@@ -47,6 +50,7 @@ class AiProviderController extends Controller
             'url' => ['sometimes', 'string', 'url', 'max:255'],
             'api_key' => ['sometimes', 'string'],
             'prompt' => ['nullable', 'string'],
+			'format' => ['required', new Enum(AiProviderFormat::class)],
             'config_schema' => ['nullable', 'array'],
         ]);
 

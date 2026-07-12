@@ -14,13 +14,13 @@ class AiProvider extends Model
 {
 
 	protected $hidden = ['api_key'];
+	protected $appends = ['has_key'];
 
 	protected function hasKey(): Attribute
 	{
 		return Attribute::get(fn () => !empty($this->api_key));
 	}
 
-	protected $appends = ['has_key'];
 	protected function casts(): array
 	{
 		return [
