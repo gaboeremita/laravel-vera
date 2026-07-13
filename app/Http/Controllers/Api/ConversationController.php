@@ -14,6 +14,8 @@ class ConversationController extends Controller
 {
 	use ResolvesAssistantUser;
 
+	private const MESSAGES_PER_PAGE = 50;
+
 	public function index(Request $request, int $assistant): JsonResponse
 	{
 
@@ -35,10 +37,22 @@ class ConversationController extends Controller
 			->conversations()
 			->findOrFail($id);
 
-		$messages = $conversation->messages()
+		$limit = self::MESSAGES_PER_PAGE;
+
+		$query = $conversation->messages()
 			->with('image')
-			->orderBy('created_at')
-			->get(['id', 'role', 'content', 'thinking', 'emotion', 'conversation_id']);
+			->orderByDesc('created_at');
+
+		if ($request->has('before')) {
+			$query->where('id', '<', (int) $request->input('before'));
+		}
+
+		// Fetch one extra to determine if older messages exist
+		$messages = $query->take($limit + 1)->get();
+		$hasMore = $messages->count() > $limit;
+
+		// Trim to limit, reverse to chronological order
+		$messages = $messages->take($limit)->reverse()->values();
 
 		$messages->transform(function ($message) {
 			$message->image_url = $message->image?->url;
@@ -46,7 +60,10 @@ class ConversationController extends Controller
 			return $message;
 		});
 
-		return response()->json($messages);
+		return response()->json([
+			'messages' => $messages,
+			'has_more' => $hasMore,
+		]);
 	}
 
 	public function store(Request $request, int $assistant): JsonResponse
