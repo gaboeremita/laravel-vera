@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AiProviderController;
 use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\AssistantEmotionController;
 use App\Http\Controllers\Api\EmotionController;
 use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\SettingsController;
@@ -37,9 +38,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/emotions', [EmotionController::class, 'index'])->name('emotions.index');
         Route::prefix('/emotions')->name('assistants.emotions.')->group(function () {
-            Route::post('/', [EmotionController::class, 'store'])->name('store');
-            Route::post('/{emotion}', [EmotionController::class, 'update'])->name('update');
-            Route::delete('/{emotion}', [EmotionController::class, 'destroy'])->name('destroy');
+            Route::post('/', [AssistantEmotionController::class, 'store'])->name('store');
+            Route::post('/{emotion}', [AssistantEmotionController::class, 'update'])->name('update');
+            Route::delete('/{emotion}', [AssistantEmotionController::class, 'destroy'])->name('destroy');
         });
     });
 

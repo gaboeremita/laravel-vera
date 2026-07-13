@@ -158,3 +158,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Do NOT delete tests without approval.
 
 </laravel-boost-guidelines>
+
+## Git Rules
+
+- NEVER commit or push changes unless the user explicitly asks you to. Making code changes does not imply permission to commit or push them.
