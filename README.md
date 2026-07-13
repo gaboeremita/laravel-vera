@@ -4,7 +4,7 @@ A multi-assistant AI platform with a dynamic visual expression system, built on 
 
 ## Overview
 
-VERA is a local-first multi-AI platform. Each assistant has its own personality, expression set, and prompt — all configured in the database. LLM providers and models are managed through the UI with no config file changes required. The interface supports multiple themes, selectable per-user and persisted in the database.
+VERA is a general-purpose multi-assistant AI platform. Each assistant has its own personality, expression set, and prompt — all configured in the database. LLM providers and models are managed through the UI, making it easy to add, switch, and configure providers without touching config files. The interface supports multiple themes, selectable per-user and persisted in the database.
 
 ## Tech Stack
 
@@ -160,7 +160,7 @@ laravel-vera/
 │   │       ├── AssistantPromptController.php # Prompt CRUD (show/store/update/destroy)
 │   │       ├── ConversationController.php    # CRUD + message sending
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
-│   │       ├── LorebookController.php        # Lorebook read/save
+│   │       ├── ArchiveController.php         # Archive read/save
 │   │       ├── SettingsController.php        # Theme + active model selection
 │   │       └── VoiceController.php           # Stub
 │   ├── Models/
@@ -173,8 +173,8 @@ laravel-vera/
 │   │   ├── Conversation.php
 │   │   ├── Message.php
 │   │   ├── Emotion.php                       # Expression name + restricted flag
-│   │   ├── Lorebook.php
-│   │   ├── LoreEntry.php
+│   │   ├── Archive.php
+│   │   ├── ArchiveEntry.php
 │   │   ├── Tag.php
 │   │   ├── Image.php                         # Polymorphic, stored on disk
 │   │   └── Video.php                         # Polymorphic, stored on disk
@@ -207,7 +207,7 @@ laravel-vera/
 │   │   ├── LoginPage.jsx
 │   │   ├── ConversationsPage.jsx             # Conversation list
 │   │   ├── ChatPage.jsx                      # Main chat interface
-│   │   ├── LorebookPage.jsx                  # Lorebook editor
+│   │   ├── ArchivePage.jsx                   # Archive editor
 │   │   ├── PromptPage.jsx                    # Visual prompt editor
 │   │   ├── SettingsPage.jsx                  # Theme selection
 │   │   └── ProvidersPage.jsx                 # AI provider/model management
@@ -217,7 +217,7 @@ laravel-vera/
 │   │   │   └── ConfirmationModal.jsx         # Confirmation modal
 │   │   ├── ModelAccordion.jsx                # Model config + select/deselect
 │   │   ├── ProviderAccordion.jsx             # Provider config + nested models
-│   │   ├── EntryAccordion.jsx                # Lorebook entry accordion
+│   │   ├── EntryAccordion.jsx                # Archive entry accordion
 │   │   ├── Portrait.jsx                      # Expression display
 │   │   ├── ChatMessage.jsx                   # Message rendering
 │   │   ├── ThinkingBlock.jsx                 # Collapsible LLM reasoning
@@ -258,7 +258,7 @@ laravel-vera/
 - **Config fallback** — if no model is selected in the UI, the `.env` default is used
 - **Conversation persistence** — messages stored in PostgreSQL
 - **Conversation management UI** — list, create, delete, and rename conversations
-- **Lorebook with RAG** — editable knowledge base with semantic retrieval injected into the system prompt
+- **Archive with RAG** — editable knowledge base with semantic retrieval injected into the system prompt
 - **Toast notifications** — non-intrusive feedback for UI actions
 - **Telegram integration** — long-poll bot for interacting with any configured assistant via Telegram
 
@@ -267,7 +267,6 @@ laravel-vera/
 - Voice output (TTS integration)
 - Voice input (Web Speech API)
 - Local image generation (ComfyUI/Stable Diffusion)
-- Full multi-assistant UI (assistant switcher, creation flow)
 
 ## Expression System
 
