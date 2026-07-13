@@ -27,6 +27,8 @@ export default function ChatPage() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [hasError, setHasError] = useState(false);
 	const [pendingImage, setPendingImage] = useState(null);
+	const [hasMore, setHasMore] = useState(false);
+	const [isLoadingMore, setIsLoadingMore] = useState(false);
 	const scrollRef = useRef(null);
 	const inputRef = useRef(null);
 	const fileInputRef = useRef(null);
@@ -82,20 +84,20 @@ export default function ChatPage() {
 					return;
 				}
 
-				// Response is a flat array of messages
 				const data = await res.json();
 				let lastEmotion = null;
 
-				const mapped = data.map((msg) => {
+				const mapped = data.messages.map((msg) => {
 					if (msg.role === 'assistant') {
 						const { emotion, text } = parseEmotionFromResponse(msg.content, emotionNames);
 						lastEmotion = emotion;
-						return { role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
+						return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
 					}
-					return { role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+					return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
 				});
 
 				setMessages(mapped);
+				setHasMore(data.has_more);
 				if (lastEmotion) setCurrentEmotion(lastEmotion);
 			} catch {
 				navigate(`/assistants/${assistantId}/conversations`, { replace: true });
@@ -111,14 +113,70 @@ export default function ChatPage() {
 	}, [messages]);
 
 	useEffect(() => {
+		const scrollEl = scrollRef.current;
+		if (!scrollEl) return;
+
+		const handleScroll = () => {
+			if (scrollEl.scrollTop < 100) {
+				loadOlderMessages();
+			}
+		};
+
+		scrollEl.addEventListener('scroll', handleScroll);
+		return () => scrollEl.removeEventListener('scroll', handleScroll);
+	}, [loadOlderMessages]);
+
+	useEffect(() => {
 		if (inputRef.current) inputRef.current.focus();
 	}, []);
+
+	const loadOlderMessages = useCallback(async () => {
+		if (isLoadingMore || !hasMore || messages.length === 0) return;
+
+		const oldestId = messages[0].id;
+		if (!oldestId) return;
+
+		setIsLoadingMore(true);
+
+		const scrollEl = scrollRef.current;
+		const previousScrollHeight = scrollEl?.scrollHeight ?? 0;
+
+		try {
+			const url = route('conversations.show', { assistant: assistantId, id }) + `?before=${oldestId}`;
+			const res = await api.get(url);
+			if (!res.ok) return;
+
+			const data = await res.json();
+
+			const mapped = data.messages.map((msg) => {
+				if (msg.role === 'assistant') {
+					const { text } = parseEmotionFromResponse(msg.content, emotionNames);
+					return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
+				}
+				return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+			});
+
+			setMessages((prev) => [...mapped, ...prev]);
+			setHasMore(data.has_more);
+
+			requestAnimationFrame(() => {
+				if (scrollEl) {
+					scrollEl.scrollTop = scrollEl.scrollHeight - previousScrollHeight;
+				}
+			});
+		} catch {
+			addToast('Failed to load older messages', 'error');
+		} finally {
+			setIsLoadingMore(false);
+		}
+	}, [isLoadingMore, hasMore, messages, assistantId, id, emotionNames]);
 
 	const sendMessage = async () => {
 		const text = input.trim();
 		if ((!text && !pendingImage) || isLoading) return;
 
 		const userMsg = {
+			id: `temp-${Date.now()}`,
 			role: 'user',
 			content: text,
 			image: pendingImage || null,
@@ -174,7 +232,7 @@ export default function ChatPage() {
 				setHasError(false);
 				setMessages([
 					...updatedMessages,
-					{ role: 'assistant', content: cleanText, thinking },
+					{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking },
 				]);
 				setIsLoading(false);
 				return;
@@ -294,8 +352,13 @@ export default function ChatPage() {
 			</Header>
 
 			<div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4">
-				{messages.map((msg, i) => (
-					<ChatMessage key={i} msg={msg} assistantName={assistantName} />
+				{isLoadingMore && (
+					<div className="text-center text-fg-3 text-xs tracking-[0.1em] py-2">
+						LOADING...
+					</div>
+				)}
+				{messages.map((msg) => (
+					<ChatMessage key={msg.id} msg={msg} assistantName={assistantName} />
 				))}
 			</div>
 

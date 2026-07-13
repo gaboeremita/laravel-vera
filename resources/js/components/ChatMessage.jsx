@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ThinkingBlock from "./ThinkingBlock";
@@ -41,7 +42,15 @@ function InlineText({ text }) {
 }
 
 const markdownComponents = {
-    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+    p: ({ children }) => {
+        const hasBlock = Array.isArray(children)
+            ? children.some((child) => child?.type === 'pre' || child?.type === 'div')
+            : children?.type === 'pre' || children?.type === 'div';
+
+        return hasBlock
+            ? <div className="mb-2 last:mb-0">{children}</div>
+            : <p className="mb-2 last:mb-0">{children}</p>;
+    },
     h1: ({ children }) => <h1 className="text-accent font-bold text-base tracking-[0.05em] mt-3 mb-1">{children}</h1>,
     h2: ({ children }) => <h2 className="text-accent font-bold text-sm tracking-[0.05em] mt-3 mb-1">{children}</h2>,
     h3: ({ children }) => <h3 className="text-accent-3 font-bold text-sm mt-2 mb-1">{children}</h3>,
@@ -79,7 +88,7 @@ const markdownComponents = {
     ),
 };
 
-export default function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
+function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
     const isAssistant = msg.role === 'assistant';
 
     return (
@@ -113,3 +122,5 @@ export default function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
         </div>
     );
 }
+
+export default memo(ChatMessage);
