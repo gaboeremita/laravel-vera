@@ -6,14 +6,14 @@ export function useEmotions() {
 	const [emotions, setEmotions] = useState([]);
 	const [emotionsLoaded, setEmotionsLoaded] = useState(false);
 
-	const fetchEmotions = async () => {
+	const fetchEmotions = async (assistantId) => {
 		try {
-			const res = await api.get(route('emotions.index'));
+			const res = await api.get(route('emotions.index', { assistant: assistantId }));
 			const data = await res.json();
 			setEmotions(data);
 			setEmotionsLoaded(true);
 		} catch {
-			setEmotionsLoaded(true);
+			// silent fail
 		}
 	};
 

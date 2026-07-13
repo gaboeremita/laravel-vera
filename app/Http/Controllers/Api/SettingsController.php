@@ -10,10 +10,10 @@ use Illuminate\Validation\Rules\Enum;
 
 class SettingsController extends Controller
 {
-    public function show(Request $request): JsonResponse
+    public function show(Request $request, int $assistant): JsonResponse
     {
         $settings = $request->user()->settings()
-            ->where('assistant_id', 1)
+            ->where('assistant_id', $assistant)
             ->first();
 
         return response()->json([
@@ -23,16 +23,16 @@ class SettingsController extends Controller
         ]);
     }
 
-    public function selectModel(Request $request): JsonResponse
+    public function selectModel(Request $request, int $assistant): JsonResponse
     {
         $validated = $request->validate([
             'ai_model_id' => ['nullable', 'integer', 'exists:ai_models,id'],
         ]);
 
         $settings = $request->user()->settings()
-            ->where('assistant_id', 1)
+            ->where('assistant_id', $assistant)
             ->firstOrCreate(
-                ['user_id' => $request->user()->id, 'assistant_id' => 1],
+                ['user_id' => $request->user()->id, 'assistant_id' => $assistant],
                 ['data' => []]
             );
 
@@ -43,16 +43,16 @@ class SettingsController extends Controller
         return response()->json(['ai_model_id' => $validated['ai_model_id']]);
     }
 
-    public function update(Request $request): JsonResponse
+    public function update(Request $request, int $assistant): JsonResponse
     {
         $validated = $request->validate([
             'theme' => ['required', 'string', new Enum(Theme::class)],
         ]);
 
         $settings = $request->user()->settings()
-            ->where('assistant_id', 1)
+            ->where('assistant_id', $assistant)
             ->firstOrCreate(
-                ['user_id' => $request->user()->id, 'assistant_id' => 1],
+                ['user_id' => $request->user()->id, 'assistant_id' => $assistant],
                 ['data' => []]
             );
 

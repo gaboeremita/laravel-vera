@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Assistant;
 use App\Models\Emotion;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
@@ -9,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 
 class SyncEmotions extends Command
 {
-    protected $signature = 'vera:sync-emotions';
+    protected $signature = 'emotions:sync {--assistant= : The assistant ID to scope emotions to}';
 
     protected $description = 'Sync emotions from the source directory — adds new, removes missing';
 
@@ -21,6 +22,22 @@ class SyncEmotions extends Command
 
     public function handle(): int
     {
+        $assistantId = $this->option('assistant');
+
+        if (! $assistantId) {
+            $this->error('You must provide an assistant ID: --assistant=1');
+
+            return self::FAILURE;
+        }
+
+        $assistant = Assistant::find($assistantId);
+
+        if (! $assistant) {
+            $this->error("Assistant {$assistantId} not found.");
+
+            return self::FAILURE;
+        }
+
         $basePath = storage_path('app/private/'.self::BASE_DIR);
 
         if (! File::isDirectory($basePath.'/images')) {
@@ -30,17 +47,19 @@ class SyncEmotions extends Command
             return self::FAILURE;
         }
 
+        $this->info("Syncing emotions for assistant: {$assistant->name} (ID: {$assistant->id})");
+
         // Collect all emotion names present in the source directories
         $sourceNames = $this->collectSourceNames($basePath);
 
         // Add new emotions
-        $this->syncImages($basePath.'/images', restricted: false);
-        $this->syncImages($basePath.'/images/restricted', restricted: true);
-        $this->syncVideos($basePath.'/videos', restricted: false);
-        $this->syncVideos($basePath.'/videos/restricted', restricted: true);
+        $this->syncImages($basePath.'/images', $assistant, restricted: false);
+        $this->syncImages($basePath.'/images/restricted', $assistant, restricted: true);
+        $this->syncVideos($basePath.'/videos', $assistant, restricted: false);
+        $this->syncVideos($basePath.'/videos/restricted', $assistant, restricted: true);
 
         // Remove emotions that no longer have source files
-        $this->purgeOrphans($sourceNames);
+        $this->purgeOrphans($sourceNames, $assistant);
 
         return self::SUCCESS;
     }
@@ -75,7 +94,7 @@ class SyncEmotions extends Command
         return $names;
     }
 
-    private function syncImages(string $path, bool $restricted): void
+    private function syncImages(string $path, Assistant $assistant, bool $restricted): void
     {
         if (! File::isDirectory($path)) {
             return;
@@ -95,7 +114,7 @@ class SyncEmotions extends Command
 
             $name = pathinfo($file->getFilename(), PATHINFO_FILENAME);
 
-            $emotion = Emotion::where('name', $name)->first();
+            $emotion = Emotion::where('name', $name)->where('assistant_id', $assistant->id)->first();
 
             if ($emotion?->image) {
                 $skipped++;
@@ -107,7 +126,7 @@ class SyncEmotions extends Command
             $storagePath = self::BASE_DIR.'/'.$subdir.'/'.$file->getFilename();
             Storage::disk('public')->put($storagePath, File::get($file));
 
-            $emotion ??= Emotion::create([
+            $emotion ??= $assistant->emotions()->create([
                 'name' => $name,
                 'restricted' => $restricted,
             ]);
@@ -127,7 +146,7 @@ class SyncEmotions extends Command
         $this->newLine();
     }
 
-    private function syncVideos(string $path, bool $restricted): void
+    private function syncVideos(string $path, Assistant $assistant, bool $restricted): void
     {
         if (! File::isDirectory($path)) {
             return;
@@ -147,7 +166,7 @@ class SyncEmotions extends Command
             }
 
             $name = pathinfo($file->getFilename(), PATHINFO_FILENAME);
-            $emotion = Emotion::where('name', $name)->first();
+            $emotion = Emotion::where('name', $name)->where('assistant_id', $assistant->id)->first();
 
             if (! $emotion) {
                 $this->warn("  Orphaned: {$file->getFilename()} (no emotion '{$name}' exists)");
@@ -185,13 +204,13 @@ class SyncEmotions extends Command
      * Remove emotions from the DB that no longer have a source image file.
      * Also cleans up their stored files from public storage.
      */
-    private function purgeOrphans(array $sourceNames): void
+    private function purgeOrphans(array $sourceNames, Assistant $assistant): void
     {
         $this->newLine();
         $this->info('Checking for orphaned emotions...');
         $removed = 0;
 
-        $dbEmotions = Emotion::all();
+        $dbEmotions = Emotion::where('assistant_id', $assistant->id)->get();
 
         foreach ($dbEmotions as $emotion) {
             if (in_array($emotion->name, $sourceNames)) {

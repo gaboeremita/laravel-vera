@@ -1,6 +1,6 @@
 /**
  * Parses VERA's response to extract the emotion tag, intimate state, and clean text.
- * Falls back to [seduced] in intimate state, [neutral] otherwise.
+ * Falls back to [seduced] in intimate state, [default] otherwise.
  */
 export function parseEmotionFromResponse(text, validEmotions = []) {
     let remaining = text;
@@ -24,7 +24,7 @@ export function parseEmotionFromResponse(text, validEmotions = []) {
 
     // Default based on state
     if (!emotion) {
-        emotion = intimate ? "seduced" : "neutral";
+        emotion = intimate ? "seduced" : "default";
     }
 
     return {

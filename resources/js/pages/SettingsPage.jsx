@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { useTheme } from '../contexts/ThemeContext';
-import Header from '../components/Header';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { route } from 'ziggy-js';
-import { api } from '../utils/api';
+import { useTheme } from '../contexts/ThemeContext.jsx';
+import { api } from '../utils/api.js';
+import Header from '../components/Header.jsx';
 
 export default function SettingsPage() {
 	const { theme, setTheme, availableThemes } = useTheme();
+	const { assistantId } = useOutletContext();
 	const [selectedTheme, setSelectedTheme] = useState(theme);
 	const [isSaving, setIsSaving] = useState(false);
 	const navigate = useNavigate();
@@ -15,7 +16,7 @@ export default function SettingsPage() {
 
 	const handleSave = async () => {
 		setIsSaving(true);
-		await api.put(route('settings.update'), { theme: selectedTheme });
+		await api.put(route('settings.update', { assistant: assistantId }), { theme: selectedTheme });
 		setTheme(selectedTheme);
 		setIsSaving(false);
 	};
@@ -26,15 +27,13 @@ export default function SettingsPage() {
 				actions={
 					<button
 						onClick={() => navigate(-1)}
-						className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em]  cursor-pointer transition-colors px-4 py-1.5"
+						className="button-primary"
 					>
 						← BACK
 					</button>
 				}
 			>
-                <span className="text-fg-2 text-lg tracking-[0.05em]">
-                    Settings
-                </span>
+				<span className="text-fg-2 text-lg tracking-[0.05em]">Settings</span>
 			</Header>
 
 			<div className="flex-1 overflow-y-auto p-5">
@@ -46,7 +45,7 @@ export default function SettingsPage() {
 						<select
 							value={selectedTheme}
 							onChange={(e) => setSelectedTheme(e.target.value)}
-							className="bg-bg-1 border border-line-1 text-fg-1  text-[0.75rem] tracking-[0.1em] px-4 py-1.5 cursor-pointer outline-none focus:border-accent transition-colors"
+							className="bg-bg-1 border border-line-1 text-fg-1 text-[0.75rem] tracking-[0.1em] px-4 py-1.5 cursor-pointer outline-none focus:border-accent transition-colors"
 						>
 							{availableThemes.map((t) => (
 								<option key={t} value={t}>
@@ -58,7 +57,6 @@ export default function SettingsPage() {
 				</div>
 			</div>
 
-			{/* Save button */}
 			<div className="px-5 py-3 border-t border-line-1 shrink-0">
 				<button
 					onClick={handleSave}

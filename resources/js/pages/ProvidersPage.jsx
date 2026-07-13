@@ -7,7 +7,7 @@ import useProviders from '../hooks/useProviders.js';
 
 export default function ProvidersPage() {
 	const navigate = useNavigate();
-	const { addToast } = useOutletContext();
+	const { addToast, assistantId } = useOutletContext();
 
 	const {
 		providers,
@@ -24,12 +24,12 @@ export default function ProvidersPage() {
 		deleteModel,
 		activeModelId,
 		selectModel,
-	} = useProviders(addToast);
+	} = useProviders(addToast, assistantId);
 
 	if (isLoading) {
 		return (
 			<>
-				<Header
+				<Header settingsPath={`/assistants/${assistantId}/settings`}
 					status={{ label: 'LOADING', color: 'text-warning', dot: '●', blink: true }}
 					actions={
 						<button onClick={() => navigate(-1)} className="button-primary">
@@ -48,7 +48,7 @@ export default function ProvidersPage() {
 
 	return (
 		<>
-			<Header
+			<Header settingsPath={`/assistants/${assistantId}/settings`}
 				status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
 				counter={`PROVIDERS: ${providers.length}`}
 				actions={

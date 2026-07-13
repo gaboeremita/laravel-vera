@@ -1,7 +1,7 @@
 import { Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export default function Header({ children, status, actions, counter }) {
+export default function Header({ children, status, actions, counter, hideSettings = false, settingsPath = '/settings' }) {
 	const navigate = useNavigate();
 
 	return (
@@ -31,12 +31,14 @@ export default function Header({ children, status, actions, counter }) {
 						)}
 					</div>
 				)}
-				<button
-					onClick={() => navigate('/settings')}
-					className="text-fg-3 hover:text-accent transition-colors cursor-pointer"
-				>
-					<Settings size={16} />
-				</button>
+				{!hideSettings && (
+					<button
+						onClick={() => navigate(settingsPath)}
+						className="text-fg-3 hover:text-accent transition-colors cursor-pointer"
+					>
+						<Settings size={16} />
+					</button>
+				)}
 			</div>
 		</div>
 	);

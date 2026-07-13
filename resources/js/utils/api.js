@@ -44,9 +44,18 @@ export const api = {
             method: "PATCH",
             body: JSON.stringify(data),
         }),
-    put: (url, data) => fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+    put: (url, data) =>
+        request(url, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }),
+    postForm: (url, formData) =>
+        fetch(url, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Accept': 'application/json',
+            },
+            body: formData,
     }),
 };

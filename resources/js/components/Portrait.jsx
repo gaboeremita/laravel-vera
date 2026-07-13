@@ -1,11 +1,11 @@
 import {useState, useEffect, useRef} from "react";
 
-export default function Portrait({ emotion, authenticated, getImageUrl, getVideoUrl }) {
+export default function Portrait({ emotion, authenticated, hasAssistant = true, getImageUrl, getVideoUrl }) {
 	const [playingVideo, setPlayingVideo] = useState(false);
 	const canvasRef = useRef(null);
 	const imgRef = useRef(null);
 
-	const src = getImageUrl(emotion) || getImageUrl('neutral');
+	const src = getImageUrl(emotion) || getImageUrl('default');
 	const videoSrc = getVideoUrl(emotion);
 
 	useEffect(() => {
@@ -30,10 +30,27 @@ export default function Portrait({ emotion, authenticated, getImageUrl, getVideo
 	}, [authenticated]);
 
 	useEffect(() => {
-		if (videoSrc && emotion === "neutral" && authenticated) {
+		if (videoSrc && emotion === "default" && authenticated) {
 			setPlayingVideo(true);
 		}
 	}, [emotion, authenticated, videoSrc]);
+
+	if (authenticated && !hasAssistant) {
+		return (
+			<div className="relative w-full h-full overflow-hidden bg-bg-0 flex items-center justify-center">
+				<div className="absolute inset-0 bg-gradient-to-b from-accent/5 via-bg-0 to-accent/10" />
+				<div className="absolute inset-0 pointer-events-none portrait-overlay" />
+				<div className="relative z-10 text-center px-4">
+					<div className="text-accent text-lg tracking-[0.2em] uppercase">
+						Please select
+					</div>
+					<div className="text-accent text-sm tracking-[0.15em] uppercase mt-1">
+						an assistant
+					</div>
+				</div>
+			</div>
+		);
+	}
 
 	if (!authenticated) {
 		return (
@@ -55,7 +72,7 @@ export default function Portrait({ emotion, authenticated, getImageUrl, getVideo
 						Please log in
 					</div>
 					<div className="text-danger font-bold text-sm tracking-[0.15em] uppercase  mt-1">
-						to access VERA
+						to continue
 					</div>
 				</div>
 			</div>
@@ -82,7 +99,7 @@ export default function Portrait({ emotion, authenticated, getImageUrl, getVideo
 		<div className="relative w-full h-full overflow-hidden portrait-bg">
 			<img
 				src={src}
-				alt={`VERA - ${emotion}`}
+				alt={emotion}
 				className="w-full h-full object-cover object-top transition-opacity duration-300"
 			/>
 			<div className="absolute inset-0 pointer-events-none portrait-overlay" />

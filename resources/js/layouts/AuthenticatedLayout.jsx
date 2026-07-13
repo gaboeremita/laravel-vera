@@ -14,9 +14,8 @@ export default function AuthenticatedLayout() {
 	const [booted, setBooted] = useState(() => {
 		return sessionStorage.getItem('vera-booted') === 'true';
 	});
-	const [currentEmotion, setCurrentEmotion] = useState('neutral');
-	const [conversations, setConversations] = useState([]);
-	
+	const [currentEmotion, setCurrentEmotion] = useState('default');
+	const [activeAssistantId, setActiveAssistantId] = useState(null);
 
 	const { emotionNames, fetchEmotions, getImageUrl, getVideoUrl, unlocked } = useEmotions();
 	const { toasts, addToast, removeToast } = useToast();
@@ -26,10 +25,6 @@ export default function AuthenticatedLayout() {
 			.then((res) => {
 				if (res.ok) {
 					setAuthState('authenticated');
-					fetchEmotions();
-					if (sessionStorage.getItem('vera-booted') === 'true') {
-						fetchConversations();
-					}
 				} else {
 					setAuthState('unauthenticated');
 				}
@@ -37,20 +32,9 @@ export default function AuthenticatedLayout() {
 			.catch(() => setAuthState('unauthenticated'));
 	}, []);
 
-	const fetchConversations = async () => {
-		try {
-			const res = await api.get(route('conversations.index', { assistant: 1 }));
-			const data = await res.json();
-			setConversations(data);
-		} catch {
-			addToast('Failed to load conversations', 'error');
-		}
-	};
-
 	const bootComplete = useCallback(() => {
 		setBooted(true);
 		sessionStorage.setItem('vera-booted', 'true');
-		fetchConversations();
 	}, []);
 
 	if (authState === 'checking') return null;
@@ -65,6 +49,7 @@ export default function AuthenticatedLayout() {
 				<Portrait
 					emotion={currentEmotion}
 					authenticated={true}
+					hasAssistant={!!activeAssistantId}
 					getImageUrl={getImageUrl}
 					getVideoUrl={getVideoUrl}
 				/>
@@ -81,9 +66,8 @@ export default function AuthenticatedLayout() {
 						fetchEmotions,
 						unlocked,
 						addToast,
-						conversations,
-						setConversations,
-						fetchConversations,
+						activeAssistantId,
+						setActiveAssistantId,
 					}} />
 				)}
 			</div>

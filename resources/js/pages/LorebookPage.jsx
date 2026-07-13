@@ -120,11 +120,11 @@ export default function LorebookPage() {
 	if (isLoading) {
 		return (
 			<>
-				<Header
+				<Header settingsPath={`/assistants/${assistantId}/settings`}
 					status={{ label: 'LOADING', color: 'text-warning', dot: '●', blink: true }}
 					actions={
 						<button
-							onClick={() => navigate('/conversations')}
+							onClick={() => navigate(`/assistants/${assistantId}/conversations`)}
 							className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em]  cursor-pointer transition-colors px-4 py-1.5"
 						>
 							← CONVERSATIONS
@@ -142,7 +142,7 @@ export default function LorebookPage() {
 
 	return (
 		<>
-			<Header
+			<Header settingsPath={`/assistants/${assistantId}/settings`}
 				status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
 				counter={`ENTRIES: ${entries.length}`}
 				actions={

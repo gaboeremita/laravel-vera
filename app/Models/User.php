@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -34,9 +33,9 @@ class User extends Authenticatable
         ];
     }
 
-	public function settings(): HasOne
+	public function settings(): HasMany
 	{
-		return $this->hasOne(Settings::class);
+		return $this->hasMany(Settings::class);
 	}
 
 	public function conversations(): HasMany

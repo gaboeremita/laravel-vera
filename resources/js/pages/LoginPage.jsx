@@ -16,7 +16,7 @@ export default function LoginPage() {
 
 	useEffect(() => {
 		api.get(route('user.show')).then((res) => {
-			if (res.ok) navigate('/conversations', { replace: true });
+			if (res.ok) navigate('/assistants', { replace: true });
 		}).catch(() => {});
 	}, []);
 
@@ -56,7 +56,7 @@ export default function LoginPage() {
 						...prev,
 						{ role: 'system', content: '> Access granted.' },
 					]);
-					setTimeout(() => navigate('/conversations', { replace: true }), 1500);
+					setTimeout(() => navigate('/assistants', { replace: true }), 1500);
 				} else {
 					setMessages((prev) => [
 						...prev,
@@ -88,7 +88,7 @@ export default function LoginPage() {
 
 			<div className="w-[35%] min-w-50 max-w-400 shrink-0 border-r border-line-1 relative z-5">
 				<Portrait
-					emotion="neutral"
+					emotion="default"
 					authenticated={false}
 					getImageUrl={() => null}
 					getVideoUrl={() => null}

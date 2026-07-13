@@ -5,19 +5,19 @@ import Header from '../components/Header.jsx';
 import { api } from '../utils/api.js';
 
 export default function ConversationsPage() {
-	const { conversations, setConversations, addToast } = useOutletContext();
+	const { conversations, setConversations, addToast, assistantId} = useOutletContext();
 	const navigate = useNavigate();
 
 	const handleSelect = (id) => {
-		navigate(`/conversations/${id}`);
+		navigate(`/assistants/${assistantId}/conversations/${id}`);
 	};
 
 	const handleNew = async () => {
 		try {
-			const res = await api.post(route('conversations.store', { assistant: 1 }));
+			const res = await api.post(route('conversations.store', { assistant: assistantId }));
 			const data = await res.json();
 			setConversations((prev) => [data, ...prev]);
-			navigate(`/conversations/${data.id}`);
+			navigate(`/assistants/${assistantId}/conversations/${data.id}`);
 		} catch {
 			addToast('Failed to create conversation', 'error');
 		}
@@ -29,7 +29,7 @@ export default function ConversationsPage() {
 
 	const handleRename = async (id, title) => {
 		try {
-			await api.patch(route('conversations.update', { assistant: 1, id }), { title });
+			await api.patch(route('conversations.update', { assistant: assistantId, id }), { title });
 			setConversations((prev) =>
 				prev.map((c) => (c.id === id ? { ...c, title } : c))
 			);
@@ -40,25 +40,31 @@ export default function ConversationsPage() {
 
 	return (
 		<>
-			<Header
+			<Header settingsPath={`/assistants/${assistantId}/settings`}
 				status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
 				counter={`CONVERSATIONS: ${conversations.length}`}
 				actions={
 					<div className="flex gap-2">
 						<button
-							onClick={() => navigate('/prompt')}
+							onClick={() => navigate('/assistants')}
+							className="button-primary"
+						>
+							← ASSISTANTS
+						</button>
+						<button
+							onClick={() => navigate(`/assistants/${assistantId}/prompt`)}
 							className="button-primary"
 						>
 							PROMPT
 						</button>
 						<button
-							onClick={() => navigate('/providers')}
+							onClick={() => navigate(`/assistants/${assistantId}/providers`)}
 							className="button-primary"
 						>
 							PROVIDERS
 						</button>
 						<button
-							onClick={() => navigate('/lorebook')}
+							onClick={() => navigate(`/assistants/${assistantId}/lorebook`)}
 							className="button-primary"
 						>
 							LOREBOOK
@@ -73,6 +79,7 @@ export default function ConversationsPage() {
 
 			<div className="flex-1 overflow-y-auto">
 				<ConversationList
+					assistantId={assistantId}
 					conversations={conversations}
 					onSelect={handleSelect}
 					onNew={handleNew}

@@ -11,6 +11,8 @@ export default function ChatPage() {
 	const { id } = useParams();
 	const navigate = useNavigate();
 	const {
+		assistantId,
+		assistantName,
 		setCurrentEmotion,
 		emotionNames,
 		addToast,
@@ -52,7 +54,7 @@ export default function ChatPage() {
 		}
 
 		try {
-			await api.patch(route('conversations.update', { assistant: 1, id }), { title: trimmed });
+			await api.patch(route('conversations.update', { assistant: assistantId, id }), { title: trimmed });
 			setConversations((prev) =>
 				prev.map((c) => (c.id === Number(id) ? { ...c, title: trimmed } : c))
 			);
@@ -74,9 +76,9 @@ export default function ChatPage() {
 	useEffect(() => {
 		const loadMessages = async () => {
 			try {
-				const res = await api.get(route('conversations.show', { assistant: 1, id }));
+				const res = await api.get(route('conversations.show', { assistant: assistantId, id }));
 				if (!res.ok) {
-					navigate('/conversations', { replace: true });
+					navigate(`/assistants/${assistantId}/conversations`, { replace: true });
 					return;
 				}
 
@@ -96,7 +98,7 @@ export default function ChatPage() {
 				setMessages(mapped);
 				if (lastEmotion) setCurrentEmotion(lastEmotion);
 			} catch {
-				navigate('/conversations', { replace: true });
+				navigate(`/assistants/${assistantId}/conversations`, { replace: true });
 			}
 		};
 		loadMessages();
@@ -146,10 +148,10 @@ export default function ChatPage() {
 			try {
 				const creatorTrigger = '[creator mode: "tsuru tuneado"]';
 				if (text.toLowerCase().includes(creatorTrigger.toLowerCase())) {
-					fetchEmotions(true);
+					fetchEmotions(assistantId);
 				}
 
-				const response = await api.post(route('conversations.sendMessage', { assistant: 1, id }), {
+				const response = await api.post(route('conversations.sendMessage', { assistant: assistantId, id }), {
 					messages: apiMessages,
 				});
 
@@ -159,13 +161,13 @@ export default function ChatPage() {
 				}
 
 				const data = await response.json();
-				const rawReply = data.content || '[neutral]\n...signal lost. Try again.';
+				const rawReply = data.content || '[default]\n...signal lost. Try again.';
 				const thinking = data.thinking || null;
 
 				const { emotion, intimate, text: cleanText } = parseEmotionFromResponse(rawReply, emotionNames);
 
 				if (intimate !== unlocked) {
-					fetchEmotions(intimate);
+					fetchEmotions(assistantId);
 				}
 
 				setCurrentEmotion(emotion);
@@ -224,31 +226,31 @@ export default function ChatPage() {
 
 	return (
 		<>
-			<Header
+			<Header settingsPath={`/assistants/${assistantId}/settings`}
 				status={status}
 				counter={`MESSAGES: ${messages.filter((m) => m.role !== 'system').length}`}
 				actions={
 					<>
 						<button
-							onClick={() => navigate('/prompt')}
+							onClick={() => navigate(`/assistants/${assistantId}/prompt`)}
 							className="button-primary"
 						>
 							PROMPT
 						</button>
 						<button
-							onClick={() => navigate('/lorebook')}
+							onClick={() => navigate(`/assistants/${assistantId}/lorebook`)}
 							className="button-primary"
 						>
 							LOREBOOK
 						</button>
 						<button
-							onClick={() => navigate('/providers')}
+							onClick={() => navigate(`/assistants/${assistantId}/providers`)}
 							className="button-primary"
 						>
 							PROVIDERS
 						</button>
 						<button
-							onClick={() => navigate('/conversations')}
+							onClick={() => navigate(`/assistants/${assistantId}/conversations`)}
 							className="button-primary"
 						>
 							← CONVERSATIONS
@@ -293,7 +295,7 @@ export default function ChatPage() {
 
 			<div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4">
 				{messages.map((msg, i) => (
-					<ChatMessage key={i} msg={msg} />
+					<ChatMessage key={i} msg={msg} assistantName={assistantName} />
 				))}
 			</div>
 

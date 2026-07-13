@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../utils/api.js';
 import {route} from "ziggy-js";
 
-export default function useProviders(addToast) {
+export default function useProviders(addToast, assistantId) {
 	const [providers, setProviders] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [deleteTarget, setDeleteTarget] = useState(null);
@@ -13,7 +13,7 @@ export default function useProviders(addToast) {
 			try {
 				const [providersRes, settingsRes] = await Promise.all([
 					api.get(route('ai-providers.index')),
-					api.get(route('settings.show')),
+					api.get(route('settings.show', { assistant: assistantId })),
 				]);
 
 				const data = await providersRes.json();
@@ -266,7 +266,7 @@ export default function useProviders(addToast) {
 
 	const selectModel = async (modelId) => {
 		try {
-			await api.put(route('settings.selectModel'), {
+			await api.put(route('settings.selectModel', { assistant: assistantId }), {
 				ai_model_id: modelId,
 			});
 			setActiveModelId(modelId);

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AiModelController;
 use App\Http\Controllers\Api\AiProviderController;
+use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\EmotionController;
@@ -12,11 +13,17 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', fn (Request $request) => $request->user())->name('user.show');
-    Route::get('/settings', [SettingsController::class, 'show'])->name('settings.show');
-    Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
-    Route::put('/settings/model', [SettingsController::class, 'selectModel'])->name('settings.selectModel');
+
+    Route::get('/assistants', [AssistantController::class, 'index'])->name('assistants.index');
+    Route::post('/assistants', [AssistantController::class, 'store'])->name('assistants.store');
+    Route::get('/assistants/{id}', [AssistantController::class, 'show'])->name('assistants.show');
+    Route::patch('/assistants/{id}', [AssistantController::class, 'update'])->name('assistants.update');
+    Route::delete('/assistants/{id}', [AssistantController::class, 'destroy'])->name('assistants.destroy');
 
     Route::prefix('assistants/{assistant}')->group(function () {
+        Route::get('/settings', [SettingsController::class, 'show'])->name('settings.show');
+        Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+        Route::put('/settings/model', [SettingsController::class, 'selectModel'])->name('settings.selectModel');
         Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
         Route::post('/conversations', [ConversationController::class, 'store'])->name('conversations.store');
         Route::get('/conversations/{id}/messages', [ConversationController::class, 'show'])->name('conversations.show');
@@ -27,6 +34,8 @@ Route::middleware('auth:sanctum')->group(function () {
 		Route::post('/prompt', [AssistantPromptController::class, 'store'])->name('prompt.store');
 		Route::put('/prompt', [AssistantPromptController::class, 'update'])->name('prompt.update');
 		Route::delete('/prompt', [AssistantPromptController::class, 'destroy'])->name('prompt.destroy');
+
+        Route::get('/emotions', [EmotionController::class, 'index'])->name('emotions.index');
     });
 
     Route::get('/ai-providers', [AiProviderController::class, 'index'])->name('ai-providers.index');
@@ -38,7 +47,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/ai-providers/{provider}/models/{model}', [AiModelController::class, 'update'])->name('ai-models.update');
     Route::delete('/ai-providers/{provider}/models/{model}', [AiModelController::class, 'destroy'])->name('ai-models.destroy');
 
-    Route::get('/emotions', [EmotionController::class, 'index'])->name('emotions.index');
     Route::get('/lorebook', [LorebookController::class, 'show'])->name('lorebook.show');
     Route::post('/lorebook', [LorebookController::class, 'save'])->name('lorebook.save');
 

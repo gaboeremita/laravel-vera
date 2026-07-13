@@ -22,8 +22,7 @@ class MessageFactory extends Factory
             'thinking' => fake()->optional(0.3)->paragraph(),
             'image' => null,
             'emotion' => fake()->optional(0.5)->randomElement([
-                'neutral', 'happy', 'angry', 'annoyed', 'sad', 'surprised',
-                'flirty', 'embarrassed', 'confused', 'content', 'amused', 'sultry',
+                'default', 'happy', 'angry'
             ]),
         ];
     }

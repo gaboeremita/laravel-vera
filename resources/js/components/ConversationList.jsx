@@ -24,7 +24,7 @@ function ActiveUnderline({ color = "accent" }) {
 	);
 }
 
-export default function ConversationList({ conversations, onSelect, onNew, onDelete, onRename }) {
+export default function ConversationList({ assistantId, conversations, onSelect, onNew, onDelete, onRename }) {
 	const [activeRow, setActiveRow] = useState(0);
 	const [activeColumn, setActiveColumn] = useState("select");
 	const [pendingDeleteId, setPendingDeleteId] = useState(null);
@@ -81,7 +81,7 @@ export default function ConversationList({ conversations, onSelect, onNew, onDel
 
 	const handleDelete = async (id) => {
 		try {
-			await api.delete(route('conversations.destroy', { assistant: 1, id }));
+			await api.delete(route('conversations.destroy', { assistant: assistantId, id }));
 			setPendingDeleteId(null);
 			onDelete(id);
 		} catch {
