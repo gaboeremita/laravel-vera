@@ -1,4 +1,4 @@
-# VERA — Volatile Emotional Response Architecture
+# VERA
 
 A multi-assistant AI platform with a dynamic visual expression system, built on Laravel, React, and a pluggable LLM backend.
 
@@ -14,7 +14,6 @@ VERA is a local-first multi-AI platform. Each assistant has its own personality,
 - **Database:** PostgreSQL
 - **Styling:** Tailwind CSS v4
 - **Auth:** Laravel Sanctum (SPA mode)
-- **Dev Environment:** Laravel Herd (macOS)
 
 ## Prerequisites
 
