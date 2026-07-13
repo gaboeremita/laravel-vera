@@ -113,20 +113,6 @@ export default function ChatPage() {
 	}, [messages]);
 
 	useEffect(() => {
-		const scrollEl = scrollRef.current;
-		if (!scrollEl) return;
-
-		const handleScroll = () => {
-			if (scrollEl.scrollTop < 100) {
-				loadOlderMessages();
-			}
-		};
-
-		scrollEl.addEventListener('scroll', handleScroll);
-		return () => scrollEl.removeEventListener('scroll', handleScroll);
-	}, [loadOlderMessages]);
-
-	useEffect(() => {
 		if (inputRef.current) inputRef.current.focus();
 	}, []);
 
@@ -170,6 +156,20 @@ export default function ChatPage() {
 			setIsLoadingMore(false);
 		}
 	}, [isLoadingMore, hasMore, messages, assistantId, id, emotionNames]);
+
+	useEffect(() => {
+		const scrollEl = scrollRef.current;
+		if (!scrollEl) return;
+
+		const handleScroll = () => {
+			if (scrollEl.scrollTop < 100) {
+				loadOlderMessages();
+			}
+		};
+
+		scrollEl.addEventListener('scroll', handleScroll);
+		return () => scrollEl.removeEventListener('scroll', handleScroll);
+	}, [loadOlderMessages]);
 
 	const sendMessage = async () => {
 		const text = input.trim();
