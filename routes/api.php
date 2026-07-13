@@ -36,6 +36,11 @@ Route::middleware('auth:sanctum')->group(function () {
 		Route::delete('/prompt', [AssistantPromptController::class, 'destroy'])->name('prompt.destroy');
 
         Route::get('/emotions', [EmotionController::class, 'index'])->name('emotions.index');
+        Route::prefix('/emotions')->name('assistants.emotions.')->group(function () {
+            Route::post('/', [EmotionController::class, 'store'])->name('store');
+            Route::post('/{emotion}', [EmotionController::class, 'update'])->name('update');
+            Route::delete('/{emotion}', [EmotionController::class, 'destroy'])->name('destroy');
+        });
     });
 
     Route::get('/ai-providers', [AiProviderController::class, 'index'])->name('ai-providers.index');
