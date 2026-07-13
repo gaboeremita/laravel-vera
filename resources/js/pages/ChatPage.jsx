@@ -230,6 +230,12 @@ export default function ChatPage() {
 				actions={
 					<>
 						<button
+							onClick={() => navigate('/prompt')}
+							className="button-primary"
+						>
+							PROMPT
+						</button>
+						<button
 							onClick={() => navigate('/lorebook')}
 							className="button-primary"
 						>

@@ -1,15 +1,16 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Ziggy } from './ziggy.js';
 import '../css/app.css';
 import { ThemeProvider } from './contexts/ThemeContext.jsx';
 import AuthenticatedLayout from './layouts/AuthenticatedLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
-import ConversationsPage from './pages/ConversationsPage.jsx';
 import ChatPage from './pages/ChatPage.jsx';
+import ConversationsPage from './pages/ConversationsPage.jsx';
 import LorebookPage from './pages/LorebookPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
-import { Ziggy } from './ziggy.js';
+import PromptPage from './pages/PromptPage.jsx';
 import ProvidersPage from './pages/ProvidersPage.jsx';
 globalThis.Ziggy = Ziggy;
 
@@ -25,6 +26,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/lorebook" element={<LorebookPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/providers" element={<ProvidersPage />} />
+                        <Route path="/prompt" element={<PromptPage />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/conversations" replace />} />
                 </Routes>

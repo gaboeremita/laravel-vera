@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AiModelController;
 use App\Http\Controllers\Api\AiProviderController;
+use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\EmotionController;
 use App\Http\Controllers\Api\LorebookController;
@@ -22,6 +23,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'])->name('conversations.sendMessage');
         Route::delete('/conversations/{id}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
         Route::patch('/conversations/{id}', [ConversationController::class, 'update'])->name('conversations.update');
+		Route::get('/prompt', [AssistantPromptController::class, 'show'])->name('prompt.show');
+		Route::post('/prompt', [AssistantPromptController::class, 'store'])->name('prompt.store');
+		Route::put('/prompt', [AssistantPromptController::class, 'update'])->name('prompt.update');
+		Route::delete('/prompt', [AssistantPromptController::class, 'destroy'])->name('prompt.destroy');
     });
 
     Route::get('/ai-providers', [AiProviderController::class, 'index'])->name('ai-providers.index');

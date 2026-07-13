@@ -46,6 +46,12 @@ export default function ConversationsPage() {
 				actions={
 					<div className="flex gap-2">
 						<button
+							onClick={() => navigate('/prompt')}
+							className="button-primary"
+						>
+							PROMPT
+						</button>
+						<button
 							onClick={() => navigate('/providers')}
 							className="button-primary"
 						>
