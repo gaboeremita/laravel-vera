@@ -3,35 +3,45 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\EmbedLoreEntry;
+use App\Jobs\EmbedArchiveEntry;
+use App\Models\Archive;
 use App\Models\Tag;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-class LorebookController extends Controller
+class ArchiveController extends Controller
 {
 	/**
-	 * Return the user's lorebook with entries and tags, or null if none exists.
+	 * List all archives belonging to the authenticated user.
 	 */
-	public function show(Request $request): JsonResponse
+	public function index(Request $request): JsonResponse
 	{
-		$lorebook = $request->user()
-			->lorebooks()
-			->with('entries.tags')
-			->first();
+		$archives = $request->user()
+			->archives()
+			->get(['id', 'name']);
 
-		if (! $lorebook) {
-			return response()->json(null);
-		}
-
-		return response()->json($lorebook);
+		return response()->json($archives);
 	}
 
 	/**
-	 * Create or update the user's lorebook and all its entries in a single save.
+	 * Return a specific archive with its entries and tags.
 	 */
-	public function save(Request $request): JsonResponse
+	public function show(Request $request, int $id): JsonResponse
+	{
+		$archive = $request->user()
+			->archives()
+			->with('entries.tags')
+			->findOrFail($id);
+
+		return response()->json($archive);
+	}
+
+	/**
+	 * Create or update an archive and all its entries in a single save.
+	 * If {id} is provided, updates that archive. Otherwise creates a new one.
+	 */
+	public function save(Request $request, ?int $id = null): JsonResponse
 	{
 		$validated = $request->validate([
 			'name' => ['required', 'string', 'max:100'],
@@ -46,28 +56,31 @@ class LorebookController extends Controller
 			'entries.*.tags.*' => ['string', 'max:50'],
 		]);
 
-		return DB::transaction(function () use ($request, $validated) {
-			$lorebook = auth()->user()
-				->lorebooks()
-				->updateOrCreate(
-					['user_id' => auth()->id()],
-					[
-						'name' => $validated['name'],
-						'description' => $validated['description'],
-					],
-				);
+		return DB::transaction(function () use ($request, $validated, $id) {
+			if ($id) {
+				$archive = $request->user()->archives()->findOrFail($id);
+				$archive->update([
+					'name' => $validated['name'],
+					'description' => $validated['description'],
+				]);
+			} else {
+				$archive = $request->user()->archives()->create([
+					'name' => $validated['name'],
+					'description' => $validated['description'],
+				]);
+			}
 
 			$incomingIds = collect($validated['entries'])
 				->pluck('id')
 				->filter()
 				->all();
 
-			$lorebook->entries()
+			$archive->entries()
 				->whereNotIn('id', $incomingIds)
 				->delete();
 
 			foreach ($validated['entries'] as $entryData) {
-				$entry = $lorebook->entries()->updateOrCreate(
+				$entry = $archive->entries()->updateOrCreate(
 					['id' => $entryData['id'] ?? null],
 					[
 						'title' => $entryData['title'],
@@ -88,14 +101,13 @@ class LorebookController extends Controller
 					$entry->tags()->detach();
 				}
 
-				// Dispatch embedding job only if content changed
 				if ($entry->wasChanged('content') || $entry->wasRecentlyCreated) {
-					EmbedLoreEntry::dispatch($entry);
+					EmbedArchiveEntry::dispatch($entry);
 				}
 			}
 
 			return response()->json(
-				$lorebook->fresh(['entries.tags']),
+				$archive->fresh(['entries.tags']),
 			);
 		});
 	}

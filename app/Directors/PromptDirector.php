@@ -4,7 +4,7 @@ namespace App\Directors;
 
 use App\Builders\PromptBuilder;
 use App\Contracts\EmbeddingProvider;
-use App\Models\LoreEntry;
+use App\Models\ArchiveEntry;
 
 class PromptDirector
 {
@@ -81,13 +81,13 @@ class PromptDirector
 	/**
 	 * Retrieve and inject relevant lore entries based on the user's message.
 	 */
-	public function withRetrieval(string $query, int $lorebookId, int $limit = 5, float $minSimilarity = 0.5): static
+	public function withRetrieval(string $query, int $archiveId, int $limit = 5, float $minSimilarity = 0.5): static
 	{
 		$provider = app(EmbeddingProvider::class);
 		$embedding = $provider->embed($query);
 
-		$entries = LoreEntry::query()
-			->where('lorebook_id', $lorebookId)
+		$entries = ArchiveEntry::query()
+			->where('archive_id', $archiveId)
 			->whereNotNull('embedding')
 			->whereVectorSimilarTo('embedding', $embedding, minSimilarity: $minSimilarity)
 			->limit($limit)

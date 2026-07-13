@@ -86,7 +86,7 @@ export default function EmotionGrid({ emotions, onAdd, onDelete, onUpdateImage, 
 							<img
 								src={emotion.preview || emotion.image_url}
 								alt={emotion.name}
-								className="w-full h-full object-cover"
+								className="w-full h-full object-cover object-top"
 							/>
 							<div className="absolute inset-0 bg-bg-0/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
 								<span className="text-fg-1 text-[0.65rem] tracking-[0.1em]">REPLACE</span>

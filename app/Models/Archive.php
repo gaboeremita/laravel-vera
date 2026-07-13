@@ -6,8 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Lorebook extends Model
+class Archive extends Model
 {
+	protected $table = 'archives';
+
 	protected $fillable = [
 		'name',
 		'description',
@@ -21,6 +23,6 @@ class Lorebook extends Model
 
 	public function entries(): HasMany
 	{
-		return $this->hasMany(LoreEntry::class);
+		return $this->hasMany(ArchiveEntry::class);
 	}
 }

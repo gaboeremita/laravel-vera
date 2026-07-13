@@ -64,10 +64,10 @@ export default function ConversationsPage() {
 							PROVIDERS
 						</button>
 						<button
-							onClick={() => navigate(`/assistants/${assistantId}/lorebook`)}
+							onClick={() => navigate(`/assistants/${assistantId}/archive`)}
 							className="button-primary"
 						>
-							LOREBOOK
+							ARCHIVE
 						</button>
 					</div>
 				}

@@ -18,8 +18,8 @@ class Tag extends Model
 		return $this->belongsTo(User::class);
 	}
 
-	public function loreEntries(): MorphToMany
+	public function archiveEntries(): MorphToMany
 	{
-		return $this->morphedByMany(LoreEntry::class, 'taggable');
+		return $this->morphedByMany(ArchiveEntry::class, 'taggable');
 	}
 }

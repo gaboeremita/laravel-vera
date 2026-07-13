@@ -238,10 +238,10 @@ export default function ChatPage() {
 							PROMPT
 						</button>
 						<button
-							onClick={() => navigate(`/assistants/${assistantId}/lorebook`)}
+							onClick={() => navigate(`/assistants/${assistantId}/archive`)}
 							className="button-primary"
 						>
-							LOREBOOK
+							ARCHIVE
 						</button>
 						<button
 							onClick={() => navigate(`/assistants/${assistantId}/providers`)}

@@ -129,14 +129,14 @@ class ConversationController extends Controller
 			'intimate' => $assistantModel->emotions()->where('restricted', true)->pluck('name')->toArray(),
 		];
 
-		$lorebook = $request->user()->lorebooks()->first();
+		$archive = $request->user()->archives()->first();
 
 		$director = (new PromptDirector($assistantModel->prompt))
 			->append('emotion tags', ['available emotions' => $emotions])
 			->except(['opening_message']);
 
-		if ($lorebook && ! empty($lastUserMessage['content'])) {
-			$director->withRetrieval($lastUserMessage['content'], $lorebook->id);
+		if ($archive && ! empty($lastUserMessage['content'])) {
+			$director->withRetrieval($lastUserMessage['content'], $archive->id);
 		}
 
 		$systemPrompt = $director->build();

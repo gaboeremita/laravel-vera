@@ -7,9 +7,9 @@ import { AnimatePresence } from 'framer-motion';
 import EntryAccordion from "../components/EntryAccordion.jsx";
 import ConfirmationModal from "../components/common/ConfirmationModal.jsx";
 
-export default function LorebookPage() {
+export default function ArchivePage() {
 	const navigate = useNavigate();
-	const { addToast } = useOutletContext();
+	const { addToast, assistantId, archiveId } = useOutletContext();
 
 	const [name, setName] = useState('');
 	const [description, setDescription] = useState('');
@@ -20,36 +20,37 @@ export default function LorebookPage() {
 	const allCollapsed = entries.every((e) => e.collapsed);
 
 	useEffect(() => {
+		if (!archiveId) {
+			setIsLoading(false);
+			return;
+		}
+
 		const load = async () => {
 			try {
-				const res = await api.get(route('lorebook.show'));
+				const res = await api.get(route('archives.show', { id: archiveId }));
 
-				// if (!res.ok) {
-				// 	throw new Error('Failed to load lorebook');
-				// }
+				if (!res.ok) throw new Error('Failed to load archive');
 
 				const data = await res.json();
-				if (data && Object.keys(data).length > 0) {
-					setName(data.name ?? '');
-					setDescription(data.description ?? '');
-					setEntries(data.entries.map((entry) => ({
-						id: entry.id,
-						title: entry.title,
-						content: entry.content,
-						keywords: (entry.keywords ?? []).join(', '),
-						tags: (entry.tags ?? []).map((t) => t.name).join(', '),
-						collapsed: true,
-					})));
-				}
+				setName(data.name ?? '');
+				setDescription(data.description ?? '');
+				setEntries(data.entries.map((entry) => ({
+					id: entry.id,
+					title: entry.title,
+					content: entry.content,
+					keywords: (entry.keywords ?? []).join(', '),
+					tags: (entry.tags ?? []).map((t) => t.name).join(', '),
+					collapsed: true,
+				})));
 			} catch(e) {
 				console.log(e);
-				addToast('Failed to load lorebook', 'error');
+				addToast('Failed to load archive', 'error');
 			} finally {
 				setIsLoading(false);
 			}
 		};
 		load();
-	}, []);
+	}, [archiveId]);
 
 	const addEntry = () => {
 		setEntries((prev) => [
@@ -90,7 +91,7 @@ export default function LorebookPage() {
 				})),
 			};
 
-			const res = await api.post(route('lorebook.save'), payload);
+			const res = await api.post(route('archives.save', { id: archiveId }), payload);
 
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
@@ -99,7 +100,6 @@ export default function LorebookPage() {
 
 			const data = await res.json();
 
-			// Sync IDs back from server response
 			setEntries(data.entries.map((entry) => ({
 				id: entry.id,
 				title: entry.title,
@@ -109,29 +109,29 @@ export default function LorebookPage() {
 				collapsed: true,
 			})));
 
-			addToast('Lorebook saved', 'success');
+			addToast('Archive saved', 'success');
 		} catch (error) {
-			addToast(error.message || 'Failed to save lorebook', 'error');
+			addToast(error.message || 'Failed to save archive', 'error');
 		} finally {
 			setIsSaving(false);
 		}
 	};
 
+	const headerActions = (
+		<button onClick={() => navigate(-1)} className="button-primary">
+			← PREVIOUS PAGE
+		</button>
+	);
+
 	if (isLoading) {
 		return (
 			<>
-				<Header settingsPath={`/assistants/${assistantId}/settings`}
+				<Header
+					settingsPath={`/assistants/${assistantId}/settings`}
 					status={{ label: 'LOADING', color: 'text-warning', dot: '●', blink: true }}
-					actions={
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/conversations`)}
-							className="bg-accent-3/15 border border-accent-3 text-accent-3 hover:bg-accent-3/25 text-[0.75rem] tracking-[0.1em]  cursor-pointer transition-colors px-4 py-1.5"
-						>
-							← CONVERSATIONS
-						</button>
-					}
+					actions={headerActions}
 				>
-					<span className="text-fg-2 text-sm tracking-[0.05em]">Lorebook</span>
+					<span className="text-fg-2 text-sm tracking-[0.05em]">Archive</span>
 				</Header>
 				<div className="flex-1 p-5">
 					<span className="text-fg-3 text-sm cursor-effect">Loading...</span>
@@ -140,25 +140,41 @@ export default function LorebookPage() {
 		);
 	}
 
+	if (!archiveId) {
+		return (
+			<>
+				<Header
+					settingsPath={`/assistants/${assistantId}/settings`}
+					status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
+					actions={headerActions}
+				>
+					<span className="text-fg-2 text-sm tracking-[0.05em]">Archive</span>
+				</Header>
+				<div className="flex-1 flex items-center justify-center p-5">
+					<div className="text-center space-y-2">
+						<p className="text-fg-3 text-sm tracking-[0.05em]">There's no archive for this assistant.</p>
+						<p className="text-fg-3 text-[0.7rem] tracking-[0.05em]">
+							Assign one from the assistant's edit page.
+						</p>
+					</div>
+				</div>
+			</>
+		);
+	}
+
 	return (
 		<>
-			<Header settingsPath={`/assistants/${assistantId}/settings`}
+			<Header
+				settingsPath={`/assistants/${assistantId}/settings`}
 				status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
 				counter={`ENTRIES: ${entries.length}`}
-				actions={
-					<button
-						onClick={() => navigate(-1)}
-						className="button-primary"
-					>
-						← PREVIOUS PAGE
-					</button>
-				}
+				actions={headerActions}
 			>
-				<span className="text-fg-2 text-sm tracking-[0.05em]">Lorebook</span>
+				<span className="text-fg-2 text-sm tracking-[0.05em]">Archive</span>
 			</Header>
 
 			<div className="flex-1 overflow-y-auto p-5 custom-scrollbar space-y-6">
-				{/* Lorebook metadata */}
+				{/* Archive metadata */}
 				<div className="space-y-3">
 					<div>
 						<label className="text-fg-3 text-[0.7rem] tracking-[0.15em] uppercase block mb-1">
@@ -169,7 +185,7 @@ export default function LorebookPage() {
 							value={name}
 							onChange={(e) => setName(e.target.value)}
 							maxLength={100}
-							className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
 							placeholder="e.g. The Bridge Universe"
 						/>
 					</div>
@@ -181,13 +197,12 @@ export default function LorebookPage() {
 							value={description}
 							onChange={(e) => setDescription(e.target.value)}
 							rows={3}
-							className="w-full bg-bg-1 border border-line-1 text-accent text-sm  px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none"
-							placeholder="Describe this lorebook..."
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none"
+							placeholder="Describe this archive..."
 						/>
 					</div>
 				</div>
 
-				{/* Divider */}
 				<hr className="border-t border-line-1" />
 
 				{/* Entries */}
@@ -228,7 +243,7 @@ export default function LorebookPage() {
 
 						<button
 							onClick={addEntry}
-							className="w-full border border-dashed border-line-1 text-success text-[0.75rem] tracking-[0.1em]  cursor-pointer hover:border-success/50 hover:bg-green-400/5 transition-colors py-3 mt-4"
+							className="w-full border border-dashed border-line-1 text-success text-[0.75rem] tracking-[0.1em] cursor-pointer hover:border-success/50 hover:bg-green-400/5 transition-colors py-3 mt-4"
 						>
 							+ ADD ENTRY
 						</button>
@@ -236,20 +251,21 @@ export default function LorebookPage() {
 				</div>
 			</div>
 
-			{/* Save button — fixed at bottom */}
+			{/* Save button */}
 			<div className="px-5 py-3 border-t border-line-1 shrink-0">
 				<button
 					onClick={save}
 					disabled={isSaving || !name.trim() || !description.trim()}
-					className={`w-full  button-success ${
+					className={`w-full button-success ${
 						isSaving || !name.trim() || !description.trim()
 							? 'bg-[#1a1a2e] text-fg-3 cursor-default'
 							: 'bg-accent/10 border border-accent text-accent hover:bg-accent/20 cursor-pointer'
 					}`}
 				>
-					{isSaving ? 'SAVING...' : 'SAVE LOREBOOK'}
+					{isSaving ? 'SAVING...' : 'SAVE ARCHIVE'}
 				</button>
 			</div>
+
 			{deleteIndex !== null && (
 				<ConfirmationModal
 					title="Delete entry"

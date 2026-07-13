@@ -70,6 +70,7 @@ class AssistantController extends Controller
 			'description' => $assistant->description,
 			'opening_message' => $assistant->opening_message,
 			'prompt' => $assistant->prompt,
+			'archive_id' => $assistant->archive_id,
 			'emotions' => $emotions,
 		]);
 	}
@@ -86,6 +87,7 @@ class AssistantController extends Controller
 			'description' => ['nullable', 'string'],
 			'opening_message' => ['nullable', 'string'],
 			'prompt' => ['nullable', 'array'],
+			'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
 			'emotions' => ['required', 'array', 'min:1'],
 			'emotions.*.name' => ['required', 'string', 'max:255'],
 			'emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
@@ -109,6 +111,7 @@ class AssistantController extends Controller
 				'description' => $validated['description'] ?? null,
 				'opening_message' => $validated['opening_message'] ?? null,
 				'prompt' => $validated['prompt'] ?? [],
+				'archive_id' => $validated['archive_id'] ?? null,
 			]);
 
 			// Create the pivot
@@ -152,6 +155,7 @@ class AssistantController extends Controller
 			'description' => ['nullable', 'string'],
 			'opening_message' => ['nullable', 'string'],
 			'prompt' => ['nullable', 'array'],
+			'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
 		]);
 
 		$assistant->update($validated);

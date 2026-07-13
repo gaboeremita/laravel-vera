@@ -6,7 +6,7 @@ use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\EmotionController;
-use App\Http\Controllers\Api\LorebookController;
+use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\SettingsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -47,7 +47,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/ai-providers/{provider}/models/{model}', [AiModelController::class, 'update'])->name('ai-models.update');
     Route::delete('/ai-providers/{provider}/models/{model}', [AiModelController::class, 'destroy'])->name('ai-models.destroy');
 
-    Route::get('/lorebook', [LorebookController::class, 'show'])->name('lorebook.show');
-    Route::post('/lorebook', [LorebookController::class, 'save'])->name('lorebook.save');
+    Route::get('/archives', [ArchiveController::class, 'index'])->name('archives.index');
+    Route::get('/archives/{id}', [ArchiveController::class, 'show'])->name('archives.show');
+    Route::post('/archives', [ArchiveController::class, 'save'])->name('archives.store');
+    Route::post('/archives/{id}', [ArchiveController::class, 'save'])->name('archives.save');
 
 });

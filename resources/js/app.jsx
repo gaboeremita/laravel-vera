@@ -12,7 +12,7 @@ import CreateAssistantPage from './pages/CreateAssistantPage.jsx';
 import EditAssistantPage from './pages/EditAssistantPage.jsx';
 import ConversationsPage from './pages/ConversationsPage.jsx';
 import ChatPage from './pages/ChatPage.jsx';
-import LorebookPage from './pages/LorebookPage.jsx';
+import ArchivePage from './pages/ArchivePage.jsx';
 import PromptPage from './pages/PromptPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import ProvidersPage from './pages/ProvidersPage.jsx';
@@ -35,7 +35,7 @@ createRoot(document.getElementById('root')).render(
                             <Route path="conversations" element={<ConversationsPage />} />
                             <Route path="conversations/:id" element={<ChatPage />} />
                             <Route path="prompt" element={<PromptPage />} />
-                            <Route path="lorebook" element={<LorebookPage />} />
+                            <Route path="archive" element={<ArchivePage />} />
                             <Route path="settings" element={<SettingsPage />} />
                             <Route path="providers" element={<ProvidersPage />} />
                         </Route>

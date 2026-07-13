@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
@@ -24,6 +24,17 @@ export default function CreateAssistantPage() {
 
 	// Staged emotions — local File objects, not yet uploaded
 	const [stagedEmotions, setStagedEmotions] = useState([]);
+
+	// Archive
+	const [archives, setArchives] = useState([]);
+	const [selectedArchiveId, setSelectedArchiveId] = useState('');
+
+	useEffect(() => {
+		api.get(route('archives.index'))
+			.then((res) => res.json())
+			.then(setArchives)
+			.catch(() => {});
+	}, []);
 
 	// Prompt input mode
 	const [promptMode, setPromptMode] = useState('manual');
@@ -95,7 +106,11 @@ export default function CreateAssistantPage() {
 				formData.append('prompt', JSON.stringify(prompt.sections));
 			}
 
-			formData.append('emotions[0][name]', 'default');
+			if (selectedArchiveId) {
+			formData.append('archive_id', selectedArchiveId);
+		}
+
+		formData.append('emotions[0][name]', 'default');
 			formData.append('emotions[0][image]', defaultImage);
 
 			stagedEmotions.forEach((emotion, i) => {
@@ -190,6 +205,22 @@ export default function CreateAssistantPage() {
 							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none"
 							placeholder="First message when a new conversation starts"
 						/>
+					</div>
+
+					<div>
+						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+							Archive
+						</label>
+						<select
+							value={selectedArchiveId}
+							onChange={(e) => setSelectedArchiveId(e.target.value)}
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+						>
+							<option value="">— None —</option>
+							{archives.map((a) => (
+								<option key={a.id} value={a.id}>{a.name}</option>
+							))}
+						</select>
 					</div>
 				</div>
 

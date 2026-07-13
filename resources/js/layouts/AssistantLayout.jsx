@@ -10,6 +10,7 @@ export default function AssistantLayout() {
 	const { setTheme, setAvailableThemes } = useTheme();
 	const [conversations, setConversations] = useState([]);
 	const [assistantName, setAssistantName] = useState('');
+	const [archiveId, setArchiveId] = useState(null);
 
 	const fetchConversations = async () => {
 		try {
@@ -28,7 +29,10 @@ export default function AssistantLayout() {
 
 		api.get(route('assistants.show', { id: assistantId }))
 			.then((res) => res.json())
-			.then((data) => setAssistantName(data.name))
+			.then((data) => {
+				setAssistantName(data.name);
+				setArchiveId(data.archive_id ?? null);
+			})
 			.catch(() => {});
 
 		api.get(route('settings.show', { assistant: assistantId }))
@@ -46,6 +50,7 @@ export default function AssistantLayout() {
 				...parentContext,
 				assistantId: Number(assistantId),
 				assistantName,
+				archiveId,
 				conversations,
 				setConversations,
 				fetchConversations,

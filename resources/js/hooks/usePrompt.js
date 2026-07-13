@@ -188,6 +188,39 @@ export default function usePrompt(assistantId, addToast) {
 		}
 	};
 
+	const saveFromJson = async (json) => {
+		let parsed;
+		try {
+			parsed = JSON.parse(json);
+		} catch {
+			addToast('Invalid JSON', 'error');
+			return;
+		}
+
+		setIsSaving(true);
+
+		try {
+			const isCreate = sections === null || Object.keys(sections).length === 0;
+			const payload = { prompt: parsed };
+
+			const res = isCreate
+				? await api.post(route('prompt.store', { assistant: assistantId }), payload)
+				: await api.put(route('prompt.update', { assistant: assistantId }), payload);
+
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Save failed');
+			}
+
+			setSections(parsed);
+			addToast('Prompt saved', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to save prompt', 'error');
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
 	const destroy = async () => {
 		try {
 			const res = await api.delete(route('prompt.destroy', { assistant: assistantId }));
@@ -212,6 +245,7 @@ export default function usePrompt(assistantId, addToast) {
 		removeListItem,
 		updateListItem,
 		save,
+		saveFromJson,
 		destroy,
 	};
 }

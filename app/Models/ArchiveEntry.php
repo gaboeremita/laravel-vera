@@ -6,14 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
-class LoreEntry extends Model
+class ArchiveEntry extends Model
 {
+	protected $table = 'archive_entries';
+
 	protected $fillable = [
 		'title',
 		'content',
 		'keywords',
 		'embedding',
-		'lorebook_id'
+		'archive_id'
 	];
 
 	protected $casts = [
@@ -21,9 +23,9 @@ class LoreEntry extends Model
 		'embedding' => 'array',
 	];
 
-	public function lorebook(): BelongsTo
+	public function archive(): BelongsTo
 	{
-		return $this->belongsTo(Lorebook::class);
+		return $this->belongsTo(Archive::class);
 	}
 
 	public function tags(): MorphToMany

@@ -8,7 +8,7 @@ import EmotionGrid from '../components/EmotionGrid.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
 export default function EditAssistantPage() {
-	const { id } = useParams();
+	const { assistantId: id } = useParams();
 	const navigate = useNavigate();
 	const { addToast } = useOutletContext();
 
@@ -21,8 +21,20 @@ export default function EditAssistantPage() {
 	const [emotions, setEmotions] = useState([]);
 	const [defaultPreview, setDefaultPreview] = useState(null);
 	const defaultImageRef = useRef(null);
+	const [archives, setArchives] = useState([]);
+	const [selectedArchiveId, setSelectedArchiveId] = useState('');
+	const [promptMode, setPromptMode] = useState('manual');
+	const [promptJson, setPromptJson] = useState('');
+	const [promptJsonError, setPromptJsonError] = useState(null);
 
 	const prompt = usePrompt(Number(id), addToast);
+
+	useEffect(() => {
+		api.get(route('archives.index'))
+			.then((res) => res.json())
+			.then(setArchives)
+			.catch(() => {});
+	}, []);
 
 	// Load assistant data
 	useEffect(() => {
@@ -38,6 +50,7 @@ export default function EditAssistantPage() {
 				setSlug(data.slug);
 				setDescription(data.description || '');
 				setOpeningMessage(data.opening_message || '');
+				setSelectedArchiveId(data.archive_id ? String(data.archive_id) : '');
 				const loadedEmotions = data.emotions || [];
 				setEmotions(loadedEmotions);
 				const defaultEmo = loadedEmotions.find((e) => e.name === 'default');
@@ -65,6 +78,7 @@ export default function EditAssistantPage() {
 				slug: slug.trim(),
 				description: description.trim() || null,
 				opening_message: openingMessage.trim() || null,
+				archive_id: selectedArchiveId ? Number(selectedArchiveId) : null,
 			});
 
 			if (!res.ok) {
@@ -237,6 +251,22 @@ export default function EditAssistantPage() {
 						/>
 					</div>
 
+					<div>
+						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+							Archive
+						</label>
+						<select
+							value={selectedArchiveId}
+							onChange={(e) => setSelectedArchiveId(e.target.value)}
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+						>
+							<option value="">— None —</option>
+							{archives.map((a) => (
+								<option key={a.id} value={a.id}>{a.name}</option>
+							))}
+						</select>
+					</div>
+
 					{/* Save basic fields */}
 					<div className="flex justify-end">
 						<button
@@ -293,10 +323,72 @@ export default function EditAssistantPage() {
 
 				{/* Prompt */}
 				<div>
-					<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-3">
-						Prompt
-					</label>
-					<PromptEditor {...prompt} />
+					<div className="flex items-center justify-between mb-3">
+						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase">
+							Prompt
+						</label>
+						<div className="flex gap-1">
+							{['manual', 'json'].map((mode) => (
+								<button
+									key={mode}
+									onClick={() => {
+										if (mode === 'json' && promptMode !== 'json') {
+											setPromptJson(prompt.sections ? JSON.stringify(prompt.sections, null, 2) : '');
+											setPromptJsonError(null);
+										}
+										setPromptMode(mode);
+									}}
+									className={`text-[0.65rem] tracking-[0.1em] uppercase px-3 py-1 border transition-colors cursor-pointer ${
+										promptMode === mode
+											? 'border-accent text-accent bg-accent/10'
+											: 'border-line-1 text-fg-3 hover:border-fg-3'
+									}`}
+								>
+									{mode === 'manual' ? 'Manual' : 'Edit JSON'}
+								</button>
+							))}
+						</div>
+					</div>
+
+					{promptMode === 'manual' ? (
+						<PromptEditor {...prompt} />
+					) : (
+						<div>
+							<textarea
+								value={promptJson}
+								onChange={(e) => {
+									setPromptJson(e.target.value);
+									try {
+										JSON.parse(e.target.value);
+										setPromptJsonError(null);
+									} catch {
+										setPromptJsonError('Invalid JSON');
+									}
+								}}
+								rows={20}
+								className={`w-full bg-bg-1 border text-accent text-sm px-3 py-2 outline-none transition-colors resize-y font-mono ${
+									promptJsonError ? 'border-danger' : 'border-line-1 focus:border-accent/50'
+								}`}
+								placeholder="{}"
+							/>
+							{promptJsonError && (
+								<p className="text-danger text-[0.65rem] mt-1">{promptJsonError}</p>
+							)}
+							<div className="flex justify-end pt-3">
+								<button
+									onClick={() => prompt.saveFromJson(promptJson)}
+									disabled={!!promptJsonError || prompt.isSaving}
+									className={`text-[0.75rem] tracking-[0.1em] px-6 py-2 transition-colors ${
+										promptJsonError || prompt.isSaving
+											? 'bg-bg-3 text-fg-3 cursor-default'
+											: 'button-success cursor-pointer'
+									}`}
+								>
+									{prompt.isSaving ? 'SAVING...' : 'SAVE PROMPT'}
+								</button>
+							</div>
+						</div>
+					)}
 				</div>
 			</div>
 		</>
