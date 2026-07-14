@@ -20,6 +20,7 @@ class AssistantEmotionController extends Controller
 		$validated = $request->validate([
 			'name' => ['required', 'string', 'max:255'],
 			'image' => ['required', 'file', 'image', 'max:10480'],
+			'restricted' => ['sometimes', 'boolean'],
 		]);
 
 		if ($assistant->emotions()->where('name', $validated['name'])->exists()) {
@@ -31,7 +32,7 @@ class AssistantEmotionController extends Controller
 
 		$emotion = $assistant->emotions()->create([
 			'name' => $validated['name'],
-			'restricted' => false,
+			'restricted' => $validated['restricted'] ?? false,
 		]);
 
 		$this->storeImageForEmotion($emotion, $validated['image'], $assistant->id);

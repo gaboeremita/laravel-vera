@@ -24,6 +24,7 @@ export default function CreateAssistantPage() {
 
 	// Staged emotions — local File objects, not yet uploaded
 	const [stagedEmotions, setStagedEmotions] = useState([]);
+	const [stagedRestrictedEmotions, setStagedRestrictedEmotions] = useState([]);
 
 	// Archive
 	const [archives, setArchives] = useState([]);
@@ -65,6 +66,27 @@ export default function CreateAssistantPage() {
 	const handleReplaceImage = (emotion, file) => {
 		const preview = URL.createObjectURL(file);
 		setStagedEmotions((prev) =>
+			prev.map((e) => {
+				if (e !== emotion) return e;
+				if (e.preview) URL.revokeObjectURL(e.preview);
+				return { ...e, file, preview };
+			})
+		);
+	};
+
+	const handleAddRestrictedEmotion = (emotionName, file) => {
+		const preview = URL.createObjectURL(file);
+		setStagedRestrictedEmotions((prev) => [...prev, { name: emotionName, file, preview }]);
+	};
+
+	const handleDeleteRestrictedEmotion = (emotion) => {
+		setStagedRestrictedEmotions((prev) => prev.filter((e) => e !== emotion));
+		if (emotion.preview) URL.revokeObjectURL(emotion.preview);
+	};
+
+	const handleReplaceRestrictedImage = (emotion, file) => {
+		const preview = URL.createObjectURL(file);
+		setStagedRestrictedEmotions((prev) =>
 			prev.map((e) => {
 				if (e !== emotion) return e;
 				if (e.preview) URL.revokeObjectURL(e.preview);
@@ -116,6 +138,11 @@ export default function CreateAssistantPage() {
 			stagedEmotions.forEach((emotion, i) => {
 				formData.append(`emotions[${i + 1}][name]`, emotion.name);
 				formData.append(`emotions[${i + 1}][image]`, emotion.file);
+			});
+
+			stagedRestrictedEmotions.forEach((emotion, i) => {
+				formData.append(`restricted_emotions[${i}][name]`, emotion.name);
+				formData.append(`restricted_emotions[${i}][image]`, emotion.file);
 			});
 
 			const res = await api.postForm(route('assistants.store'), formData);
@@ -259,6 +286,15 @@ export default function CreateAssistantPage() {
 					onAdd={handleAddEmotion}
 					onDelete={handleDeleteEmotion}
 					onUpdateImage={handleReplaceImage}
+				/>
+
+				{/* Restricted Emotions */}
+				<EmotionGrid
+					label="Restricted Emotions"
+					emotions={stagedRestrictedEmotions}
+					onAdd={handleAddRestrictedEmotion}
+					onDelete={handleDeleteRestrictedEmotion}
+					onUpdateImage={handleReplaceRestrictedImage}
 				/>
 
 				{/* Divider */}

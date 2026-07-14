@@ -19,6 +19,7 @@ export default function EditAssistantPage() {
 	const [description, setDescription] = useState('');
 	const [openingMessage, setOpeningMessage] = useState('');
 	const [emotions, setEmotions] = useState([]);
+	const [restrictedEmotions, setRestrictedEmotions] = useState([]);
 	const [defaultPreview, setDefaultPreview] = useState(null);
 	const defaultImageRef = useRef(null);
 	const [archives, setArchives] = useState([]);
@@ -53,6 +54,7 @@ export default function EditAssistantPage() {
 				setSelectedArchiveId(data.archive_id ? String(data.archive_id) : '');
 				const loadedEmotions = data.emotions || [];
 				setEmotions(loadedEmotions);
+				setRestrictedEmotions(data.restricted_emotions || []);
 				const defaultEmo = loadedEmotions.find((e) => e.name === 'default');
 				if (defaultEmo?.image_url) setDefaultPreview(defaultEmo.image_url);
 			} catch {
@@ -129,6 +131,29 @@ export default function EditAssistantPage() {
 		}
 	};
 
+	const handleAddRestrictedEmotion = async (emotionName, file) => {
+		const formData = new FormData();
+		formData.append('name', emotionName);
+		formData.append('image', file);
+		formData.append('restricted', '1');
+
+		try {
+			const res = await api.postForm(
+				route('assistants.emotions.store', { assistant: id }),
+				formData
+			);
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Failed to add emotion');
+			}
+			const data = await res.json();
+			setRestrictedEmotions((prev) => [...prev, data]);
+			addToast('Restricted emotion added', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to add emotion', 'error');
+		}
+	};
+
 	const handleDeleteEmotion = async (emotion) => {
 		try {
 			const res = await api.delete(
@@ -136,6 +161,7 @@ export default function EditAssistantPage() {
 			);
 			if (!res.ok) throw new Error('Delete failed');
 			setEmotions((prev) => prev.filter((e) => e.id !== emotion.id));
+			setRestrictedEmotions((prev) => prev.filter((e) => e.id !== emotion.id));
 			addToast('Emotion deleted', 'success');
 		} catch {
 			addToast('Failed to delete emotion', 'error');
@@ -154,6 +180,7 @@ export default function EditAssistantPage() {
 			if (!res.ok) throw new Error('Update failed');
 			const data = await res.json();
 			setEmotions((prev) => prev.map((e) => (e.id === emotion.id ? data : e)));
+			setRestrictedEmotions((prev) => prev.map((e) => (e.id === emotion.id ? data : e)));
 			addToast('Image updated', 'success');
 		} catch {
 			addToast('Failed to update emotion', 'error');
@@ -315,6 +342,15 @@ export default function EditAssistantPage() {
 				<EmotionGrid
 					emotions={emotions.filter((e) => e.name !== 'default')}
 					onAdd={handleAddEmotion}
+					onDelete={handleDeleteEmotion}
+					onUpdateImage={handleReplaceImage}
+				/>
+
+				{/* Restricted Emotions */}
+				<EmotionGrid
+					label="Restricted Emotions"
+					emotions={restrictedEmotions}
+					onAdd={handleAddRestrictedEmotion}
 					onDelete={handleDeleteEmotion}
 					onUpdateImage={handleReplaceImage}
 				/>

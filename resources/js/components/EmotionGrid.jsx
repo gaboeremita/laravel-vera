@@ -10,7 +10,7 @@ import ConfirmationModal from './common/ConfirmationModal.jsx';
  * @param {function} onUpdateImage - (emotion, file) => void
  * @param {boolean} isSaving
  */
-export default function EmotionGrid({ emotions, onAdd, onDelete, onUpdateImage, isSaving = false }) {
+export default function EmotionGrid({ emotions, onAdd, onDelete, onUpdateImage, isSaving = false, label = 'Emotions' }) {
 	const [isAdding, setIsAdding] = useState(false);
 	const [newName, setNewName] = useState('');
 	const [newFile, setNewFile] = useState(null);
@@ -66,7 +66,7 @@ export default function EmotionGrid({ emotions, onAdd, onDelete, onUpdateImage, 
 	return (
 		<div className="space-y-3">
 			<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
-				Emotions ({emotions.length})
+				{label} ({emotions.length})
 			</label>
 
 			<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">

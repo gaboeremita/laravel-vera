@@ -53,15 +53,23 @@ class AssistantController extends Controller
 			->assistants()
 			->findOrFail($id);
 
+		$mapEmotion = fn ($emotion) => [
+			'id' => $emotion->id,
+			'name' => $emotion->name,
+			'image_url' => $emotion->image?->url,
+		];
+
 		$emotions = $assistant->emotions()
 			->where('restricted', false)
 			->with('image')
 			->get()
-			->map(fn ($emotion) => [
-				'id' => $emotion->id,
-				'name' => $emotion->name,
-				'image_url' => $emotion->image?->url,
-			]);
+			->map($mapEmotion);
+
+		$restrictedEmotions = $assistant->emotions()
+			->where('restricted', true)
+			->with('image')
+			->get()
+			->map($mapEmotion);
 
 		return response()->json([
 			'id' => $assistant->id,
@@ -72,6 +80,7 @@ class AssistantController extends Controller
 			'prompt' => $assistant->prompt,
 			'archive_id' => $assistant->archive_id,
 			'emotions' => $emotions,
+			'restricted_emotions' => $restrictedEmotions,
 		]);
 	}
 
@@ -91,6 +100,9 @@ class AssistantController extends Controller
 			'emotions' => ['required', 'array', 'min:1'],
 			'emotions.*.name' => ['required', 'string', 'max:255'],
 			'emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
+			'restricted_emotions' => ['sometimes', 'array'],
+			'restricted_emotions.*.name' => ['required', 'string', 'max:255'],
+			'restricted_emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
 		]);
 
 		// At least one emotion must be named "default"
@@ -118,16 +130,13 @@ class AssistantController extends Controller
 			$request->user()->assistants()->attach($assistant->id);
 
 			// Store emotions with images
-			foreach ($validated['emotions'] as $emotionData) {
+			$storeEmotion = function (array $emotionData, bool $restricted) use ($assistant): void {
 				$emotion = $assistant->emotions()->create([
 					'name' => $emotionData['name'],
-					'restricted' => false,
+					'restricted' => $restricted,
 				]);
 
-				$path = $emotionData['image']->store(
-					"emotions/{$assistant->id}",
-					'public'
-				);
+				$path = $emotionData['image']->store("emotions/{$assistant->id}", 'public');
 
 				$emotion->image()->create([
 					'path' => $path,
@@ -135,6 +144,14 @@ class AssistantController extends Controller
 					'mime_type' => $emotionData['image']->getMimeType(),
 					'size' => $emotionData['image']->getSize(),
 				]);
+			};
+
+			foreach ($validated['emotions'] as $emotionData) {
+				$storeEmotion($emotionData, false);
+			}
+
+			foreach ($validated['restricted_emotions'] ?? [] as $emotionData) {
+				$storeEmotion($emotionData, true);
 			}
 
 			return $assistant;
