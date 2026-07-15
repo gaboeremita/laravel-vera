@@ -92,7 +92,7 @@ TELEGRAM_ASSISTANT_ID=
 
 ### LLM Providers
 
-Providers and models are managed through the **Providers** page in the UI (`/providers`). Each provider has:
+Providers and models are managed through the **Providers** page in the UI (`/assistants/:id/providers`). Each provider has:
 
 - A base URL (any OpenAI-compatible endpoint, or Anthropic)
 - An API key (encrypted at rest)
@@ -107,7 +107,7 @@ The active model is selected per-user via the **SELECT** button in the Providers
 
 ### Theming
 
-The app supports multiple themes, selectable per-user via the Settings page (`/settings`) and persisted in the database.
+The app supports multiple themes, selectable per-user via the Settings page (`/assistants/:id/settings`) and persisted in the database.
 
 Available themes are defined in the `Theme` enum (`app/Enums/Theme.php`):
 
@@ -157,12 +157,13 @@ laravel-vera/
 │   │   └── Api/
 │   │       ├── AiProviderController.php      # CRUD for AI providers
 │   │       ├── AiModelController.php         # CRUD for AI models
+│   │       ├── ArchiveController.php         # Archive read/save (with async embedding)
+│   │       ├── AssistantController.php       # CRUD for assistants (multipart, emotion images)
+│   │       ├── AssistantEmotionController.php# Per-assistant emotion store/update/destroy
 │   │       ├── AssistantPromptController.php # Prompt CRUD (show/store/update/destroy)
 │   │       ├── ConversationController.php    # CRUD + message sending
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
-│   │       ├── ArchiveController.php         # Archive read/save
-│   │       ├── SettingsController.php        # Theme + active model selection
-│   │       └── VoiceController.php           # Stub
+│   │       └── SettingsController.php        # Theme + active model selection
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions)
@@ -178,6 +179,8 @@ laravel-vera/
 │   │   ├── Tag.php
 │   │   ├── Image.php                         # Polymorphic, stored on disk
 │   │   └── Video.php                         # Polymorphic, stored on disk
+│   ├── Jobs/
+│   │   └── EmbedArchiveEntry.php             # Async vector embedding for archive entries
 │   ├── Providers/
 │   │   └── AppServiceProvider.php
 │   └── Services/
@@ -202,12 +205,16 @@ laravel-vera/
 │   ├── contexts/
 │   │   └── ThemeContext.jsx                  # Global theme state
 │   ├── layouts/
-│   │   └── AuthenticatedLayout.jsx           # Shared layout for protected routes
+│   │   ├── AuthenticatedLayout.jsx           # Auth guard + emotion state + boot sequence
+│   │   └── AssistantLayout.jsx               # Assistant-scoped context (conversations, settings)
 │   ├── pages/
 │   │   ├── LoginPage.jsx
+│   │   ├── AssistantsPage.jsx                # List/delete assistants
+│   │   ├── CreateAssistantPage.jsx           # Multipart assistant creation form
+│   │   ├── EditAssistantPage.jsx             # Edit assistant + manage emotions
 │   │   ├── ConversationsPage.jsx             # Conversation list
 │   │   ├── ChatPage.jsx                      # Main chat interface
-│   │   ├── ArchivePage.jsx                   # Archive editor
+│   │   ├── ArchivePage.jsx                   # Archive editor (RAG knowledge base)
 │   │   ├── PromptPage.jsx                    # Visual prompt editor
 │   │   ├── SettingsPage.jsx                  # Theme selection
 │   │   └── ProvidersPage.jsx                 # AI provider/model management
@@ -217,7 +224,11 @@ laravel-vera/
 │   │   │   └── ConfirmationModal.jsx         # Confirmation modal
 │   │   ├── ModelAccordion.jsx                # Model config + select/deselect
 │   │   ├── ProviderAccordion.jsx             # Provider config + nested models
+│   │   ├── EmotionGrid.jsx                   # Emotion image manager (add/rename/replace/delete)
+│   │   ├── PromptEditor.jsx                  # Local prompt tree editor (create/edit flows)
+│   │   ├── PromptNode.jsx                    # Recursive prompt tree node editor
 │   │   ├── EntryAccordion.jsx                # Archive entry accordion
+│   │   ├── Header.jsx                        # Navigation header
 │   │   ├── Portrait.jsx                      # Expression display
 │   │   ├── ChatMessage.jsx                   # Message rendering
 │   │   ├── ThinkingBlock.jsx                 # Collapsible LLM reasoning
@@ -226,8 +237,9 @@ laravel-vera/
 │   │   ├── ToastContainer.jsx                # Toast notification display
 │   │   └── Scanlines.jsx                     # CRT scanline overlay
 │   ├── hooks/
-│   │   ├── useConversations.js               # Conversation CRUD state
+│   │   ├── useAssistants.js                  # Assistant list + delete
 │   │   ├── useEmotions.js                    # Emotion set fetching
+│   │   ├── useLocalPrompt.js                 # Local-only prompt tree state
 │   │   ├── usePrompt.js                      # Prompt tree CRUD + save/destroy
 │   │   ├── useProviders.js                   # Provider/model CRUD + active model state
 │   │   └── useToast.js                       # Toast notification state
@@ -273,11 +285,13 @@ laravel-vera/
 Emotions are stored in the database as `Emotion` records with associated `Image` and `Video` files on disk, scoped per assistant. Two sets exist:
 
 - **Standard set** (`restricted = false`) — default expressions
-- **Restricted set** (`restricted = true`) — alternate expressions, unlocked via the `unlocked` query param on `GET /api/emotions`
+- **Restricted set** (`restricted = true`) — alternate expressions, unlocked via the `unlocked` query param on `GET /api/assistants/{assistant}/emotions`
 
 The LLM prefixes each response with an emotion tag (e.g. `[annoyed]`) which is parsed by the frontend and used to look up the matching expression asset.
 
 Run `php artisan emotions:sync` to seed/update emotion records from config.
+
+Emotions are now also manageable per-assistant directly through the UI on the Edit Assistant page (`/assistants/:id/edit`).
 
 ## License
 
