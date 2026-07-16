@@ -59,11 +59,26 @@ class ParameterBuilder
         return match ($definition['type'] ?? 'string') {
             'integer' => $this->castInteger($name, $value, $definition),
             'float'   => $this->castFloat($name, $value, $definition),
-            'boolean' => (bool) $value,
+            'boolean' => $this->castBoolean($value),
             'enum'    => $this->castEnum($name, $value, $definition),
             'object'  => $this->castObject($name, $value, $definition),
             default   => (string) $value,
         };
+    }
+
+    private function castBoolean(mixed $value): bool
+    {
+        if (is_string($value)) {
+            $lower = strtolower($value);
+            if ($lower === 'true') {
+                return true;
+            }
+            if ($lower === 'false') {
+                return false;
+            }
+        }
+
+        return (bool) $value;
     }
 
     /**
