@@ -12,6 +12,11 @@ export default function SchemaForm({ schema, config, onChange }) {
 
     const handleFieldChange = (name, value) => {
         const current = typeof config === 'object' && config ? config : {};
+        if (value === undefined) {
+            const { [name]: _removed, ...rest } = current;
+            onChange(rest);
+            return;
+        }
         onChange({ ...current, [name]: value });
     };
 
