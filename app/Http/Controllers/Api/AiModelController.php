@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Rules\ValidModelConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,9 +17,10 @@ class AiModelController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'thinking' => ['sometimes', 'boolean'],
-			'config' => ['nullable', 'array'],
             'endpoint' => ['required', 'string', 'max:255'],
+            'thinking_key' => ['nullable', 'string', 'max:100'],
+            'config' => ['nullable', 'array', new ValidModelConfig($provider->config_schema ?? [])],
+            'additional_config' => ['nullable', 'array'],
             'prompt' => ['nullable', 'string'],
         ]);
 
@@ -37,9 +39,10 @@ class AiModelController extends Controller
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'thinking' => ['sometimes', 'boolean'],
             'endpoint' => ['sometimes', 'string', 'max:255'],
-			'config' => ['nullable', 'array'],
+            'thinking_key' => ['nullable', 'string', 'max:100'],
+            'config' => ['nullable', 'array', new ValidModelConfig($provider->config_schema ?? [])],
+            'additional_config' => ['nullable', 'array'],
             'prompt' => ['nullable', 'string'],
         ]);
 
