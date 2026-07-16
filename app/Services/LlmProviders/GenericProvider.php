@@ -2,6 +2,7 @@
 
 namespace App\Services\LlmProviders;
 
+use App\Builders\ParameterBuilder;
 use App\Contracts\LlmProvider;
 use App\DTOs\LlmResponse;
 use App\Models\AiModel;
@@ -9,62 +10,47 @@ use Illuminate\Support\Facades\Http;
 
 class GenericProvider implements LlmProvider
 {
-	public function __construct(
-		private readonly string $url,
-		private readonly string $model,
-		private readonly ?string $apiKey = null,
-		private readonly bool $thinking = false,
-		private readonly ?string $thinkingKey = null,
-		private readonly ?string $thinkingParam = null,
-		private readonly bool $stream = false,
-		private readonly array $config = [],
-	) {}
+    public function __construct(
+        private readonly string $url,
+        private readonly string $model,
+        private readonly ?string $apiKey = null,
+        private readonly bool $stream = false,
+        private readonly array $params = [],
+    ) {}
 
     public static function fromModel(AiModel $aiModel): static
     {
         $provider = $aiModel->provider;
-        $schema = $provider->config_schema ?? [];
+
+        $params = (new ParameterBuilder)->build(
+            schema: $provider->config_schema ?? [],
+            config: $aiModel->config ?? [],
+        );
 
         return new static(
             url: $provider->url,
             model: $aiModel->endpoint,
             apiKey: $provider->api_key,
-            thinking: $aiModel->thinking,
-            thinkingKey: data_get($schema, 'thinking_key.default'),
-            config: $aiModel->config ?? [],
+            stream: config('ai.stream', false),
+            params: $params,
         );
     }
 
     public function chat(array $messages): LlmResponse
     {
-        $formattedMessages = array_map([$this, 'formatMessage'], $messages);
-
         $payload = [
             'model' => $this->model,
-            'stream' => config('ai.stream', false),
-            'messages' => $formattedMessages,
+            'stream' => $this->stream,
+            'messages' => array_map([$this, 'formatMessage'], $messages),
+            ...$this->params,
         ];
-
-        if (isset($this->config['max_tokens'])) {
-            $payload['max_tokens'] = $this->config['max_tokens'];
-        }
-
-		$thinkingParam = $this->thinkingParam ?? 'reasoning';
-
-		if ($this->thinking && isset($this->config['thinking_budget'])) {
-			$payload[$thinkingParam] = [
-				'max_tokens' => $this->config['thinking_budget'],
-			];
-		}
 
         $headers = [];
         if ($this->apiKey) {
             $headers['Authorization'] = "Bearer {$this->apiKey}";
         }
 
-        $timeout = $this->config['timeout'] ?? config('ai.defaults.timeout', 600);
-
-        $response = Http::timeout($timeout)
+        $response = Http::timeout(config('ai.defaults.timeout', 600))
             ->withHeaders($headers)
             ->post($this->url, $payload);
 
@@ -79,11 +65,9 @@ class GenericProvider implements LlmProvider
         }
 
         $choice = $data['choices'][0]['message'] ?? [];
-        $thinkingKey = $this->thinkingKey ?? 'reasoning';
 
         return new LlmResponse(
             content: $choice['content'] ?? '',
-            thinking: $choice[$thinkingKey] ?? null,
         );
     }
 

@@ -176,7 +176,6 @@ export default function useProviders(addToast, assistantId) {
 								uid: crypto.randomUUID(),
 								name: '',
 								endpoint: '',
-								thinking: false,
 								prompt: '',
 								config: '',
 								collapsed: false,
@@ -198,7 +197,6 @@ export default function useProviders(addToast, assistantId) {
 			const payload = {
 				name: model.name,
 				endpoint: model.endpoint,
-				thinking: model.thinking,
 				prompt: model.prompt || null,
 			};
 

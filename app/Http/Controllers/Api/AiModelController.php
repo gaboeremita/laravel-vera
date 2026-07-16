@@ -16,8 +16,7 @@ class AiModelController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'thinking' => ['sometimes', 'boolean'],
-			'config' => ['nullable', 'array'],
+            'config' => ['nullable', 'array'],
             'endpoint' => ['required', 'string', 'max:255'],
             'prompt' => ['nullable', 'string'],
         ]);
@@ -37,9 +36,8 @@ class AiModelController extends Controller
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'thinking' => ['sometimes', 'boolean'],
             'endpoint' => ['sometimes', 'string', 'max:255'],
-			'config' => ['nullable', 'array'],
+            'config' => ['nullable', 'array'],
             'prompt' => ['nullable', 'string'],
         ]);
 

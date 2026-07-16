@@ -6,13 +6,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['provider_id', 'name', 'endpoint', 'thinking', 'prompt', 'config'])]
+#[Fillable(['provider_id', 'name', 'endpoint', 'prompt', 'config'])]
 class AiModel extends Model
 {
     protected function casts(): array
     {
         return [
-            'thinking' => 'boolean',
             'config' => 'array',
         ];
     }

@@ -183,6 +183,7 @@ export default function ProviderAccordion({
 						<ModelAccordion
 							key={model.id ?? model.uid}
 							model={model}
+							configSchema={Array.isArray(provider.config_schema) ? provider.config_schema : []}
 							canSave={!!provider.id}
 							isActive={model.id === activeModelId}
 							onUpdate={(field, value) => onUpdateModel(mi, field, value)}
