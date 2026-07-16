@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Accordion from './common/Accordion.jsx';
 import ModelAccordion from './ModelAccordion.jsx';
+import SchemaEditor from './SchemaEditor.jsx';
 
 export default function ProviderAccordion({
 											  provider,
@@ -132,18 +133,10 @@ export default function ProviderAccordion({
 								<div>
 									<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
 										Config Schema
-										<span className="text-fg-3 ml-2 normal-case">JSON, optional</span>
 									</label>
-									<textarea
-										value={
-											typeof provider.config_schema === 'object' && provider.config_schema
-												? JSON.stringify(provider.config_schema, null, 2)
-												: provider.config_schema ?? ''
-										}
-										onChange={(e) => onUpdate('config_schema', e.target.value)}
-										rows={4}
-										className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none font-mono text-xs"
-										placeholder='{"max_tokens": {"type": "integer", "required": true, "default": 4096}}'
+									<SchemaEditor
+										schema={Array.isArray(provider.config_schema) ? provider.config_schema : []}
+										onChange={(schema) => onUpdate('config_schema', schema)}
 									/>
 								</div>
 
@@ -183,6 +176,7 @@ export default function ProviderAccordion({
 						<ModelAccordion
 							key={model.id ?? model.uid}
 							model={model}
+							configSchema={Array.isArray(provider.config_schema) ? provider.config_schema : []}
 							canSave={!!provider.id}
 							isActive={model.id === activeModelId}
 							onUpdate={(field, value) => onUpdateModel(mi, field, value)}

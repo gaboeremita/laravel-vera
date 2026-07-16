@@ -1,6 +1,9 @@
 import Accordion from './common/Accordion.jsx';
+import SchemaForm from './SchemaForm.jsx';
 
-export default function ModelAccordion({ model, onUpdate, onSave, onDelete, canSave, isActive, onSelect, onDeselect }) {
+export default function ModelAccordion({ model, configSchema, onUpdate, onSave, onDelete, canSave, isActive, onSelect, onDeselect }) {
+	const hasSchema = Array.isArray(configSchema) && configSchema.length > 0;
+
 	return (
 		<Accordion
 			label="MODEL"
@@ -53,21 +56,19 @@ export default function ModelAccordion({ model, onUpdate, onSave, onDelete, canS
 				/>
 			</div>
 
-			{/* Thinking toggle */}
-			<div className="flex items-center gap-3">
-				<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase">
-					Thinking
+			{/* Thinking Key */}
+			<div>
+				<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+					Thinking Key
+					<span className="text-fg-3 ml-2 normal-case">optional</span>
 				</label>
-				<button
-					onClick={() => onUpdate('thinking', !model.thinking)}
-					className={`px-3 py-1 text-[0.7rem] tracking-[0.1em] border transition-colors cursor-pointer ${
-						model.thinking
-							? 'border-success text-success bg-success/10'
-							: 'border-line-1 text-fg-3'
-					}`}
-				>
-					{model.thinking ? 'ON' : 'OFF'}
-				</button>
+				<input
+					type="text"
+					value={model.thinking_key ?? ''}
+					onChange={(e) => onUpdate('thinking_key', e.target.value)}
+					className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+					placeholder="e.g. reasoning, reasoning_content"
+				/>
 			</div>
 
 			{/* Prompt */}
@@ -89,18 +90,45 @@ export default function ModelAccordion({ model, onUpdate, onSave, onDelete, canS
 			<div>
 				<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
 					Config
+					{!hasSchema && <span className="text-fg-3 ml-2 normal-case">JSON, optional</span>}
+				</label>
+				{hasSchema ? (
+					<SchemaForm
+						schema={configSchema}
+						config={typeof model.config === 'object' && model.config ? model.config : {}}
+						onChange={(v) => onUpdate('config', v)}
+					/>
+				) : (
+					<textarea
+						value={
+							typeof model.config === 'object' && model.config
+								? JSON.stringify(model.config, null, 2)
+								: model.config ?? ''
+						}
+						onChange={(e) => onUpdate('config', e.target.value)}
+						rows={4}
+						className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none font-mono text-xs"
+						placeholder="{}"
+					/>
+				)}
+			</div>
+
+			{/* Additional Config */}
+			<div>
+				<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+					Additional Config
 					<span className="text-fg-3 ml-2 normal-case">JSON, optional</span>
 				</label>
 				<textarea
 					value={
-						typeof model.config === 'object' && model.config
-							? JSON.stringify(model.config, null, 2)
-							: model.config ?? ''
+						typeof model.additional_config === 'object' && model.additional_config
+							? JSON.stringify(model.additional_config, null, 2)
+							: model.additional_config ?? ''
 					}
-					onChange={(e) => onUpdate('config', e.target.value)}
+					onChange={(e) => onUpdate('additional_config', e.target.value)}
 					rows={4}
 					className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none font-mono text-xs"
-					placeholder='{"max_tokens": 4096, "thinking_budget": 10000}'
+					placeholder="{}"
 				/>
 			</div>
 
