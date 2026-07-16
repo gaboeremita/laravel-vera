@@ -56,6 +56,21 @@ export default function ModelAccordion({ model, configSchema, onUpdate, onSave, 
 				/>
 			</div>
 
+			{/* Thinking Key */}
+			<div>
+				<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+					Thinking Key
+					<span className="text-fg-3 ml-2 normal-case">optional</span>
+				</label>
+				<input
+					type="text"
+					value={model.thinking_key ?? ''}
+					onChange={(e) => onUpdate('thinking_key', e.target.value)}
+					className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+					placeholder="e.g. reasoning, reasoning_content"
+				/>
+			</div>
+
 			{/* Prompt */}
 			<div>
 				<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
@@ -96,6 +111,25 @@ export default function ModelAccordion({ model, configSchema, onUpdate, onSave, 
 						placeholder="{}"
 					/>
 				)}
+			</div>
+
+			{/* Additional Config */}
+			<div>
+				<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+					Additional Config
+					<span className="text-fg-3 ml-2 normal-case">JSON, optional</span>
+				</label>
+				<textarea
+					value={
+						typeof model.additional_config === 'object' && model.additional_config
+							? JSON.stringify(model.additional_config, null, 2)
+							: model.additional_config ?? ''
+					}
+					onChange={(e) => onUpdate('additional_config', e.target.value)}
+					rows={4}
+					className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none font-mono text-xs"
+					placeholder="{}"
+				/>
 			</div>
 
 			{/* Save */}

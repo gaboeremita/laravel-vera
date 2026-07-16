@@ -166,3 +166,9 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 ## Migration Rules
 
 - NEVER edit existing migration files. Always create a new migration to modify the database schema.
+
+## Before Taking Action
+
+- Before writing any code, creating any file, or running any command that modifies state, briefly state what you plan to do and why, and wait for confirmation.
+- If the task is research, doc-checking, planning, thinking, or answering a question — take the action requested. Do not infer that a code change is also needed.
+- Only take action when explicitly requested.

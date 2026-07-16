@@ -16,6 +16,7 @@ class GenericProvider implements LlmProvider
         private readonly ?string $apiKey = null,
         private readonly bool $stream = false,
         private readonly array $params = [],
+        private readonly ?string $thinkingKey = null,
     ) {}
 
     public static function fromModel(AiModel $aiModel): static
@@ -27,12 +28,17 @@ class GenericProvider implements LlmProvider
             config: $aiModel->config ?? [],
         );
 
+        if (! empty($aiModel->additional_config)) {
+            $params = array_merge($params, $aiModel->additional_config);
+        }
+
         return new static(
             url: $provider->url,
             model: $aiModel->endpoint,
             apiKey: $provider->api_key,
             stream: config('ai.stream', false),
             params: $params,
+            thinkingKey: $aiModel->thinking_key,
         );
     }
 
@@ -68,6 +74,7 @@ class GenericProvider implements LlmProvider
 
         return new LlmResponse(
             content: $choice['content'] ?? '',
+            thinking: $this->thinkingKey ? ($choice[$this->thinkingKey] ?? null) : null,
         );
     }
 

@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { api } from '../utils/api.js';
 import {route} from "ziggy-js";
 
+function stripSchemaUids(fields) {
+	return fields.map(({ uid, ...rest }) => ({
+		...rest,
+		...(Array.isArray(rest.children) ? { children: stripSchemaUids(rest.children) } : {}),
+	}));
+}
+
 export default function useProviders(addToast, assistantId) {
 	const [providers, setProviders] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -82,8 +89,8 @@ export default function useProviders(addToast, assistantId) {
 
 			if (typeof provider.config_schema === 'string' && provider.config_schema.trim()) {
 				payload.config_schema = JSON.parse(provider.config_schema);
-			} else if (typeof provider.config_schema === 'object') {
-				payload.config_schema = provider.config_schema;
+			} else if (Array.isArray(provider.config_schema)) {
+				payload.config_schema = stripSchemaUids(provider.config_schema);
 			}
 
 			if (provider.api_key) {
@@ -176,8 +183,10 @@ export default function useProviders(addToast, assistantId) {
 								uid: crypto.randomUUID(),
 								name: '',
 								endpoint: '',
+								thinking_key: '',
 								prompt: '',
 								config: '',
+								additional_config: '',
 								collapsed: false,
 								saving: false,
 							},
@@ -197,6 +206,7 @@ export default function useProviders(addToast, assistantId) {
 			const payload = {
 				name: model.name,
 				endpoint: model.endpoint,
+				thinking_key: model.thinking_key || null,
 				prompt: model.prompt || null,
 			};
 
@@ -204,6 +214,12 @@ export default function useProviders(addToast, assistantId) {
 				payload.config = JSON.parse(model.config);
 			} else if (typeof model.config === 'object') {
 				payload.config = model.config;
+			}
+
+			if (typeof model.additional_config === 'string' && model.additional_config.trim()) {
+				payload.additional_config = JSON.parse(model.additional_config);
+			} else if (typeof model.additional_config === 'object' && model.additional_config) {
+				payload.additional_config = model.additional_config;
 			}
 
 			let res;

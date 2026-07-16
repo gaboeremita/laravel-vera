@@ -30,6 +30,10 @@ class AnthropicProvider implements LlmProvider
             config: $config,
         );
 
+        if (! empty($aiModel->additional_config)) {
+            $params = array_merge($params, $aiModel->additional_config);
+        }
+
         return new static(
             url: $provider->url,
             model: $aiModel->endpoint,
