@@ -67,7 +67,7 @@ class AnthropicProvider implements LlmProvider
             $body['system'] = $systemPrompt;
         }
 
-        $response = Http::timeout(config('ai.defaults.timeout', 120))
+        $response = Http::timeout(config('ai.default.config.timeout', 120))
             ->withHeaders([
                 'x-api-key' => $this->key,
                 'anthropic-version' => $this->version,
