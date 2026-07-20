@@ -55,6 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/archives', [ArchiveController::class, 'index'])->name('archives.index');
     Route::get('/archives/{id}', [ArchiveController::class, 'show'])->name('archives.show');
+    Route::get('/archives/{id}/export', [ArchiveController::class, 'export'])->name('archives.export');
     Route::post('/archives', [ArchiveController::class, 'save'])->name('archives.store');
     Route::post('/archives/{id}', [ArchiveController::class, 'save'])->name('archives.save');
 

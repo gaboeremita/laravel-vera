@@ -16,6 +16,7 @@ export default function ArchivePage() {
 	const [entries, setEntries] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
+	const [isExporting, setIsExporting] = useState(false);
 	const [deleteIndex, setDeleteIndex] = useState(null);
 	const allCollapsed = entries.every((e) => e.collapsed);
 
@@ -114,6 +115,34 @@ export default function ArchivePage() {
 			addToast(error.message || 'Failed to save archive', 'error');
 		} finally {
 			setIsSaving(false);
+		}
+	};
+
+	const exportArchive = async () => {
+		setIsExporting(true);
+
+		try {
+			const res = await api.get(route('archives.export', { id: archiveId }));
+
+			if (!res.ok) throw new Error('Export failed');
+
+			const blob = await res.blob();
+			const disposition = res.headers.get('Content-Disposition') || '';
+			const match = disposition.match(/filename="?([^"]+)"?/);
+			const filename = match ? match[1] : `${name || 'archive'}.md`;
+
+			const url = window.URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = filename;
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			window.URL.revokeObjectURL(url);
+		} catch (error) {
+			addToast(error.message || 'Failed to export archive', 'error');
+		} finally {
+			setIsExporting(false);
 		}
 	};
 
@@ -251,12 +280,19 @@ export default function ArchivePage() {
 				</div>
 			</div>
 
-			{/* Save button */}
-			<div className="px-5 py-3 border-t border-line-1 shrink-0">
+			{/* Save / export buttons */}
+			<div className="px-5 py-3 border-t border-line-1 shrink-0 flex gap-3">
+				<button
+					onClick={exportArchive}
+					disabled={isExporting}
+					className="button-primary"
+				>
+					{isExporting ? 'EXPORTING...' : 'EXPORT ARCHIVE'}
+				</button>
 				<button
 					onClick={save}
 					disabled={isSaving || !name.trim() || !description.trim()}
-					className={`w-full button-success ${
+					className={`flex-1 button-success ${
 						isSaving || !name.trim() || !description.trim()
 							? 'bg-[#1a1a2e] text-fg-3 cursor-default'
 							: 'bg-accent/10 border border-accent text-accent hover:bg-accent/20 cursor-pointer'
