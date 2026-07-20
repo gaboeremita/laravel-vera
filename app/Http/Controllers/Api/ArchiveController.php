@@ -9,6 +9,9 @@ use App\Models\Tag;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ArchiveController extends Controller
 {
@@ -110,5 +113,41 @@ class ArchiveController extends Controller
 				$archive->fresh(['entries.tags']),
 			);
 		});
+	}
+
+	/**
+	 * Export an archive and its entries as a Markdown file.
+	 */
+	public function export(Request $request, int $id): BinaryFileResponse
+	{
+		$archive = $request->user()
+			->archives()
+			->with('entries.tags')
+			->findOrFail($id);
+
+		$markdown = "# {$archive->name}\n\n{$archive->description}\n";
+
+		foreach ($archive->entries as $entry) {
+			$markdown .= "\n## {$entry->title}\n\n";
+
+			if (! empty($entry->keywords)) {
+				$markdown .= '**Keywords:** '.implode(', ', $entry->keywords)."\n\n";
+			}
+
+			if ($entry->tags->isNotEmpty()) {
+				$markdown .= '**Tags:** '.$entry->tags->pluck('name')->implode(', ')."\n\n";
+			}
+
+			$markdown .= "{$entry->content}\n";
+		}
+
+		$filename = Str::slug($archive->name).'.md';
+		$path = 'exports/'.Str::uuid().'.md';
+
+		Storage::disk('local')->put($path, $markdown);
+
+		return response()
+			->download(Storage::disk('local')->path($path), $filename)
+			->deleteFileAfterSend(true);
 	}
 }
