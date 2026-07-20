@@ -56,7 +56,7 @@ class GenericProvider implements LlmProvider
             $headers['Authorization'] = "Bearer {$this->apiKey}";
         }
 
-        $response = Http::timeout(config('ai.defaults.timeout', 600))
+        $response = Http::timeout(config('ai.default.config.timeout', 600))
             ->withHeaders($headers)
             ->post($this->url, $payload);
 

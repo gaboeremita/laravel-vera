@@ -3,12 +3,14 @@
 namespace App\Console\Commands;
 
 use App\Directors\PromptDirector;
+use App\Exceptions\TelegramApiException;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\User;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\TelegramService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class TelegramPollCommand extends Command
 {
@@ -40,6 +42,7 @@ class TelegramPollCommand extends Command
 			->firstOrFail();
 		$this->assistant = $this->assistantUser->assistant;
 		$this->info('VERA Telegram bot started. Listening...');
+		Log::info('VERA Telegram bot started. Listening...');
 
 		$offset = 0;
 		$timeout = $config['poll_timeout'];
@@ -50,12 +53,28 @@ class TelegramPollCommand extends Command
 
 				foreach ($updates as $update) {
 					$offset = $update['update_id'] + 1;
-					$this->processUpdate($update);
+
+					try {
+						$this->processUpdate($update);
+					} catch (\Throwable $e) {
+						$this->error("Update processing error: {$e->getMessage()}");
+						Log::error('Telegram update processing failed', [
+							'update_id' => $update['update_id'] ?? null,
+							'exception' => $e->getMessage(),
+						]);
+					}
 				}
-			} catch (\Exception $e) {
+			} catch (\Throwable $e) {
+				$retryAfter = $e instanceof TelegramApiException ? ($e->retryAfter ?? 5) : 5;
+
 				$this->error("Poll error: {$e->getMessage()}");
-				// Wait before retrying on connection failure
-				sleep(5);
+				Log::error('Telegram poll error', [
+					'exception' => $e->getMessage(),
+					'retry_after' => $retryAfter,
+				]);
+
+				// Wait before retrying on connection failure, respecting Telegram's flood control when given
+				sleep($retryAfter);
 			}
 		}
 	}
@@ -106,7 +125,7 @@ class TelegramPollCommand extends Command
 			'start', '/new' => $this->commandNew($chatId),
 			'/current' => $this->commandCurrent($chatId),
 			'/switch' => $this->commandSwitch($chatId, $argument),
-			default => $this->telegram->sendMessage($chatId, "Unknown command: {$command}"),
+			default => $this->trySendMessage($chatId, "Unknown command: {$command}"),
 		};
 	}
 
@@ -117,7 +136,7 @@ class TelegramPollCommand extends Command
 			->get(['id', 'title', 'updated_at']);
 
 		if ($conversations->isEmpty()) {
-			$this->telegram->sendMessage($chatId, 'No conversations found. Use /new to start one.');
+			$this->trySendMessage($chatId, 'No conversations found. Use /new to start one.');
 
 			return;
 		}
@@ -128,7 +147,7 @@ class TelegramPollCommand extends Command
 			return ($i + 1) . ". {$conv->title}{$marker}";
 		});
 
-		$this->telegram->sendMessage($chatId, "Conversations:\n\n" . $lines->implode("\n"));
+		$this->trySendMessage($chatId, "Conversations:\n\n" . $lines->implode("\n"));
 	}
 
 	private function commandNew(int $chatId): void
@@ -138,13 +157,13 @@ class TelegramPollCommand extends Command
 		]);
 
 		$this->activeConversationId = $conversation->id;
-		$this->telegram->sendMessage($chatId, 'New conversation started.');
+		$this->trySendMessage($chatId, 'New conversation started.');
 	}
 
 	private function commandCurrent(int $chatId): void
 	{
 		if (! $this->activeConversationId) {
-			$this->telegram->sendMessage($chatId, 'No active conversation. Use /list or /new.');
+			$this->trySendMessage($chatId, 'No active conversation. Use /list or /new.');
 
 			return;
 		}
@@ -152,19 +171,19 @@ class TelegramPollCommand extends Command
 		$conversation = $this->assistantUser->conversations()->find($this->activeConversationId);
 
 		if (! $conversation) {
-			$this->telegram->sendMessage($chatId, 'Active conversation not found.');
+			$this->trySendMessage($chatId, 'Active conversation not found.');
 			$this->activeConversationId = null;
 
 			return;
 		}
 
-		$this->telegram->sendMessage($chatId, "Active: {$conversation->title}");
+		$this->trySendMessage($chatId, "Active: {$conversation->title}");
 	}
 
 	private function commandSwitch(int $chatId, ?string $name): void
 	{
 		if (! $name) {
-			$this->telegram->sendMessage($chatId, 'Usage: /switch conversation name');
+			$this->trySendMessage($chatId, 'Usage: /switch conversation name');
 
 			return;
 		}
@@ -175,20 +194,20 @@ class TelegramPollCommand extends Command
 			->get(['id', 'title']);
 
 		if ($matches->isEmpty()) {
-			$this->telegram->sendMessage($chatId, "No conversation matching \"{$name}\".");
+			$this->trySendMessage($chatId, "No conversation matching \"{$name}\".");
 
 			return;
 		}
 
 		if ($matches->count() > 1) {
 			$list = $matches->map(fn ($c, $i) => ($i + 1) . ". {$c->title}")->implode("\n");
-			$this->telegram->sendMessage($chatId, "Multiple matches:\n\n{$list}\n\nBe more specific.");
+			$this->trySendMessage($chatId, "Multiple matches:\n\n{$list}\n\nBe more specific.");
 
 			return;
 		}
 
 		$this->activeConversationId = $matches->first()->id;
-		$this->telegram->sendMessage($chatId, "Switched to: {$matches->first()->title}");
+		$this->trySendMessage($chatId, "Switched to: {$matches->first()->title}");
 	}
 
 
@@ -243,9 +262,15 @@ class TelegramPollCommand extends Command
 				['role' => 'system', 'content' => $systemPrompt],
 				...$history,
 			]);
-		} catch (\RuntimeException $e) {
-			$this->telegram->sendMessage($chatId, 'Connection failed. Try again.');
+		} catch (\Throwable $e) {
 			$this->error("LLM error: {$e->getMessage()}");
+			Log::error('Telegram LLM request failed', [
+				'chat_id' => $chatId,
+				'conversation_id' => $conversation->id,
+				'exception' => $e->getMessage(),
+			]);
+
+			$this->trySendMessage($chatId, 'Connection failed. Try again.');
 
 			return;
 		}
@@ -271,8 +296,38 @@ class TelegramPollCommand extends Command
 			]);
 		}
 
-		$this->telegram->sendMessage($chatId, $content);
+		$this->trySendMessage($chatId, $content);
 		$this->info("Processed. Emotion: {$emotion}");
+		Log::info('Telegram message processed', ['chat_id' => $chatId, 'emotion' => $emotion]);
+	}
+
+	/**
+	 * Send a reply to the chat, falling back to plain text if Markdown parsing fails,
+	 * and logging (rather than throwing) if delivery ultimately fails so the poll loop keeps running.
+	 */
+	private function trySendMessage(int $chatId, string $text): void
+	{
+		try {
+			$this->telegram->sendMessage($chatId, $text);
+		} catch (TelegramApiException $e) {
+			$this->error("Telegram sendMessage failed: {$e->getMessage()}");
+			Log::error('Telegram sendMessage failed, retrying as plain text', [
+				'chat_id' => $chatId,
+				'error_code' => $e->errorCode,
+				'exception' => $e->getMessage(),
+			]);
+
+			try {
+				$this->telegram->sendMessage($chatId, $text, parseMode: null);
+			} catch (TelegramApiException $retryException) {
+				$this->error("Telegram sendMessage plain-text retry failed: {$retryException->getMessage()}");
+				Log::error('Telegram sendMessage plain-text retry failed', [
+					'chat_id' => $chatId,
+					'error_code' => $retryException->errorCode,
+					'exception' => $retryException->getMessage(),
+				]);
+			}
+		}
 	}
 
 	/**
