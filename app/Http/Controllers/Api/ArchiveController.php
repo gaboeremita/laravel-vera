@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\BuildArchiveFile;
 use App\Http\Controllers\Controller;
 use App\Jobs\EmbedArchiveEntry;
 use App\Models\Archive;
@@ -118,28 +119,14 @@ class ArchiveController extends Controller
 	/**
 	 * Export an archive and its entries as a Markdown file.
 	 */
-	public function export(Request $request, int $id): BinaryFileResponse
+	public function export(Request $request, int $id, BuildArchiveFile $buildArchiveFile): BinaryFileResponse
 	{
 		$archive = $request->user()
 			->archives()
 			->with('entries.tags')
 			->findOrFail($id);
 
-		$markdown = "# {$archive->name}\n\n{$archive->description}\n";
-
-		foreach ($archive->entries as $entry) {
-			$markdown .= "\n## {$entry->title}\n\n";
-
-			if (! empty($entry->keywords)) {
-				$markdown .= '**Keywords:** '.implode(', ', $entry->keywords)."\n\n";
-			}
-
-			if ($entry->tags->isNotEmpty()) {
-				$markdown .= '**Tags:** '.$entry->tags->pluck('name')->implode(', ')."\n\n";
-			}
-
-			$markdown .= "{$entry->content}\n";
-		}
+		$markdown = $buildArchiveFile->handle($archive);
 
 		$filename = Str::slug($archive->name).'.md';
 		$path = 'exports/'.Str::uuid().'.md';
