@@ -16,6 +16,7 @@ export default function ArchivePage() {
 	const [entries, setEntries] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
+	const [isExporting, setIsExporting] = useState(false);
 	const [deleteIndex, setDeleteIndex] = useState(null);
 	const allCollapsed = entries.every((e) => e.collapsed);
 
@@ -117,6 +118,34 @@ export default function ArchivePage() {
 		}
 	};
 
+	const exportArchive = async () => {
+		setIsExporting(true);
+
+		try {
+			const res = await api.get(route('archives.export', { id: archiveId }));
+
+			if (!res.ok) throw new Error('Export failed');
+
+			const blob = await res.blob();
+			const disposition = res.headers.get('Content-Disposition') || '';
+			const match = disposition.match(/filename="?([^"]+)"?/);
+			const filename = match ? match[1] : `${name || 'archive'}.md`;
+
+			const url = window.URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = filename;
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			window.URL.revokeObjectURL(url);
+		} catch (error) {
+			addToast(error.message || 'Failed to export archive', 'error');
+		} finally {
+			setIsExporting(false);
+		}
+	};
+
 	const headerActions = (
 		<button onClick={() => navigate(-1)} className="button-primary">
 			← PREVIOUS PAGE
@@ -180,14 +209,23 @@ export default function ArchivePage() {
 						<label className="text-fg-3 text-[0.7rem] tracking-[0.15em] uppercase block mb-1">
 							Name
 						</label>
-						<input
-							type="text"
-							value={name}
-							onChange={(e) => setName(e.target.value)}
-							maxLength={100}
-							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
-							placeholder="e.g. The Bridge Universe"
-						/>
+						<div className="flex gap-3">
+							<input
+								type="text"
+								value={name}
+								onChange={(e) => setName(e.target.value)}
+								maxLength={100}
+								className="flex-1 bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+								placeholder="e.g. The Bridge Universe"
+							/>
+							<button
+								onClick={exportArchive}
+								disabled={isExporting}
+								className="button-primary shrink-0"
+							>
+								{isExporting ? 'EXPORTING...' : 'EXPORT ARCHIVE'}
+							</button>
+						</div>
 					</div>
 					<div>
 						<label className="text-fg-3 text-[0.7rem] tracking-[0.15em] uppercase block mb-1">
