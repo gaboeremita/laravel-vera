@@ -209,14 +209,23 @@ export default function ArchivePage() {
 						<label className="text-fg-3 text-[0.7rem] tracking-[0.15em] uppercase block mb-1">
 							Name
 						</label>
-						<input
-							type="text"
-							value={name}
-							onChange={(e) => setName(e.target.value)}
-							maxLength={100}
-							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
-							placeholder="e.g. The Bridge Universe"
-						/>
+						<div className="flex gap-3">
+							<input
+								type="text"
+								value={name}
+								onChange={(e) => setName(e.target.value)}
+								maxLength={100}
+								className="flex-1 bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+								placeholder="e.g. The Bridge Universe"
+							/>
+							<button
+								onClick={exportArchive}
+								disabled={isExporting}
+								className="button-primary shrink-0"
+							>
+								{isExporting ? 'EXPORTING...' : 'EXPORT ARCHIVE'}
+							</button>
+						</div>
 					</div>
 					<div>
 						<label className="text-fg-3 text-[0.7rem] tracking-[0.15em] uppercase block mb-1">
@@ -280,19 +289,12 @@ export default function ArchivePage() {
 				</div>
 			</div>
 
-			{/* Save / export buttons */}
-			<div className="px-5 py-3 border-t border-line-1 shrink-0 flex gap-3">
-				<button
-					onClick={exportArchive}
-					disabled={isExporting}
-					className="button-primary"
-				>
-					{isExporting ? 'EXPORTING...' : 'EXPORT ARCHIVE'}
-				</button>
+			{/* Save button */}
+			<div className="px-5 py-3 border-t border-line-1 shrink-0">
 				<button
 					onClick={save}
 					disabled={isSaving || !name.trim() || !description.trim()}
-					className={`flex-1 button-success ${
+					className={`w-full button-success ${
 						isSaving || !name.trim() || !description.trim()
 							? 'bg-[#1a1a2e] text-fg-3 cursor-default'
 							: 'bg-accent/10 border border-accent text-accent hover:bg-accent/20 cursor-pointer'
