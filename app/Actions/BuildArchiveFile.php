@@ -16,7 +16,7 @@ class BuildArchiveFile
 			->paragraph($archive->description)
 			->heading('Entries', 2);
 
-		foreach ($archive->entries as $entry) {
+		foreach ($archive->entries->sortBy('id') as $entry) {
 			$this->fileBuilder
 				->heading($entry->title, 3)
 				->paragraph($entry->content);
