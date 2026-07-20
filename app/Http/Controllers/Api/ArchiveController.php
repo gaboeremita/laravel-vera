@@ -128,7 +128,7 @@ class ArchiveController extends Controller
 
 		$markdown = $buildArchiveFile->handle($archive);
 
-		$filename = Str::slug($archive->name).'.md';
+		$filename = (Str::slug($archive->name) ?: 'archive').'.md';
 		$path = 'exports/'.Str::uuid().'.md';
 
 		Storage::disk('local')->put($path, $markdown);
