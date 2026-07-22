@@ -38,8 +38,29 @@ export default function ChatPage() {
 	const [editTitleValue, setEditTitleValue] = useState('');
 	const [voiceMuted, setVoiceMuted] = useState(false);
 	const audioPlayerRef = useRef(null);
+	const draftTimeoutRef = useRef(null);
 
 	const conversationTitle = conversations.find((c) => c.id === Number(id))?.title || '';
+	const draftKey = `chatDraft:${assistantId}:${id}`;
+
+	// Restore draft when switching conversations
+	useEffect(() => {
+		setInput(localStorage.getItem(draftKey) || '');
+		return () => clearTimeout(draftTimeoutRef.current);
+	}, [draftKey]);
+
+	const handleInputChange = (e) => {
+		const value = e.target.value;
+		setInput(value);
+		clearTimeout(draftTimeoutRef.current);
+		draftTimeoutRef.current = setTimeout(() => {
+			if (value.trim()) {
+				localStorage.setItem(draftKey, value);
+			} else {
+				localStorage.removeItem(draftKey);
+			}
+		}, 500);
+	};
 
 	const startEditingTitle = () => {
 		setEditTitleValue(conversationTitle);
@@ -218,6 +239,8 @@ export default function ChatPage() {
 		if (!usingOverride) setInput('');
 		setPendingImage(null);
 		setIsLoading(true);
+		clearTimeout(draftTimeoutRef.current);
+		localStorage.removeItem(draftKey);
 
 		// Build API message format
 		const apiMessages = updatedMessages.map((m) => {
@@ -499,7 +522,7 @@ export default function ChatPage() {
 					ref={inputRef}
 					type="text"
 					value={input}
-					onChange={(e) => setInput(e.target.value)}
+					onChange={handleInputChange}
 					onKeyDown={handleKeyDown}
 					disabled={isLoading}
 					placeholder={isLoading ? 'VERA is processing...' : 'Type something...'}
