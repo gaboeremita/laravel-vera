@@ -8,6 +8,9 @@
 
         <link rel="icon" type="image/png" href="/favicon.png">
 
+        <!-- Self-hosted VAD bundle (onnxruntime-web is CJS/require-based and breaks under Vite's ESM dep pre-bundling) -->
+        <script src="/vendor/vad/bundle.min.js"></script>
+
         @fonts
 
         <!-- Styles / Scripts -->

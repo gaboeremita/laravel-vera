@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { route } from 'ziggy-js';
 import { useTheme } from '../contexts/ThemeContext.jsx';
@@ -9,15 +9,32 @@ export default function SettingsPage() {
 	const { theme, setTheme, availableThemes } = useTheme();
 	const { assistantId } = useOutletContext();
 	const [selectedTheme, setSelectedTheme] = useState(theme);
+	const [voice, setVoice] = useState(null);
+	const [selectedVoice, setSelectedVoice] = useState(null);
+	const [availableVoices, setAvailableVoices] = useState([]);
 	const [isSaving, setIsSaving] = useState(false);
 	const navigate = useNavigate();
 
-	const hasChanges = selectedTheme !== theme;
+	useEffect(() => {
+		api.get(route('settings.show', { assistant: assistantId }))
+			.then((res) => res.json())
+			.then((data) => {
+				setVoice(data.tts_voice);
+				setSelectedVoice(data.tts_voice);
+				setAvailableVoices(data.available_voices || []);
+			});
+	}, [assistantId]);
+
+	const hasChanges = selectedTheme !== theme || selectedVoice !== voice;
 
 	const handleSave = async () => {
 		setIsSaving(true);
-		await api.put(route('settings.update', { assistant: assistantId }), { theme: selectedTheme });
+		await api.put(route('settings.update', { assistant: assistantId }), {
+			theme: selectedTheme,
+			tts_voice: selectedVoice,
+		});
 		setTheme(selectedTheme);
+		setVoice(selectedVoice);
 		setIsSaving(false);
 	};
 
@@ -50,6 +67,23 @@ export default function SettingsPage() {
 							{availableThemes.map((t) => (
 								<option key={t} value={t}>
 									{t.toUpperCase()}
+								</option>
+							))}
+						</select>
+					</div>
+
+					<div className="flex items-center gap-4">
+						<label className="text-fg-3 text-[0.7rem] tracking-[0.15em] uppercase">
+							Voice:
+						</label>
+						<select
+							value={selectedVoice || ''}
+							onChange={(e) => setSelectedVoice(e.target.value)}
+							className="bg-bg-1 border border-line-1 text-fg-1 text-[0.75rem] tracking-[0.1em] px-4 py-1.5 cursor-pointer outline-none focus:border-accent transition-colors"
+						>
+							{availableVoices.map((v) => (
+								<option key={v} value={v}>
+									{v.toUpperCase()}
 								</option>
 							))}
 						</select>

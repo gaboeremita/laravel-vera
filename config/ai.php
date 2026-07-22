@@ -24,6 +24,21 @@ return [
 		'model' => env('AI_EMBEDDING_MODEL'),
 	],
 
+	'stt' => [
+		'url' => env('AI_STT_URL'),
+		'model' => env('AI_STT_MODEL'),
+		'format' => env('AI_STT_FORMAT', 'whisper'),
+		'timeout' => (int) env('AI_STT_TIMEOUT', 60),
+	],
+
+	'tts' => [
+		'url' => env('AI_TTS_URL'),
+		'model' => env('AI_TTS_MODEL'),
+		'format' => env('AI_TTS_FORMAT', 'orpheus'),
+		'voice' => env('AI_TTS_VOICE', 'tara'),
+		'timeout' => (int) env('AI_TTS_TIMEOUT', 120),
+	],
+
 	'telegram' => [
 		'url' => env('TELEGRAM_URL'),
 		'token' => env('TELEGRAM_BOT_TOKEN'),

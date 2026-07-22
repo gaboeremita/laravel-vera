@@ -25,4 +25,9 @@ class Settings extends Model
 	{
 		return $this->belongsTo(Assistant::class);
 	}
+
+	public static function ttsVoiceCacheKey(int $userId, int $assistantId): string
+	{
+		return "tts_voice:{$userId}:{$assistantId}";
+	}
 }

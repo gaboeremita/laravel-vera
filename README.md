@@ -11,6 +11,8 @@ VERA is a general-purpose multi-assistant AI platform. Each assistant has its ow
 - **Backend:** Laravel 13 (PHP 8.4)
 - **Frontend:** React 19 (via Vite, React Router)
 - **LLM:** Any OpenAI-compatible API or Anthropic — configured via the Providers UI
+- **Voice input (STT):** whisper.cpp, local
+- **Voice output (TTS):** Orpheus 3B, served locally via llama.cpp
 - **Database:** PostgreSQL
 - **Styling:** Tailwind CSS v4
 - **Auth:** Laravel Sanctum (SPA mode)
@@ -22,6 +24,7 @@ VERA is a general-purpose multi-assistant AI platform. Each assistant has its ow
 - Node.js & npm
 - PostgreSQL
 - An LLM API endpoint (OpenRouter, Anthropic, a local Ollama-compatible server, etc.)
+- (Optional, for Voice Mode) `whisper-cpp` and `llama.cpp` — see [Voice Mode](#voice-mode) below
 
 ## Installation
 
@@ -48,6 +51,9 @@ php artisan migrate
 # Seed emotions
 php artisan emotions:sync
 
+# Link public storage (required for emotion images and user uploads)
+php artisan storage:link
+
 # Create your user
 php artisan tinker --execute 'User::create(["name" => "YourName", "email" => "you@email.com", "password" => bcrypt("yourpassword")]);'
 
@@ -56,6 +62,16 @@ npm run dev
 ```
 
 If using Laravel Herd, add the site through Herd's UI. Otherwise run `php artisan serve`.
+
+### Queue Worker (required for RAG embeddings)
+
+Archive entry embeddings are dispatched as async jobs. To process them, run the queue worker:
+
+```bash
+php artisan queue:work
+```
+
+This is only needed if you use the Archive feature. Without it, archive entries will be saved but won't have embeddings, so retrieval won't return results.
 
 ## Configuration
 
@@ -81,6 +97,24 @@ AI_DEFAULT_THINKING=false
 AI_DEFAULT_MAX_TOKENS=4096
 AI_DEFAULT_TIMEOUT=600
 AI_STREAM=false
+
+# Embedding provider (required for Archive RAG retrieval)
+# Must be an OpenAI-compatible embeddings endpoint
+AI_EMBEDDING_URL=https://openrouter.ai/api/v1
+AI_EMBEDDING_MODEL=text-embedding-3-small
+
+# Voice input (optional — required only for Voice Mode)
+AI_STT_URL=http://localhost:8080
+AI_STT_MODEL=medium
+AI_STT_FORMAT=whisper
+AI_STT_TIMEOUT=60
+
+# Voice output (optional — required only for Voice Mode)
+AI_TTS_URL=http://localhost:5005/v1/audio/speech
+AI_TTS_MODEL=orpheus
+AI_TTS_FORMAT=orpheus
+AI_TTS_VOICE=tara
+AI_TTS_TIMEOUT=120
 
 # Telegram (optional)
 TELEGRAM_URL=https://api.telegram.org
@@ -133,6 +167,48 @@ Each assistant's prompt is stored as a JSON object in the `prompt` column of the
 
 The structure of the prompt JSON is flexible — any key becomes a section in the assembled system prompt. The `opening_message` field on the `Assistant` model is used as the first message when a new conversation is created.
 
+## Voice Mode
+
+Speak to an assistant instead of typing, and hear replies read back. Fully optional — the app works the same without it if the backing services aren't running. See [ARCHITECTURE.md → Voice Mode](./ARCHITECTURE.md#voice-mode) for the full pipeline, diagrams, and design rationale; this section only covers getting it running.
+
+### Setup
+
+Voice mode needs three local services running alongside `php artisan serve` / Herd. None of these are managed by the app — they're plain background processes you start yourself.
+
+```bash
+# 1. STT — whisper.cpp
+brew install whisper-cpp
+mkdir -p ~/whisper-models
+curl -L -o ~/whisper-models/ggml-medium.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin
+whisper-server -m ~/whisper-models/ggml-medium.bin --host 127.0.0.1 --port 8080
+
+# 2. TTS inference — llama.cpp, serving the Orpheus 3B model
+brew install llama.cpp
+# Get an Orpheus GGUF (e.g. via `ollama pull legraphista/Orpheus` and reuse its blob,
+# or download a GGUF directly) — then:
+llama-server -m /path/to/orpheus.gguf --host 127.0.0.1 --port 8081 -c 8192
+
+# 3. TTS wrapper — Orpheus-FastAPI (separate repo, not part of this codebase)
+git clone https://github.com/Lex-au/Orpheus-FastAPI.git
+cd Orpheus-FastAPI
+python3.11 -m venv venv && source venv/bin/activate   # needs Python 3.8–3.11
+pip3 install torch torchvision torchaudio             # Mac: plain pip install, not the CUDA build
+pip3 install -r requirements.txt
+mkdir -p outputs static
+cp .env.example .env
+# edit .env: ORPHEUS_API_URL=http://127.0.0.1:8081/v1/completions
+python app.py   # serves on :5005
+```
+
+Then set `AI_STT_URL`/`AI_TTS_URL` in `laravel-vera/.env` to match (see [Environment Variables](#environment-variables) above) and select a voice per-assistant on the Settings page.
+
+**Why llama.cpp and not Ollama for TTS**, even though Ollama is already a dependency for embeddings: Orpheus-FastAPI's completion prompt relies on special tokens to force the model into audio-token-generation mode, and Ollama's `/v1/completions` doesn't honor them reliably — it intermittently falls back to normal chat text instead of generating audio. `llama-server` handles it correctly and consistently. Full details in [ARCHITECTURE.md](./ARCHITECTURE.md#infrastructure-stack).
+
+### Known limitation: latency
+
+TTS replies currently take **5–15 seconds** to generate. Orpheus is a 3B-parameter model generating audio as thousands of discrete tokens, autoregressively, on a personal Mac rather than dedicated inference hardware — this is architectural, not a misconfiguration. There's no streaming support in the current pipeline. See [ARCHITECTURE.md → Known Limitations](./ARCHITECTURE.md#known-limitations-1) for the full breakdown and what would actually fix it.
+
 ## Project Structure
 
 ```
@@ -144,16 +220,20 @@ laravel-vera/
 │   │   ├── SyncEmotions.php                  # Seeds/syncs emotion records from config
 │   │   └── TelegramPollCommand.php           # Long-polls Telegram for incoming messages
 │   ├── Contracts/
-│   │   └── LlmProvider.php                   # LLM interface (chat method)
+│   │   ├── LlmProvider.php                   # LLM interface (chat method)
+│   │   ├── SttProvider.php                   # STT interface (transcribe)
+│   │   └── TtsProvider.php                   # TTS interface (synthesize)
 │   ├── Directors/
 │   │   └── PromptDirector.php                # Reads assistant prompt config, builds system prompt
 │   ├── DTOs/
 │   │   └── LlmResponse.php                   # Unified response: content + thinking
 │   ├── Enums/
-│   │   └── AiProviderFormat.php              # generic | anthropic
+│   │   ├── AiProviderFormat.php              # generic | anthropic
+│   │   └── TtsVoice.php                      # tara | leah | jess | leo | dan | mia | zac | zoe
 │   ├── Http/Controllers/
 │   │   ├── Auth/
 │   │   │   └── AuthController.php            # Login/logout
+│   │   ├── VadAssetController.php            # Serves VAD's .mjs files with correct MIME type
 │   │   └── Api/
 │   │       ├── AiProviderController.php      # CRUD for AI providers
 │   │       ├── AiModelController.php         # CRUD for AI models
@@ -161,14 +241,15 @@ laravel-vera/
 │   │       ├── AssistantController.php       # CRUD for assistants (multipart, emotion images)
 │   │       ├── AssistantEmotionController.php# Per-assistant emotion store/update/destroy
 │   │       ├── AssistantPromptController.php # Prompt CRUD (show/store/update/destroy)
-│   │       ├── ConversationController.php    # CRUD + message sending
+│   │       ├── ConversationController.php    # CRUD + message sending (voice_mode flag)
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
-│   │       └── SettingsController.php        # Theme + active model selection
+│   │       ├── SettingsController.php        # Theme + active model + voice selection
+│   │       └── VoiceController.php           # Transcribe / synthesize
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions)
 │   │   ├── AssistantUser.php                 # Pivot: user ↔ assistant
-│   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model)
+│   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model, voice)
 │   │   ├── AiProvider.php                    # DB-managed LLM provider
 │   │   ├── AiModel.php                       # DB-managed LLM model
 │   │   ├── Conversation.php
@@ -182,7 +263,9 @@ laravel-vera/
 │   ├── Jobs/
 │   │   └── EmbedArchiveEntry.php             # Async vector embedding for archive entries
 │   ├── Providers/
-│   │   └── AppServiceProvider.php
+│   │   ├── AppServiceProvider.php            # Binds EmbeddingProvider, SttProvider, TtsProvider
+│   │   ├── Stt/WhisperSttProvider.php        # Talks to whisper-server
+│   │   └── Tts/OrpheusTtsProvider.php        # Talks to Orpheus-FastAPI
 │   └── Services/
 │       ├── LlmProviders/
 │       │   ├── LlmManager.php                # Resolves provider: DB model → config fallback
@@ -190,7 +273,7 @@ laravel-vera/
 │       │   └── AnthropicProvider.php
 │       └── TelegramService.php               # Telegram API wrapper
 ├── config/
-│   └── ai.php                                # Default LLM config + telegram config
+│   └── ai.php                                # Default LLM + embedding + stt + tts + telegram config
 ├── database/migrations/
 │   ├── create_conversations_table.php
 │   ├── create_messages_table.php
@@ -216,7 +299,7 @@ laravel-vera/
 │   │   ├── ChatPage.jsx                      # Main chat interface
 │   │   ├── ArchivePage.jsx                   # Archive editor (RAG knowledge base)
 │   │   ├── PromptPage.jsx                    # Visual prompt editor
-│   │   ├── SettingsPage.jsx                  # Theme selection
+│   │   ├── SettingsPage.jsx                  # Theme + voice selection
 │   │   └── ProvidersPage.jsx                 # AI provider/model management
 │   ├── components/
 │   │   ├── common/
@@ -242,11 +325,15 @@ laravel-vera/
 │   │   ├── useLocalPrompt.js                 # Local-only prompt tree state
 │   │   ├── usePrompt.js                      # Prompt tree CRUD + save/destroy
 │   │   ├── useProviders.js                   # Provider/model CRUD + active model state
-│   │   └── useToast.js                       # Toast notification state
+│   │   ├── useToast.js                       # Toast notification state
+│   │   └── useVoiceMode.js                   # Mic capture + voice activity detection
 │   └── utils/
 │       ├── api.js                            # API wrapper (fetch with auth)
 │       ├── formatMessage.jsx                 # Text formatting (actions, thoughts, OOC)
-│       └── parsers.js                        # Response parsing (emotion tags)
+│       └── parsers.js                        # Response parsing (emotion tags, speech text cleanup)
+├── resources/views/welcome.blade.php         # SPA shell; loads voice-mode's VAD bundle via <script>
+├── public/vendor/vad/                        # Gitignored — VAD assets, regenerated from node_modules
+├── storage/app/vad/                          # .mjs files, served with correct MIME type by Laravel
 └── storage/app/public/                       # Expression images and user-uploaded images
 ```
 
@@ -273,11 +360,12 @@ laravel-vera/
 - **Archive with RAG** — editable knowledge base with semantic retrieval injected into the system prompt
 - **Toast notifications** — non-intrusive feedback for UI actions
 - **Telegram integration** — long-poll bot for interacting with any configured assistant via Telegram
+- **Voice Mode** — speak to an assistant and hear replies read back; local STT (whisper.cpp) and TTS (Orpheus 3B via llama.cpp), voice-specific prompt handling, per-assistant voice selection. See [Voice Mode](#voice-mode). Known limitation: 5-15s TTS latency (no streaming yet)
 
 ### Planned / Nice-to-Have
 
-- Voice output (TTS integration)
-- Voice input (Web Speech API)
+- Voice mode latency reduction (streaming, faster local TTS, or cloud-hosted inference)
+- Per-assistant voice settings beyond voice selection (speed, per-emotion tag mapping)
 - Local image generation (ComfyUI/Stable Diffusion)
 
 ## Expression System
