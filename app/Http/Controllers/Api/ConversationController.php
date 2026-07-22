@@ -154,7 +154,10 @@ class ConversationController extends Controller
 		if (! empty($validated['voice_mode'])) {
 			$excludedSections[] = 'style rules';
 			$excludedSections[] = 'OOC mode';
-			$excludedSections[] = 'image handling';
+
+			if (empty($lastUserMessage['images'][0])) {
+				$excludedSections[] = 'image handling';
+			}
 		} else {
 			$excludedSections[] = 'voice mode';
 		}
