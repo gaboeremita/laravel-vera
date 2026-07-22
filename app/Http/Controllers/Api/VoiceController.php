@@ -25,8 +25,14 @@ class VoiceController extends Controller
 			'audio' => ['required', 'file', 'max:10480', 'mimetypes:audio/wav,audio/x-wav,audio/webm,audio/ogg,audio/mpeg,audio/mp4'],
 		]);
 
+		$audio = file_get_contents($validated['audio']->getRealPath());
+
+		if ($audio === false) {
+			return response()->json(['message' => 'Failed to read uploaded audio'], 422);
+		}
+
 		try {
-			$text = $stt->transcribe(file_get_contents($validated['audio']->getRealPath()));
+			$text = $stt->transcribe($audio);
 		} catch (\RuntimeException $e) {
 			return response()->json(['message' => $e->getMessage()], 502);
 		}
