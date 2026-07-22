@@ -17,6 +17,10 @@ class WhisperSttProvider implements SttProvider
 
 	public function transcribe(string $audio): string
 	{
+		if (empty($this->baseUrl) || empty($this->model)) {
+			throw new RuntimeException('STT is not configured (set AI_STT_URL and AI_STT_MODEL).');
+		}
+
 		try {
 			$response = Http::baseUrl($this->baseUrl)
 				->timeout($this->timeout)
