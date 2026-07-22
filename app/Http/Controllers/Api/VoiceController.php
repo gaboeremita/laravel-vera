@@ -22,7 +22,7 @@ class VoiceController extends Controller
 		$this->resolveAssistantUser($request, $assistant);
 
 		$validated = $request->validate([
-			'audio' => ['required', 'file', 'mimetypes:audio/wav,audio/x-wav,audio/webm,audio/ogg,audio/mpeg,audio/mp4'],
+			'audio' => ['required', 'file', 'max:10480', 'mimetypes:audio/wav,audio/x-wav,audio/webm,audio/ogg,audio/mpeg,audio/mp4'],
 		]);
 
 		try {
