@@ -10,8 +10,8 @@ use RuntimeException;
 class WhisperSttProvider implements SttProvider
 {
 	public function __construct(
-		private readonly string $baseUrl,
-		private readonly string $model,
+		private readonly ?string $baseUrl,
+		private readonly ?string $model,
 		private readonly int $timeout,
 	) {}
 
