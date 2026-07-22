@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\AssistantEmotionController;
 use App\Http\Controllers\Api\EmotionController;
 use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\VoiceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -35,6 +36,9 @@ Route::middleware('auth:sanctum')->group(function () {
 		Route::post('/prompt', [AssistantPromptController::class, 'store'])->name('prompt.store');
 		Route::put('/prompt', [AssistantPromptController::class, 'update'])->name('prompt.update');
 		Route::delete('/prompt', [AssistantPromptController::class, 'destroy'])->name('prompt.destroy');
+
+        Route::post('/voice/transcribe', [VoiceController::class, 'transcribe'])->name('voice.transcribe');
+        Route::post('/voice/synthesize', [VoiceController::class, 'synthesize'])->name('voice.synthesize');
 
         Route::get('/emotions', [EmotionController::class, 'index'])->name('emotions.index');
         Route::prefix('/emotions')->name('assistants.emotions.')->group(function () {

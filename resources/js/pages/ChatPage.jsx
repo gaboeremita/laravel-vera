@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { Pencil } from 'lucide-react';
+import { Pencil, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
-import { parseEmotionFromResponse } from '../utils/parsers.js';
+import { parseEmotionFromResponse, stripForSpeech } from '../utils/parsers.js';
+import { useVoiceMode } from '../hooks/useVoiceMode.js';
 import ChatMessage from '../components/ChatMessage.jsx';
 import Header from '../components/Header.jsx';
 
@@ -35,6 +36,8 @@ export default function ChatPage() {
 	const editInputRef = useRef(null);
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
 	const [editTitleValue, setEditTitleValue] = useState('');
+	const [voiceMuted, setVoiceMuted] = useState(false);
+	const audioPlayerRef = useRef(null);
 	const draftTimeoutRef = useRef(null);
 
 	const conversationTitle = conversations.find((c) => c.id === Number(id))?.title || '';
@@ -192,8 +195,39 @@ export default function ChatPage() {
 		return () => scrollEl.removeEventListener('scroll', handleScroll);
 	}, [loadOlderMessages]);
 
-	const sendMessage = async () => {
-		const text = input.trim();
+	const playSynthesizedAudio = async (rawText) => {
+		const text = stripForSpeech(rawText);
+		if (!text) return;
+
+		try {
+			const response = await api.post(route('voice.synthesize', { assistant: assistantId }), { text });
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.message || 'Synthesis failed');
+			}
+
+			const audioBlob = await response.blob();
+			const url = URL.createObjectURL(audioBlob);
+
+			const previous = audioPlayerRef.current;
+			if (previous) {
+				previous.pause();
+				if (previous.src?.startsWith('blob:')) URL.revokeObjectURL(previous.src);
+			}
+
+			const player = new Audio(url);
+			audioPlayerRef.current = player;
+			player.addEventListener('ended', () => URL.revokeObjectURL(url), { once: true });
+			await player.play();
+		} catch (error) {
+			addToast(error.message || 'Failed to play voice response', 'error');
+		}
+	};
+
+	const sendMessage = async (overrideText, { voiceMode = false } = {}) => {
+		const usingOverride = overrideText !== undefined;
+		const text = (usingOverride ? overrideText : input).trim();
 		if ((!text && !pendingImage) || isLoading) return;
 
 		const userMsg = {
@@ -207,7 +241,7 @@ export default function ChatPage() {
 			...updatedMessages,
 			{ role: 'assistant', content: '', loading: true },
 		]);
-		setInput('');
+		if (!usingOverride) setInput('');
 		setPendingImage(null);
 		setIsLoading(true);
 		clearTimeout(draftTimeoutRef.current);
@@ -234,6 +268,7 @@ export default function ChatPage() {
 
 				const response = await api.post(route('conversations.sendMessage', { assistant: assistantId, id }), {
 					messages: apiMessages,
+					...(voiceMode ? { voice_mode: true } : {}),
 				});
 
 				if (!response.ok) {
@@ -258,6 +293,9 @@ export default function ChatPage() {
 					{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking },
 				]);
 				setIsLoading(false);
+				if (voiceMode && !voiceMuted) {
+					playSynthesizedAudio(cleanText);
+				}
 				return;
 			} catch (error) {
 				lastError = error;
@@ -281,6 +319,54 @@ export default function ChatPage() {
 		addToast(lastError?.message || 'Connection to The Bridge failed', 'error');
 		setMessages([...updatedMessages]);
 		setIsLoading(false);
+	};
+
+	const handleSpeechEnd = useCallback(async (audioBlob) => {
+		const formData = new FormData();
+		formData.append('audio', audioBlob, 'speech.wav');
+
+		try {
+			const response = await api.postForm(
+				route('voice.transcribe', { assistant: assistantId }),
+				formData
+			);
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.message || 'Transcription failed');
+			}
+
+			const { text } = await response.json();
+			if (text && text.trim()) {
+				sendMessage(text, { voiceMode: true });
+			}
+		} catch (error) {
+			addToast(error.message || 'Failed to transcribe audio', 'error');
+		}
+	}, [assistantId, sendMessage, addToast]);
+
+	const { isListening, isSpeaking, error: voiceError, start: startVoiceMode, stop: stopVoiceMode } = useVoiceMode({
+		onSpeechEnd: handleSpeechEnd,
+	});
+
+	useEffect(() => {
+		if (voiceError) addToast(voiceError, 'error');
+	}, [voiceError]);
+
+	useEffect(() => {
+		return () => {
+			stopVoiceMode();
+			audioPlayerRef.current?.pause();
+		};
+	}, [stopVoiceMode]);
+
+	const toggleVoiceMode = () => {
+		if (isListening) {
+			stopVoiceMode();
+			audioPlayerRef.current?.pause();
+		} else {
+			startVoiceMode();
+		}
 	};
 
 	const handleImageSelect = (e) => {
@@ -416,6 +502,27 @@ export default function ChatPage() {
 				>
 					📎
 				</button>
+				<button
+					onClick={toggleVoiceMode}
+					title={isListening ? 'Stop voice mode' : 'Start voice mode'}
+					className={`transition-colors shrink-0 cursor-pointer ${
+						isSpeaking ? 'text-accent' : isListening ? 'text-fg-1' : 'text-fg-3 hover:text-accent'
+					}`}
+				>
+					{isListening ? <Mic size={16} /> : <MicOff size={16} />}
+				</button>
+				{isListening && (
+					<button
+						onClick={() => {
+							if (!voiceMuted) audioPlayerRef.current?.pause();
+							setVoiceMuted((m) => !m);
+						}}
+						title={voiceMuted ? 'Unmute voice replies' : 'Mute voice replies'}
+						className="text-fg-3 hover:text-accent transition-colors shrink-0 cursor-pointer"
+					>
+						{voiceMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+					</button>
+				)}
 				<input
 					ref={inputRef}
 					type="text"
@@ -427,7 +534,7 @@ export default function ChatPage() {
 					className="flex-1 bg-transparent border-none outline-none text-fg-1  text-sm caret-accent placeholder:text-line-2"
 				/>
 				<button
-					onClick={sendMessage}
+					onClick={() => sendMessage()}
 					disabled={isLoading || !input.trim()}
 					className={`bg-transparent border  text-[0.7rem] px-3 py-1.5 tracking-[0.1em] transition-all shrink-0 ${
 						isLoading || !input.trim()
