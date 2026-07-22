@@ -167,6 +167,10 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - NEVER edit existing migration files. Always create a new migration to modify the database schema.
 
+## Linting
+
+- At the moment, we are not using lint. Do not run `eslint` or add a `lint` script.
+
 ## Before Taking Action
 
 - Before writing any code, creating any file, or running any command that modifies state, briefly state what you plan to do and why, and wait for confirmation.
