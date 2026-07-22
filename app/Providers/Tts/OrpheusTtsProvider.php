@@ -10,8 +10,8 @@ use RuntimeException;
 class OrpheusTtsProvider implements TtsProvider
 {
 	public function __construct(
-		private readonly string $url,
-		private readonly string $model,
+		private readonly ?string $url,
+		private readonly ?string $model,
 		private readonly string $defaultVoice,
 		private readonly int $timeout,
 	) {}
