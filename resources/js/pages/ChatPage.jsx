@@ -210,10 +210,15 @@ export default function ChatPage() {
 			const audioBlob = await response.blob();
 			const url = URL.createObjectURL(audioBlob);
 
-			audioPlayerRef.current?.pause();
+			const previous = audioPlayerRef.current;
+			if (previous) {
+				previous.pause();
+				if (previous.src?.startsWith('blob:')) URL.revokeObjectURL(previous.src);
+			}
+
 			const player = new Audio(url);
 			audioPlayerRef.current = player;
-			player.addEventListener('ended', () => URL.revokeObjectURL(url));
+			player.addEventListener('ended', () => URL.revokeObjectURL(url), { once: true });
 			await player.play();
 		} catch (error) {
 			addToast(error.message || 'Failed to play voice response', 'error');
