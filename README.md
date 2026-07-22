@@ -48,6 +48,9 @@ php artisan migrate
 # Seed emotions
 php artisan emotions:sync
 
+# Link public storage (required for emotion images and user uploads)
+php artisan storage:link
+
 # Create your user
 php artisan tinker --execute 'User::create(["name" => "YourName", "email" => "you@email.com", "password" => bcrypt("yourpassword")]);'
 
@@ -56,6 +59,16 @@ npm run dev
 ```
 
 If using Laravel Herd, add the site through Herd's UI. Otherwise run `php artisan serve`.
+
+### Queue Worker (required for RAG embeddings)
+
+Archive entry embeddings are dispatched as async jobs. To process them, run the queue worker:
+
+```bash
+php artisan queue:work
+```
+
+This is only needed if you use the Archive feature. Without it, archive entries will be saved but won't have embeddings, so retrieval won't return results.
 
 ## Configuration
 
@@ -81,6 +94,11 @@ AI_DEFAULT_THINKING=false
 AI_DEFAULT_MAX_TOKENS=4096
 AI_DEFAULT_TIMEOUT=600
 AI_STREAM=false
+
+# Embedding provider (required for Archive RAG retrieval)
+# Must be an OpenAI-compatible embeddings endpoint
+AI_EMBEDDING_URL=https://openrouter.ai/api/v1
+AI_EMBEDDING_MODEL=text-embedding-3-small
 
 # Telegram (optional)
 TELEGRAM_URL=https://api.telegram.org
