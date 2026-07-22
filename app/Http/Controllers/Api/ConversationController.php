@@ -117,6 +117,7 @@ class ConversationController extends Controller
 			'messages.*.role' => ['required', 'string', 'in:user,assistant'],
 			'messages.*.content' => ['nullable', 'string'],
 			'messages.*.images' => ['sometimes', 'array'],
+			'voice_mode' => ['sometimes', 'boolean'],
 		]);
 
 		$assistantUser = $this->resolveAssistantUser($request, $assistant);
@@ -148,9 +149,19 @@ class ConversationController extends Controller
 
 		$archive = $request->user()->archives()->first();
 
+		$excludedSections = ['opening_message'];
+
+		if (! empty($validated['voice_mode'])) {
+			$excludedSections[] = 'style rules';
+			$excludedSections[] = 'OOC mode';
+			$excludedSections[] = 'image handling';
+		} else {
+			$excludedSections[] = 'voice mode';
+		}
+
 		$director = (new PromptDirector($assistantModel->prompt))
 			->append('emotion tags', ['available emotions' => $emotions])
-			->except(['opening_message']);
+			->except($excludedSections);
 
 		if ($archive && ! empty($lastUserMessage['content'])) {
 			$director->withRetrieval($lastUserMessage['content'], $archive->id);

@@ -33,3 +33,16 @@ export function parseEmotionFromResponse(text, validEmotions = []) {
         text: remaining.trim(),
     };
 }
+
+/**
+ * Strips asterisk-wrapped stage directions / action narration from text
+ * before it's sent to TTS. Defense-in-depth alongside the voice-mode prompt
+ * instructions — models don't always follow formatting instructions.
+ */
+export function stripForSpeech(text) {
+    return text
+        .replace(/\*[^*]+\*/g, ' ')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n{2,}/g, '\n')
+        .trim();
+}
