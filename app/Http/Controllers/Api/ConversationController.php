@@ -6,6 +6,7 @@ use App\Directors\PromptDirector;
 use App\Http\Controllers\Controller;
 use App\Models\Image;
 use App\Services\LlmProviders\LlmManager;
+use App\Services\TtsProviders\TtsManager;
 use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -165,6 +166,18 @@ class ConversationController extends Controller
 		$director = (new PromptDirector($assistantModel->prompt))
 			->append('emotion tags', ['available emotions' => $emotions])
 			->except($excludedSections);
+
+		if (! empty($validated['voice_mode'])) {
+			$voiceModel = (new TtsManager())->resolveVoiceModel($assistantUser);
+
+			if ($voiceModel?->provider->prompt) {
+				$director->append('voice provider prompt', $voiceModel->provider->prompt);
+			}
+
+			if ($voiceModel?->prompt) {
+				$director->append('voice model prompt', $voiceModel->prompt);
+			}
+		}
 
 		if ($archive && ! empty($lastUserMessage['content'])) {
 			$director->withRetrieval($lastUserMessage['content'], $archive->id);
