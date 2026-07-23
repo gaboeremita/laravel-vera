@@ -27,7 +27,7 @@ class SummarizeConversation implements ShouldQueue
 
 	public function handle(SummarizeConversationAction $action): void
 	{
-		$action->handle($this->conversation, $this->upToMessageId);
+		$action->handle($this->conversation, $this->upToMessageId, $this->lockedAt);
 
 		$this->releaseLock();
 	}

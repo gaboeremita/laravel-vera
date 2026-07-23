@@ -26,23 +26,32 @@ export default function AssistantMemoryPromptEditor({ assistantId, addToast }) {
 	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
+		let cancelled = false;
+		setIsLoading(true);
+		setInitialValue(null);
+
 		const load = async () => {
 			try {
 				const res = await api.get(route('memory-prompt.show', { assistant: assistantId }));
+				if (!res.ok) throw new Error('Failed to load memory prompt');
 				const data = await res.json();
-				setInitialValue(data);
+				if (!cancelled) setInitialValue(data);
 			} catch (e) {
-				addToast('Failed to load memory prompt', 'error');
+				if (!cancelled) addToast('Failed to load memory prompt', 'error');
 			} finally {
-				setIsLoading(false);
+				if (!cancelled) setIsLoading(false);
 			}
 		};
 		void load();
+
+		return () => {
+			cancelled = true;
+		};
 	}, [assistantId]);
 
 	if (isLoading) {
 		return <span className="text-fg-3 text-sm cursor-effect">Loading...</span>;
 	}
 
-	return <Editor initialValue={initialValue} assistantId={assistantId} addToast={addToast} />;
+	return <Editor key={assistantId} initialValue={initialValue} assistantId={assistantId} addToast={addToast} />;
 }

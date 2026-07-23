@@ -31,7 +31,15 @@ class SummarizeConversation
 		return $instructions !== '' ? $instructions : self::FALLBACK_INSTRUCTIONS;
 	}
 
-	public function handle(Conversation $conversation, int $upToMessageId): void
+	private function lockStillHeld(Conversation $conversation, string $lockedAt): bool
+	{
+		return $conversation->newQuery()
+			->whereKey($conversation->id)
+			->where('memory_summarizing_at', $lockedAt)
+			->exists();
+	}
+
+	public function handle(Conversation $conversation, int $upToMessageId, string $lockedAt): void
 	{
 		$checkpoint = $conversation->memory_checkpoint_message_id ?? 0;
 
@@ -56,6 +64,12 @@ class SummarizeConversation
 		$instructions = $this->buildInstructions($conversation);
 
 		while ($checkpoint < $upToMessageId) {
+			// A force-unlock (or a newer run) may have cleared or replaced this
+			// lock while we were mid-batch — stop writing rather than clobber it.
+			if (! $this->lockStillHeld($conversation, $lockedAt)) {
+				break;
+			}
+
 			$messages = $conversation->messages()
 				->where('id', '>', $checkpoint)
 				->where('id', '<=', $upToMessageId)
@@ -88,16 +102,18 @@ class SummarizeConversation
 
 			$summary = trim($response->content ?? '');
 
-			if ($summary !== '') {
-				$existing = $conversation->long_term_memory;
-
-				$conversation->update([
-					'long_term_memory' => $existing ? "{$summary}\n\n---\n\n{$existing}" : $summary,
-				]);
+			if ($summary === '') {
+				throw new \RuntimeException('Conversation summarization returned an empty response.');
 			}
 
+			$existing = $conversation->long_term_memory;
+
+			$conversation->update([
+				'long_term_memory' => $existing ? "{$summary}\n\n---\n\n{$existing}" : $summary,
+				'memory_checkpoint_message_id' => $batchEnd,
+			]);
+
 			$checkpoint = $batchEnd;
-			$conversation->update(['memory_checkpoint_message_id' => $checkpoint]);
 		}
 	}
 }
