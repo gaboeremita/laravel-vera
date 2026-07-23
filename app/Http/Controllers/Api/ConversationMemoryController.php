@@ -77,9 +77,11 @@ class ConversationMemoryController extends Controller
 			return response()->json(['queued' => false]);
 		}
 
-		$conversation->update(['memory_summarizing_at' => now()]);
+		$lockedAt = now()->toDateTimeString();
 
-		SummarizeConversation::dispatch($conversation, $upToMessageId);
+		$conversation->update(['memory_summarizing_at' => $lockedAt]);
+
+		SummarizeConversation::dispatch($conversation, $upToMessageId, $lockedAt);
 
 		return response()->json(['queued' => true]);
 	}

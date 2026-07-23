@@ -210,13 +210,15 @@ class ConversationController extends Controller
 		$pendingCount = $conversation->messages()->where('id', '>', $checkpoint)->count();
 
 		if ($conversation->auto_summarize_enabled && $pendingCount >= self::MEMORY_SUMMARY_TRIGGER_COUNT) {
+			$lockedAt = now()->toDateTimeString();
+
 			$locked = $conversation->newQuery()
 				->whereKey($conversation->id)
 				->whereNull('memory_summarizing_at')
-				->update(['memory_summarizing_at' => now()]);
+				->update(['memory_summarizing_at' => $lockedAt]);
 
 			if ($locked === 1) {
-				SummarizeConversation::dispatch($conversation, $assistantMessage->id);
+				SummarizeConversation::dispatch($conversation, $assistantMessage->id, $lockedAt);
 			}
 		}
 
