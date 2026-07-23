@@ -179,7 +179,8 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Comments
 
-- Default to no comment. Code must be self-explanatory through naming and structure.
-- A comment may only state a non-obvious WHY: a hidden constraint, a subtle invariant, a workaround for a specific bug. Never state WHAT the code does — that's what reading the code is for.
-- Never narrate a decision, a fix, or reasoning from the current task ("excluded here because...", "added for the X flow"). That belongs in the commit message, not the source — it rots as soon as the thing it describes changes.
-- If deleting the comment wouldn't confuse a future reader, don't write it.
+## Comments
+- Default to zero comments. Only comment when the WHY is non-obvious (a hidden constraint, workaround, or gotcha).
+- Never write comments that narrate WHAT the code does — if the code needs that, the names are wrong.
+- Never write decision journals, design rationale essays, or development-context narration inline. That belongs in commit messages or PR descriptions.
+- Comments above code, never on the side.
