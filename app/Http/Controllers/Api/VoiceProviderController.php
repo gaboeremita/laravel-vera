@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\VoiceProvider;
+use App\Rules\ValidPromptStructure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,7 +24,7 @@ class VoiceProviderController extends Controller
 	public function updatePrompt(Request $request, int $id): JsonResponse
 	{
 		$validated = $request->validate([
-			'prompt' => ['nullable', 'array'],
+			'prompt' => ['nullable', 'array', new ValidPromptStructure],
 		]);
 
 		$provider = VoiceProvider::findOrFail($id);
