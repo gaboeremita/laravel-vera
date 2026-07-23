@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Contracts\SttProvider;
-use App\Contracts\TtsProvider;
-use App\Enums\TtsVoice;
 use App\Http\Controllers\Controller;
 use App\Models\Settings;
+use App\Models\VoiceModel;
+use App\Services\TtsProviders\TtsManager;
 use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,7 +40,7 @@ class VoiceController extends Controller
 		return response()->json(['text' => $text]);
 	}
 
-	public function synthesize(Request $request, int $assistant, TtsProvider $tts): Response
+	public function synthesize(Request $request, int $assistant, TtsManager $ttsManager): Response
 	{
 		$assistantUser = $this->resolveAssistantUser($request, $assistant);
 
@@ -48,17 +48,28 @@ class VoiceController extends Controller
 			'text' => ['required', 'string'],
 		]);
 
-		$voice = Cache::rememberForever(
-			Settings::ttsVoiceCacheKey($assistantUser->user_id, $assistantUser->assistant_id),
-			fn () => $assistantUser->user->settings()
-				->where('assistant_id', $assistantUser->assistant_id)
-				->first()?->data['tts_voice'] ?? TtsVoice::Tara->value
+		$voiceSettings = Cache::rememberForever(
+			Settings::voiceCacheKey($assistantUser->user_id, $assistantUser->assistant_id),
+			function () use ($assistantUser) {
+				$data = $assistantUser->user->settings()
+					->where('assistant_id', $assistantUser->assistant_id)
+					->first()?->data ?? [];
+
+				return [
+					'tts_model_id' => $data['tts_model_id'] ?? null,
+					'tts_voice' => $data['tts_voice'] ?? null,
+				];
+			}
 		);
 
 		try {
+			$tts = $voiceSettings['tts_model_id']
+				? $ttsManager->fromModel(VoiceModel::with('provider')->findOrFail($voiceSettings['tts_model_id']))
+				: $ttsManager->fromConfig();
+
 			$audio = $tts->synthesize(
 				text: $validated['text'],
-				voice: $voice,
+				voice: $voiceSettings['tts_voice'],
 			);
 		} catch (\RuntimeException $e) {
 			return response()->json(['message' => $e->getMessage()], 502);

@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\EmotionController;
 use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\VoiceController;
+use App\Http\Controllers\Api\VoiceModelController;
+use App\Http\Controllers\Api\VoiceProviderController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +28,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/settings', [SettingsController::class, 'show'])->name('settings.show');
         Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::put('/settings/model', [SettingsController::class, 'selectModel'])->name('settings.selectModel');
+        Route::put('/settings/voice-model', [SettingsController::class, 'selectVoiceModel'])->name('settings.selectVoiceModel');
+        Route::put('/settings/voice', [SettingsController::class, 'updateVoice'])->name('settings.updateVoice');
         Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
         Route::post('/conversations', [ConversationController::class, 'store'])->name('conversations.store');
         Route::get('/conversations/{id}/messages', [ConversationController::class, 'show'])->name('conversations.show');
@@ -56,6 +60,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/ai-providers/{provider}/models', [AiModelController::class, 'store'])->name('ai-models.store');
     Route::patch('/ai-providers/{provider}/models/{model}', [AiModelController::class, 'update'])->name('ai-models.update');
     Route::delete('/ai-providers/{provider}/models/{model}', [AiModelController::class, 'destroy'])->name('ai-models.destroy');
+
+    Route::get('/voice-providers', [VoiceProviderController::class, 'index'])->name('voice-providers.index');
+    Route::patch('/voice-providers/{id}', [VoiceProviderController::class, 'updatePrompt'])->name('voice-providers.updatePrompt');
+    Route::patch('/voice-providers/{provider}/models/{model}', [VoiceModelController::class, 'updatePrompt'])->name('voice-models.updatePrompt');
 
     Route::get('/archives', [ArchiveController::class, 'index'])->name('archives.index');
     Route::get('/archives/{id}', [ArchiveController::class, 'show'])->name('archives.show');

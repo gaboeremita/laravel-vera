@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\Theme;
-use App\Enums\TtsVoice;
 use App\Http\Controllers\Controller;
 use App\Models\Settings;
 use Illuminate\Http\JsonResponse;
@@ -23,8 +22,8 @@ class SettingsController extends Controller
             'selected_theme' => $settings?->data['theme'] ?? 'default',
             'available_themes' => array_column(Theme::cases(), 'value'),
             'ai_model_id' => $settings?->data['ai_model_id'] ?? null,
-            'tts_voice' => $settings?->data['tts_voice'] ?? TtsVoice::Tara->value,
-            'available_voices' => array_column(TtsVoice::cases(), 'value'),
+            'tts_model_id' => $settings?->data['tts_model_id'] ?? null,
+            'tts_voice' => $settings?->data['tts_voice'] ?? null,
         ]);
     }
 
@@ -48,11 +47,54 @@ class SettingsController extends Controller
         return response()->json(['ai_model_id' => $validated['ai_model_id']]);
     }
 
+    public function selectVoiceModel(Request $request, int $assistant): JsonResponse
+    {
+        $validated = $request->validate([
+            'tts_model_id' => ['nullable', 'integer', 'exists:voice_models,id'],
+        ]);
+
+        $settings = $request->user()->settings()
+            ->where('assistant_id', $assistant)
+            ->firstOrCreate(
+                ['user_id' => $request->user()->id, 'assistant_id' => $assistant],
+                ['data' => []]
+            );
+
+        $data = $settings->data ?? [];
+        $data['tts_model_id'] = $validated['tts_model_id'];
+        $settings->update(['data' => $data]);
+
+        $this->cacheVoiceSettings($request->user()->id, $assistant, $data);
+
+        return response()->json(['tts_model_id' => $validated['tts_model_id']]);
+    }
+
+    public function updateVoice(Request $request, int $assistant): JsonResponse
+    {
+        $validated = $request->validate([
+            'tts_voice' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $settings = $request->user()->settings()
+            ->where('assistant_id', $assistant)
+            ->firstOrCreate(
+                ['user_id' => $request->user()->id, 'assistant_id' => $assistant],
+                ['data' => []]
+            );
+
+        $data = $settings->data ?? [];
+        $data['tts_voice'] = $validated['tts_voice'];
+        $settings->update(['data' => $data]);
+
+        $this->cacheVoiceSettings($request->user()->id, $assistant, $data);
+
+        return response()->json(['tts_voice' => $validated['tts_voice']]);
+    }
+
     public function update(Request $request, int $assistant): JsonResponse
     {
         $validated = $request->validate([
             'theme' => ['required', 'string', new Enum(Theme::class)],
-            'tts_voice' => ['sometimes', 'string', new Enum(TtsVoice::class)],
         ]);
 
         $settings = $request->user()->settings()
@@ -64,17 +106,16 @@ class SettingsController extends Controller
 
         $data = $settings->data ?? [];
         $data['theme'] = $validated['theme'];
-
-        if (array_key_exists('tts_voice', $validated)) {
-            $data['tts_voice'] = $validated['tts_voice'];
-            Cache::forever(
-                Settings::ttsVoiceCacheKey($request->user()->id, $assistant),
-                $validated['tts_voice']
-            );
-        }
-
         $settings->update(['data' => $data]);
 
         return response()->json($settings->data);
+    }
+
+    private function cacheVoiceSettings(int $userId, int $assistantId, array $data): void
+    {
+        Cache::forever(Settings::voiceCacheKey($userId, $assistantId), [
+            'tts_model_id' => $data['tts_model_id'] ?? null,
+            'tts_voice' => $data['tts_voice'] ?? null,
+        ]);
     }
 }
