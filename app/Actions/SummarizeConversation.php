@@ -56,17 +56,18 @@ class SummarizeConversation
 		$instructions = $this->buildInstructions($conversation);
 
 		while ($checkpoint < $upToMessageId) {
-			$batchEnd = min($checkpoint + self::BATCH_SIZE, $upToMessageId);
-
 			$messages = $conversation->messages()
-				->whereBetween('id', [$checkpoint + 1, $batchEnd])
+				->where('id', '>', $checkpoint)
+				->where('id', '<=', $upToMessageId)
 				->orderBy('id')
-				->get(['role', 'content']);
+				->limit(self::BATCH_SIZE)
+				->get(['id', 'role', 'content']);
 
 			if ($messages->isEmpty()) {
-				$checkpoint = $batchEnd;
-				continue;
+				break;
 			}
+
+			$batchEnd = (int) $messages->last()->id;
 
 			$transcript = $messages
 				->map(fn ($message) => match ($message->role) {
