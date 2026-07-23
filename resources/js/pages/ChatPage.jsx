@@ -394,6 +394,7 @@ export default function ChatPage() {
 	return (
 		<>
 			<Header settingsPath={`/assistants/${assistantId}/settings`}
+				onBack={() => navigate(`/assistants/${assistantId}/conversations`)}
 				status={status}
 				counter={`MESSAGES: ${messages.filter((m) => m.role !== 'system').length}`}
 				actions={
@@ -423,10 +424,10 @@ export default function ChatPage() {
 							VOICE
 						</button>
 						<button
-							onClick={() => navigate(`/assistants/${assistantId}/conversations`)}
+							onClick={() => navigate(`/assistants/${assistantId}/conversations/${id}/memory`)}
 							className="button-primary"
 						>
-							← CONVERSATIONS
+							MEMORY
 						</button>
 					</>
 				}
