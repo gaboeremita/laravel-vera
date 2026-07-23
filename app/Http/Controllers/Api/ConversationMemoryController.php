@@ -62,10 +62,6 @@ class ConversationMemoryController extends Controller
 			->conversations()
 			->findOrFail($id);
 
-		if ($conversation->memory_summarizing_at !== null) {
-			return response()->json(['queued' => false, 'already_summarizing' => true]);
-		}
-
 		if (($validated['mode'] ?? 'since_last') === 'full') {
 			$conversation->update(['memory_checkpoint_message_id' => 0]);
 		}
@@ -79,7 +75,14 @@ class ConversationMemoryController extends Controller
 
 		$lockedAt = now()->toDateTimeString();
 
-		$conversation->update(['memory_summarizing_at' => $lockedAt]);
+		$locked = $conversation->newQuery()
+			->whereKey($conversation->id)
+			->whereNull('memory_summarizing_at')
+			->update(['memory_summarizing_at' => $lockedAt]);
+
+		if ($locked !== 1) {
+			return response()->json(['queued' => false, 'already_summarizing' => true]);
+		}
 
 		SummarizeConversation::dispatch($conversation, $upToMessageId, $lockedAt);
 

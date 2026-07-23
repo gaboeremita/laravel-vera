@@ -26,23 +26,29 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 
 	const fetchStatus = async () => {
 		const res = await api.get(route('memory.show', { assistant: assistantId, id: conversationId }));
+		if (!res.ok) throw new Error('Failed to load memory');
 		return await res.json();
 	};
 
 	useEffect(() => {
+		let cancelled = false;
+		setIsLoading(true);
+		setIsLocked(false);
+
 		const load = async () => {
 			try {
 				const data = await fetchStatus();
-				applyShowData(data);
+				if (!cancelled) applyShowData(data);
 			} catch (e) {
-				addToast('Failed to load memory', 'error');
+				if (!cancelled) addToast('Failed to load memory', 'error');
 			} finally {
-				setIsLoading(false);
+				if (!cancelled) setIsLoading(false);
 			}
 		};
 		void load();
 
 		return () => {
+			cancelled = true;
 			if (pollRef.current) clearInterval(pollRef.current);
 		};
 	}, [assistantId, conversationId]);
@@ -82,9 +88,12 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 			});
 
 			if (res.status === 409) {
+				setIsLocked(true);
 				addToast('Memory is being summarized in the background — try again shortly', 'error');
 				return;
 			}
+
+			if (!res.ok) throw new Error('Failed to save memory');
 
 			const data = await res.json();
 			setMemory(data.long_term_memory ?? '');
@@ -100,6 +109,7 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 		setIsSummarizing(true);
 		try {
 			const res = await api.post(route('memory.summarize', { assistant: assistantId, id: conversationId }), { mode });
+			if (!res.ok) throw new Error('Failed to queue summarization');
 			const data = await res.json();
 
 			if (data.queued) {
@@ -125,6 +135,7 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 		setIsUnlocking(true);
 		try {
 			const res = await api.post(route('memory.unlock', { assistant: assistantId, id: conversationId }));
+			if (!res.ok) throw new Error('Failed to clear lock');
 			const data = await res.json();
 			setMemory(data.long_term_memory ?? '');
 			setIsLocked(false);
@@ -145,9 +156,12 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 			});
 
 			if (res.status === 409) {
+				setIsLocked(true);
 				addToast('Memory is being summarized in the background — try again shortly', 'error');
 				return;
 			}
+
+			if (!res.ok) throw new Error('Failed to update setting');
 
 			const data = await res.json();
 			setAutoSummarizeEnabled(!!data.auto_summarize_enabled);
