@@ -9,10 +9,11 @@ export default function Header({ children, status, actions, counter, hideSetting
 			<div className="flex items-end gap-4">
 				{onBack && (
 					<button
+						type="button"
 						onClick={onBack}
+						aria-label="Back"
 						className="text-fg-3 hover:text-accent transition-colors cursor-pointer"
 					>
-						<ArrowLeft size={16} />
 					</button>
 				)}
 				{children}
