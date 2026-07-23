@@ -24,10 +24,23 @@ class AssistantMemoryPromptController extends Controller
 		$assistantUser = $this->resolveAssistantUser($request, $assistant);
 
 		$validated = $request->validate([
-			'memory_prompt' => ['required', 'array', new ValidPromptStructure],
+			'memory_prompt' => [
+				'present',
+				'nullable',
+				'array',
+				function (string $attribute, mixed $value, \Closure $fail): void {
+					if ($value === null || $value === []) {
+						return;
+					}
+
+					(new ValidPromptStructure())->validate($attribute, $value, $fail);
+				},
+			],
 		]);
 
-		$assistantUser->update(['memory_prompt' => $validated['memory_prompt']]);
+		$assistantUser->update([
+			'memory_prompt' => ($validated['memory_prompt'] ?? null) ?: null,
+		]);
 
 		return response()->json($assistantUser->memory_prompt ?? (object) []);
 	}
