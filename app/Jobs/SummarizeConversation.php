@@ -22,23 +22,34 @@ class SummarizeConversation implements ShouldQueue
 	public function __construct(
 		public Conversation $conversation,
 		public int $upToMessageId,
+		public string $lockedAt,
 	) {}
 
 	public function handle(SummarizeConversationAction $action): void
 	{
 		$action->handle($this->conversation, $this->upToMessageId);
 
-		$this->conversation->update(['memory_summarizing_at' => null]);
+		$this->releaseLock();
 	}
 
 	public function failed(\Throwable $exception): void
 	{
-		$this->conversation->update(['memory_summarizing_at' => null]);
+		$this->releaseLock();
 
 		Log::error('Failed to summarize conversation', [
 			'conversation_id' => $this->conversation->id,
 			'up_to_message_id' => $this->upToMessageId,
 			'error' => $exception->getMessage(),
 		]);
+	}
+
+	// Only clears the lock if it still matches the value this job itself set —
+	// prevents a stale/late-finishing job from clobbering a newer run's lock.
+	private function releaseLock(): void
+	{
+		$this->conversation->newQuery()
+			->whereKey($this->conversation->id)
+			->where('memory_summarizing_at', $this->lockedAt)
+			->update(['memory_summarizing_at' => null]);
 	}
 }
