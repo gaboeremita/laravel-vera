@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Directors\PromptDirector;
 use App\Http\Controllers\Controller;
+use App\Jobs\SummarizeConversation;
 use App\Models\Image;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\TtsProviders\TtsManager;
@@ -16,6 +17,8 @@ class ConversationController extends Controller
 	use ResolvesAssistantUser;
 
 	private const MESSAGES_PER_PAGE = 50;
+
+	private const MEMORY_SUMMARY_TRIGGER_COUNT = 50;
 
 	public function index(Request $request, int $assistant): JsonResponse
 	{
@@ -183,6 +186,8 @@ class ConversationController extends Controller
 			$director->withRetrieval($lastUserMessage['content'], $archive->id);
 		}
 
+		$director->withLongTermMemory($conversation);
+
 		$systemPrompt = $director->build();
 
 		try {
@@ -195,11 +200,19 @@ class ConversationController extends Controller
 			return response()->json(['message' => $e->getMessage()], 502);
 		}
 
-		$conversation->messages()->create([
+		$assistantMessage = $conversation->messages()->create([
 			'role' => 'assistant',
 			'content' => $response->content,
 			'thinking' => $response->thinking,
 		]);
+
+		$checkpoint = $conversation->memory_checkpoint_message_id ?? 0;
+		$pendingCount = $conversation->messages()->where('id', '>', $checkpoint)->count();
+
+		if ($conversation->auto_summarize_enabled && $pendingCount >= self::MEMORY_SUMMARY_TRIGGER_COUNT && $conversation->memory_summarizing_at === null) {
+			$conversation->update(['memory_summarizing_at' => now()]);
+			SummarizeConversation::dispatch($conversation, $assistantMessage->id);
+		}
 
 		return response()->json([
 			'conversation_id' => $conversation->id,
