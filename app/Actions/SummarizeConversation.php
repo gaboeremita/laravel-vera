@@ -35,10 +35,19 @@ class SummarizeConversation
 	{
 		$checkpoint = $conversation->memory_checkpoint_message_id ?? 0;
 
-		// Never reach further back than this many messages — older backlog is
-		// skipped over (checkpoint fast-forwarded) rather than summarized.
-		if ($upToMessageId - $checkpoint > self::MAX_BACKLOG_MESSAGES) {
-			$checkpoint = $upToMessageId - self::MAX_BACKLOG_MESSAGES;
+		$pendingQuery = $conversation->messages()
+			->where('id', '>', $checkpoint)
+			->where('id', '<=', $upToMessageId);
+
+		$pendingCount = $pendingQuery->count();
+
+		if ($pendingCount > self::MAX_BACKLOG_MESSAGES) {
+			$skipToId = (clone $pendingQuery)
+				->orderByDesc('id')
+				->skip(self::MAX_BACKLOG_MESSAGES)
+				->value('id');
+
+			$checkpoint = $skipToId ?? $checkpoint;
 		}
 
 		$llm = null;
