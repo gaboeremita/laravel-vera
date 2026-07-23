@@ -14,6 +14,7 @@ export default function Header({ children, status, actions, counter, hideSetting
 						aria-label="Back"
 						className="text-fg-3 hover:text-accent transition-colors cursor-pointer"
 					>
+						<ArrowLeft size={16} />
 					</button>
 				)}
 				{children}
