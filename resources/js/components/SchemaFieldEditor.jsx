@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SchemaEditor from './SchemaEditor.jsx';
+import Toggle from './common/Toggle.jsx';
 
 const TYPES = ['string', 'integer', 'float', 'boolean', 'enum', 'object'];
 const SECTIONS = ['primary', 'advanced'];
@@ -131,17 +132,10 @@ export default function SchemaFieldEditor({ field, onChange, onRemove, showSecti
 								<div className="flex-1">
 									<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">Required?</label>
 									<div className="flex items-center gap-3 h-[38px]">
-										<button
-											onClick={() => update('required', !(field.required ?? false))}
-											className="relative w-12 h-6 rounded-full cursor-pointer transition-colors duration-200 border border-line-1"
-											style={{ backgroundColor: field.required ? 'var(--color-accent)' : 'var(--color-bg-1)' }}
-											aria-pressed={field.required ?? false}
-										>
-											<span
-												className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
-												style={{ left: field.required ? 'calc(100% - 20px)' : '4px' }}
-											/>
-										</button>
+										<Toggle
+											checked={field.required ?? false}
+											onChange={() => update('required', !(field.required ?? false))}
+										/>
 										<span className={`text-[0.65rem] tracking-[0.1em] uppercase ${field.required ? 'text-accent' : 'text-fg-3'}`}>
 											{field.required ? 'Yes' : 'No'}
 										</span>
