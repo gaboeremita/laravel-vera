@@ -10,9 +10,14 @@
 	transition: color 0.15s, background-color 0.15s;
 }
 
-.button-primary:hover {
+.button-primary:hover:not(:disabled) {
 	background-color: var(--accent);
 	color: var(--accent-fg);
+}
+
+.button-primary:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 .button-secondary {

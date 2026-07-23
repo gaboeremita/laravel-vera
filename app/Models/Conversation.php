@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['assistant_user_id', 'title'])]
+#[Fillable(['assistant_user_id', 'title', 'long_term_memory', 'memory_checkpoint_message_id', 'memory_summarizing_at', 'auto_summarize_enabled'])]
 class Conversation extends Model
 {
     /** @use HasFactory<ConversationFactory> */

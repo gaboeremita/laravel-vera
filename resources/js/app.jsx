@@ -17,6 +17,7 @@ import PromptPage from './pages/PromptPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import ProvidersPage from './pages/ProvidersPage.jsx';
 import VoicePage from './pages/VoicePage.jsx';
+import MemoryPage from './pages/MemoryPage.jsx';
 globalThis.Ziggy = Ziggy;
 
 createRoot(document.getElementById('root')).render(
@@ -35,6 +36,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/assistants/:assistantId" element={<AssistantLayout />}>
                             <Route path="conversations" element={<ConversationsPage />} />
                             <Route path="conversations/:id" element={<ChatPage />} />
+                            <Route path="conversations/:id/memory" element={<MemoryPage />} />
                             <Route path="prompt" element={<PromptPage />} />
                             <Route path="archive" element={<ArchivePage />} />
                             <Route path="settings" element={<SettingsPage />} />
