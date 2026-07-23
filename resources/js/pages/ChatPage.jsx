@@ -417,6 +417,12 @@ export default function ChatPage() {
 							PROVIDERS
 						</button>
 						<button
+							onClick={() => navigate(`/assistants/${assistantId}/voice`)}
+							className="button-primary"
+						>
+							VOICE
+						</button>
+						<button
 							onClick={() => navigate(`/assistants/${assistantId}/conversations`)}
 							className="button-primary"
 						>

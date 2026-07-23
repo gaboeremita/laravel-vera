@@ -33,8 +33,9 @@ return [
 
 	'tts' => [
 		'url' => env('AI_TTS_URL'),
+		'key' => env('AI_TTS_API_KEY', ''),
 		'model' => env('AI_TTS_MODEL'),
-		'format' => env('AI_TTS_FORMAT', 'orpheus'),
+		'format' => env('AI_TTS_FORMAT', 'openai_compatible'),
 		'voice' => env('AI_TTS_VOICE', 'tara'),
 		'timeout' => (int) env('AI_TTS_TIMEOUT', 120),
 	],

@@ -69,6 +69,12 @@ export default function ConversationsPage() {
 						>
 							ARCHIVE
 						</button>
+						<button
+							onClick={() => navigate(`/assistants/${assistantId}/voice`)}
+							className="button-primary"
+						>
+							VOICE
+						</button>
 					</div>
 				}
 			>
