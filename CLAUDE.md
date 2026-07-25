@@ -179,8 +179,14 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Comments
 
-## Comments
 - Default to zero comments. Only comment when the WHY is non-obvious (a hidden constraint, workaround, or gotcha).
 - Never write comments that narrate WHAT the code does — if the code needs that, the names are wrong.
 - Never write decision journals, design rationale essays, or development-context narration inline. That belongs in commit messages or PR descriptions.
 - Comments above code, never on the side.
+
+## Written Communication (commit messages, PRs, issues)
+
+- No journal comments: don't narrate the path you took to get somewhere ("X, not Y", "instead of doing A we did B") when the reader has no context for A or Y. A reader who never saw the abandoned approach just sees a random, unexplained contrast — it reads as confused or self-congratulatory, not informative.
+- State the current fact plainly. If something used to work a different way and this change fixes/replaces it, say that explicitly as a fix ("fixes X", "was previously Y, now Z because—"), not as a bare "not Y" aside dropped with no setup.
+- Don't justify implementation details that no reader asked about (e.g. why a file lives in one directory over another) unless it's the actual point of the change.
+- This is the same rule as the "not just X" / "X not Y" filler rule above, applied specifically to commit messages, PR descriptions, and issue text.
