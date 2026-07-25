@@ -7,11 +7,11 @@ import Scanlines from '../components/Scanlines.jsx';
 import Header from "../components/Header.jsx";
 
 export default function LoginPage() {
-	const [loginStep, setLoginStep] = useState('email');
-	const [loginEmail, setLoginEmail] = useState('');
-	const [input, setInput] = useState('');
-	const [messages, setMessages] = useState([]);
-	const inputRef = useRef(null);
+	const [email, setEmail] = useState('');
+	const [password, setPassword] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [error, setError] = useState('');
+	const emailRef = useRef(null);
 	const navigate = useNavigate();
 
 	useEffect(() => {
@@ -21,68 +21,34 @@ export default function LoginPage() {
 	}, []);
 
 	useEffect(() => {
-		if (inputRef.current) inputRef.current.focus();
-	}, [loginStep]);
+		if (emailRef.current) emailRef.current.focus();
+	}, []);
 
-	const handleLogin = async () => {
-		const text = input.trim();
-		if (!text) return;
-		setInput('');
+	const handleLogin = async (e) => {
+		e.preventDefault();
+		if (!email.trim() || !password || isSubmitting) return;
 
-		if (loginStep === 'email') {
-			setLoginEmail(text);
-			setMessages((prev) => [
-				...prev,
-				{ role: 'system', content: `> ${text}` },
-			]);
-			setLoginStep('password');
-			return;
-		}
+		setIsSubmitting(true);
+		setError('');
 
-		if (loginStep === 'password') {
-			setMessages((prev) => [
-				...prev,
-				{ role: 'system', content: '> ********' },
-				{ role: 'system', content: '> Authenticating...' },
-			]);
-			setLoginStep('authenticating');
+		try {
+			await api.getCsrfCookie();
+			const res = await api.login(email.trim(), password);
 
-			try {
-				await api.getCsrfCookie();
-				const res = await api.login(loginEmail, text);
-
-				if (res.ok) {
-					setMessages((prev) => [
-						...prev,
-						{ role: 'system', content: '> Access granted.' },
-					]);
-					setTimeout(() => navigate('/assistants', { replace: true }), 1500);
-				} else {
-					setMessages((prev) => [
-						...prev,
-						{ role: 'system', content: '> Authentication failed. Try again.' },
-					]);
-					setLoginStep('email');
-				}
-			} catch {
-				setMessages((prev) => [
-					...prev,
-					{ role: 'system', content: '> Connection error. Try again.' },
-				]);
-				setLoginStep('email');
+			if (res.ok) {
+				navigate('/assistants', { replace: true });
+			} else {
+				setError('Authentication failed. Check your email and password.');
+				setIsSubmitting(false);
 			}
-		}
-	};
-
-	const handleKeyDown = (e) => {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			handleLogin();
+		} catch {
+			setError('Connection error. Try again.');
+			setIsSubmitting(false);
 		}
 	};
 
 	return (
-		<div className="w-full h-screen bg-bg-0  flex relative overflow-hidden">
+		<div className="w-full h-screen bg-bg-0 flex relative overflow-hidden">
 			<Scanlines />
 			<div className="absolute inset-0 pointer-events-none z-[11] viewport-ambient" />
 
@@ -97,31 +63,65 @@ export default function LoginPage() {
 
 			<div className="flex-1 flex flex-col relative z-5 min-w-0">
 				<Header
+					hideSettings
+					align="center"
 					status={{ label: 'OFFLINE', color: 'text-fg-3', dot: '○', blink: false }}
-				/>
+				>
+					<span className="text-accent text-3xl font-bold tracking-[0.5em] ml-4">VERA</span>
+				</Header>
 
-				<div className="flex-1 overflow-y-auto p-6">
-					{messages.map((msg, i) => (
-						<div key={i} className="mb-1 text-[0.8rem] text-accent">
-							{msg.content}
+				<div className="flex-1 flex items-center justify-center p-6">
+					<form onSubmit={handleLogin} className="w-full max-w-sm bg-bg-1 border border-line-1 rounded-lg p-8">
+						<h1 className="text-fg-1 text-lg font-semibold tracking-[0.02em]">
+							Welcome to VERA
+						</h1>
+						<p className="text-fg-3 text-sm mt-1 mb-6">
+							Please log in to continue
+						</p>
+
+						<div className="space-y-4">
+							<div>
+								<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+									Email
+								</label>
+								<input
+									ref={emailRef}
+									type="email"
+									value={email}
+									onChange={(e) => setEmail(e.target.value)}
+									disabled={isSubmitting}
+									className="w-full bg-bg-0 border border-line-1 text-fg-1 text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+									placeholder="you@example.com"
+								/>
+							</div>
+
+							<div>
+								<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+									Password
+								</label>
+								<input
+									type="password"
+									value={password}
+									onChange={(e) => setPassword(e.target.value)}
+									disabled={isSubmitting}
+									className="w-full bg-bg-0 border border-line-1 text-fg-1 text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+									placeholder="••••••••"
+								/>
+							</div>
 						</div>
-					))}
-				</div>
 
-				<div className="px-5 py-3 border-t border-line-1 flex gap-2 items-center shrink-0">
-                    <span className="text-accent text-xs shrink-0 whitespace-nowrap">
-                        {loginStep === 'password' ? '> Enter password:' : '> Enter email:'}
-                    </span>
-					<input
-						ref={inputRef}
-						type={loginStep === 'password' ? 'password' : 'text'}
-						value={input}
-						onChange={(e) => setInput(e.target.value)}
-						onKeyDown={handleKeyDown}
-						disabled={loginStep === 'authenticating'}
-						className="flex-1 bg-transparent border-none outline-none text-fg-1  text-sm caret-accent placeholder:text-line-2"
-						placeholder={loginStep === 'password' ? 'Enter password...' : 'Enter email...'}
-					/>
+						{error && (
+							<p className="text-danger text-xs mt-4">{error}</p>
+						)}
+
+						<button
+							type="submit"
+							disabled={isSubmitting || !email.trim() || !password}
+							className="button-primary w-full mt-6"
+						>
+							{isSubmitting ? 'LOGGING IN…' : 'LOG IN'}
+						</button>
+					</form>
 				</div>
 			</div>
 		</div>

@@ -1,0 +1,58 @@
+/* ── Assistant "thinking" indicator ── */
+/* Shown in place of the loading cursor while a reply is streaming in. */
+.thinking {
+	position: relative;
+	display: inline-block;
+	animation:
+		thinking-rotate-cw 4s linear infinite,
+		thinking-breathe 2s ease-in-out infinite,
+		thinking-tilt 3.5s ease-in-out infinite;
+	filter: drop-shadow(0 0 18px rgba(99, 102, 241, 0.55))
+	        drop-shadow(0 0 36px rgba(168, 85, 247, 0.35));
+}
+
+.thinking .depth {
+	animation: thinking-rotate-ccw 4s linear infinite;
+	filter: blur(22px) opacity(0.65);
+}
+
+@keyframes thinking-rotate-cw {
+	to { rotate: 360deg; }
+}
+
+@keyframes thinking-rotate-ccw {
+	to { rotate: -360deg; }
+}
+
+@keyframes thinking-breathe {
+	0%, 100% { scale: 1; }
+	50%      { scale: 1.15; }
+}
+
+@keyframes thinking-tilt {
+	0%, 100% { transform: rotate(0deg); }
+	25%      { transform: rotate(6deg); }
+	75%      { transform: rotate(-6deg); }
+}
+
+/* shimmering "X is thinking…" label — a bright band sweeps left to right across the text */
+.thinking-label {
+	background-image: linear-gradient(
+		90deg,
+		var(--fg-3) 0%,
+		var(--fg-3) 40%,
+		var(--accent) 50%,
+		var(--fg-3) 60%,
+		var(--fg-3) 100%
+	);
+	background-size: 200% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	animation: thinking-shimmer 2s linear infinite;
+}
+
+@keyframes thinking-shimmer {
+	0%   { background-position: 200% 0; }
+	100% { background-position: -200% 0; }
+}

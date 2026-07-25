@@ -1,0 +1,81 @@
+/* ── Vera avatar animation ── */
+/* 12s cycle: float in place for 5s, spin CW at 5s, float another 5s, spin CCW back at 11s, loop. Glow pulses independently on its own 4s loop. */
+.vera-avatar {
+	position: relative;
+	animation:
+		float 12s ease-in-out infinite,
+		spin-cycle 12s linear infinite,
+		breathe 12s ease-in-out infinite,
+		tilt 12s ease-in-out infinite,
+		glow 4s ease-in-out infinite;
+}
+
+.vera-avatar .depth {
+	animation: spin-cycle-reverse 12s linear infinite;
+	filter: blur(22px) opacity(0.65);
+}
+
+/* bobs during the two hold windows (0-41.67%, 50-91.67%), holds still during the two spin windows */
+@keyframes float {
+	0%, 41.67%, 50%, 91.67%, 100% { translate: 0 0; }
+	10.42%, 60.42%                 { translate: 0 -6px; }
+	20.83%, 70.83%                 { translate: 0 0; }
+	31.25%, 81.25%                 { translate: 0 -6px; }
+}
+
+/* hold, spin clockwise at 5s, hold, spin counterclockwise back at 11s */
+@keyframes spin-cycle {
+	0%      { rotate: 0deg; }
+	41.67%  { rotate: 0deg; }
+	50%     { rotate: 360deg; }
+	91.67%  { rotate: 360deg; }
+	100%    { rotate: 0deg; }
+}
+
+@keyframes spin-cycle-reverse {
+	0%      { rotate: 0deg; }
+	41.67%  { rotate: 0deg; }
+	50%     { rotate: -360deg; }
+	91.67%  { rotate: -360deg; }
+	100%    { rotate: 0deg; }
+}
+
+/* breathe pulse synced to each spin */
+@keyframes breathe {
+	0%, 41.67%, 50%, 91.67%, 100% { scale: 1; }
+	45.83%, 95.83%                 { scale: 1.06; }
+}
+
+/* tilt wobble synced to each spin */
+@keyframes tilt {
+	0%, 41.67%, 50%, 91.67%, 100% { transform: rotate(0deg); }
+	44.44%, 94.44%                 { transform: rotate(4deg); }
+	47.22%, 97.22%                 { transform: rotate(-4deg); }
+}
+
+/* slow ambient glow pulse, independent of the spin cycle */
+@keyframes glow {
+	0%, 100% {
+		filter: drop-shadow(0 0 14px rgba(99, 102, 241, 0.4))
+		        drop-shadow(0 0 28px rgba(168, 85, 247, 0.25));
+	}
+	50% {
+		filter: drop-shadow(0 0 22px rgba(99, 102, 241, 0.65))
+		        drop-shadow(0 0 44px rgba(168, 85, 247, 0.4));
+	}
+}
+
+/* ── Pre-login variant: floats and glows, no spin — reserved for after log in ── */
+.vera-avatar-idle {
+	position: relative;
+	animation: idle-float 3.2s ease-in-out infinite, glow 4s ease-in-out infinite;
+}
+
+.vera-avatar-idle .depth {
+	filter: blur(22px) opacity(0.65);
+}
+
+@keyframes idle-float {
+	0%, 100% { translate: 0 0; }
+	50%      { translate: 0 -6px; }
+}

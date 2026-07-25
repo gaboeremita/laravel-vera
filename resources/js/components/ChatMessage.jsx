@@ -2,6 +2,7 @@ import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ThinkingBlock from "./ThinkingBlock";
+import veraAvatar from '../../images/vera-avatar.png';
 
 function InlineText({ text }) {
     // Split on VERA-specific patterns: *actions* and (thoughts)
@@ -117,7 +118,15 @@ function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
                         <InlineText text={msg.content} />
                     </p>
                 )}
-                {msg.loading && <span className="cursor-effect text-danger">_</span>}
+                {msg.loading && (
+                    <span className="inline-flex items-center gap-2 align-middle">
+                        <span className="thinking w-4 h-4 inline-block">
+                            <img src={veraAvatar} alt="" aria-hidden="true" className="w-full h-full object-contain" />
+                            <img src={veraAvatar} alt="" aria-hidden="true" className="depth absolute inset-0 w-full h-full object-contain" />
+                        </span>
+                        <span className="thinking-label">{assistantName} is thinking…</span>
+                    </span>
+                )}
             </div>
         </div>
     );

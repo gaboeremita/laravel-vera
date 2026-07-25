@@ -1,5 +1,8 @@
 @import "base.css";
-@import "components.css";
+@import "components/buttons.css";
+@import "components/avatar.css";
+@import "components/thinking-indicator.css";
+@import "components/nebula-background.css";
 @import "themes/default.css";
 @import "themes/slate.css";
 @import "themes/terminal.css";

@@ -1,12 +1,13 @@
 import { ArrowLeft, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export default function Header({ children, status, actions, counter, hideSettings = false, settingsPath = '/settings', onBack }) {
+export default function Header({ children, status, actions, counter, hideSettings = false, settingsPath = '/settings', onBack, align = 'end' }) {
 	const navigate = useNavigate();
+	const alignClass = align === 'center' ? 'items-center' : 'items-end';
 
 	return (
-		<div className="px-5 py-3 border-b border-line-1 flex justify-between items-end shrink-0">
-			<div className="flex items-end gap-4">
+		<div className={`px-5 py-3 border-b border-line-1 flex justify-between ${alignClass} shrink-0`}>
+			<div className={`flex ${alignClass} gap-4`}>
 				{onBack && (
 					<button
 						type="button"
