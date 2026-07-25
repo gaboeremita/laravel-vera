@@ -1,0 +1,85 @@
+/* ── Ambient nebula background for the "no assistant selected" portrait ── */
+/* Only ever renders on the default (light) theme's unselected-assistant screens
+   (login, assistants list, create/edit assistant) — colors are tuned for that
+   background specifically, no need to hedge for the dark persona themes.
+   Three blurred color clouds each loop the full perimeter (all four corners/edges)
+   on their own duration, direction and starting corner, so the set never reads as
+   synchronized. Each also pulses brightness on its own separate cycle — the pulses
+   are desynchronized from each other, not absent. Positions animate via top/left
+   (relative to the container) rather than transform (relative to the element itself)
+   so the travel distance is real rather than a few imperceptible pixels. Teal/rose/
+   amber, kept apart from the avatar's own indigo/purple glow so the two don't mesh. */
+.portrait-nebula {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.nebula-blob {
+	position: absolute;
+	width: 46%;
+	aspect-ratio: 1;
+	border-radius: 50%;
+	filter: blur(46px);
+}
+
+.nebula-blob-1 {
+	background: radial-gradient(circle, rgba(94, 211, 200, 0.6) 0%, transparent 70%);
+	animation: nebula-orbit-a 14s ease-in-out infinite, nebula-pulse-a 6s ease-in-out infinite;
+	animation-delay: 0s, -1.5s;
+}
+
+.nebula-blob-2 {
+	background: radial-gradient(circle, rgba(236, 98, 130, 0.6) 0%, transparent 70%);
+	animation: nebula-orbit-b 18s ease-in-out infinite, nebula-pulse-b 8s ease-in-out infinite;
+	animation-delay: -6s, -4s;
+}
+
+.nebula-blob-3 {
+	background: radial-gradient(circle, rgba(250, 204, 130, 0.55) 0%, transparent 70%);
+	animation: nebula-orbit-c 22s ease-in-out infinite, nebula-pulse-c 5s ease-in-out infinite;
+	animation-delay: -11s, -2.5s;
+}
+
+/* clockwise loop starting top-left: top-left -> top-right -> bottom-right -> bottom-left */
+@keyframes nebula-orbit-a {
+	0%   { top: -12%; left: -12%; }
+	25%  { top: -12%; left: 58%; }
+	50%  { top: 58%;  left: 58%; }
+	75%  { top: 58%;  left: -12%; }
+	100% { top: -12%; left: -12%; }
+}
+
+/* counterclockwise loop starting bottom-left — opposite direction, different phase */
+@keyframes nebula-orbit-b {
+	0%   { top: 58%;  left: -12%; }
+	25%  { top: -12%; left: -12%; }
+	50%  { top: -12%; left: 58%; }
+	75%  { top: 58%;  left: 58%; }
+	100% { top: 58%;  left: -12%; }
+}
+
+/* clockwise loop starting top-right — third phase offset, slowest of the three */
+@keyframes nebula-orbit-c {
+	0%   { top: -12%; left: 58%; }
+	25%  { top: 58%;  left: 58%; }
+	50%  { top: 58%;  left: -12%; }
+	75%  { top: -12%; left: -12%; }
+	100% { top: -12%; left: 58%; }
+}
+
+@keyframes nebula-pulse-a {
+	0%, 100% { opacity: 0.45; }
+	50%      { opacity: 0.9; }
+}
+
+@keyframes nebula-pulse-b {
+	0%, 100% { opacity: 0.4; }
+	50%      { opacity: 0.85; }
+}
+
+@keyframes nebula-pulse-c {
+	0%, 100% { opacity: 0.35; }
+	50%      { opacity: 0.8; }
+}

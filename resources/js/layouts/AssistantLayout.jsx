@@ -27,6 +27,7 @@ export default function AssistantLayout() {
 		fetchConversations();
 		parentContext.fetchEmotions(Number(assistantId));
 
+
 		api.get(route('assistants.show', { id: assistantId }))
 			.then((res) => res.json())
 			.then((data) => {
@@ -42,6 +43,11 @@ export default function AssistantLayout() {
 				setTheme(data.selected_theme);
 			})
 			.catch(() => {});
+
+		return () => {
+			parentContext.setActiveAssistantId(null);
+			setTheme('default');
+		};
 	}, [assistantId]);
 
 	return (
