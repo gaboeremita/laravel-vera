@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import Header from '../components/Header.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import useAssistants from '../hooks/useAssistants.js';
+import veraAvatar from '../../images/vera-avatar.png';
 
 export default function AssistantsPage() {
 	const navigate = useNavigate();
@@ -75,17 +76,12 @@ export default function AssistantsPage() {
 								<div className="flex gap-4 p-4">
 									{/* Avatar */}
 									<div className="w-24 h-24 shrink-0 border border-line-1 overflow-hidden">
-										{assistant.image_url ? (
-											<img
-												src={assistant.image_url}
-												alt={assistant.name}
-												className="w-full h-full object-cover object-top"
-											/>
-										) : (
-											<div className="w-full h-full bg-bg-2 flex items-center justify-center text-fg-3 text-xs">
-												NO IMG
-											</div>
-										)}
+										<img
+											src={assistant.image_url || veraAvatar}
+											alt={assistant.name}
+											onError={(e) => { e.currentTarget.src = veraAvatar; }}
+											className="w-full h-full object-cover object-top"
+										/>
 									</div>
 
 									{/* Info */}
