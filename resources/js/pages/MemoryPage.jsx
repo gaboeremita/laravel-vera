@@ -101,8 +101,8 @@ export default function MemoryPage() {
 
 				<p className="text-fg-3 text-xs">
 					<strong>Summarize last</strong> processes messages added since memory was last
-					refreshed, up to a maximum of 50. <strong>As far as possible</strong> reaches back through
-					the last 200 messages regardless of what's already covered, and adds to what's here —
+					refreshed, summarizing at most the 50 most recent pending messages (older pending messages are skipped).
+					<strong>As far as possible</strong> reaches back through the last 200 messages regardless of what's already covered, and adds to what's here —
 					clear or edit the text above first if you want a clean rewrite instead of an addition.
 					Summarizing runs in the background and can take a moment to appear — reopen this page
 					later to see the result.
