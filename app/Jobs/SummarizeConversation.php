@@ -23,11 +23,12 @@ class SummarizeConversation implements ShouldQueue
 		public Conversation $conversation,
 		public int $upToMessageId,
 		public string $lockedAt,
+		public string $mode = 'since_last',
 	) {}
 
 	public function handle(SummarizeConversationAction $action): void
 	{
-		$action->handle($this->conversation, $this->upToMessageId, $this->lockedAt);
+		$action->handle($this->conversation, $this->upToMessageId, $this->lockedAt, $this->mode);
 
 		$this->releaseLock();
 	}
