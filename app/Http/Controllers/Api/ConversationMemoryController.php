@@ -58,11 +58,13 @@ class ConversationMemoryController extends Controller
 			'mode' => ['sometimes', 'string', 'in:since_last,full'],
 		]);
 
+		$mode = $validated['mode'] ?? 'since_last';
+
 		$conversation = $this->resolveAssistantUser($request, $assistant)
 			->conversations()
 			->findOrFail($id);
 
-		if (($validated['mode'] ?? 'since_last') === 'full') {
+		if ($mode === 'full') {
 			$conversation->update(['memory_checkpoint_message_id' => 0]);
 		}
 
@@ -84,7 +86,7 @@ class ConversationMemoryController extends Controller
 			return response()->json(['queued' => false, 'already_summarizing' => true]);
 		}
 
-		SummarizeConversation::dispatch($conversation, $upToMessageId, $lockedAt);
+		SummarizeConversation::dispatch($conversation, $upToMessageId, $lockedAt, $mode);
 
 		return response()->json(['queued' => true]);
 	}

@@ -100,11 +100,12 @@ export default function MemoryPage() {
 				/>
 
 				<p className="text-fg-3 text-xs">
-					<strong>Since last update</strong> only processes messages added since memory was last
-					refreshed. <strong>As far as possible</strong> reaches back through the last 200 messages
-					regardless of what's already covered, and adds to what's here — clear or edit the text
-					above first if you want a clean rewrite instead of an addition. Summarizing runs in the
-					background and can take a moment to appear — reopen this page later to see the result.
+					<strong>Summarize last</strong> processes messages added since memory was last
+					refreshed, summarizing at most the 50 most recent pending messages (older pending messages are skipped).
+					<strong>As far as possible</strong> reaches back through the last 200 messages regardless of what's already covered, and adds to what's here —
+					clear or edit the text above first if you want a clean rewrite instead of an addition.
+					Summarizing runs in the background and can take a moment to appear — reopen this page
+					later to see the result.
 				</p>
 
 				<div className="flex gap-4 justify-end shrink-0">
@@ -113,7 +114,7 @@ export default function MemoryPage() {
 						disabled={isSummarizing || isLocked || pendingCount === 0}
 						className="button-primary"
 					>
-						{isSummarizing ? 'SUMMARIZING...' : `SINCE LAST UPDATE (${pendingCount})`}
+						{isSummarizing ? 'SUMMARIZING...' : `SUMMARIZE LAST (${Math.min(pendingCount, 50)})`}
 					</button>
 					<button
 						onClick={summarizeAsFarAsPossible}

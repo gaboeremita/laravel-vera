@@ -12,6 +12,8 @@ class SummarizeConversation
 
 	private const MAX_BACKLOG_MESSAGES = 200;
 
+	private const MAX_SINCE_LAST_MESSAGES = 50;
+
 	private const FALLBACK_INSTRUCTIONS = 'Write a brief narrative summary of this conversation segment.';
 
 	public function __construct(private LlmManager $llmManager) {}
@@ -39,7 +41,7 @@ class SummarizeConversation
 			->exists();
 	}
 
-	public function handle(Conversation $conversation, int $upToMessageId, string $lockedAt): void
+	public function handle(Conversation $conversation, int $upToMessageId, string $lockedAt, string $mode = 'since_last'): void
 	{
 		$checkpoint = $conversation->memory_checkpoint_message_id ?? 0;
 
@@ -49,10 +51,12 @@ class SummarizeConversation
 
 		$pendingCount = $pendingQuery->count();
 
-		if ($pendingCount > self::MAX_BACKLOG_MESSAGES) {
+		$maxBacklog = $mode === 'full' ? self::MAX_BACKLOG_MESSAGES : self::MAX_SINCE_LAST_MESSAGES;
+
+		if ($pendingCount > $maxBacklog) {
 			$skipToId = (clone $pendingQuery)
 				->orderByDesc('id')
-				->skip(self::MAX_BACKLOG_MESSAGES)
+				->skip($maxBacklog)
 				->value('id');
 
 			$checkpoint = $skipToId ?? $checkpoint;
