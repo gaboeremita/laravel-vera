@@ -208,7 +208,6 @@ class ConversationController extends Controller
 		}
 
 		$content = $response->content;
-		\Illuminate\Log\log($content);
 		$ttsInstructions = null;
 		if ($tts) {
 			$result = $tts->parseLlmResponse($response->content);
