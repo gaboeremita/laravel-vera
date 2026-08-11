@@ -170,6 +170,8 @@ class ConversationController extends Controller
 			->append('emotion tags', ['available emotions' => $emotions])
 			->except($excludedSections);
 
+		$voiceModel = null;
+
 		if (! empty($validated['voice_mode'])) {
 			$voiceModel = (new TtsManager())->resolveVoiceModel($assistantUser);
 
@@ -190,19 +192,33 @@ class ConversationController extends Controller
 
 		$systemPrompt = $director->build();
 
+		$tts = $voiceModel ? (new TtsManager())->fromModel($voiceModel) : null;
+
 		try {
 			$llm = (new LlmManager())->forAssistantUser($assistantUser);
-			$response = $llm->chat([
-				['role' => 'system', 'content' => $systemPrompt],
-				...$validated['messages'],
-			]);
+			$response = $llm->chat(
+				messages: [
+					['role' => 'system', 'content' => $systemPrompt],
+					...$validated['messages'],
+				],
+				options: $tts?->llmOptions() ?? [],
+			);
 		} catch (\RuntimeException $e) {
 			return response()->json(['message' => $e->getMessage()], 502);
 		}
 
+		$content = $response->content;
+		\Illuminate\Log\log($content);
+		$ttsInstructions = null;
+		if ($tts) {
+			$result = $tts->parseLlmResponse($response->content);
+			$content = $result->content;
+			$ttsInstructions = $result->ttsInstructions;
+		}
+
 		$assistantMessage = $conversation->messages()->create([
 			'role' => 'assistant',
-			'content' => $response->content,
+			'content' => $content,
 			'thinking' => $response->thinking,
 		]);
 
@@ -224,8 +240,9 @@ class ConversationController extends Controller
 
 		return response()->json([
 			'conversation_id' => $conversation->id,
-			'content' => $response->content,
+			'content' => $content,
 			'thinking' => $response->thinking,
+			'tts_instructions' => $ttsInstructions,
 		]);
 	}
 }

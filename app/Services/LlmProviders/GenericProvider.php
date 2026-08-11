@@ -42,13 +42,14 @@ class GenericProvider implements LlmProvider
         );
     }
 
-    public function chat(array $messages): LlmResponse
+    public function chat(array $messages, array $options = []): LlmResponse
     {
         $payload = [
             'model' => $this->model,
             'stream' => $this->stream,
             'messages' => array_map([$this, 'formatMessage'], $messages),
             ...$this->params,
+            ...$options,
         ];
 
         $headers = [];
@@ -61,12 +62,14 @@ class GenericProvider implements LlmProvider
             ->post($this->url, $payload);
 
         if ($response->failed()) {
+            \Illuminate\Support\Facades\Log::error('[GenericProvider] LLM request failed', ['status' => $response->status(), 'body' => $response->body()]);
             throw new \RuntimeException('LLM request failed: '.$response->body());
         }
 
         $data = $response->json();
 
         if (isset($data['error'])) {
+            \Illuminate\Support\Facades\Log::error('[GenericProvider] LLM error', ['error' => $data['error']]);
             throw new \RuntimeException('LLM error: '.($data['error']['message'] ?? 'Unknown error'));
         }
 

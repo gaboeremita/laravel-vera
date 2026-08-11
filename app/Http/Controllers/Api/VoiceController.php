@@ -46,6 +46,7 @@ class VoiceController extends Controller
 
 		$validated = $request->validate([
 			'text' => ['required', 'string'],
+			'instructions' => ['sometimes', 'nullable', 'string'],
 		]);
 
 		$voiceSettings = Cache::rememberForever(
@@ -62,6 +63,11 @@ class VoiceController extends Controller
 			}
 		);
 
+		$options = [];
+		if (! empty($validated['instructions'])) {
+			$options['instructions'] = $validated['instructions'];
+		}
+
 		try {
 			$tts = $voiceSettings['tts_model_id']
 				? $ttsManager->fromModel(VoiceModel::with('provider')->findOrFail($voiceSettings['tts_model_id']))
@@ -70,6 +76,7 @@ class VoiceController extends Controller
 			$audio = $tts->synthesize(
 				text: $validated['text'],
 				voice: $voiceSettings['tts_voice'],
+				options: $options,
 			);
 		} catch (\RuntimeException $e) {
 			return response()->json(['message' => $e->getMessage()], 502);

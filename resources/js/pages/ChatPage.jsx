@@ -195,12 +195,14 @@ export default function ChatPage() {
 		return () => scrollEl.removeEventListener('scroll', handleScroll);
 	}, [loadOlderMessages]);
 
-	const playSynthesizedAudio = async (rawText) => {
+	const playSynthesizedAudio = async (rawText, ttsInstructions = null) => {
 		const text = stripForSpeech(rawText);
 		if (!text) return;
 
 		try {
-			const response = await api.post(route('voice.synthesize', { assistant: assistantId }), { text });
+			const payload = { text };
+			if (ttsInstructions) payload.instructions = ttsInstructions;
+			const response = await api.post(route('voice.synthesize', { assistant: assistantId }), payload);
 
 			if (!response.ok) {
 				const errorData = await response.json().catch(() => ({}));
@@ -281,6 +283,7 @@ export default function ChatPage() {
 				const thinking = data.thinking || null;
 
 				const { emotion, intimate, text: cleanText } = parseEmotionFromResponse(rawReply, emotionNames);
+				const ttsInstructions = data.tts_instructions ?? null;
 
 				if (intimate !== unlocked) {
 					fetchEmotions(assistantId);
@@ -290,11 +293,11 @@ export default function ChatPage() {
 				setHasError(false);
 				setMessages([
 					...updatedMessages,
-					{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking },
+					{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions },
 				]);
 				setIsLoading(false);
 				if (voiceMode && !voiceMuted) {
-					playSynthesizedAudio(cleanText);
+					playSynthesizedAudio(cleanText, ttsInstructions);
 				}
 				return;
 			} catch (error) {
