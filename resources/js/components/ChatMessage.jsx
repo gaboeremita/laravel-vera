@@ -2,6 +2,7 @@ import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ThinkingBlock from "./ThinkingBlock";
+import VoiceInstructionsBlock from "./VoiceInstructionsBlock";
 import veraAvatar from '../../images/vera-avatar.png';
 
 function InlineText({ text }) {
@@ -99,6 +100,7 @@ function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
             </span>
 
             {isAssistant && msg.thinking && <ThinkingBlock content={msg.thinking} />}
+            {isAssistant && msg.ttsInstructions && <VoiceInstructionsBlock content={msg.ttsInstructions} />}
 
             {msg.image && (
                 <img

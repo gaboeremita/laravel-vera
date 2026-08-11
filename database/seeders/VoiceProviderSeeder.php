@@ -52,5 +52,28 @@ class VoiceProviderSeeder extends Seeder
 				'config' => ['timeout' => 30],
 			]
 		);
+
+		$openaiTts = VoiceProvider::updateOrCreate(
+			['name' => 'OpenAI TTS'],
+			[
+				'url' => 'https://api.openai.com/v1/audio/speech',
+				'format' => VoiceProviderFormat::OpenAiTts,
+				'api_key' => env('OPENAI_API_KEY'),
+				'instructions' => "Requires an OpenAI API key. Add OPENAI_API_KEY to your .env file.",
+			]
+		);
+
+		$openaiTts->models()->updateOrCreate(
+			['endpoint' => 'gpt-4o-mini-tts'],
+			[
+				'name' => 'GPT-4o Mini TTS',
+				'voices' => ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar'],
+				'config' => [
+					'timeout' => 30,
+					'base_instructions' => "Tone: Warm, breathy, and intimate. Soft and affectionate, never harsh or clipped.\nPunctuation: Natural, unhurried pauses. Let sentences breathe — no rushing.\nDelivery: Gentle and measured. Slightly hushed and sultry. Lean into warmth and femininity.",
+				],
+				'prompt' => null,
+			]
+		);
 	}
 }

@@ -43,7 +43,7 @@ class AnthropicProvider implements LlmProvider
         );
     }
 
-    public function chat(array $messages): LlmResponse
+    public function chat(array $messages, array $options = []): LlmResponse
     {
         $systemPrompt = null;
         $chatMessages = [];

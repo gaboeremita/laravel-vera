@@ -9,7 +9,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
-class OpenAiCompatibleTtsProvider implements TtsProvider
+class OpenAiTtsProvider implements TtsProvider
 {
 	public function __construct(
 		private readonly string $url,
@@ -17,6 +17,7 @@ class OpenAiCompatibleTtsProvider implements TtsProvider
 		private readonly ?string $apiKey,
 		private readonly ?string $defaultVoice,
 		private readonly int $timeout,
+		private readonly ?string $baseInstructions = null,
 	) {}
 
 	public static function fromModel(VoiceModel $voiceModel): static
@@ -28,7 +29,8 @@ class OpenAiCompatibleTtsProvider implements TtsProvider
 			model: $voiceModel->endpoint,
 			apiKey: $provider->api_key,
 			defaultVoice: $voiceModel->voices[0] ?? null,
-			timeout: $voiceModel->config['timeout'] ?? 120,
+			timeout: $voiceModel->config['timeout'] ?? 30,
+			baseInstructions: $voiceModel->config['base_instructions'] ?? null,
 		);
 	}
 
@@ -39,14 +41,20 @@ class OpenAiCompatibleTtsProvider implements TtsProvider
 			$headers['Authorization'] = "Bearer {$this->apiKey}";
 		}
 
+		$payload = [
+			'model' => $this->model,
+			'input' => $text,
+			'voice' => $voice ?? $this->defaultVoice,
+		];
+
+		if (! empty($options['instructions'])) {
+			$payload['instructions'] = $options['instructions'];
+		}
+
 		try {
 			$response = Http::timeout($this->timeout)
 				->withHeaders($headers)
-				->post($this->url, [
-					'model' => $this->model,
-					'input' => $text,
-					'voice' => $voice ?? $this->defaultVoice,
-				]);
+				->post($this->url, $payload);
 		} catch (ConnectionException $e) {
 			throw new RuntimeException('Failed to connect to TTS provider: '.$e->getMessage());
 		}
@@ -60,7 +68,25 @@ class OpenAiCompatibleTtsProvider implements TtsProvider
 
 	public function parseLlmResponse(string $content): VoiceModeResult
 	{
-		return new VoiceModeResult(content: $content);
+		$emotion = null;
+		if (preg_match('/\[([a-zA-Z]+)\]/', $content, $matches)) {
+			$emotion = $matches[1];
+		}
+
+		return new VoiceModeResult(
+			content: $content,
+			ttsInstructions: $this->buildInstructions($emotion),
+		);
+	}
+
+	private function buildInstructions(?string $emotion): ?string
+	{
+		$parts = array_filter([
+			$this->baseInstructions,
+			$emotion ? "Emotion: {$emotion}" : null,
+		]);
+
+		return $parts ? implode("\n", $parts) : null;
 	}
 
 	public function llmOptions(): array

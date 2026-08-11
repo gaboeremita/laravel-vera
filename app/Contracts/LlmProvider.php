@@ -12,7 +12,7 @@ interface LlmProvider
 	 *
 	 * @param array<int, array{role: string, content: string|null, images?: array}> $messages
 	 */
-	public function chat(array $messages): LlmResponse;
+	public function chat(array $messages, array $options = []): LlmResponse;
 
 	public static function fromModel(AiModel $aiModel): static;
 }
