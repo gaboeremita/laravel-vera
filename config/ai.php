@@ -52,4 +52,10 @@ return [
 		'chat_id' => (int) env('TELEGRAM_CHAT_ID'),
 		'assistant_id' => (int) env('TELEGRAM_ASSISTANT_ID')
 	],
+
+	'discord' => [
+		'api_url' => env('DISCORD_API_URL', 'http://localhost:3001'),
+		'api_secret' => env('DISCORD_API_SECRET'),
+		'timeout' => (int) env('DISCORD_API_TIMEOUT', 10),
+	],
 ];

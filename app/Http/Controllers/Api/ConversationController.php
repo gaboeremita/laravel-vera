@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Directors\PromptDirector;
 use App\Http\Controllers\Controller;
 use App\Jobs\SummarizeConversation;
+use App\Models\Conversation;
 use App\Models\Image;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\TtsProviders\TtsManager;
@@ -221,6 +222,155 @@ class ConversationController extends Controller
 			'thinking' => $response->thinking,
 		]);
 
+		$this->checkpointAutoSummarize($conversation, $assistantMessage->id);
+
+		return response()->json([
+			'conversation_id' => $conversation->id,
+			'content' => $content,
+			'thinking' => $response->thinking,
+			'tts_instructions' => $ttsInstructions,
+		]);
+	}
+
+	public function sendDiscordMessage(Request $request, int $assistant): JsonResponse
+	{
+		$validated = $request->validate([
+			'channel_id' => ['required', 'string'],
+			'message_id' => ['nullable', 'string'],
+			'content' => ['nullable', 'string'],
+			'images' => ['sometimes', 'array'],
+		]);
+
+		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+		$conversation = $assistantUser->conversations()->firstOrCreate(
+			['discord_channel_id' => $validated['channel_id']],
+			['title' => 'New conversation'],
+		);
+
+		$message = $conversation->messages()->create([
+			'role' => 'user',
+			'discord_message_id' => $validated['message_id'] ?? null,
+			'content' => $validated['content'] ?? '',
+		]);
+
+		if (! empty($validated['images'][0])) {
+			$storagePath = "messages/{$request->user()->id}/{$conversation->id}";
+			Image::storeFromBase64($validated['images'][0], $message, $storagePath);
+		}
+
+		$assistantModel = $assistantUser->assistant;
+		$archive = $request->user()->archives()->first();
+
+		$director = (new PromptDirector($assistantModel->prompt))
+			->except(['opening_message', 'voice mode', 'emotion tags']);
+
+		if ($archive && ! empty($validated['content'])) {
+			$director->withRetrieval($validated['content'], $archive->id);
+		}
+
+		$director->withLongTermMemory($conversation);
+		$director->withDiscordEnvironment($conversation, $assistantUser);
+
+		$systemPrompt = $director->build();
+
+		$ownMessages = $conversation->messages()
+			->orderBy('created_at')
+			->get(['role', 'content', 'discord_message_id', 'created_at'])
+			->map(fn ($m) => [
+				'role' => $m->role,
+				'content' => $m->content,
+				'discord_message_id' => $m->discord_message_id,
+				'created_at' => $m->created_at,
+			]);
+
+		$siblingMessages = Conversation::query()
+			->whereHas('assistantUser', fn ($q) => $q->where('user_id', $request->user()->id))
+			->where('discord_channel_id', $validated['channel_id'])
+			->where('id', '!=', $conversation->id)
+			->with('assistantUser.assistant')
+			->get()
+			->flatMap(function (Conversation $sibling) {
+				$assistantName = $sibling->assistantUser->assistant->name;
+
+				return $sibling->messages()
+					->get(['role', 'content', 'discord_message_id', 'created_at'])
+					->map(fn ($m) => [
+						'role' => 'user',
+						'content' => $m->role === 'assistant' ? "{$assistantName}: {$m->content}" : $m->content,
+						'discord_message_id' => $m->discord_message_id,
+						'created_at' => $m->created_at,
+					]);
+			});
+
+		// A message mentioning multiple bots gets saved once per bot, into each bot's own
+		// conversation — dedupe those by Discord message id so it isn't repeated in the merged view.
+		$seenDiscordMessageIds = [];
+
+		$history = $ownMessages
+			->concat($siblingMessages)
+			->sortBy('created_at')
+			->values()
+			->filter(function ($m) use (&$seenDiscordMessageIds) {
+				if (! $m['discord_message_id']) {
+					return true;
+				}
+
+				if (in_array($m['discord_message_id'], $seenDiscordMessageIds, true)) {
+					return false;
+				}
+
+				$seenDiscordMessageIds[] = $m['discord_message_id'];
+
+				return true;
+			})
+			->map(fn ($m) => ['role' => $m['role'], 'content' => $m['content']])
+			->values()
+			->toArray();
+
+		if (! empty($validated['images'][0]) && count($history) > 0) {
+			$lastIndex = array_key_last($history);
+			$history[$lastIndex]['images'] = [$validated['images'][0]];
+		}
+
+		try {
+			$llm = (new LlmManager())->forAssistantUser($assistantUser);
+			$response = $llm->chat(messages: [
+				['role' => 'system', 'content' => $systemPrompt],
+				...$history,
+			]);
+		} catch (\RuntimeException $e) {
+			return response()->json(['message' => $e->getMessage()], 502);
+		}
+
+		$content = $response->content;
+		$emotion = 'neutral';
+
+		if (preg_match('/^\[([a-z]+)\]/', $content, $match)) {
+			$emotion = $match[1];
+			$content = trim(substr($content, strlen($match[0])));
+		}
+
+		$assistantMessage = $conversation->messages()->create([
+			'role' => 'assistant',
+			'content' => $content,
+			'thinking' => $response->thinking,
+			'emotion' => $emotion,
+		]);
+
+		if ($conversation->title === 'New conversation') {
+			$conversation->update([
+				'title' => str($validated['content'] ?? '')->limit(50)->toString(),
+			]);
+		}
+
+		$this->checkpointAutoSummarize($conversation, $assistantMessage->id);
+
+		return response()->json(['content' => $content]);
+	}
+
+	private function checkpointAutoSummarize(Conversation $conversation, int $assistantMessageId): void
+	{
 		$checkpoint = $conversation->memory_checkpoint_message_id ?? 0;
 		$pendingCount = $conversation->messages()->where('id', '>', $checkpoint)->count();
 
@@ -233,15 +383,8 @@ class ConversationController extends Controller
 				->update(['memory_summarizing_at' => $lockedAt]);
 
 			if ($locked === 1) {
-				SummarizeConversation::dispatch($conversation, $assistantMessage->id, $lockedAt);
+				SummarizeConversation::dispatch($conversation, $assistantMessageId, $lockedAt);
 			}
 		}
-
-		return response()->json([
-			'conversation_id' => $conversation->id,
-			'content' => $content,
-			'thinking' => $response->thinking,
-			'tts_instructions' => $ttsInstructions,
-		]);
 	}
 }

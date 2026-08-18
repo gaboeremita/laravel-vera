@@ -16,6 +16,7 @@ class Message extends Model
     protected $fillable = [
         'conversation_id',
         'role',
+        'discord_message_id',
         'content',
         'thinking',
         'image',

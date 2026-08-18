@@ -34,4 +34,14 @@ class AssistantUser extends Pivot
 	{
 		return $this->hasMany(Conversation::class, 'assistant_user_id');
 	}
+
+	public function discordServers(): HasMany
+	{
+		return $this->hasMany(AssistantDiscordServer::class, 'assistant_user_id');
+	}
+
+	public function discordChannels(): HasMany
+	{
+		return $this->hasMany(AssistantDiscordChannel::class, 'assistant_user_id');
+	}
 }

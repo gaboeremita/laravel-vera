@@ -75,6 +75,12 @@ export default function ConversationsPage() {
 						>
 							VOICE
 						</button>
+						<button
+							onClick={() => navigate(`/assistants/${assistantId}/discord`)}
+							className="button-primary"
+						>
+							DISCORD
+						</button>
 					</div>
 				}
 			>

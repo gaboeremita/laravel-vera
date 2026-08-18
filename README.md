@@ -126,6 +126,11 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_USER_ID=
 TELEGRAM_CHAT_ID=
 TELEGRAM_ASSISTANT_ID=
+
+# Discord (optional — see Discord Integration below)
+DISCORD_API_URL=http://localhost:3001
+DISCORD_API_SECRET=
+DISCORD_API_TIMEOUT=10
 ```
 
 ### LLM Providers
@@ -249,6 +254,28 @@ KittenTTS's `VoiceProvider` row is already seeded pointing at `http://127.0.0.1:
 
 This is specific to Orpheus, not TTS in general — KittenTTS runs in well under a second on CPU. Orpheus replies currently take **5–15 seconds** to generate: it's a 3B-parameter model generating audio as thousands of discrete tokens, autoregressively, on consumer-grade hardware rather than dedicated inference hardware — this is architectural, not a misconfiguration. There's no streaming support in the current pipeline. See [ARCHITECTURE.md → Known Limitations](./ARCHITECTURE.md#known-limitations-1) for the full breakdown and what would actually fix it.
 
+## Discord Integration
+
+Any assistant can hold conversations in Discord, the same way it does through the web app or Telegram. Unlike Telegram (a single long-poll command inside this app), Discord runs through a separate bridge service — [node-discord-api](https://github.com/gaboeremita/node-discord-api) — since Discord requires a persistent Gateway (WebSocket) connection per bot, not a poll loop. See [ARCHITECTURE.md → Discord Integration](./ARCHITECTURE.md#discord-integration) for the full pipeline and data model.
+
+### Setup
+
+1. Clone and configure [node-discord-api](https://github.com/gaboeremita/node-discord-api) separately — it holds Discord bot tokens and the Gateway connections, and is never given database access; it only talks to this app over HTTP.
+2. Set `DISCORD_API_URL` and `DISCORD_API_SECRET` in this app's `.env` to match the bridge's own `DISCORD_API_PORT`/`DISCORD_API_SECRET` — this secret authenticates the bridge's discovery requests into this app.
+3. Generate a Sanctum token for the bridge to authenticate as your user when relaying messages:
+   ```bash
+   php artisan tinker --execute 'echo App\Models\User::find(1)->createToken("discord-api")->plainTextToken;'
+   ```
+   Put that token in the bridge's own `.env` as `DISCORD_API_TOKEN` — it's how the bridge calls this app's `discord-messages` endpoint as you, separate from the shared secret above (which only protects the discovery endpoint).
+4. Go to an assistant's **Discord** page (`/assistants/:id/discord`) to see which Discord servers/channels its bot is currently in, set each channel's trigger mode (off / always / on mention), and write optional per-server and per-channel prompt context.
+
+### How it fits together
+
+This app never talks to Discord directly and never stores a bot token. The bridge owns the Gateway connection and calls two endpoints on this app:
+
+- `GET /api/assistants/{assistant}/discord/discovery` — returns the bridge's live view of its servers/channels, and this app's own config for each (trigger mode, prompt). Also syncs `discord_servers`/`discord_channels` so they have a stable internal id to attach prompts to.
+- `POST /api/assistants/{assistant}/discord-messages` — the bridge calls this once it decides a message should get a reply (per the trigger mode). Conversation history for that Discord channel is resolved and loaded entirely server-side, same as Telegram — the bridge only ever sends the new message, never the whole history.
+
 ## Project Structure
 
 ```
@@ -281,9 +308,10 @@ laravel-vera/
 │   │       ├── AssistantController.php       # CRUD for assistants (multipart, emotion images)
 │   │       ├── AssistantEmotionController.php# Per-assistant emotion store/update/destroy
 │   │       ├── AssistantPromptController.php # Prompt CRUD (show/store/update/destroy)
-│   │       ├── ConversationController.php    # CRUD + message sending (voice_mode flag, voice prompt injection)
+│   │       ├── ConversationController.php    # CRUD + message sending (voice_mode flag, voice prompt injection, sendDiscordMessage)
+│   │       ├── DiscordController.php         # Discovery proxy (syncs discord_servers/channels) + server/channel prompt updates
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
-│   │       ├── SettingsController.php        # Theme + active LLM/voice model + voice selection
+│   │       ├── SettingsController.php        # Theme + active LLM/voice model + voice selection + Discord trigger mode
 │   │       ├── VoiceController.php           # Transcribe / synthesize
 │   │       ├── VoiceProviderController.php   # Read-only catalog + prompt-only update
 │   │       └── VoiceModelController.php      # Prompt-only update
@@ -296,8 +324,12 @@ laravel-vera/
 │   │   ├── AiModel.php                       # DB-managed LLM model
 │   │   ├── VoiceProvider.php                 # Seeded TTS provider catalog entry
 │   │   ├── VoiceModel.php                    # Seeded TTS model catalog entry
-│   │   ├── Conversation.php
-│   │   ├── Message.php
+│   │   ├── DiscordServer.php                 # Known Discord server (guild id + name)
+│   │   ├── DiscordChannel.php                # Known Discord channel, belongs to a DiscordServer
+│   │   ├── AssistantDiscordServer.php        # Per-assistant server prompt
+│   │   ├── AssistantDiscordChannel.php       # Per-assistant channel trigger mode + prompt
+│   │   ├── Conversation.php                  # discord_channel_id ties a conversation to a Discord channel
+│   │   ├── Message.php                       # discord_message_id dedupes across assistants sharing a channel
 │   │   ├── Emotion.php                       # Expression name + restricted flag
 │   │   ├── Archive.php
 │   │   ├── ArchiveEntry.php
@@ -319,7 +351,7 @@ laravel-vera/
 │       │   └── OpenAiCompatibleTtsProvider.php # Talks to any OpenAI-compatible /v1/audio/speech backend
 │       └── TelegramService.php               # Telegram API wrapper
 ├── config/
-│   └── ai.php                                # Default LLM + embedding + stt + tts (fallback) + telegram config
+│   └── ai.php                                # Default LLM + embedding + stt + tts (fallback) + telegram + discord config
 ├── database/
 │   ├── migrations/
 │   │   ├── create_conversations_table.php
@@ -331,7 +363,11 @@ laravel-vera/
 │   │   ├── create_ai_models_table.php
 │   │   ├── create_settings_table.php
 │   │   ├── create_voice_providers_table.php  # name/url/api_key/format/instructions/prompt
-│   │   └── create_voice_models_table.php     # provider_id/name/endpoint/voices/config/prompt
+│   │   ├── create_voice_models_table.php     # provider_id/name/endpoint/voices/config/prompt
+│   │   ├── create_discord_servers_table.php  # discord_guild_id/name
+│   │   ├── create_discord_channels_table.php # discord_server_id/discord_channel_id/name
+│   │   ├── create_assistant_discord_servers_table.php  # assistant_user_id/discord_server_id/prompt (json)
+│   │   └── create_assistant_discord_channels_table.php # assistant_user_id/discord_channel_id/trigger_mode/prompt (json)
 │   └── seeders/
 │       └── VoiceProviderSeeder.php           # Seeds the TTS catalog (Orpheus, KittenTTS) — re-run to add more
 ├── resources/js/
@@ -352,7 +388,8 @@ laravel-vera/
 │   │   ├── PromptPage.jsx                    # Visual prompt editor
 │   │   ├── SettingsPage.jsx                  # Theme only
 │   │   ├── ProvidersPage.jsx                 # AI provider/model management
-│   │   └── VoicePage.jsx                     # Read-only voice catalog; select model/voice, edit prompts
+│   │   ├── VoicePage.jsx                     # Read-only voice catalog; select model/voice, edit prompts
+│   │   └── DiscordPage.jsx                   # Discord servers/channels; trigger mode + prompt editor per channel
 │   ├── components/
 │   │   ├── common/
 │   │   │   ├── Accordion.jsx                 # Reusable collapsible accordion
@@ -361,6 +398,8 @@ laravel-vera/
 │   │   ├── ProviderAccordion.jsx             # Provider config + nested models
 │   │   ├── VoiceProviderAccordion.jsx        # Read-only provider info + prompt editor
 │   │   ├── VoiceModelAccordion.jsx           # Voice picker (free text + hints) + prompt editor
+│   │   ├── DiscordServerAccordion.jsx        # Server prompt editor + nested channel accordions
+│   │   ├── DiscordChannelAccordion.jsx       # Trigger mode select + channel prompt editor
 │   │   ├── PromptTreeEditor.jsx              # Manual/Paste-JSON toggle around a usePromptTree instance
 │   │   ├── EmotionGrid.jsx                   # Emotion image manager (add/rename/replace/delete)
 │   │   ├── PromptEditor.jsx                  # Local prompt tree editor (create/edit flows)
@@ -379,9 +418,10 @@ laravel-vera/
 │   │   ├── useEmotions.js                    # Emotion set fetching
 │   │   ├── useLocalPrompt.js                 # Local-only prompt tree state
 │   │   ├── usePrompt.js                      # Prompt tree CRUD + save/destroy (assistant prompt)
-│   │   ├── usePromptTree.js                  # Generic prompt tree editing state (reused by voice prompts)
+│   │   ├── usePromptTree.js                  # Generic prompt tree editing state (reused by voice + Discord prompts)
 │   │   ├── useProviders.js                   # Provider/model CRUD + active model state
 │   │   ├── useVoiceProviders.js              # Read-only catalog + model/voice selection
+│   │   ├── useDiscordSettings.js             # Discovery data + immediate-save trigger mode changes
 │   │   ├── useToast.js                       # Toast notification state
 │   │   └── useVoiceMode.js                   # Mic capture + voice activity detection
 │   └── utils/
@@ -417,6 +457,7 @@ laravel-vera/
 - **Archive with RAG** — editable knowledge base with semantic retrieval injected into the system prompt
 - **Toast notifications** — non-intrusive feedback for UI actions
 - **Telegram integration** — long-poll bot for interacting with any configured assistant via Telegram
+- **Discord integration** — assistants respond in Discord via a separate bridge service, with per-channel trigger modes (off/always/on mention), per-server and per-channel prompt context, and shared awareness between assistants configured for the same channel. See [Discord Integration](#discord-integration)
 - **Voice Mode** — speak to an assistant and hear replies read back; local STT (whisper.cpp, single fixed backend) and pluggable, DB-managed TTS. See [Voice Mode](#voice-mode)
 - **Provider-agnostic TTS** — any backend speaking the OpenAI-compatible `/v1/audio/speech` shape plugs in via a seeded `VoiceProvider`/`VoiceModel` row, no new code. Orpheus and KittenTTS confirmed working
 - **Per-provider/per-model voice prompts** — backend-specific instructions (e.g. Orpheus's inline vocal tags) live on the `VoiceProvider`/`VoiceModel` record and are injected only while that backend is active, via the same visual prompt-tree editor used for assistant prompts

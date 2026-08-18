@@ -102,6 +102,11 @@ All routes behind `auth:sanctum` middleware:
 | PUT | `/api/assistants/{assistant}/settings/model` | `SettingsController@selectModel` |
 | PUT | `/api/assistants/{assistant}/settings/voice-model` | `SettingsController@selectVoiceModel` |
 | PUT | `/api/assistants/{assistant}/settings/voice` | `SettingsController@updateVoice` |
+| PUT | `/api/assistants/{assistant}/settings/discord` | `SettingsController@updateDiscord` (per-channel trigger mode) |
+| GET | `/api/assistants/{assistant}/discord/discovery` | `DiscordController@discovery` — proxies node-discord-api, syncs `discord_servers`/`discord_channels`, merges in trigger mode + prompt |
+| PUT | `/api/assistants/{assistant}/discord/servers/{guildId}/prompt` | `DiscordController@updateServerPrompt` |
+| PUT | `/api/assistants/{assistant}/discord/channels/{channelId}/prompt` | `DiscordController@updateChannelPrompt` |
+| POST | `/api/assistants/{assistant}/discord-messages` | `ConversationController@sendDiscordMessage` — called by node-discord-api, not the browser |
 | GET | `/api/assistants/{assistant}/emotions` | `EmotionController@index` |
 | POST | `/api/assistants/{assistant}/emotions` | `AssistantEmotionController@store` |
 | POST | `/api/assistants/{assistant}/emotions/{emotion}` | `AssistantEmotionController@update` |
@@ -171,6 +176,7 @@ Full conversation lifecycle, scoped to `assistants/{assistant}`:
   6. Resolves the LLM provider via `LlmManager::forAssistantUser()`
   7. Calls `chat()`, saves the assistant reply (content + thinking)
   8. Returns `conversation_id`, `content`, `thinking`
+- `sendDiscordMessage` — the Discord equivalent, called by node-discord-api rather than the browser. Takes `channel_id`/`message_id`/`content`/`images` instead of a client-supplied history array. See [Discord Integration](#discord-integration) for the full flow; the auto-summarize checkpoint logic (`checkpointAutoSummarize`) is a private method shared between this and `sendMessage` rather than duplicated
 
 **`AiProviderController`**
 CRUD for `AiProvider` records. API key is encrypted at rest and never returned in responses (`has_key` boolean appended instead). Validates `format` against the `AiProviderFormat` enum.
@@ -184,8 +190,13 @@ CRUD for `AiModel` records nested under a provider. Manages `name`, `endpoint`, 
 - `selectModel` — saves `ai_model_id` into settings data, or clears it (nullable)
 - `selectVoiceModel` — saves `tts_model_id`, mirrors `selectModel`; writes through to the voice cache (see [Voice Settings & Caching](#voice-settings--caching))
 - `updateVoice` — saves `tts_voice` independently of model selection; also writes through to the voice cache
+- `updateDiscord` — replaces the full set of `assistant_discord_channels` rows for this assistant from the submitted `channels` array (upsert each, then delete any not in the submitted set); `show` also returns `discord_channels` sourced from these rows, not `Settings.data` — this is the one piece of "settings" that lives in its own relational tables rather than the JSON blob (see [Discord Integration](#discord-integration))
 
 Voice model and voice selection were split out of the theme `update` action into their own endpoints — theme is a simple always-editable preference, but voice model selection behaves like LLM model selection (pick-to-activate from a catalog), so it got its own action instead of being bundled with unrelated settings.
+
+**`DiscordController`**
+- `discovery` — proxies `GET {DISCORD_API_URL}/assistants/{assistant}/discovery` on node-discord-api (authenticated via the `X-Internal-Secret` header, `DISCORD_API_SECRET`), then syncs the returned guilds/channels into `discord_servers`/`discord_channels` (`updateOrCreate`, keyed by the Discord snowflake id) and merges in this assistant's own `trigger_mode`/`prompt` for each channel and `prompt` for each server before returning. Returns `{guilds: [], message: '...'}` with a 502 if node-discord-api is unreachable, rather than a hard failure, since the settings page still needs to render
+- `updateServerPrompt` / `updateChannelPrompt` — save the JSON prompt tree for one server or channel, looked up by the raw Discord id (not the internal numeric id, since the frontend only ever has the Discord id from the discovery response). `updateChannelPrompt` requires the `assistant_discord_channels` row to already exist (i.e. a trigger mode already set via `updateDiscord`) — it returns a 422 rather than silently creating a row with no trigger mode
 
 **`EmotionController`**
 Returns the emotion set for the active assistant filtered by `restricted` flag. `?unlocked=true` returns alternate expressions.
@@ -299,7 +310,7 @@ The system prompt is assembled entirely on the backend from data stored in the d
 Renders a prompt config array recursively into natural language. Strings pass through as-is, sequential arrays become comma-separated lists, associative arrays become labeled sub-sections.
 
 **`App\Directors\PromptDirector`**
-Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `only([...])`, `except([...])`, and `append(key, value)` for injecting dynamic data (e.g. emotion tags, retrieved lore, voice provider/model prompts — see [Prompt Architecture for Voice Mode](#prompt-architecture-for-voice-mode)). Called on every `sendMessage` request. Also supports `withRetrieval()` for RAG — embedding the user's message and retrieving semantically similar archive entries.
+Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `only([...])`, `except([...])`, and `append(key, value)` for injecting dynamic data (e.g. emotion tags, retrieved lore, voice provider/model prompts — see [Prompt Architecture for Voice Mode](#prompt-architecture-for-voice-mode)). Called on every `sendMessage` request. Also supports `withRetrieval()` for RAG — embedding the user's message and retrieving semantically similar archive entries — and `withDiscordEnvironment()`, called only from `sendDiscordMessage`, which injects server/channel prompt context and sibling-assistant awareness (see [Discord Integration](#discord-integration)).
 
 ### Models & Database
 
@@ -340,13 +351,23 @@ Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `on
 - Belongs to `VoiceProvider`
 
 **`Conversation`**
-- `assistant_user_id`, `title`
+- `assistant_user_id`, `title`, `discord_channel_id` (nullable)
 - Has many `Message`s
+- `discord_channel_id` is unique per `(assistant_user_id, discord_channel_id)` — one conversation per assistant per Discord channel, `firstOrCreate`'d by `sendDiscordMessage` on the first message in a channel. Channel ids are globally unique across Discord (not scoped per-server), so this works unmodified across any number of servers
 
 **`Message`**
-- `conversation_id`, `role`, `content`, `thinking`, `emotion`
+- `conversation_id`, `role`, `discord_message_id` (nullable), `content`, `thinking`, `emotion`
 - `thinking` stores the LLM's internal reasoning chain
-- `emotion` is defined but not yet written by the controller (frontend-only state)
+- `emotion` is defined but not yet written by the controller (frontend-only state) for web-originated messages — Discord and Telegram both do parse and store it (see [Discord Integration](#discord-integration))
+- `discord_message_id` holds the real Discord snowflake for messages that came from Discord, used to dedupe when a single Discord message triggers more than one assistant
+
+**`DiscordServer`** — `discord_guild_id` (unique), `name`. Global catalog, not per-assistant; synced from node-discord-api's live view on every `discovery` call. Has many `DiscordChannel`s
+
+**`DiscordChannel`** — `discord_server_id`, `discord_channel_id` (unique), `name`. Belongs to `DiscordServer`
+
+**`AssistantDiscordServer`** (pivot) — `assistant_user_id`, `discord_server_id`, `prompt` (nullable JSON, same tree structure as `Assistant->prompt`). One row per assistant per server it's configured for — the same physical server can have a different prompt per assistant
+
+**`AssistantDiscordChannel`** (pivot) — `assistant_user_id`, `discord_channel_id`, `trigger_mode` (`off`/`always`/`mention`), `prompt` (nullable JSON). Unique per `(assistant_user_id, discord_channel_id)`. This is what node-discord-api reads (via `SettingsController@show`) to decide whether to relay a given message at all
 
 **`Emotion`** — `name`, `restricted`, `assistant_id`; morphOne `Image`, morphOne `Video`
 
@@ -393,6 +414,7 @@ The app uses React Router. `app.jsx` defines all routes:
   settings                           → SettingsPage
   providers                          → ProvidersPage
   voice                              → VoicePage
+  discord                            → DiscordPage
 *                                    → redirect to /assistants
 ```
 
@@ -458,6 +480,13 @@ Voice provider/model catalog — structurally similar to `ProvidersPage` but rea
 - Picking a voice for an inactive model activates that model in the same action (`useVoiceProviders.chooseVoice`) — no separate SELECT-then-pick-voice step
 - Each accordion embeds a `PromptTreeEditor` for that provider's/model's `prompt` field, saved independently via the narrow `updatePrompt` endpoints
 
+**`DiscordPage`**
+Servers/channels the assistant's Discord bot is currently in — structurally the same pattern as `VoicePage`:
+- Loads everything from a single `GET .../discord/discovery` call via `useDiscordSettings`, which already returns trigger mode and prompt merged in per channel/server (see [Discord Integration](#discord-integration)) — no second request needed the way `VoicePage` needs one for the catalog and one for settings
+- `DiscordServerAccordion` per server, `DiscordChannelAccordion` nested per channel, same accordion-in-accordion shape as `VoiceProviderAccordion`/`VoiceModelAccordion`
+- Trigger mode changes save immediately on selection (`useDiscordSettings.setChannelTrigger`), matching `VoicePage`'s pick-to-activate convention — no separate batched save button
+- Server and channel prompts each get their own `PromptTreeEditor`, saved independently, same as the voice provider/model prompts
+
 ### Key Components
 
 **`Accordion`** (`components/common/`)
@@ -476,13 +505,19 @@ Displays the current emotion set for an assistant. Supports adding new emotions 
 Reusable prompt tree editor — recursive `PromptNode` rendering, "+ ADD SECTION" at the root, save button. Used both for the assistant's own prompt (`PromptPage`, plus create/edit flows before a prompt is saved to the DB) and, via `PromptTreeEditor`, for voice provider/model prompts.
 
 **`PromptTreeEditor`**
-Wraps `PromptEditor` with the Manual/Paste JSON toggle (same switcher `PromptPage` has inline) so any `usePromptTree` instance — not just the assistant's own prompt — gets the same editing UX. Used by `VoiceProviderAccordion`/`VoiceModelAccordion`.
+Wraps `PromptEditor` with the Manual/Paste JSON toggle (same switcher `PromptPage` has inline) so any `usePromptTree` instance — not just the assistant's own prompt — gets the same editing UX. Used by `VoiceProviderAccordion`/`VoiceModelAccordion` and, later, `DiscordServerAccordion`/`DiscordChannelAccordion` — none of the three needed a new editor built for them.
 
 **`VoiceProviderAccordion`**
 Read-only provider info (name, `instructions` with auto-linked URLs) plus a `PromptTreeEditor` for the provider's `prompt`. Embeds `VoiceModelAccordion` for each model. No edit/save/delete on the provider's own config fields — only `prompt` is writable.
 
 **`VoiceModelAccordion`**
 Free-text voice input (with the model's seeded `voices` as `<datalist>` suggestions, not a hard dropdown) plus a `PromptTreeEditor` for the model's `prompt`. Header shows `● ACTIVE` badge when this model is the selected `tts_model_id`; picking a voice on an inactive model activates it in the same action.
+
+**`DiscordServerAccordion`**
+A `PromptTreeEditor` for the server's own prompt, plus a nested `DiscordChannelAccordion` per channel in that server — same shape as `VoiceProviderAccordion` embedding `VoiceModelAccordion`.
+
+**`DiscordChannelAccordion`**
+Trigger-mode select (off/always/mention) plus a `PromptTreeEditor` for the channel's prompt. Header shows the current trigger mode as a badge when it's not `off`, mirroring `ModelAccordion`'s `● ACTIVE` badge convention.
 
 **`Portrait`**
 Three rendering modes:
@@ -528,13 +563,17 @@ When no assistant is active, renders a neutral waiting state.
 **`usePromptTree(initialValue, onSave, addToast)`**
 - Generic version of `usePrompt`'s tree-editing logic, extracted so it isn't tied to the assistant-prompt endpoints — persistence is left entirely to the caller via `onSave(sections)`
 - Same manipulation API (`setValueAtPath`, `addKey`, `removeKey`, `renameKey`, `addListItem`, `removeListItem`, `updateListItem`) plus `save()` and `saveFromJson(json)`
-- Used by `VoiceProviderAccordion`/`VoiceModelAccordion`, each instantiating their own with a `PATCH .../updatePrompt` call as `onSave`
+- Used by `VoiceProviderAccordion`/`VoiceModelAccordion`, each instantiating their own with a `PATCH .../updatePrompt` call as `onSave`; `DiscordServerAccordion`/`DiscordChannelAccordion` do the same with a `PUT .../discord/servers|channels/{id}/prompt` call
 
 **`useVoiceProviders(addToast, assistantId)`**
 - Loads the catalog from `GET /api/voice-providers` and `tts_model_id`/`tts_voice` from `GET /api/assistants/{assistant}/settings` in parallel
 - No CRUD — the catalog is read-only from the frontend's perspective
 - `chooseVoice(modelId, voice)` — if `modelId` isn't already active, selects it first (`PUT .../settings/voice-model`), then sets the voice (`PUT .../settings/voice`); both write through the same cache `SettingsController` populates, so `VoiceController::synthesize` stays a cache hit
 - `deactivateModel()` — clears both `tts_model_id` and `tts_voice`, falling back to `.env`
+
+**`useDiscordSettings(addToast, assistantId)`**
+- Loads everything from a single `GET .../discord/discovery` call — guilds, channels, trigger mode, and prompt all arrive together (unlike `useVoiceProviders`, which needs two requests), since `DiscordController@discovery` already merges the DB config in server-side
+- `setChannelTrigger(guild, channel, mode)` — saves immediately via `PUT .../settings/discord`, sending the full recomputed channel list (that endpoint replaces the whole set rather than patching one row)
 
 **`useEmotions`** — fetches emotion name → `{ image_url, video_url }` map; `fetchEmotions(assistantId)` to reload for a specific assistant
 **`useToast`** — add/remove toasts with auto-dismiss
@@ -782,6 +821,88 @@ A mic toggle button and a mute button (shown only while listening) sit in the me
 
 ---
 
+## Discord Integration
+
+Assistants can hold conversations in Discord, the same way they do through the web app or Telegram. Discord's requirements ruled out reusing Telegram's approach directly: Telegram's `getUpdates` is a plain long-poll endpoint, callable from a normal synchronous PHP loop, but Discord only delivers messages over a persistent Gateway WebSocket connection, and expects a heartbeat roughly every 40 seconds or it drops the connection. A PHP `while(true)` loop blocked on an LLM call for 10-30+ seconds would miss those heartbeats. So Discord runs through a **separate Node.js service**, [node-discord-api](https://github.com/gaboeremita/node-discord-api), built on `discord.js` — Node's non-blocking I/O model means an `await fetch()` to this app doesn't stall the Gateway connection's own heartbeat timer, whereas the same blocking pattern would be a real risk in PHP or in a ReactPHP-based alternative (Laravel-flavored `Http::` calls run synchronously against ReactPHP's single event loop too).
+
+This app never holds a Discord bot token and never talks to Discord's API directly. node-discord-api owns the Gateway connections and all Discord-specific mechanics (intents, mentions, message chunking); this app only ever sees plain HTTP requests from it, authenticated as a normal user via Sanctum.
+
+### Pipeline Diagram
+
+```mermaid
+sequenceDiagram
+    participant U as Discord user
+    participant D as Discord Gateway
+    participant B as node-discord-api
+    participant L as Laravel (this app)
+    participant LLM as LLM Provider
+
+    U->>D: sends a message in a channel
+    D->>B: MESSAGE_CREATE event
+    B->>B: look up channelConfig[channel.id] — off / always / mention
+    Note over B: skip entirely if off, or if mention mode and the bot wasn't @mentioned
+    B->>D: sendTyping() (re-sent every 8s while waiting — Discord's own indicator expires after ~10s)
+    B->>L: POST /discord-messages { channel_id, message_id, content, images? }
+    L->>L: firstOrCreate Conversation by (assistant_user, discord_channel_id)
+    L->>L: save user Message (discord_message_id set, for later dedup)
+    L->>L: load channel history + merge sibling assistants' replies for the same channel, dedupe by discord_message_id
+    L->>L: PromptDirector — except([opening_message, voice mode, emotion tags]) + withDiscordEnvironment()
+    L->>LLM: system prompt + history
+    LLM-->>L: reply text
+    L->>L: save assistant Message, auto-title on first message, checkpointAutoSummarize()
+    L-->>B: { content }
+    B->>B: split into ≤1900-char chunks (Discord's hard limit is 2000)
+    B->>D: send reply, one message per chunk
+    D->>U: sees the reply
+```
+
+### Trigger Modes
+
+Each `(assistant, channel)` pair has a `trigger_mode` on `assistant_discord_channels`: **`off`** (default — the assistant ignores everything in that channel), **`always`** (responds to every non-bot message), or **`mention`** (responds only when actually @mentioned — a real Discord mention, the `<@user_id>` form the client inserts when you pick someone from the autocomplete, not just typing their name as text). node-discord-api fetches this config from `SettingsController@show` on login and refreshes it every 60 seconds, so a trigger-mode change made on the Discord settings page takes effect without restarting the bridge.
+
+### Multi-Assistant Shared Channel Awareness
+
+Multiple assistants (Vera, Mona, or any others) can be configured for the same Discord channel — that's the actual point of the integration, not an edge case. Each still gets its own `Conversation` row (`assistant_user_id` + `discord_channel_id`, unique together), so `long_term_memory` and the auto-summarize checkpoint stay correctly scoped per assistant rather than shared. But `sendDiscordMessage`'s history isn't limited to that one conversation — it also pulls in every *other* configured assistant's messages for the same `discord_channel_id`:
+
+```php
+$siblingMessages = Conversation::query()
+    ->whereHas('assistantUser', fn ($q) => $q->where('user_id', $request->user()->id))
+    ->where('discord_channel_id', $validated['channel_id'])
+    ->where('id', '!=', $conversation->id)
+    ->get()
+    ->flatMap(function ($sibling) {
+        // every message, not just assistant replies — human messages that only
+        // triggered a *different* assistant still belong in this one's view of the channel
+    });
+```
+
+Everything from a sibling conversation becomes `role: user` from the current assistant's perspective — its own past replies stay `role: assistant`, but another assistant's replies are relabeled `"{AssistantName}: {content}"` and merged in chronologically. Chat completion APIs only understand a two-party `user`/`assistant` turn structure, so there's no native way to represent "a third party said something" — prefixing the content and folding it into `user` turns is the practical workaround, and it reads naturally: from the model's point of view, it's just hearing multiple voices in the room, the same way a human would in a real group chat.
+
+**The dedup problem this creates, and how it's solved:** if a message mentions two assistants at once, both get triggered and each saves its own copy of that human message into its own conversation. Naively merging "every message from every sibling conversation" would then show that duplicated message twice. `Message.discord_message_id` — the real Discord snowflake, sent by node-discord-api on every `discord-messages` call — solves this without content/timestamp guessing: the merge keeps the first occurrence of any given `discord_message_id` and drops the rest, while `null` (every assistant-generated reply, which was never a Discord message) is never deduped against other `null`s.
+
+### `PromptDirector::withDiscordEnvironment()`
+
+Injected only by `sendDiscordMessage`, this adds:
+- A `discord location` section — which server and channel, by name
+- `discord server context` / `discord channel context` — the assistant's own `AssistantDiscordServer`/`AssistantDiscordChannel` `prompt`, if one's been written, rendered through the normal `PromptBuilder` recursion (same string/list/object structure as the assistant's own prompt, not a flat string)
+- `other discord participants` — names of any sibling assistants configured for the same channel, so the model knows it isn't alone even before anyone else has said anything yet
+
+Excluded sections for Discord (`except(['opening_message', 'voice mode', 'emotion tags'])`) mirror the reasoning behind voice mode's exclusions above: `opening_message` has nothing to seed since a Discord conversation always starts from a real user message; `voice mode` is irrelevant since Discord is text-only; `emotion tags` is skipped because there's no UI on the Discord side to render the tag against (unlike the web app's `Portrait`) — the reply is still parsed for a leading `[tag]` and stripped before saving, for consistency with how every other message row looks, but the model isn't prompted to produce one.
+
+### Discovery & Internal IDs
+
+`discord_servers`/`discord_channels` exist purely so per-server/per-channel config (`prompt`, `trigger_mode`) has something stable to attach to, since a raw Discord snowflake alone can't hold a `belongsTo`. They're kept in sync by `DiscordController@discovery` — every time the Discord settings page loads, it `updateOrCreate`s a `DiscordServer`/`DiscordChannel` row per guild/channel node-discord-api reports seeing live, before merging in this assistant's config and returning the combined result. This means a channel has to have been *seen* at least once (any assistant's discovery call touching that server is enough) before a prompt can be attached to it — there's no way to pre-configure a channel the bot hasn't joined yet.
+
+### Known Limitations
+
+- **No real Discord `@mention` capability yet** — the "other discord participants" injection only tells an assistant sibling assistants' *names*; it can't give them a working `<@user_id>` mention, because that id lives only in node-discord-api (each bot knows its own `client.user.id` and, since all bots run in one process, each other's), and this app was never given it. An assistant can reference another by name in plain text, but writing that name doesn't produce a real Discord ping the way `<@id>` would. Closing this gap means node-discord-api exposing bot user ids somewhere this app can read them — not built.
+- **No full member-list awareness** — an assistant knows which *other assistants* share a channel (from `assistant_discord_channels`), not which human members can see or are active in it. Real member visibility would need the `GUILD_MEMBERS` privileged intent (a third Developer Portal toggle beyond `MESSAGE_CONTENT`) plus an explicit `guild.members.fetch()` call on node-discord-api's side, and there's no cheap way to scope that down to "who can see this specific channel" beyond fetching everyone and checking permissions per member. Deliberately out of scope for now.
+- **node-discord-api is a separate, unmanaged process** — like the voice-mode backends, it isn't started, monitored, or restarted by Laravel, Herd, or a queue. If it isn't running, `DiscordController@discovery` degrades gracefully (returns `{guilds: [], message: '...'}` with a 502 rather than a hard error, so the settings page still renders), but no assistant will actually respond in Discord until it's started again.
+- **A single unhandled `client.login()` failure crashes every bot in the process, not just the one that failed** — all bots run in one Node process for simplicity (letting them share the discovery HTTP server and see each other's `client.user.id` locally), so a transient network failure on one bot's login is an unhandled promise rejection that takes the whole process down, not just that bot. Restarts have been rare enough in practice that this hasn't been fixed with retry/backoff logic yet.
+- **No test coverage** — `sendDiscordMessage`, `DiscordController`, and the sibling-message merge/dedup logic have no automated tests yet, same repo-wide sqlite/`vector`-column blocker as the rest of the feature test suite (see [Voice Mode → Known Limitations](#known-limitations-1)).
+
+---
+
 ## Authentication Flow
 
 The app uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
@@ -804,6 +925,7 @@ The app uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
 
 - **Emotion not persisted** — the `emotion` column exists on `messages` but is never written. Emotion state is frontend-only.
 - **Voice mode implemented, with known gaps** — see [Voice Mode → Known Limitations](#known-limitations-1): notably Orpheus's 5-15s latency (backend-specific, not universal), no per-assistant speed control, no streaming, voice lists that can drift from what's actually loaded on hot-swappable backends, and a repo-wide test-DB issue blocking feature tests for the voice endpoints and the whole TTS provider system.
+- **Discord integration implemented, with known gaps** — see [Discord Integration → Known Limitations](#known-limitations-2): no real `@mention` capability yet (name-only awareness of other assistants), no member-list visibility, and node-discord-api is an unmanaged separate process with no test coverage on either side.
 - **Metrics not implemented** — affection/trust/patience system planned but not built.
 
 ### Planned Features
@@ -811,6 +933,7 @@ The app uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
 - Local image generation (ComfyUI/Stable Diffusion)
 - Orpheus latency reduction specifically (faster local TTS, smaller quantization, or cloud-hosted inference) — KittenTTS is already fast; this only affects the expressive/vocal-tag backend
 - Per-assistant voice settings beyond voice selection (speed, per-emotion tag mapping)
+- Real Discord `@mention` support for assistants addressing each other (needs bot user ids surfaced from node-discord-api)
 
 ---
 
@@ -842,9 +965,10 @@ laravel-vera/
 │   │       ├── AssistantController.php         assistant CRUD (multipart, emotion images)
 │   │       ├── AssistantEmotionController.php  per-assistant emotion store/update/destroy
 │   │       ├── AssistantPromptController.php   prompt CRUD (show/store/update/destroy)
-│   │       ├── ConversationController.php      CRUD + sendMessage (voice_mode flag, voice provider/model prompt injection)
+│   │       ├── ConversationController.php      CRUD + sendMessage (voice_mode flag, voice provider/model prompt injection) + sendDiscordMessage
+│   │       ├── DiscordController.php           discovery proxy (syncs discord_servers/channels) + server/channel prompt updates
 │   │       ├── EmotionController.php           serve emotions (locked/unlocked)
-│   │       ├── SettingsController.php          theme + LLM model + voice model + voice selection
+│   │       ├── SettingsController.php          theme + LLM model + voice model + voice selection + Discord trigger mode
 │   │       ├── VoiceController.php             transcribe / synthesize
 │   │       ├── VoiceProviderController.php     read-only catalog index; prompt-only update
 │   │       └── VoiceModelController.php        prompt-only update
@@ -852,14 +976,18 @@ laravel-vera/
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Assistant.php                       name/slug/prompt/opening_message/archive_id
-│   │   ├── AssistantUser.php                   pivot; has many Conversations
+│   │   ├── AssistantUser.php                   pivot; has many Conversations, AssistantDiscordServers/Channels
 │   │   ├── Settings.php                        data JSON (theme, ai_model_id, tts_model_id, tts_voice) + voiceCacheKey()
 │   │   ├── AiProvider.php                      url/api_key(encrypted)/format/config_schema
 │   │   ├── AiModel.php                         name/endpoint/thinking/prompt/config
 │   │   ├── VoiceProvider.php                   name/url/api_key(encrypted)/format/instructions/prompt — seeded, not user_id-owned
 │   │   ├── VoiceModel.php                      provider_id/name/endpoint/voices/config/prompt
-│   │   ├── Conversation.php                    assistant_user_id/title
-│   │   ├── Message.php                         role/content/thinking/emotion
+│   │   ├── DiscordServer.php                   discord_guild_id/name — global catalog, synced from discovery
+│   │   ├── DiscordChannel.php                  discord_server_id/discord_channel_id/name
+│   │   ├── AssistantDiscordServer.php          assistant_user_id/discord_server_id/prompt (json)
+│   │   ├── AssistantDiscordChannel.php         assistant_user_id/discord_channel_id/trigger_mode/prompt (json)
+│   │   ├── Conversation.php                    assistant_user_id/title/discord_channel_id
+│   │   ├── Message.php                         role/content/thinking/emotion/discord_message_id
 │   │   ├── Emotion.php                         name/restricted, morphOne Image/Video
 │   │   ├── Archive.php                         name/description, belongs to User
 │   │   ├── ArchiveEntry.php                    title/content/keywords, many-to-many Tags
@@ -879,9 +1007,9 @@ laravel-vera/
 │       │   ├── TtsManager.php                  forAssistantUser() / resolveVoiceModel() / fromModel() / fromConfig()
 │       │   └── OpenAiCompatibleTtsProvider.php posts text to any /v1/audio/speech backend
 │       └── TelegramService.php                 getUpdates + sendMessage
-├── config/ai.php                               default provider + embedding + stt + tts (fallback) + telegram
+├── config/ai.php                               default provider + embedding + stt + tts (fallback) + telegram + discord
 ├── database/
-│   ├── migrations/                             all tables, incl. voice_providers/voice_models + their prompt columns
+│   ├── migrations/                             all tables, incl. voice_providers/voice_models + discord_servers/channels + their prompt columns
 │   └── seeders/VoiceProviderSeeder.php         seeds the TTS catalog (Orpheus, KittenTTS); re-run to add more
 ├── routes/
 │   ├── web.php                                 SPA entry + auth routes + /vendor/vad/{file}
@@ -903,7 +1031,8 @@ laravel-vera/
 │   │   ├── PromptPage.jsx
 │   │   ├── SettingsPage.jsx                    theme only
 │   │   ├── ProvidersPage.jsx
-│   │   └── VoicePage.jsx                       read-only voice catalog; select model/voice, edit prompts
+│   │   ├── VoicePage.jsx                       read-only voice catalog; select model/voice, edit prompts
+│   │   └── DiscordPage.jsx                     servers/channels; trigger mode + prompt editor per channel
 │   ├── components/
 │   │   ├── common/
 │   │   │   ├── Accordion.jsx                   label/title/badge/actions/collapsed
@@ -912,6 +1041,8 @@ laravel-vera/
 │   │   ├── ProviderAccordion.jsx               provider form + nested models
 │   │   ├── VoiceProviderAccordion.jsx          read-only provider info (instructions, auto-linked) + prompt editor
 │   │   ├── VoiceModelAccordion.jsx             free-text voice picker (datalist hints) + prompt editor
+│   │   ├── DiscordServerAccordion.jsx          server prompt editor + nested channel accordions
+│   │   ├── DiscordChannelAccordion.jsx         trigger mode select + channel prompt editor
 │   │   ├── PromptTreeEditor.jsx                Manual/Paste-JSON toggle around a usePromptTree instance
 │   │   ├── EmotionGrid.jsx                     emotion image manager (add/rename/replace/delete)
 │   │   ├── PromptEditor.jsx                    reusable prompt tree editor (assistant prompt + voice prompts)
@@ -933,6 +1064,7 @@ laravel-vera/
 │   │   ├── usePromptTree.js                    generic prompt tree state (caller supplies persistence)
 │   │   ├── useProviders.js                     provider/model CRUD + activeModelId
 │   │   ├── useVoiceProviders.js                read-only catalog + model/voice selection
+│   │   ├── useDiscordSettings.js               discovery data + immediate-save trigger mode changes
 │   │   ├── useToast.js                         toast state
 │   │   └── useVoiceMode.js                     mic capture + VAD, wraps window.vad.MicVAD
 │   └── utils/

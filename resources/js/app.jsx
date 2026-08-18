@@ -18,6 +18,7 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import ProvidersPage from './pages/ProvidersPage.jsx';
 import VoicePage from './pages/VoicePage.jsx';
 import MemoryPage from './pages/MemoryPage.jsx';
+import DiscordPage from './pages/DiscordPage.jsx';
 globalThis.Ziggy = Ziggy;
 
 createRoot(document.getElementById('root')).render(
@@ -42,6 +43,7 @@ createRoot(document.getElementById('root')).render(
                             <Route path="settings" element={<SettingsPage />} />
                             <Route path="providers" element={<ProvidersPage />} />
                             <Route path="voice" element={<VoicePage />} />
+                            <Route path="discord" element={<DiscordPage />} />
                         </Route>
                     </Route>
                     <Route path="*" element={<Navigate to="/assistants" replace />} />
