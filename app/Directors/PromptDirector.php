@@ -5,7 +5,11 @@ namespace App\Directors;
 use App\Builders\PromptBuilder;
 use App\Contracts\EmbeddingProvider;
 use App\Models\ArchiveEntry;
+use App\Models\AssistantDiscordChannel;
+use App\Models\AssistantDiscordServer;
+use App\Models\AssistantUser;
 use App\Models\Conversation;
+use App\Models\DiscordChannel;
 
 class PromptDirector
 {
@@ -124,6 +128,63 @@ class PromptDirector
 			$contextBlock .= "\n</long_term_memory>";
 
 			$this->append('long term memory', $contextBlock);
+		}
+
+		return $this;
+	}
+
+	/**
+	 * Inject awareness of the Discord server/channel this conversation is happening in,
+	 * including any other assistants also configured for the same channel.
+	 */
+	public function withDiscordEnvironment(Conversation $conversation, AssistantUser $assistantUser): static
+	{
+		if (! $conversation->discord_channel_id) {
+			return $this;
+		}
+
+		$channel = DiscordChannel::with('server')
+			->where('discord_channel_id', $conversation->discord_channel_id)
+			->first();
+
+		if (! $channel) {
+			return $this;
+		}
+
+		$this->append('discord location', [
+			'server' => $channel->server->name,
+			'channel' => "#{$channel->name}",
+		]);
+
+		$serverPivot = AssistantDiscordServer::where('assistant_user_id', $assistantUser->id)
+			->where('discord_server_id', $channel->discord_server_id)
+			->first();
+
+		if (! empty($serverPivot?->prompt)) {
+			$this->append('discord server context', $serverPivot->prompt);
+		}
+
+		$channelPivot = AssistantDiscordChannel::where('assistant_user_id', $assistantUser->id)
+			->where('discord_channel_id', $channel->id)
+			->first();
+
+		if (! empty($channelPivot?->prompt)) {
+			$this->append('discord channel context', $channelPivot->prompt);
+		}
+
+		$siblingNames = AssistantDiscordChannel::where('discord_channel_id', $channel->id)
+			->where('assistant_user_id', '!=', $assistantUser->id)
+			->with('assistantUser.assistant')
+			->get()
+			->pluck('assistantUser.assistant.name')
+			->unique()
+			->values();
+
+		if ($siblingNames->isNotEmpty()) {
+			$this->append('other discord participants', [
+				'note' => 'Other AI participants are also active in this channel. You can address them by name in your reply, and they may respond in turn.',
+				'names' => $siblingNames->all(),
+			]);
 		}
 
 		return $this;

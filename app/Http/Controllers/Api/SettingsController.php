@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\Theme;
 use App\Http\Controllers\Controller;
+use App\Models\AssistantDiscordChannel;
+use App\Models\DiscordChannel;
+use App\Models\DiscordServer;
 use App\Models\Settings;
+use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -12,11 +16,26 @@ use Illuminate\Validation\Rules\Enum;
 
 class SettingsController extends Controller
 {
+    use ResolvesAssistantUser;
+
     public function show(Request $request, int $assistant): JsonResponse
     {
         $settings = $request->user()->settings()
             ->where('assistant_id', $assistant)
             ->first();
+
+        $assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+        $discordChannels = $assistantUser->discordChannels()
+            ->with('channel.server')
+            ->get()
+            ->map(fn (AssistantDiscordChannel $ac) => [
+                'guild_id' => $ac->channel->server->discord_guild_id,
+                'guild_name' => $ac->channel->server->name,
+                'channel_id' => $ac->channel->discord_channel_id,
+                'channel_name' => $ac->channel->name,
+                'trigger_mode' => $ac->trigger_mode,
+            ]);
 
         return response()->json([
             'selected_theme' => $settings?->data['theme'] ?? 'default',
@@ -24,7 +43,49 @@ class SettingsController extends Controller
             'ai_model_id' => $settings?->data['ai_model_id'] ?? null,
             'tts_model_id' => $settings?->data['tts_model_id'] ?? null,
             'tts_voice' => $settings?->data['tts_voice'] ?? null,
+            'discord_channels' => $discordChannels,
         ]);
+    }
+
+    public function updateDiscord(Request $request, int $assistant): JsonResponse
+    {
+        $validated = $request->validate([
+            'channels' => ['present', 'array'],
+            'channels.*.guild_id' => ['required', 'string'],
+            'channels.*.guild_name' => ['required', 'string'],
+            'channels.*.channel_id' => ['required', 'string'],
+            'channels.*.channel_name' => ['required', 'string'],
+            'channels.*.trigger_mode' => ['required', 'string', 'in:always,mention'],
+        ]);
+
+        $assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+        $discordChannelIds = [];
+
+        foreach ($validated['channels'] as $channel) {
+            $server = DiscordServer::updateOrCreate(
+                ['discord_guild_id' => $channel['guild_id']],
+                ['name' => $channel['guild_name']],
+            );
+
+            $discordChannel = DiscordChannel::updateOrCreate(
+                ['discord_channel_id' => $channel['channel_id']],
+                ['discord_server_id' => $server->id, 'name' => $channel['channel_name']],
+            );
+
+            AssistantDiscordChannel::updateOrCreate(
+                ['assistant_user_id' => $assistantUser->id, 'discord_channel_id' => $discordChannel->id],
+                ['trigger_mode' => $channel['trigger_mode']],
+            );
+
+            $discordChannelIds[] = $discordChannel->id;
+        }
+
+        $assistantUser->discordChannels()
+            ->whereNotIn('discord_channel_id', $discordChannelIds)
+            ->delete();
+
+        return response()->json(['discord_channels' => $validated['channels']]);
     }
 
     public function selectModel(Request $request, int $assistant): JsonResponse
