@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { formatMessage } from "../utils/formatMessage.jsx";
 
-export default function ThinkingBlock({ content }) {
+export default function ThinkingBlock({ content, label = "Thinking Process" }) {
     const [isOpen, setIsOpen] = useState(false);
 
     if (!content) return null;
@@ -15,7 +15,7 @@ export default function ThinkingBlock({ content }) {
         <span className={`inline-block transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}>
           ▶
         </span>
-                Thinking Process
+                {label}
             </button>
             {isOpen && (
                 <div className="mt-2 pl-4 border-l border-line-1 text-[0.75rem] leading-relaxed text-fg-3 whitespace-pre-wrap">

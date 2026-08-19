@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\ConversationMemoryController;
 use App\Http\Controllers\Api\AssistantEmotionController;
 use App\Http\Controllers\Api\EmotionController;
 use App\Http\Controllers\Api\ArchiveController;
+use App\Http\Controllers\Api\ImageGenModelController;
+use App\Http\Controllers\Api\ImageGenProviderController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\VoiceController;
 use App\Http\Controllers\Api\VoiceModelController;
@@ -32,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::put('/settings/model', [SettingsController::class, 'selectModel'])->name('settings.selectModel');
         Route::put('/settings/voice-model', [SettingsController::class, 'selectVoiceModel'])->name('settings.selectVoiceModel');
+        Route::put('/settings/image-gen-model', [SettingsController::class, 'selectImageGenModel'])->name('settings.selectImageGenModel');
         Route::put('/settings/voice', [SettingsController::class, 'updateVoice'])->name('settings.updateVoice');
         Route::put('/settings/discord', [SettingsController::class, 'updateDiscord'])->name('settings.updateDiscord');
         Route::get('/discord/discovery', [DiscordController::class, 'discovery'])->name('discord.discovery');
@@ -74,6 +77,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/ai-providers/{provider}/models', [AiModelController::class, 'store'])->name('ai-models.store');
     Route::patch('/ai-providers/{provider}/models/{model}', [AiModelController::class, 'update'])->name('ai-models.update');
     Route::delete('/ai-providers/{provider}/models/{model}', [AiModelController::class, 'destroy'])->name('ai-models.destroy');
+
+    Route::get('/image-gen-providers', [ImageGenProviderController::class, 'index'])->name('image-gen-providers.index');
+    Route::post('/image-gen-providers', [ImageGenProviderController::class, 'store'])->name('image-gen-providers.store');
+    Route::patch('/image-gen-providers/{id}', [ImageGenProviderController::class, 'update'])->name('image-gen-providers.update');
+    Route::delete('/image-gen-providers/{id}', [ImageGenProviderController::class, 'destroy'])->name('image-gen-providers.destroy');
+
+    Route::post('/image-gen-providers/{provider}/models', [ImageGenModelController::class, 'store'])->name('image-gen-models.store');
+    Route::patch('/image-gen-providers/{provider}/models/{model}', [ImageGenModelController::class, 'update'])->name('image-gen-models.update');
+    Route::delete('/image-gen-providers/{provider}/models/{model}', [ImageGenModelController::class, 'destroy'])->name('image-gen-models.destroy');
 
     Route::get('/voice-providers', [VoiceProviderController::class, 'index'])->name('voice-providers.index');
     Route::patch('/voice-providers/{id}', [VoiceProviderController::class, 'updatePrompt'])->name('voice-providers.updatePrompt');

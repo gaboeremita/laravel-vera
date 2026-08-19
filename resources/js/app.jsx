@@ -16,6 +16,7 @@ import ArchivePage from './pages/ArchivePage.jsx';
 import PromptPage from './pages/PromptPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import ProvidersPage from './pages/ProvidersPage.jsx';
+import ImageGenProvidersPage from './pages/ImageGenProvidersPage.jsx';
 import VoicePage from './pages/VoicePage.jsx';
 import MemoryPage from './pages/MemoryPage.jsx';
 import DiscordPage from './pages/DiscordPage.jsx';
@@ -42,6 +43,7 @@ createRoot(document.getElementById('root')).render(
                             <Route path="archive" element={<ArchivePage />} />
                             <Route path="settings" element={<SettingsPage />} />
                             <Route path="providers" element={<ProvidersPage />} />
+                            <Route path="image-gen-providers" element={<ImageGenProvidersPage />} />
                             <Route path="voice" element={<VoicePage />} />
                             <Route path="discord" element={<DiscordPage />} />
                         </Route>

@@ -64,6 +64,12 @@ export default function ConversationsPage() {
 							PROVIDERS
 						</button>
 						<button
+							onClick={() => navigate(`/assistants/${assistantId}/image-gen-providers`)}
+							className="button-primary"
+						>
+							IMAGE GEN
+						</button>
+						<button
 							onClick={() => navigate(`/assistants/${assistantId}/archive`)}
 							className="button-primary"
 						>

@@ -10,13 +10,14 @@ export function parseEmotionFromResponse(text, validEmotions = []) {
     const emotionMatch = remaining.match(/^\[([a-zA-Z]+)\]/);
     if (emotionMatch) {
         remaining = remaining.slice(emotionMatch[0].length);
-        if (validEmotions.length === 0 || validEmotions.includes(emotionMatch[1])) {
-            emotion = emotionMatch[1];
+        const matchedEmotion = emotionMatch[1].toLowerCase();
+        if (validEmotions.length === 0 || validEmotions.some((e) => e.toLowerCase() === matchedEmotion)) {
+            emotion = matchedEmotion;
         }
     }
 
     // Check for [intimate] tag immediately after
-    const intimateMatch = remaining.match(/^\[intimate\]/);
+    const intimateMatch = remaining.match(/^\[intimate\]/i);
     const intimate = !!intimateMatch;
     if (intimateMatch) {
         remaining = remaining.slice(intimateMatch[0].length);
