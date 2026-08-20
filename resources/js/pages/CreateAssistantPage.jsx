@@ -170,11 +170,7 @@ export default function CreateAssistantPage() {
 					dot: '●',
 					blink: isSaving,
 				}}
-				actions={
-					<button onClick={() => navigate('/assistants')} className="button-primary">
-						← BACK
-					</button>
-				}
+				onBack={() => navigate('/assistants')}
 			>
 				<span className="text-fg-2 text-sm tracking-[0.05em]">New Assistant</span>
 			</Header>

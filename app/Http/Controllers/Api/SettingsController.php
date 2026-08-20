@@ -29,13 +29,15 @@ class SettingsController extends Controller
         $discordChannels = $assistantUser->discordChannels()
             ->with('channel.server')
             ->get()
+            ->filter(fn (AssistantDiscordChannel $ac) => $ac->channel->server !== null)
             ->map(fn (AssistantDiscordChannel $ac) => [
                 'guild_id' => $ac->channel->server->discord_guild_id,
                 'guild_name' => $ac->channel->server->name,
                 'channel_id' => $ac->channel->discord_channel_id,
                 'channel_name' => $ac->channel->name,
                 'trigger_mode' => $ac->trigger_mode,
-            ]);
+            ])
+            ->values();
 
         return response()->json([
             'selected_theme' => $settings?->data['theme'] ?? 'default',

@@ -6,6 +6,7 @@ import Header from '../components/Header.jsx';
 import { AnimatePresence } from 'framer-motion';
 import EntryAccordion from "../components/EntryAccordion.jsx";
 import ConfirmationModal from "../components/common/ConfirmationModal.jsx";
+import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';
 
 export default function ArchivePage() {
 	const navigate = useNavigate();
@@ -146,19 +147,14 @@ export default function ArchivePage() {
 		}
 	};
 
-	const headerActions = (
-		<button onClick={() => navigate(-1)} className="button-primary">
-			← PREVIOUS PAGE
-		</button>
-	);
-
 	if (isLoading) {
 		return (
 			<>
 				<Header
 					settingsPath={`/assistants/${assistantId}/settings`}
+					menuItems={getAssistantMenuItems(assistantId)}
 					status={{ label: 'LOADING', color: 'text-warning', dot: '●', blink: true }}
-					actions={headerActions}
+					onBack={() => navigate(-1)}
 				>
 					<span className="text-fg-2 text-sm tracking-[0.05em]">Archive</span>
 				</Header>
@@ -174,8 +170,9 @@ export default function ArchivePage() {
 			<>
 				<Header
 					settingsPath={`/assistants/${assistantId}/settings`}
+					menuItems={getAssistantMenuItems(assistantId)}
 					status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
-					actions={headerActions}
+					onBack={() => navigate(-1)}
 				>
 					<span className="text-fg-2 text-sm tracking-[0.05em]">Archive</span>
 				</Header>
@@ -195,9 +192,10 @@ export default function ArchivePage() {
 		<>
 			<Header
 				settingsPath={`/assistants/${assistantId}/settings`}
+				menuItems={getAssistantMenuItems(assistantId)}
 				status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
 				counter={`ENTRIES: ${entries.length}`}
-				actions={headerActions}
+				onBack={() => navigate(-1)}
 			>
 				<span className="text-fg-2 text-sm tracking-[0.05em]">Archive</span>
 			</Header>

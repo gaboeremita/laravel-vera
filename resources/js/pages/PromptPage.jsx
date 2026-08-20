@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import usePrompt from '../hooks/usePrompt.js';
+import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';
 
 export default function PromptPage() {
 	const navigate = useNavigate();
@@ -25,12 +26,9 @@ export default function PromptPage() {
 		return (
 			<>
 				<Header settingsPath={`/assistants/${assistantId}/settings`}
+					menuItems={getAssistantMenuItems(assistantId)}
 					status={{ label: 'LOADING', color: 'text-warning', dot: '●', blink: true }}
-					actions={
-						<button onClick={() => navigate(-1)} className="button-primary">
-							← PREVIOUS PAGE
-						</button>
-					}
+					onBack={() => navigate(-1)}
 				>
 					<span className="text-fg-2 text-sm tracking-[0.05em]">Prompt</span>
 				</Header>
@@ -44,6 +42,7 @@ export default function PromptPage() {
 	return (
 		<>
 			<Header settingsPath={`/assistants/${assistantId}/settings`}
+					menuItems={getAssistantMenuItems(assistantId)}
 				status={{
 					label: prompt.isSaving ? 'SAVING' : 'WAITING',
 					color: prompt.isSaving ? 'text-warning' : 'text-info',
@@ -51,27 +50,23 @@ export default function PromptPage() {
 					blink: prompt.isSaving,
 				}}
 				counter={prompt.sections ? `SECTIONS: ${Object.entries(prompt.sections).length}` : null}
-				actions={
-					<div className="flex items-center gap-3">
-						<button onClick={() => navigate(-1)} className="button-primary">
-							← PREVIOUS PAGE
-						</button>
-						{prompt.sections && (
-							<button
-								onClick={() => prompt.destroy()}
-								className="text-danger text-[0.7rem] tracking-[0.1em] cursor-pointer hover:text-danger transition-colors"
-							>
-								DELETE PROMPT
-							</button>
-						)}
-					</div>
-				}
+				onBack={() => navigate(-1)}
 			>
 				<span className="text-fg-2 text-sm tracking-[0.05em]">Prompt</span>
 			</Header>
 
 			<div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
-				<div className="flex justify-end mb-4">
+				<div className="flex justify-between items-center mb-4">
+					{prompt.sections ? (
+						<button
+							onClick={() => prompt.destroy()}
+							className="text-danger text-[0.7rem] tracking-[0.1em] cursor-pointer hover:text-danger transition-colors"
+						>
+							DELETE PROMPT
+						</button>
+					) : (
+						<span />
+					)}
 					<div className="flex gap-1">
 						{['manual', 'json'].map((mode) => (
 							<button
