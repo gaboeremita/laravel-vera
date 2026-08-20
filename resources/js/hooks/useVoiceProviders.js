@@ -90,7 +90,6 @@ export default function useVoiceProviders(addToast, assistantId) {
 			if (provider.id) {
 				res = await api.put(route('voice-providers.update', { id: provider.id }), payload);
 			} else {
-				payload.api_key = provider.api_key || '';
 				res = await api.post(route('voice-providers.store'), payload);
 			}
 
