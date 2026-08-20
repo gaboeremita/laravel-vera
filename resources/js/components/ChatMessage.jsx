@@ -99,13 +99,15 @@ function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
                 {isAssistant ? `${assistantName.toUpperCase()}>` : 'USER>'}
             </span>
 
-            {isAssistant && msg.thinking && <ThinkingBlock content={msg.thinking} />}
+            {isAssistant && msg.thinking && (
+                <ThinkingBlock content={msg.thinking} label={msg.image ? 'Image Prompt' : 'Thinking Process'} />
+            )}
             {isAssistant && msg.ttsInstructions && <VoiceInstructionsBlock content={msg.ttsInstructions} />}
 
             {msg.image && (
                 <img
                     src={msg.image}
-                    alt="User attachment"
+                    alt={isAssistant ? 'Generated image' : 'User attachment'}
                     className="mt-1 mb-2 max-h-48 rounded border border-line-1"
                 />
             )}
@@ -126,7 +128,9 @@ function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
                             <img src={veraAvatar} alt="" aria-hidden="true" className="w-full h-full object-contain" />
                             <img src={veraAvatar} alt="" aria-hidden="true" className="depth absolute inset-0 w-full h-full object-contain" />
                         </span>
-                        <span className="thinking-label">{assistantName} is thinking…</span>
+                        <span className="thinking-label">
+                            {msg.generatingImage ? 'Generating image…' : `${assistantName} is thinking…`}
+                        </span>
                     </span>
                 )}
             </div>

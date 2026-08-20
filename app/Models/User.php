@@ -58,6 +58,11 @@ class User extends Authenticatable
 		return $this->hasMany(AiProvider::class);
 	}
 
+	public function imageGenProviders(): HasMany
+	{
+		return $this->hasMany(ImageGenProvider::class);
+	}
+
 	public function assistants(): BelongsToMany
 	{
 		return $this->belongsToMany(Assistant::class)

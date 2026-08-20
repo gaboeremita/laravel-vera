@@ -232,6 +232,8 @@ export default function ChatPage() {
 		const text = (usingOverride ? overrideText : input).trim();
 		if ((!text && !pendingImage) || isLoading) return;
 
+		const isImageGen = text.toLowerCase().startsWith('/create-image ');
+
 		const userMsg = {
 			id: `temp-${Date.now()}`,
 			role: 'user',
@@ -241,7 +243,7 @@ export default function ChatPage() {
 		const updatedMessages = [...messages, userMsg];
 		setMessages([
 			...updatedMessages,
-			{ role: 'assistant', content: '', loading: true },
+			{ role: 'assistant', content: '', loading: true, generatingImage: isImageGen },
 		]);
 		if (!usingOverride) setInput('');
 		setPendingImage(null);
@@ -279,6 +281,24 @@ export default function ChatPage() {
 				}
 
 				const data = await response.json();
+
+				if (data.image_url) {
+					const imageEmotion = data.emotion || (data.intimate ? 'seduced' : 'default');
+
+					if (data.intimate !== unlocked) {
+						fetchEmotions(assistantId);
+					}
+
+					setCurrentEmotion(imageEmotion);
+					setHasError(false);
+					setMessages([
+						...updatedMessages,
+						{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: data.content || '', thinking: data.thinking || null, image: data.image_url },
+					]);
+					setIsLoading(false);
+					return;
+				}
+
 				const rawReply = data.content || '[default]\n...signal lost. Try again.';
 				const thinking = data.thinking || null;
 
@@ -419,6 +439,12 @@ export default function ChatPage() {
 							className="button-primary"
 						>
 							PROVIDERS
+						</button>
+						<button
+							onClick={() => navigate(`/assistants/${assistantId}/image-gen-providers`)}
+							className="button-primary"
+						>
+							IMAGE GEN
 						</button>
 						<button
 							onClick={() => navigate(`/assistants/${assistantId}/voice`)}

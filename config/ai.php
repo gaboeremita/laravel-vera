@@ -40,6 +40,14 @@ return [
 		'timeout' => (int) env('AI_TTS_TIMEOUT', 120),
 	],
 
+	'image_gen' => [
+		'url' => env('IMAGE_GEN_URL', 'https://openrouter.ai/api/v1/images'),
+		'key' => env('IMAGE_GEN_API_KEY', env('AI_DEFAULT_API_KEY', '')),
+		'model' => env('IMAGE_GEN_MODEL', 'bytedance-seed/seedream-4.5'),
+		'format' => env('IMAGE_GEN_FORMAT', 'openrouter'),
+		'timeout' => (int) env('IMAGE_GEN_TIMEOUT', 120),
+	],
+
 	'telegram' => [
 		'url' => env('TELEGRAM_URL'),
 		'token' => env('TELEGRAM_BOT_TOKEN'),
