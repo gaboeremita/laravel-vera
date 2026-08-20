@@ -16,14 +16,13 @@ class VoiceModelController extends Controller
 		$validated = $request->validate([
 			'name' => ['required', 'string', 'max:255'],
 			'endpoint' => ['required', 'string', 'max:255'],
-			'voices' => ['nullable', 'array'],
+			'voices' => ['sometimes', 'array'],
 			'voices.*' => ['string'],
-			'config' => ['nullable', 'array'],
+			'config' => ['sometimes', 'array'],
 		]);
 
-		$model = $provider->models()->create($validated);
-
-		return response()->json($model, 201);
+		$validated['voices'] ??= [];
+		$validated['config'] ??= [];
 	}
 
 	public function update(Request $request, int $providerId, int $id): JsonResponse
