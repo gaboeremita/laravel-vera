@@ -4,6 +4,7 @@ import { route } from 'ziggy-js';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
+import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';
 
 export default function SettingsPage() {
 	const { theme, setTheme, availableThemes } = useTheme();
@@ -26,16 +27,10 @@ export default function SettingsPage() {
 	return (
 		<>
 			<Header
-				actions={
-					<button
-						onClick={() => navigate(-1)}
-						className="button-primary"
-					>
-						← BACK
-					</button>
-				}
+				menuItems={getAssistantMenuItems(assistantId)}
+				onBack={() => navigate(-1)}
 			>
-				<span className="text-fg-2 text-lg tracking-[0.05em]">Settings</span>
+				<span className="text-fg-2 text-sm tracking-[0.05em]">Settings</span>
 			</Header>
 
 			<div className="flex-1 overflow-y-auto p-5">

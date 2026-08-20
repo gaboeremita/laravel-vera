@@ -3,6 +3,7 @@ import { route } from 'ziggy-js';
 import ConversationList from '../components/ConversationList.jsx';
 import Header from '../components/Header.jsx';
 import { api } from '../utils/api.js';
+import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';
 
 export default function ConversationsPage() {
 	const { conversations, setConversations, addToast, assistantId} = useOutletContext();
@@ -43,54 +44,10 @@ export default function ConversationsPage() {
 			<Header settingsPath={`/assistants/${assistantId}/settings`}
 				status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
 				counter={`CONVERSATIONS: ${conversations.length}`}
-				actions={
-					<div className="flex gap-2">
-						<button
-							onClick={() => navigate('/assistants')}
-							className="button-primary"
-						>
-							← ASSISTANTS
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/prompt`)}
-							className="button-primary"
-						>
-							PROMPT
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/providers`)}
-							className="button-primary"
-						>
-							PROVIDERS
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/image-gen-providers`)}
-							className="button-primary"
-						>
-							IMAGE GEN
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/archive`)}
-							className="button-primary"
-						>
-							ARCHIVE
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/voice`)}
-							className="button-primary"
-						>
-							VOICE
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/discord`)}
-							className="button-primary"
-						>
-							DISCORD
-						</button>
-					</div>
-				}
+				menuItems={getAssistantMenuItems(assistantId)}
+				onBack={() => navigate('/assistants')}
 			>
-				<span className="text-fg-2 text-lg tracking-[0.05em]">
+				<span className="text-fg-2 text-sm tracking-[0.05em]">
 					Conversations
 				</span>
 			</Header>

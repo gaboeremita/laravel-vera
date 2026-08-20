@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { Pencil, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import { Pencil, Mic, MicOff, Volume2, VolumeX, Brain } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { parseEmotionFromResponse, stripForSpeech } from '../utils/parsers.js';
 import { useVoiceMode } from '../hooks/useVoiceMode.js';
 import ChatMessage from '../components/ChatMessage.jsx';
 import Header from '../components/Header.jsx';
+import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';
 
 export default function ChatPage() {
 	const { id } = useParams();
@@ -420,46 +421,10 @@ export default function ChatPage() {
 				onBack={() => navigate(`/assistants/${assistantId}/conversations`)}
 				status={status}
 				counter={`MESSAGES: ${messages.filter((m) => m.role !== 'system').length}`}
-				actions={
-					<>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/prompt`)}
-							className="button-primary"
-						>
-							PROMPT
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/archive`)}
-							className="button-primary"
-						>
-							ARCHIVE
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/providers`)}
-							className="button-primary"
-						>
-							PROVIDERS
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/image-gen-providers`)}
-							className="button-primary"
-						>
-							IMAGE GEN
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/voice`)}
-							className="button-primary"
-						>
-							VOICE
-						</button>
-						<button
-							onClick={() => navigate(`/assistants/${assistantId}/conversations/${id}/memory`)}
-							className="button-primary"
-						>
-							MEMORY
-						</button>
-					</>
-				}
+				menuItems={[
+					...getAssistantMenuItems(assistantId),
+					{ label: 'Memory', to: `/assistants/${assistantId}/conversations/${id}/memory`, icon: Brain },
+				]}
 			>
 				{isEditingTitle ? (
 					<input

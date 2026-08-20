@@ -4,6 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import Header from '../components/Header.jsx';
 import VoiceProviderAccordion from '../components/VoiceProviderAccordion.jsx';
 import useVoiceProviders from '../hooks/useVoiceProviders.js';
+import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';
 
 export default function VoicePage() {
 	const navigate = useNavigate();
@@ -23,12 +24,9 @@ export default function VoicePage() {
 		return (
 			<>
 				<Header settingsPath={`/assistants/${assistantId}/settings`}
+					menuItems={getAssistantMenuItems(assistantId)}
 					status={{ label: 'LOADING', color: 'text-warning', dot: '●', blink: true }}
-					actions={
-						<button onClick={() => navigate(-1)} className="button-primary">
-							← PREVIOUS PAGE
-						</button>
-					}
+					onBack={() => navigate(-1)}
 				>
 					<span className="text-fg-2 text-sm tracking-[0.05em]">Voice</span>
 				</Header>
@@ -42,13 +40,10 @@ export default function VoicePage() {
 	return (
 		<>
 			<Header settingsPath={`/assistants/${assistantId}/settings`}
+					menuItems={getAssistantMenuItems(assistantId)}
 				status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
 				counter={`PROVIDERS: ${providers.length}`}
-				actions={
-					<button onClick={() => navigate(-1)} className="button-primary">
-						← PREVIOUS PAGE
-					</button>
-				}
+				onBack={() => navigate(-1)}
 			>
 				<span className="text-fg-2 text-sm tracking-[0.05em]">Voice</span>
 			</Header>
