@@ -112,7 +112,11 @@ class SettingsController extends Controller
     public function selectImageGenModel(Request $request, int $assistant): JsonResponse
     {
         $validated = $request->validate([
-            'image_gen_model_id' => ['nullable', 'integer', 'exists:image_gen_models,id'],
+            'image_gen_model_id' => [
+                'nullable',
+                'integer',
+                \Illuminate\Validation\Rule::exists('image_gen_models', 'id')->where(fn ($q) => $q->whereIn('provider_id', $request->user()->imageGenProviders()->select('id'))),
+            ],
         ]);
 
         $settings = $request->user()->settings()
