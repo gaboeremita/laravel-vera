@@ -84,6 +84,32 @@ class PromptDirector
 	}
 
 	/**
+	 * Insert new sections immediately after an existing section, preserving the order
+	 * of everything else. Falls back to appending at the end if the anchor key is missing.
+	 *
+	 * @param array<string, mixed> $sections
+	 */
+	public function insertAfter(string $afterKey, array $sections): static
+	{
+		if (! array_key_exists($afterKey, $this->config)) {
+			$this->config = [...$this->config, ...$sections];
+
+			return $this;
+		}
+
+		$result = [];
+		foreach ($this->config as $key => $value) {
+			$result[$key] = $value;
+			if ($key === $afterKey) {
+				$result = [...$result, ...$sections];
+			}
+		}
+		$this->config = $result;
+
+		return $this;
+	}
+
+	/**
 	 * Retrieve and inject relevant lore entries based on the user's message.
 	 */
 	public function withRetrieval(string $query, int $archiveId, int $limit = 5, float $minSimilarity = 0.5): static

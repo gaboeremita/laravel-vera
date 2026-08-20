@@ -207,12 +207,16 @@ class ConversationController extends Controller
 		if (! empty($validated['voice_mode'])) {
 			$voiceModel = (new TtsManager())->resolveVoiceModel($assistantUser);
 
+			$voiceSections = [];
 			if ($voiceModel?->provider->prompt) {
-				$director->append('voice provider prompt', $voiceModel->provider->prompt);
+				$voiceSections['voice provider prompt'] = $voiceModel->provider->prompt;
+			}
+			if ($voiceModel?->prompt) {
+				$voiceSections['voice model prompt'] = $voiceModel->prompt;
 			}
 
-			if ($voiceModel?->prompt) {
-				$director->append('voice model prompt', $voiceModel->prompt);
+			if ($voiceSections) {
+				$director->insertAfter('identity', $voiceSections);
 			}
 		}
 
