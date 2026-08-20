@@ -192,11 +192,7 @@ export default function EditAssistantPage() {
 			<>
 				<Header
 					status={{ label: 'LOADING', color: 'text-warning', dot: '●', blink: true }}
-					actions={
-						<button onClick={() => navigate('/assistants')} className="button-primary">
-							← BACK
-						</button>
-					}
+					onBack={() => navigate('/assistants')}
 				>
 					<span className="text-fg-2 text-sm tracking-[0.05em]">Edit Assistant</span>
 				</Header>
@@ -216,11 +212,7 @@ export default function EditAssistantPage() {
 					dot: '●',
 					blink: isSaving,
 				}}
-				actions={
-					<button onClick={() => navigate('/assistants')} className="button-primary">
-						← BACK
-					</button>
-				}
+				onBack={() => navigate('/assistants')}
 			>
 				<span className="text-fg-2 text-sm tracking-[0.05em]">
 					Edit — {name}

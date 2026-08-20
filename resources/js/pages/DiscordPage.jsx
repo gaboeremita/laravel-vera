@@ -5,6 +5,7 @@ import Header from '../components/Header.jsx';
 import DiscordServerAccordion from '../components/DiscordServerAccordion.jsx';
 import DiscordDmAccordion from '../components/DiscordDmAccordion.jsx';
 import useDiscordSettings from '../hooks/useDiscordSettings.js';
+import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';
 
 export default function DiscordPage() {
 	const navigate = useNavigate();
@@ -18,12 +19,9 @@ export default function DiscordPage() {
 		return (
 			<>
 				<Header settingsPath={`/assistants/${assistantId}/settings`}
+				menuItems={getAssistantMenuItems(assistantId)}
 					status={{ label: 'LOADING', color: 'text-warning', dot: '●', blink: true }}
-					actions={
-						<button onClick={() => navigate(-1)} className="button-primary">
-							← PREVIOUS PAGE
-						</button>
-					}
+					onBack={() => navigate(-1)}
 				>
 					<span className="text-fg-2 text-sm tracking-[0.05em]">Discord</span>
 				</Header>
@@ -37,13 +35,10 @@ export default function DiscordPage() {
 	return (
 		<>
 			<Header settingsPath={`/assistants/${assistantId}/settings`}
+				menuItems={getAssistantMenuItems(assistantId)}
 				status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
 				counter={`SERVERS: ${guilds.length}`}
-				actions={
-					<button onClick={() => navigate(-1)} className="button-primary">
-						← PREVIOUS PAGE
-					</button>
-				}
+				onBack={() => navigate(-1)}
 			>
 				<span className="text-fg-2 text-sm tracking-[0.05em]">Discord</span>
 			</Header>

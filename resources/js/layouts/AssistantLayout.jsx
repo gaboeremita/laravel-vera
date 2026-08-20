@@ -39,7 +39,7 @@ export default function AssistantLayout() {
 		api.get(route('settings.show', { assistant: assistantId }))
 			.then((res) => res.json())
 			.then((data) => {
-				setAvailableThemes(data.available_themes);
+				setAvailableThemes(data.available_themes ?? []);
 				setTheme(data.selected_theme);
 			})
 			.catch(() => {});
