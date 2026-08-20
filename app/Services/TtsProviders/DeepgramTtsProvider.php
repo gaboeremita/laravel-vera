@@ -26,7 +26,7 @@ class DeepgramTtsProvider implements TtsProvider
 			url: rtrim($provider->url, '/').'/'.ltrim($voiceModel->endpoint, '/'),
 			apiKey: $provider->api_key,
 			defaultVoice: $voiceModel->voices[0] ?? null,
-			timeout: $voiceModel->config['timeout'] ?? 30,
+			timeout: (int) data_get($voiceModel->config, 'timeout', 30),
 		);
 	}
 
