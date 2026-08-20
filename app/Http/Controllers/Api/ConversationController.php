@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SummarizeConversation;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
+use App\Models\DiscordChannel;
 use App\Models\Image;
 use App\Services\ImageGenProviders\ImageGenManager;
 use App\Services\ImageGenProviders\ImageGenPromptEnhancer;
@@ -395,9 +396,17 @@ class ConversationController extends Controller
 			'message_id' => ['nullable', 'string'],
 			'content' => ['nullable', 'string'],
 			'images' => ['sometimes', 'array'],
+			'dm_username' => ['nullable', 'string'],
 		]);
 
 		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+		if (! empty($validated['dm_username'])) {
+			DiscordChannel::updateOrCreate(
+				['discord_channel_id' => $validated['channel_id']],
+				['discord_server_id' => null, 'name' => $validated['dm_username']],
+			);
+		}
 
 		$conversation = $assistantUser->conversations()->firstOrCreate(
 			['discord_channel_id' => $validated['channel_id']],

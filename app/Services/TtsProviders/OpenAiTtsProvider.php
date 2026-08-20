@@ -30,7 +30,7 @@ class OpenAiTtsProvider implements TtsProvider
 			apiKey: $provider->api_key,
 			defaultVoice: $voiceModel->voices[0] ?? null,
 			timeout: $voiceModel->config['timeout'] ?? 30,
-			baseInstructions: $voiceModel->config['base_instructions'] ?? null,
+			baseInstructions: $voiceModel->prompt['tts instructions'] ?? null,
 		);
 	}
 

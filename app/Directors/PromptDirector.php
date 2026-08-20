@@ -134,7 +134,7 @@ class PromptDirector
 	}
 
 	/**
-	 * Inject awareness of the Discord server/channel this conversation is happening in,
+	 * Inject awareness of the Discord server/channel or DM this conversation is happening in,
 	 * including any other assistants also configured for the same channel.
 	 */
 	public function withDiscordEnvironment(Conversation $conversation, AssistantUser $assistantUser): static
@@ -151,17 +151,33 @@ class PromptDirector
 			return $this;
 		}
 
-		$this->append('discord location', [
-			'server' => $channel->server->name,
-			'channel' => "#{$channel->name}",
-		]);
+		$this->append('discord location', $channel->server
+			? ['server' => $channel->server->name, 'channel' => "#{$channel->name}"]
+			: ['dm' => $channel->name]);
 
-		$serverPivot = AssistantDiscordServer::where('assistant_user_id', $assistantUser->id)
-			->where('discord_server_id', $channel->discord_server_id)
-			->first();
+		if ($channel->server) {
+			$serverPivot = AssistantDiscordServer::where('assistant_user_id', $assistantUser->id)
+				->where('discord_server_id', $channel->discord_server_id)
+				->first();
 
-		if (! empty($serverPivot?->prompt)) {
-			$this->append('discord server context', $serverPivot->prompt);
+			if (! empty($serverPivot?->prompt)) {
+				$this->append('discord server context', $serverPivot->prompt);
+			}
+
+			$siblingNames = AssistantDiscordChannel::where('discord_channel_id', $channel->id)
+				->where('assistant_user_id', '!=', $assistantUser->id)
+				->with('assistantUser.assistant')
+				->get()
+				->pluck('assistantUser.assistant.name')
+				->unique()
+				->values();
+
+			if ($siblingNames->isNotEmpty()) {
+				$this->append('other discord participants', [
+					'note' => 'Other AI participants are also active in this channel. You can address them by name in your reply, and they may respond in turn.',
+					'names' => $siblingNames->all(),
+				]);
+			}
 		}
 
 		$channelPivot = AssistantDiscordChannel::where('assistant_user_id', $assistantUser->id)
@@ -169,22 +185,7 @@ class PromptDirector
 			->first();
 
 		if (! empty($channelPivot?->prompt)) {
-			$this->append('discord channel context', $channelPivot->prompt);
-		}
-
-		$siblingNames = AssistantDiscordChannel::where('discord_channel_id', $channel->id)
-			->where('assistant_user_id', '!=', $assistantUser->id)
-			->with('assistantUser.assistant')
-			->get()
-			->pluck('assistantUser.assistant.name')
-			->unique()
-			->values();
-
-		if ($siblingNames->isNotEmpty()) {
-			$this->append('other discord participants', [
-				'note' => 'Other AI participants are also active in this channel. You can address them by name in your reply, and they may respond in turn.',
-				'names' => $siblingNames->all(),
-			]);
+			$this->append($channel->server ? 'discord channel context' : 'discord dm context', $channelPivot->prompt);
 		}
 
 		return $this;

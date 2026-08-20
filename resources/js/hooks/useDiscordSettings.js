@@ -8,6 +8,7 @@ import { route } from 'ziggy-js';
  */
 export default function useDiscordSettings(addToast, assistantId) {
 	const [guilds, setGuilds] = useState([]);
+	const [dms, setDms] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [discoveryError, setDiscoveryError] = useState(null);
 
@@ -18,6 +19,7 @@ export default function useDiscordSettings(addToast, assistantId) {
 				const data = await res.json();
 
 				setGuilds(data.guilds ?? []);
+				setDms(data.dms ?? []);
 				setDiscoveryError(data.guilds?.length ? null : (data.message ?? null));
 			} catch (e) {
 				addToast('Failed to load Discord settings', 'error');
@@ -75,5 +77,5 @@ export default function useDiscordSettings(addToast, assistantId) {
 		}
 	};
 
-	return { guilds, isLoading, discoveryError, setChannelTrigger };
+	return { guilds, dms, isLoading, discoveryError, setChannelTrigger };
 }

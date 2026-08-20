@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AssistantDiscordChannel;
 use App\Models\AssistantDiscordServer;
+use App\Models\AssistantUser;
 use App\Models\DiscordChannel;
 use App\Models\DiscordServer;
 use App\Traits\ResolvesAssistantUser;
@@ -63,7 +64,30 @@ class DiscordController extends Controller
 			}
 		}
 
-		return response()->json(['guilds' => $guilds]);
+		return response()->json(['guilds' => $guilds, 'dms' => $this->dms($assistantUser)]);
+	}
+
+	/**
+	 * DM channels aren't discoverable through discord-api ahead of time — a bot only learns
+	 * about one once a message arrives (see ConversationController::sendDiscordMessage), so
+	 * this reads what's already been recorded locally instead of calling out to discord-api.
+	 *
+	 * @return array<int, array{id: string, name: string, prompt: array}>
+	 */
+	private function dms(AssistantUser $assistantUser): array
+	{
+		$dmChannels = DiscordChannel::whereNull('discord_server_id')->get();
+
+		$channelConfigs = AssistantDiscordChannel::where('assistant_user_id', $assistantUser->id)
+			->whereIn('discord_channel_id', $dmChannels->pluck('id'))
+			->get()
+			->keyBy('discord_channel_id');
+
+		return $dmChannels->map(fn (DiscordChannel $channel) => [
+			'id' => $channel->discord_channel_id,
+			'name' => $channel->name,
+			'prompt' => $channelConfigs->get($channel->id)?->prompt ?? [],
+		])->values()->all();
 	}
 
 	public function updateServerPrompt(Request $request, int $assistant, string $guildId): JsonResponse
@@ -87,6 +111,16 @@ class DiscordController extends Controller
 
 		$assistantUser = $this->resolveAssistantUser($request, $assistant);
 		$channel = DiscordChannel::where('discord_channel_id', $channelId)->firstOrFail();
+
+		// A DM has no trigger mode to set first, so its pivot is created here on first prompt save.
+		if ($channel->discord_server_id === null) {
+			$pivot = AssistantDiscordChannel::updateOrCreate(
+				['assistant_user_id' => $assistantUser->id, 'discord_channel_id' => $channel->id],
+				['prompt' => $validated['prompt']],
+			);
+
+			return response()->json(['prompt' => $pivot->prompt]);
+		}
 
 		$pivot = AssistantDiscordChannel::where('assistant_user_id', $assistantUser->id)
 			->where('discord_channel_id', $channel->id)
