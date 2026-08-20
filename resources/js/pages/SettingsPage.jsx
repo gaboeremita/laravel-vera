@@ -4,6 +4,7 @@ import { route } from 'ziggy-js';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
+import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';
 
 export default function SettingsPage() {
 	const { theme, setTheme, availableThemes } = useTheme();
@@ -26,6 +27,7 @@ export default function SettingsPage() {
 	return (
 		<>
 			<Header
+				menuItems={getAssistantMenuItems(assistantId)}
 				onBack={() => navigate(-1)}
 			>
 				<span className="text-fg-2 text-sm tracking-[0.05em]">Settings</span>
