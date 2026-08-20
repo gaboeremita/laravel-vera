@@ -68,11 +68,10 @@ class VoiceProviderSeeder extends Seeder
 			[
 				'name' => 'GPT-4o Mini TTS',
 				'voices' => ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar'],
-				'config' => [
-					'timeout' => 30,
-					'base_instructions' => "Tone: Warm, breathy, and intimate. Soft and affectionate, never harsh or clipped.\nPunctuation: Natural, unhurried pauses. Let sentences breathe — no rushing.\nDelivery: Gentle and measured. Slightly hushed and sultry. Lean into warmth and femininity.",
+				'config' => ['timeout' => 30],
+				'prompt' => [
+					'tts instructions' => "Tone: Warm, breathy, and intimate. Soft and affectionate, never harsh or clipped.\nPunctuation: Natural, unhurried pauses. Let sentences breathe — no rushing.\nDelivery: Gentle and measured. Slightly hushed and sultry. Lean into warmth and femininity.",
 				],
-				'prompt' => null,
 			]
 		);
 	}
