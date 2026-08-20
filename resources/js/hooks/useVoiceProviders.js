@@ -103,7 +103,7 @@ export default function useVoiceProviders(addToast, assistantId) {
 			setProviders((prev) =>
 				prev.map((p, i) =>
 					i === index
-						? { ...p, ...data, api_key: '', hasKey: true, collapsed: p.collapsed, saving: false, models: p.models }
+						? { ...p, ...data, api_key: '', hasKey: !!data.has_key, collapsed: p.collapsed, saving: false, models: p.models }
 						: p
 				)
 			);
