@@ -421,10 +421,15 @@ export default function ChatPage() {
 				onBack={() => navigate(`/assistants/${assistantId}/conversations`)}
 				status={status}
 				counter={`MESSAGES: ${messages.filter((m) => m.role !== 'system').length}`}
-				menuItems={[
-					...getAssistantMenuItems(assistantId),
-					{ label: 'Memory', to: `/assistants/${assistantId}/conversations/${id}/memory`, icon: Brain },
-				]}
+				menuItems={(() => {
+					const items = getAssistantMenuItems(assistantId);
+					items.splice(items.length - 1, 0, {
+						label: 'Memory',
+						to: `/assistants/${assistantId}/conversations/${id}/memory`,
+						icon: Brain,
+					});
+					return items;
+				})()}
 			>
 				{isEditingTitle ? (
 					<input
