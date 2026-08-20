@@ -24,10 +24,11 @@ class ImageGenManager
             ->where('assistant_id', $assistantUser->assistant_id)
             ->first();
 
-        $selectedModelId = $settings?->data['image_gen_model_id'] ?? null;
-
         return $selectedModelId
-            ? ImageGenModel::with('provider')->findOrFail($selectedModelId)
+            ? ImageGenModel::with('provider')
+                ->whereKey($selectedModelId)
+                ->whereHas('provider', fn ($q) => $q->where('user_id', $assistantUser->user_id))
+                ->first()
             : null;
     }
 

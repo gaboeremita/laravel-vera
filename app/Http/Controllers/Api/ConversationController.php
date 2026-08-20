@@ -267,11 +267,11 @@ class ConversationController extends Controller
 	{
 		$content = trim($content ?? '');
 
-		if (! str_starts_with($content, self::IMAGE_GEN_COMMAND)) {
+		if (! preg_match('/^\/create-image(?:\s+|$)/i', $content, $match)) {
 			return null;
 		}
 
-		return trim(substr($content, strlen(self::IMAGE_GEN_COMMAND)));
+		return trim(substr($content, strlen($match[0])));
 	}
 
 	/**

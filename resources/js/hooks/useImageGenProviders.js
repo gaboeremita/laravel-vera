@@ -119,7 +119,7 @@ export default function useImageGenProviders(addToast, assistantId) {
 							...p,
 							...data,
 							api_key: '',
-							hasKey: true,
+							hasKey: !!data.has_key,
 							collapsed: p.collapsed,
 							saving: false,
 							models: p.models,
