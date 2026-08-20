@@ -58,6 +58,11 @@ class OpenAiCompatibleTtsProvider implements TtsProvider
 		return $response->body();
 	}
 
+	public function contentType(): string
+	{
+		return 'audio/wav';
+	}
+
 	public function parseLlmResponse(string $content): VoiceModeResult
 	{
 		return new VoiceModeResult(content: $content);

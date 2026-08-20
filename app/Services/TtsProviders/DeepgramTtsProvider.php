@@ -9,15 +9,13 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
-class OpenAiTtsProvider implements TtsProvider
+class DeepgramTtsProvider implements TtsProvider
 {
 	public function __construct(
 		private readonly string $url,
-		private readonly string $model,
 		private readonly ?string $apiKey,
 		private readonly ?string $defaultVoice,
 		private readonly int $timeout,
-		private readonly ?string $baseInstructions = null,
 	) {}
 
 	public static function fromModel(VoiceModel $voiceModel): static
@@ -25,12 +23,10 @@ class OpenAiTtsProvider implements TtsProvider
 		$provider = $voiceModel->provider;
 
 		return new static(
-			url: $provider->url,
-			model: $voiceModel->endpoint,
+			url: rtrim($provider->url, '/').'/'.ltrim($voiceModel->endpoint, '/'),
 			apiKey: $provider->api_key,
 			defaultVoice: $voiceModel->voices[0] ?? null,
 			timeout: $voiceModel->config['timeout'] ?? 30,
-			baseInstructions: $voiceModel->prompt['tts instructions'] ?? null,
 		);
 	}
 
@@ -38,23 +34,13 @@ class OpenAiTtsProvider implements TtsProvider
 	{
 		$headers = [];
 		if ($this->apiKey) {
-			$headers['Authorization'] = "Bearer {$this->apiKey}";
-		}
-
-		$payload = [
-			'model' => $this->model,
-			'input' => $text,
-			'voice' => $voice ?? $this->defaultVoice,
-		];
-
-		if (! empty($options['instructions'])) {
-			$payload['instructions'] = $options['instructions'];
+			$headers['Authorization'] = "Token {$this->apiKey}";
 		}
 
 		try {
 			$response = Http::timeout($this->timeout)
 				->withHeaders($headers)
-				->post($this->url, $payload);
+				->post($this->url.'?model='.($voice ?? $this->defaultVoice), ['text' => $text]);
 		} catch (ConnectionException $e) {
 			throw new RuntimeException('Failed to connect to TTS provider: '.$e->getMessage());
 		}
@@ -68,30 +54,12 @@ class OpenAiTtsProvider implements TtsProvider
 
 	public function contentType(): string
 	{
-		return 'audio/wav';
+		return 'audio/mpeg';
 	}
 
 	public function parseLlmResponse(string $content): VoiceModeResult
 	{
-		$emotion = null;
-		if (preg_match('/\[([a-zA-Z]+)\]/', $content, $matches)) {
-			$emotion = $matches[1];
-		}
-
-		return new VoiceModeResult(
-			content: $content,
-			ttsInstructions: $this->buildInstructions($emotion),
-		);
-	}
-
-	private function buildInstructions(?string $emotion): ?string
-	{
-		$parts = array_filter([
-			$this->baseInstructions,
-			$emotion ? "Emotion: {$emotion}" : null,
-		]);
-
-		return $parts ? implode("\n", $parts) : null;
+		return new VoiceModeResult(content: $content);
 	}
 
 	public function llmOptions(): array

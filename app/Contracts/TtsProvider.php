@@ -11,6 +11,8 @@ interface TtsProvider
 
 	public function synthesize(string $text, ?string $voice = null, array $options = []): string;
 
+	public function contentType(): string;
+
 	public function parseLlmResponse(string $content): VoiceModeResult;
 
 	public function llmOptions(): array;

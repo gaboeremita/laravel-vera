@@ -82,6 +82,6 @@ class VoiceController extends Controller
 			return response()->json(['message' => $e->getMessage()], 502);
 		}
 
-		return response($audio, 200)->header('Content-Type', 'audio/wav');
+		return response($audio, 200)->header('Content-Type', $tts->contentType());
 	}
 }

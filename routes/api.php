@@ -88,8 +88,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/image-gen-providers/{provider}/models/{model}', [ImageGenModelController::class, 'destroy'])->name('image-gen-models.destroy');
 
     Route::get('/voice-providers', [VoiceProviderController::class, 'index'])->name('voice-providers.index');
+    Route::post('/voice-providers', [VoiceProviderController::class, 'store'])->name('voice-providers.store');
+    Route::put('/voice-providers/{id}', [VoiceProviderController::class, 'update'])->name('voice-providers.update');
     Route::patch('/voice-providers/{id}', [VoiceProviderController::class, 'updatePrompt'])->name('voice-providers.updatePrompt');
+    Route::delete('/voice-providers/{id}', [VoiceProviderController::class, 'destroy'])->name('voice-providers.destroy');
+
+    Route::post('/voice-providers/{provider}/models', [VoiceModelController::class, 'store'])->name('voice-models.store');
+    Route::put('/voice-providers/{provider}/models/{model}', [VoiceModelController::class, 'update'])->name('voice-models.update');
     Route::patch('/voice-providers/{provider}/models/{model}', [VoiceModelController::class, 'updatePrompt'])->name('voice-models.updatePrompt');
+    Route::delete('/voice-providers/{provider}/models/{model}', [VoiceModelController::class, 'destroy'])->name('voice-models.destroy');
 
     Route::get('/archives', [ArchiveController::class, 'index'])->name('archives.index');
     Route::get('/archives/{id}', [ArchiveController::class, 'show'])->name('archives.show');
