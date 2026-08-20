@@ -41,6 +41,22 @@ export default function AssistantsPage() {
 					blink: isLoading,
 				}}
 				counter={!isLoading ? `ASSISTANTS: ${assistants.length}` : null}
+				actions={
+					<div className="flex gap-2">
+						<button
+							onClick={() => navigate('/settings')}
+							className="button-primary"
+						>
+							SETTINGS
+						</button>
+						<button
+							onClick={() => navigate('/providers')}
+							className="button-primary"
+						>
+							PROVIDERS
+						</button>
+					</div>
+				}
 			>
 				<span className="text-fg-2 text-lg tracking-[0.05em]">Assistants</span>
 			</Header>

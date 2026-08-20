@@ -4,7 +4,6 @@ import Header from '../components/Header.jsx';
 import ImageGenProviderAccordion from '../components/ImageGenProviderAccordion.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import useImageGenProviders from '../hooks/useImageGenProviders.js';
-import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';
 
 export default function ImageGenProvidersPage() {
 	const navigate = useNavigate();
@@ -31,9 +30,12 @@ export default function ImageGenProvidersPage() {
 		return (
 			<>
 				<Header settingsPath={`/assistants/${assistantId}/settings`}
-					menuItems={getAssistantMenuItems(assistantId)}
 					status={{ label: 'LOADING', color: 'text-warning', dot: '●', blink: true }}
-					onBack={() => navigate(-1)}
+					actions={
+						<button onClick={() => navigate(-1)} className="button-primary">
+							← PREVIOUS PAGE
+						</button>
+					}
 				>
 					<span className="text-fg-2 text-sm tracking-[0.05em]">Image Gen Providers</span>
 				</Header>
@@ -47,10 +49,13 @@ export default function ImageGenProvidersPage() {
 	return (
 		<>
 			<Header settingsPath={`/assistants/${assistantId}/settings`}
-					menuItems={getAssistantMenuItems(assistantId)}
 				status={{ label: 'WAITING', color: 'text-info', dot: '●', blink: false }}
 				counter={`PROVIDERS: ${providers.length}`}
-				onBack={() => navigate(-1)}
+				actions={
+					<button onClick={() => navigate(-1)} className="button-primary">
+						← PREVIOUS PAGE
+					</button>
+				}
 			>
 				<span className="text-fg-2 text-sm tracking-[0.05em]">Image Gen Providers</span>
 			</Header>
