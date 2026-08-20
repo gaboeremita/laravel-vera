@@ -27,7 +27,7 @@ class OpenAiCompatibleImageGenProvider implements ImageGenProvider
             url: $provider->url,
             model: $imageGenModel->endpoint,
             apiKey: $provider->api_key,
-            timeout: $imageGenModel->config['timeout'] ?? 120,
+            timeout: ($imageGenModel->config ?? [])['timeout'] ?? 120,
             additionalConfig: $imageGenModel->additional_config ?? [],
         );
     }
