@@ -246,7 +246,7 @@ class TelegramPollCommand extends Command
 
 		// Load prompt from assistant
 		$director = new PromptDirector($this->assistant->prompt);
-		$archive = $this->user->archives()->first();
+		$archive = $this->assistant->archive;
 
 		if ($archive && !empty($text)) {
 			$director->withRetrieval($text, $archive->id);

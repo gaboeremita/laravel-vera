@@ -183,7 +183,7 @@ class ConversationController extends Controller
 			'intimate' => $assistantModel->emotions()->where('restricted', true)->pluck('name')->toArray(),
 		];
 
-		$archive = $request->user()->archives()->first();
+		$archive = $assistantModel->archive;
 
 		$excludedSections = ['opening_message'];
 
@@ -364,7 +364,7 @@ class ConversationController extends Controller
 			->append('emotion tags', ['available emotions' => $emotions])
 			->except($excludedSections);
 
-		$archive = $request->user()->archives()->first();
+		$archive = $assistantModel->archive;
 		if ($archive) {
 			$director->withRetrieval($rawPrompt, $archive->id);
 		}
@@ -454,7 +454,7 @@ class ConversationController extends Controller
 		}
 
 		$assistantModel = $assistantUser->assistant;
-		$archive = $request->user()->archives()->first();
+		$archive = $assistantModel->archive;
 
 		$director = (new PromptDirector($assistantModel->prompt))
 			->except(['opening_message', 'voice mode', 'emotion tags']);
