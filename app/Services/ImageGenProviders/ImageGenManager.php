@@ -24,6 +24,8 @@ class ImageGenManager
             ->where('assistant_id', $assistantUser->assistant_id)
             ->first();
 
+        $selectedModelId = $settings?->data['image_gen_model_id'] ?? null;
+
         return $selectedModelId
             ? ImageGenModel::with('provider')
                 ->whereKey($selectedModelId)
