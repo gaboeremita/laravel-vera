@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use Database\Factories\AssistantUserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Pivot;
@@ -10,7 +12,10 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 #[Fillable(['memory_prompt'])]
 class AssistantUser extends Pivot
 {
-    public $incrementing = false;
+    /** @use HasFactory<AssistantUserFactory> */
+    use HasFactory;
+
+    public $incrementing = true;
 
     protected function casts(): array
     {

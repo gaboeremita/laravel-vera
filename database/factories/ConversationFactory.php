@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Models\AssistantUser;
 use App\Models\Conversation;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -14,7 +14,7 @@ class ConversationFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory(),
+            'assistant_user_id' => AssistantUser::factory(),
             'title' => fake()->sentence(3),
         ];
     }
