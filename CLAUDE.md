@@ -169,7 +169,8 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Linting
 
-- At the moment, we are not using lint. Do not run `eslint` or add a `lint` script.
+- PHP code must be Pint-compliant: run `vendor/bin/pint --test` before considering PHP changes done, and `vendor/bin/pint` to fix violations.
+- Frontend code must be ESLint-compliant: run `npm run lint` before considering JS/TS changes done.
 
 ## Before Taking Action
 
