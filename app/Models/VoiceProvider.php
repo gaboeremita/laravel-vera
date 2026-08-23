@@ -11,26 +11,26 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['name', 'url', 'api_key', 'format', 'instructions', 'prompt'])]
 class VoiceProvider extends Model
 {
-	protected $hidden = ['api_key'];
+    protected $hidden = ['api_key'];
 
-	protected $appends = ['has_key'];
+    protected $appends = ['has_key'];
 
-	protected function hasKey(): Attribute
-	{
-		return Attribute::get(fn () => ! empty($this->api_key));
-	}
+    protected function hasKey(): Attribute
+    {
+        return Attribute::get(fn () => ! empty($this->api_key));
+    }
 
-	protected function casts(): array
-	{
-		return [
-			'api_key' => 'encrypted',
-			'format' => VoiceProviderFormat::class,
-			'prompt' => 'array',
-		];
-	}
+    protected function casts(): array
+    {
+        return [
+            'api_key' => 'encrypted',
+            'format' => VoiceProviderFormat::class,
+            'prompt' => 'array',
+        ];
+    }
 
-	public function models(): HasMany
-	{
-		return $this->hasMany(VoiceModel::class, 'provider_id');
-	}
+    public function models(): HasMany
+    {
+        return $this->hasMany(VoiceModel::class, 'provider_id');
+    }
 }

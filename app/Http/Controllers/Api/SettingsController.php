@@ -12,6 +12,7 @@ use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class SettingsController extends Controller
@@ -117,7 +118,7 @@ class SettingsController extends Controller
             'image_gen_model_id' => [
                 'nullable',
                 'integer',
-                \Illuminate\Validation\Rule::exists('image_gen_models', 'id')->where(fn ($q) => $q->whereIn('provider_id', $request->user()->imageGenProviders()->select('id'))),
+                Rule::exists('image_gen_models', 'id')->where(fn ($q) => $q->whereIn('provider_id', $request->user()->imageGenProviders()->select('id'))),
             ],
         ]);
 

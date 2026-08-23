@@ -12,23 +12,23 @@ class Emotion extends Model
     /** @use HasFactory<EmotionFactory> */
     use HasFactory;
 
-	protected $fillable = [
-		'name',
-		'restricted'
-	];
+    protected $fillable = [
+        'name',
+        'restricted',
+    ];
 
-	public function image(): MorphOne
-	{
-		return $this->morphOne(Image::class, 'imageable');
-	}
+    public function image(): MorphOne
+    {
+        return $this->morphOne(Image::class, 'imageable');
+    }
 
-	public function video(): MorphOne
-	{
-		return $this->morphOne(Video::class, 'videoable');
-	}
+    public function video(): MorphOne
+    {
+        return $this->morphOne(Video::class, 'videoable');
+    }
 
-	public function assistant(): BelongsTo
-	{
-		return $this->belongsTo(Assistant::class);
-	}
+    public function assistant(): BelongsTo
+    {
+        return $this->belongsTo(Assistant::class);
+    }
 }

@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-		Schema::table('emotions', function (Blueprint $table) {
-			$table->boolean('restricted')->default(false);
-		});
+        Schema::table('emotions', function (Blueprint $table) {
+            $table->boolean('restricted')->default(false);
+        });
     }
 
     /**
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-		Schema::table('emotions', function (Blueprint $table) {
-			$table->dropColumn('restricted');
-		});
+        Schema::table('emotions', function (Blueprint $table) {
+            $table->dropColumn('restricted');
+        });
     }
 };

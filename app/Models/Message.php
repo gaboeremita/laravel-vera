@@ -28,8 +28,8 @@ class Message extends Model
         return $this->belongsTo(Conversation::class);
     }
 
-	public function image(): MorphOne
-	{
-		return $this->morphOne(Image::class, 'imageable');
-	}
+    public function image(): MorphOne
+    {
+        return $this->morphOne(Image::class, 'imageable');
+    }
 }

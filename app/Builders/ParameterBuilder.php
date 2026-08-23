@@ -58,11 +58,11 @@ class ParameterBuilder
     {
         return match ($definition['type'] ?? 'string') {
             'integer' => $this->castInteger($name, $value, $definition),
-            'float'   => $this->castFloat($name, $value, $definition),
+            'float' => $this->castFloat($name, $value, $definition),
             'boolean' => $this->castBoolean($value),
-            'enum'    => $this->castEnum($name, $value, $definition),
-            'object'  => $this->castObject($name, $value, $definition),
-            default   => (string) $value,
+            'enum' => $this->castEnum($name, $value, $definition),
+            'object' => $this->castObject($name, $value, $definition),
+            default => (string) $value,
         };
     }
 

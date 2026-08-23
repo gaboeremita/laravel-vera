@@ -12,66 +12,66 @@ use Illuminate\Validation\Rules\Enum;
 
 class VoiceProviderController extends Controller
 {
-	public function index(): JsonResponse
-	{
-		return response()->json(
-			VoiceProvider::with('models')->get()
-		);
-	}
+    public function index(): JsonResponse
+    {
+        return response()->json(
+            VoiceProvider::with('models')->get()
+        );
+    }
 
-	public function store(Request $request): JsonResponse
-	{
-		$validated = $request->validate([
-			'name' => ['required', 'string', 'max:255'],
-			'url' => ['required', 'string', 'url', 'max:255'],
-			'api_key' => ['nullable', 'string'],
-			'format' => ['required', new Enum(VoiceProviderFormat::class)],
-			'instructions' => ['nullable', 'string'],
-		]);
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'url' => ['required', 'string', 'url', 'max:255'],
+            'api_key' => ['nullable', 'string'],
+            'format' => ['required', new Enum(VoiceProviderFormat::class)],
+            'instructions' => ['nullable', 'string'],
+        ]);
 
-		$provider = VoiceProvider::create($validated);
+        $provider = VoiceProvider::create($validated);
 
-		return response()->json($provider, 201);
-	}
+        return response()->json($provider, 201);
+    }
 
-	public function update(Request $request, int $id): JsonResponse
-	{
-		$provider = VoiceProvider::findOrFail($id);
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $provider = VoiceProvider::findOrFail($id);
 
-		$validated = $request->validate([
-			'name' => ['sometimes', 'string', 'max:255'],
-			'url' => ['sometimes', 'string', 'url', 'max:255'],
-			'api_key' => ['sometimes', 'string'],
-			'format' => ['sometimes', new Enum(VoiceProviderFormat::class)],
-			'instructions' => ['nullable', 'string'],
-		]);
+        $validated = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'url' => ['sometimes', 'string', 'url', 'max:255'],
+            'api_key' => ['sometimes', 'string'],
+            'format' => ['sometimes', new Enum(VoiceProviderFormat::class)],
+            'instructions' => ['nullable', 'string'],
+        ]);
 
-		$provider->update($validated);
+        $provider->update($validated);
 
-		return response()->json($provider);
-	}
+        return response()->json($provider);
+    }
 
-	public function destroy(int $id): JsonResponse
-	{
-		VoiceProvider::findOrFail($id)->delete();
+    public function destroy(int $id): JsonResponse
+    {
+        VoiceProvider::findOrFail($id)->delete();
 
-		return response()->json(['message' => 'Provider deleted']);
-	}
+        return response()->json(['message' => 'Provider deleted']);
+    }
 
-	/**
-	 * Prompt editing stays separate from the general config update above — it's a
-	 * structured JSON tree (see ValidPromptStructure) driven by its own UI (PromptTreeEditor),
-	 * not a plain-string field alongside url/api_key/format.
-	 */
-	public function updatePrompt(Request $request, int $id): JsonResponse
-	{
-		$validated = $request->validate([
-			'prompt' => ['nullable', 'array', new ValidPromptStructure],
-		]);
+    /**
+     * Prompt editing stays separate from the general config update above — it's a
+     * structured JSON tree (see ValidPromptStructure) driven by its own UI (PromptTreeEditor),
+     * not a plain-string field alongside url/api_key/format.
+     */
+    public function updatePrompt(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'prompt' => ['nullable', 'array', new ValidPromptStructure],
+        ]);
 
-		$provider = VoiceProvider::findOrFail($id);
-		$provider->update($validated);
+        $provider = VoiceProvider::findOrFail($id);
+        $provider->update($validated);
 
-		return response()->json($provider);
-	}
+        return response()->json($provider);
+    }
 }

@@ -7,14 +7,14 @@ use App\Services\LlmProviders\GenericProvider;
 
 enum AiProviderFormat: string
 {
-	case Generic = 'generic';
-	case Anthropic = 'anthropic';
+    case Generic = 'generic';
+    case Anthropic = 'anthropic';
 
-	public function providerClass(): string
-	{
-		return match ($this) {
-			self::Generic => GenericProvider::class,
-			self::Anthropic => AnthropicProvider::class,
-		};
-	}
+    public function providerClass(): string
+    {
+        return match ($this) {
+            self::Generic => GenericProvider::class,
+            self::Anthropic => AnthropicProvider::class,
+        };
+    }
 }

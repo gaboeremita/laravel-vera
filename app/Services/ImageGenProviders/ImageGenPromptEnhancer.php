@@ -24,7 +24,7 @@ class ImageGenPromptEnhancer
      */
     public function enhance(string $rawPrompt, AssistantUser $assistantUser, Conversation $conversation, ?ImageGenModel $imageGenModel = null): string
     {
-        $llm = (new LlmManager())->forAssistantUser($assistantUser);
+        $llm = (new LlmManager)->forAssistantUser($assistantUser);
 
         $systemPrompt = $this->buildSystemPrompt($assistantUser, $conversation, $rawPrompt, $imageGenModel);
         $history = $this->recentHistory($conversation);

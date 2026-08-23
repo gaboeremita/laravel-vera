@@ -22,7 +22,7 @@ class MessageFactory extends Factory
             'thinking' => fake()->optional(0.3)->paragraph(),
             'image' => null,
             'emotion' => fake()->optional(0.5)->randomElement([
-                'default', 'happy', 'angry'
+                'default', 'happy', 'angry',
             ]),
         ];
     }

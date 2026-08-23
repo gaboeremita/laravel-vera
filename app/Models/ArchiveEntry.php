@@ -8,28 +8,28 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class ArchiveEntry extends Model
 {
-	protected $table = 'archive_entries';
+    protected $table = 'archive_entries';
 
-	protected $fillable = [
-		'title',
-		'content',
-		'keywords',
-		'embedding',
-		'archive_id'
-	];
+    protected $fillable = [
+        'title',
+        'content',
+        'keywords',
+        'embedding',
+        'archive_id',
+    ];
 
-	protected $casts = [
-		'keywords' => 'array',
-		'embedding' => 'array',
-	];
+    protected $casts = [
+        'keywords' => 'array',
+        'embedding' => 'array',
+    ];
 
-	public function archive(): BelongsTo
-	{
-		return $this->belongsTo(Archive::class);
-	}
+    public function archive(): BelongsTo
+    {
+        return $this->belongsTo(Archive::class);
+    }
 
-	public function tags(): MorphToMany
-	{
-		return $this->morphToMany(Tag::class, 'taggable');
-	}
+    public function tags(): MorphToMany
+    {
+        return $this->morphToMany(Tag::class, 'taggable');
+    }
 }

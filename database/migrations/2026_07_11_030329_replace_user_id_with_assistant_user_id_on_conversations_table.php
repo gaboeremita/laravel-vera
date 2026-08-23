@@ -11,10 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-		Schema::table('conversations', function (Blueprint $table) {
-			$table->dropConstrainedForeignId('user_id');
-			$table->foreignId('assistant_user_id')->nullable()->constrained('assistant_user')->cascadeOnDelete();
-		});
+        Schema::table('conversations', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('user_id');
+            $table->foreignId('assistant_user_id')->nullable()->constrained('assistant_user')->cascadeOnDelete();
+        });
     }
 
     /**
@@ -22,9 +22,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-		Schema::table('conversations', function (Blueprint $table) {
-			$table->dropConstrainedForeignId('assistant_user_id');
-			$table->foreignId('user_id')->constrained()->cascadeOnDelete();
-		});
+        Schema::table('conversations', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('assistant_user_id');
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+        });
     }
 };

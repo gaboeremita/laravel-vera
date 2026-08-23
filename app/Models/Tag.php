@@ -8,18 +8,18 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class Tag extends Model
 {
-	protected $fillable = [
-		'name',
-		'user_id'
-	];
+    protected $fillable = [
+        'name',
+        'user_id',
+    ];
 
-	public function user(): BelongsTo
-	{
-		return $this->belongsTo(User::class);
-	}
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
-	public function archiveEntries(): MorphToMany
-	{
-		return $this->morphedByMany(ArchiveEntry::class, 'taggable');
-	}
+    public function archiveEntries(): MorphToMany
+    {
+        return $this->morphedByMany(ArchiveEntry::class, 'taggable');
+    }
 }

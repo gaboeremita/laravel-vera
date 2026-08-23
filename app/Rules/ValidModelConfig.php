@@ -75,11 +75,11 @@ class ValidModelConfig implements ValidationRule
 
         match ($type) {
             'integer' => $this->validateInteger($field, $value, $definition, $fail),
-            'float'   => $this->validateFloat($field, $value, $definition, $fail),
+            'float' => $this->validateFloat($field, $value, $definition, $fail),
             'boolean' => $this->validateBoolean($field, $value, $fail),
-            'enum'    => $this->validateEnum($field, $value, $definition, $fail),
-            'object'  => $this->validateObject($field, $value, $definition, $fail),
-            default   => null,
+            'enum' => $this->validateEnum($field, $value, $definition, $fail),
+            'object' => $this->validateObject($field, $value, $definition, $fail),
+            default => null,
         };
     }
 

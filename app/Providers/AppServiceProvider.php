@@ -16,20 +16,20 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
 
-		$this->app->bind(EmbeddingProvider::class, function () {
-			return new OllamaEmbeddingProvider(
-				baseUrl: config('ai.embedding.url'),
-				model: config('ai.embedding.model'),
-			);
-		});
+        $this->app->bind(EmbeddingProvider::class, function () {
+            return new OllamaEmbeddingProvider(
+                baseUrl: config('ai.embedding.url'),
+                model: config('ai.embedding.model'),
+            );
+        });
 
-		$this->app->bind(SttProvider::class, function () {
-			return new WhisperSttProvider(
-				baseUrl: config('ai.stt.url'),
-				model: config('ai.stt.model'),
-				timeout: config('ai.stt.timeout'),
-			);
-		});
+        $this->app->bind(SttProvider::class, function () {
+            return new WhisperSttProvider(
+                baseUrl: config('ai.stt.url'),
+                model: config('ai.stt.model'),
+                timeout: config('ai.stt.timeout'),
+            );
+        });
 
     }
 

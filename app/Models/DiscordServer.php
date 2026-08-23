@@ -9,13 +9,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['discord_guild_id', 'name'])]
 class DiscordServer extends Model
 {
-	public function channels(): HasMany
-	{
-		return $this->hasMany(DiscordChannel::class);
-	}
+    public function channels(): HasMany
+    {
+        return $this->hasMany(DiscordChannel::class);
+    }
 
-	public function assistantDiscordServers(): HasMany
-	{
-		return $this->hasMany(AssistantDiscordServer::class);
-	}
+    public function assistantDiscordServers(): HasMany
+    {
+        return $this->hasMany(AssistantDiscordServer::class);
+    }
 }

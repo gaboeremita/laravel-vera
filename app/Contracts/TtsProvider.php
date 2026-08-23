@@ -7,13 +7,13 @@ use App\Models\VoiceModel;
 
 interface TtsProvider
 {
-	public static function fromModel(VoiceModel $voiceModel): static;
+    public static function fromModel(VoiceModel $voiceModel): static;
 
-	public function synthesize(string $text, ?string $voice = null, array $options = []): string;
+    public function synthesize(string $text, ?string $voice = null, array $options = []): string;
 
-	public function contentType(): string;
+    public function contentType(): string;
 
-	public function parseLlmResponse(string $content): VoiceModeResult;
+    public function parseLlmResponse(string $content): VoiceModeResult;
 
-	public function llmOptions(): array;
+    public function llmOptions(): array;
 }

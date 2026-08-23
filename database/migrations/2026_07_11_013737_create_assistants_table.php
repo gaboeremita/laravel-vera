@@ -11,15 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-		Schema::create('assistants', function (Blueprint $table) {
-			$table->id();
-			$table->string('name');
-			$table->string('slug')->unique();
-			$table->text('description')->nullable();
-			$table->json('prompt');
-			$table->text('opening_message')->nullable();
-			$table->timestamps();
-		});
+        Schema::create('assistants', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('slug')->unique();
+            $table->text('description')->nullable();
+            $table->json('prompt');
+            $table->text('opening_message')->nullable();
+            $table->timestamps();
+        });
     }
 
     /**
@@ -27,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-		Schema::dropIfExists('assistants');
+        Schema::dropIfExists('assistants');
     }
 };

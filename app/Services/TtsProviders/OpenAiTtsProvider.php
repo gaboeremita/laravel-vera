@@ -11,91 +11,91 @@ use RuntimeException;
 
 class OpenAiTtsProvider implements TtsProvider
 {
-	public function __construct(
-		private readonly string $url,
-		private readonly string $model,
-		private readonly ?string $apiKey,
-		private readonly ?string $defaultVoice,
-		private readonly int $timeout,
-		private readonly ?string $baseInstructions = null,
-	) {}
+    public function __construct(
+        private readonly string $url,
+        private readonly string $model,
+        private readonly ?string $apiKey,
+        private readonly ?string $defaultVoice,
+        private readonly int $timeout,
+        private readonly ?string $baseInstructions = null,
+    ) {}
 
-	public static function fromModel(VoiceModel $voiceModel): static
-	{
-		$provider = $voiceModel->provider;
+    public static function fromModel(VoiceModel $voiceModel): static
+    {
+        $provider = $voiceModel->provider;
 
-		return new static(
-			url: $provider->url,
-			model: $voiceModel->endpoint,
-			apiKey: $provider->api_key,
-			defaultVoice: $voiceModel->voices[0] ?? null,
-			timeout: $voiceModel->config['timeout'] ?? 30,
-			baseInstructions: $voiceModel->prompt['tts instructions'] ?? null,
-		);
-	}
+        return new static(
+            url: $provider->url,
+            model: $voiceModel->endpoint,
+            apiKey: $provider->api_key,
+            defaultVoice: $voiceModel->voices[0] ?? null,
+            timeout: $voiceModel->config['timeout'] ?? 30,
+            baseInstructions: $voiceModel->prompt['tts instructions'] ?? null,
+        );
+    }
 
-	public function synthesize(string $text, ?string $voice = null, array $options = []): string
-	{
-		$headers = [];
-		if ($this->apiKey) {
-			$headers['Authorization'] = "Bearer {$this->apiKey}";
-		}
+    public function synthesize(string $text, ?string $voice = null, array $options = []): string
+    {
+        $headers = [];
+        if ($this->apiKey) {
+            $headers['Authorization'] = "Bearer {$this->apiKey}";
+        }
 
-		$payload = [
-			'model' => $this->model,
-			'input' => $text,
-			'voice' => $voice ?? $this->defaultVoice,
-		];
+        $payload = [
+            'model' => $this->model,
+            'input' => $text,
+            'voice' => $voice ?? $this->defaultVoice,
+        ];
 
-		if (! empty($options['instructions'])) {
-			$payload['instructions'] = $options['instructions'];
-		}
+        if (! empty($options['instructions'])) {
+            $payload['instructions'] = $options['instructions'];
+        }
 
-		try {
-			$response = Http::timeout($this->timeout)
-				->withHeaders($headers)
-				->post($this->url, $payload);
-		} catch (ConnectionException $e) {
-			throw new RuntimeException('Failed to connect to TTS provider: '.$e->getMessage());
-		}
+        try {
+            $response = Http::timeout($this->timeout)
+                ->withHeaders($headers)
+                ->post($this->url, $payload);
+        } catch (ConnectionException $e) {
+            throw new RuntimeException('Failed to connect to TTS provider: '.$e->getMessage());
+        }
 
-		if ($response->failed()) {
-			throw new RuntimeException('TTS synthesis request failed: '.$response->body());
-		}
+        if ($response->failed()) {
+            throw new RuntimeException('TTS synthesis request failed: '.$response->body());
+        }
 
-		return $response->body();
-	}
+        return $response->body();
+    }
 
-	public function contentType(): string
-	{
-		return 'audio/wav';
-	}
+    public function contentType(): string
+    {
+        return 'audio/wav';
+    }
 
-	public function parseLlmResponse(string $content): VoiceModeResult
-	{
-		$emotion = null;
-		if (preg_match('/\[([a-zA-Z]+)\]/', $content, $matches)) {
-			$emotion = $matches[1];
-		}
+    public function parseLlmResponse(string $content): VoiceModeResult
+    {
+        $emotion = null;
+        if (preg_match('/\[([a-zA-Z]+)\]/', $content, $matches)) {
+            $emotion = $matches[1];
+        }
 
-		return new VoiceModeResult(
-			content: $content,
-			ttsInstructions: $this->buildInstructions($emotion),
-		);
-	}
+        return new VoiceModeResult(
+            content: $content,
+            ttsInstructions: $this->buildInstructions($emotion),
+        );
+    }
 
-	private function buildInstructions(?string $emotion): ?string
-	{
-		$parts = array_filter([
-			$this->baseInstructions,
-			$emotion ? "Emotion: {$emotion}" : null,
-		]);
+    private function buildInstructions(?string $emotion): ?string
+    {
+        $parts = array_filter([
+            $this->baseInstructions,
+            $emotion ? "Emotion: {$emotion}" : null,
+        ]);
 
-		return $parts ? implode("\n", $parts) : null;
-	}
+        return $parts ? implode("\n", $parts) : null;
+    }
 
-	public function llmOptions(): array
-	{
-		return [];
-	}
+    public function llmOptions(): array
+    {
+        return [];
+    }
 }

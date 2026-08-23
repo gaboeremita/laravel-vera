@@ -11,27 +11,27 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['name', 'slug', 'description', 'prompt', 'opening_message', 'archive_id'])]
 class Assistant extends Model
 {
-	protected function casts(): array
-	{
-		return [
-			'prompt' => 'array',
-		];
-	}
+    protected function casts(): array
+    {
+        return [
+            'prompt' => 'array',
+        ];
+    }
 
-	public function archive(): BelongsTo
-	{
-		return $this->belongsTo(Archive::class);
-	}
+    public function archive(): BelongsTo
+    {
+        return $this->belongsTo(Archive::class);
+    }
 
-	public function users(): BelongsToMany
-	{
-		return $this->belongsToMany(User::class)
-			->using(AssistantUser::class)
-			->withTimestamps();
-	}
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)
+            ->using(AssistantUser::class)
+            ->withTimestamps();
+    }
 
-	public function emotions(): HasMany
-	{
-		return $this->hasMany(Emotion::class);
-	}
+    public function emotions(): HasMany
+    {
+        return $this->hasMany(Emotion::class);
+    }
 }

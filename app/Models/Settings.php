@@ -21,13 +21,13 @@ class Settings extends Model
         return $this->belongsTo(User::class);
     }
 
-	public function assistant(): BelongsTo
-	{
-		return $this->belongsTo(Assistant::class);
-	}
+    public function assistant(): BelongsTo
+    {
+        return $this->belongsTo(Assistant::class);
+    }
 
-	public static function voiceCacheKey(int $userId, int $assistantId): string
-	{
-		return "voice_settings:{$userId}:{$assistantId}";
-	}
+    public static function voiceCacheKey(int $userId, int $assistantId): string
+    {
+        return "voice_settings:{$userId}:{$assistantId}";
+    }
 }

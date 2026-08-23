@@ -11,65 +11,65 @@ use RuntimeException;
 
 class OpenAiCompatibleTtsProvider implements TtsProvider
 {
-	public function __construct(
-		private readonly string $url,
-		private readonly string $model,
-		private readonly ?string $apiKey,
-		private readonly ?string $defaultVoice,
-		private readonly int $timeout,
-	) {}
+    public function __construct(
+        private readonly string $url,
+        private readonly string $model,
+        private readonly ?string $apiKey,
+        private readonly ?string $defaultVoice,
+        private readonly int $timeout,
+    ) {}
 
-	public static function fromModel(VoiceModel $voiceModel): static
-	{
-		$provider = $voiceModel->provider;
+    public static function fromModel(VoiceModel $voiceModel): static
+    {
+        $provider = $voiceModel->provider;
 
-		return new static(
-			url: $provider->url,
-			model: $voiceModel->endpoint,
-			apiKey: $provider->api_key,
-			defaultVoice: $voiceModel->voices[0] ?? null,
-			timeout: $voiceModel->config['timeout'] ?? 120,
-		);
-	}
+        return new static(
+            url: $provider->url,
+            model: $voiceModel->endpoint,
+            apiKey: $provider->api_key,
+            defaultVoice: $voiceModel->voices[0] ?? null,
+            timeout: $voiceModel->config['timeout'] ?? 120,
+        );
+    }
 
-	public function synthesize(string $text, ?string $voice = null, array $options = []): string
-	{
-		$headers = [];
-		if ($this->apiKey) {
-			$headers['Authorization'] = "Bearer {$this->apiKey}";
-		}
+    public function synthesize(string $text, ?string $voice = null, array $options = []): string
+    {
+        $headers = [];
+        if ($this->apiKey) {
+            $headers['Authorization'] = "Bearer {$this->apiKey}";
+        }
 
-		try {
-			$response = Http::timeout($this->timeout)
-				->withHeaders($headers)
-				->post($this->url, [
-					'model' => $this->model,
-					'input' => $text,
-					'voice' => $voice ?? $this->defaultVoice,
-				]);
-		} catch (ConnectionException $e) {
-			throw new RuntimeException('Failed to connect to TTS provider: '.$e->getMessage());
-		}
+        try {
+            $response = Http::timeout($this->timeout)
+                ->withHeaders($headers)
+                ->post($this->url, [
+                    'model' => $this->model,
+                    'input' => $text,
+                    'voice' => $voice ?? $this->defaultVoice,
+                ]);
+        } catch (ConnectionException $e) {
+            throw new RuntimeException('Failed to connect to TTS provider: '.$e->getMessage());
+        }
 
-		if ($response->failed()) {
-			throw new RuntimeException('TTS synthesis request failed: '.$response->body());
-		}
+        if ($response->failed()) {
+            throw new RuntimeException('TTS synthesis request failed: '.$response->body());
+        }
 
-		return $response->body();
-	}
+        return $response->body();
+    }
 
-	public function contentType(): string
-	{
-		return 'audio/wav';
-	}
+    public function contentType(): string
+    {
+        return 'audio/wav';
+    }
 
-	public function parseLlmResponse(string $content): VoiceModeResult
-	{
-		return new VoiceModeResult(content: $content);
-	}
+    public function parseLlmResponse(string $content): VoiceModeResult
+    {
+        return new VoiceModeResult(content: $content);
+    }
 
-	public function llmOptions(): array
-	{
-		return [];
-	}
+    public function llmOptions(): array
+    {
+        return [];
+    }
 }
