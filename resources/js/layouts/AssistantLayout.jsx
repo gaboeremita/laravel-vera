@@ -24,7 +24,16 @@ export default function AssistantLayout() {
 
 	useEffect(() => {
 		parentContext.setActiveAssistantId(Number(assistantId));
-		fetchConversations();
+		const loadInitialConversations = async () => {
+			try {
+				const res = await api.get(route('conversations.index', { assistant: assistantId }));
+				const data = await res.json();
+				setConversations(data);
+			} catch {
+				parentContext.addToast('Failed to load conversations', 'error');
+			}
+		};
+		void loadInitialConversations();
 		parentContext.fetchEmotions(Number(assistantId));
 
 

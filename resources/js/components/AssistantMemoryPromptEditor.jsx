@@ -27,10 +27,11 @@ export default function AssistantMemoryPromptEditor({ assistantId, addToast }) {
 
 	useEffect(() => {
 		let cancelled = false;
-		setIsLoading(true);
-		setInitialValue(null);
 
 		const load = async () => {
+			setIsLoading(true);
+			setInitialValue(null);
+
 			try {
 				const res = await api.get(route('memory-prompt.show', { assistant: assistantId }));
 				if (!res.ok) throw new Error('Failed to load memory prompt');

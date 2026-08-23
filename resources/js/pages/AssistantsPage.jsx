@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import Header from '../components/Header.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
@@ -10,6 +10,12 @@ export default function AssistantsPage() {
 	const { addToast } = useOutletContext();
 	const { assistants, isLoading, deleteAssistant } = useAssistants(addToast);
 	const [deleteTarget, setDeleteTarget] = useState(null);
+	const [now, setNow] = useState(() => Date.now());
+
+	useEffect(() => {
+		const interval = setInterval(() => setNow(Date.now()), 60000);
+		return () => clearInterval(interval);
+	}, []);
 
 	const handleConfirmDelete = async () => {
 		if (deleteTarget) {
@@ -20,7 +26,7 @@ export default function AssistantsPage() {
 
 	const formatTimeAgo = (dateString) => {
 		if (!dateString) return 'No activity';
-		const diff = Date.now() - new Date(dateString).getTime();
+		const diff = now - new Date(dateString).getTime();
 		const minutes = Math.floor(diff / 60000);
 		if (minutes < 1) return 'Just now';
 		if (minutes < 60) return `${minutes} min ago`;
