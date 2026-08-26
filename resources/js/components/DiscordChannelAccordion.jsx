@@ -8,6 +8,7 @@ const TRIGGER_MODES = [
 	{ value: 'off', label: 'OFF' },
 	{ value: 'always', label: 'ALWAYS' },
 	{ value: 'mention', label: 'ON MENTION' },
+	{ value: 'mentioned_by_name', label: 'MENTIONED BY NAME' },
 ];
 
 export default function DiscordChannelAccordion({
