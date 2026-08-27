@@ -6,7 +6,7 @@ hooks:
   before_constitution:
   - extension: git
     command: speckit.git.initialize
-    enabled: false
+    enabled: true
     optional: false
     priority: 10
     prompt: Execute speckit.git.initialize?
