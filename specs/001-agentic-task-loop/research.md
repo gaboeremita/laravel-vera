@@ -6,7 +6,7 @@
 
 **Rationale**: Confirmed directly against current Anthropic API docs (platform.claude.com) rather than assumed from prior knowledge, since the API surface changes over time.
 
-**Alternatives considered**: Anthropic's own MCP connector (`mcp_servers` param) was considered as a way to skip building tool-call plumbing entirely, but it only proxies *MCP* tools specifically and requires a publicly reachable HTTPS server — not applicable here, since this feature's one built-in test tool is a local PHP function, and MCP itself is out of scope for this spec.
+**Alternatives considered**: Anthropic's own MCP connector (`mcp_servers` param) was considered as a way to skip building tool-call plumbing entirely, but it only proxies *MCP* tools specifically and requires a publicly reachable HTTPS server — not applicable here, since this feature's one built-in tool (`get_current_datetime`, contracts/get-current-datetime-tool.md) is a local PHP function, and MCP itself is out of scope for this spec.
 
 ## 2. OpenAI-compatible tool-calling wire format
 
@@ -50,8 +50,18 @@
 
 ## 7. Testing strategy for the loop
 
-**Decision**: Pest feature tests fake the outbound LLM HTTP calls with `Http::fake()`, sequencing responses (e.g., a `tool_use` response followed by a final-answer response) to deterministically exercise each user story without calling a real model. One minimal built-in test tool (e.g., returning a fixed value for a fixed input) is used across all three test scenarios.
+**Decision**: Pest feature tests fake the outbound LLM HTTP calls with `Http::fake()`, sequencing responses (e.g., a `tool_use` response followed by a final-answer response) to deterministically exercise each user story without calling a real model. The one built-in tool, `get_current_datetime` (contracts/get-current-datetime-tool.md), is used across all three test scenarios; Carbon's test clock (`Carbon::setTestNow()`) makes its output deterministic.
 
 **Rationale**: Matches Constitution Principle VI (feature-test-first, factory-backed) and the project's existing Pest convention; `Http::fake()` is already how this kind of external-call testing is done elsewhere in a Laravel app of this shape.
 
-**Alternatives considered**: None — this is the standard, already-idiomatic approach for this codebase; no other pattern was seriously considered.
+**Alternatives considered**: None for the faking approach — this is the standard, already-idiomatic approach for this codebase. For the tool itself, several genuinely useful options were weighed (web search, VERA's own archive search, a calculator, weather lookup, reminders/notes) before settling on date/time lookup — see #8 below.
+
+## 8. The built-in tool: `get_current_datetime`
+
+**Decision**: A single, parameterless tool that returns the current date/time in the server's configured timezone. Full contract in contracts/get-current-datetime-tool.md.
+
+**Rationale**: Genuinely useful to a companion assistant (a real, everyday question, not a manufactured fixture) rather than the internal-only stand-in ("lookup_record" over fake fixture data) considered first. Requires no new external dependency or credential — unlike a web search or weather API, it needs no HTTP call at all.
+
+**Alternatives considered**: Weather lookup (Open-Meteo, free/keyless) and a calculator/expression evaluator were the closest runners-up — both are real and simple, but were passed over once date/time was explicitly chosen. Web search was rejected as introducing a new external dependency and behaving inconsistently across providers (Anthropic has a native, provider-side web-search tool; generic OpenAI-compatible endpoints do not, which would conflict with FR-006's cross-model consistency requirement). VERA's own archive search (exposing `RetrievalService` as an agent-callable tool instead of always-on retrieval) and a reminders/notes tool were both rejected as larger in scope than a single proving-the-loop tool warrants — the latter would need new persistence, which Constitution Principle VII cautions against for this feature.
+
+**Known limitation**: no parameters means this tool cannot itself force a dependent second call or a long step-limit-exhausting chain — User Story 2 and User Story 3 are validated through Pest test sequencing (#7 above), not a real multi-step interaction with this specific tool in the product. This was an accepted tradeoff, not an oversight.

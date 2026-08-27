@@ -33,6 +33,10 @@ Existing table: `messages`.
 
 **Relationships**: unchanged — `Message belongsTo Conversation`.
 
+## Built-in tool (not a data entity)
+
+The one tool this feature ships with, `get_current_datetime`, is a stateless PHP class, not a database row — there is no tools table for this feature (tool *registration* as data is MCP's job, out of scope here). Full contract: contracts/get-current-datetime-tool.md.
+
 ## Task (conceptual, not a new table)
 
 Corresponds to a single `sendMessage` request/response cycle for an agent-mode assistant. Bounded by the existing `Conversation`/`Message` chain — a "task" is not a persisted entity of its own; it's the set of `tool_call`/`tool_result` messages generated between one user message and the resulting final-answer assistant message.
