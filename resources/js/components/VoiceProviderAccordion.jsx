@@ -147,6 +147,7 @@ export default function VoiceProviderAccordion({
 										<option value="openai_compatible">OpenAI-compatible (self-hosted)</option>
 										<option value="openai_tts">OpenAI TTS</option>
 										<option value="deepgram">Deepgram</option>
+										<option value="elevenlabs">ElevenLabs</option>
 									</select>
 								</div>
 

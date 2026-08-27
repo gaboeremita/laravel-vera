@@ -155,5 +155,44 @@ class VoiceProviderSeeder extends Seeder
                 'config' => ['timeout' => 30],
             ]
         );
+
+        $elevenLabs = VoiceProvider::updateOrCreate(
+            ['name' => 'ElevenLabs'],
+            [
+                'url' => 'https://api.elevenlabs.io/v1/text-to-speech',
+                'format' => VoiceProviderFormat::ElevenLabs,
+                'api_key' => env('ELEVENLABS_API_KEY'),
+                'instructions' => "Requires an ElevenLabs API key. Add ELEVENLABS_API_KEY to your .env file.\n\n"
+                    ."The seeded voices below are ElevenLabs' legacy Default voices, which ElevenLabs is retiring on Dec 31, 2026. "
+                    .'Grab current voice IDs from your Voice Library (elevenlabs.io/app/voice-library) and add them as models below.',
+            ]
+        );
+
+        $elevenLabs->models()->updateOrCreate(
+            ['endpoint' => 'eleven_multilingual_v2'],
+            [
+                'name' => 'Multilingual v2',
+                'voices' => ['21m00Tcm4TlvDq8ikWAM', 'pNInz6obpgDQGcFmaJgB'],
+                'config' => ['timeout' => 30],
+            ]
+        );
+
+        $elevenLabs->models()->updateOrCreate(
+            ['endpoint' => 'eleven_flash_v2_5'],
+            [
+                'name' => 'Flash v2.5',
+                'voices' => ['21m00Tcm4TlvDq8ikWAM', 'pNInz6obpgDQGcFmaJgB'],
+                'config' => ['timeout' => 30],
+            ]
+        );
+
+        $elevenLabs->models()->updateOrCreate(
+            ['endpoint' => 'eleven_v3'],
+            [
+                'name' => 'v3',
+                'voices' => ['21m00Tcm4TlvDq8ikWAM', 'pNInz6obpgDQGcFmaJgB'],
+                'config' => ['timeout' => 30],
+            ]
+        );
     }
 }

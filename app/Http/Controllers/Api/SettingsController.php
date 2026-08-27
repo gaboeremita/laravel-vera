@@ -59,7 +59,7 @@ class SettingsController extends Controller
             'channels.*.guild_name' => ['required', 'string'],
             'channels.*.channel_id' => ['required', 'string'],
             'channels.*.channel_name' => ['required', 'string'],
-            'channels.*.trigger_mode' => ['required', 'string', 'in:always,mention'],
+            'channels.*.trigger_mode' => ['required', 'string', 'in:always,mention,mentioned_by_name'],
         ]);
 
         $assistantUser = $this->resolveAssistantUser($request, $assistant);

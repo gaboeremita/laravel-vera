@@ -43,7 +43,7 @@ class ImageGenPromptEnhancer
         $director = (new PromptDirector($assistantUser->assistant->prompt))
             ->except(['emotion tags', 'secret trigger', 'voice mode', 'OOC mode', 'image handling', 'style rules']);
 
-        $archive = $assistantUser->user->archives()->first();
+        $archive = $assistantUser->assistant->archive;
         if ($archive) {
             $director->withRetrieval($rawPrompt, $archive->id);
         }
