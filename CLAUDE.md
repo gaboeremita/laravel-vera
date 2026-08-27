@@ -163,10 +163,6 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - Product, architecture, and quality principles for this repo (code style gates, data isolation, testing approach, and more) live in `.specify/memory/constitution.md` — consult it for anything not covered by the operational rules below.
 
-## Git Rules
-
-- NEVER commit or push changes unless the user explicitly asks you to. Making code changes does not imply permission to commit or push them.
-
 ## Migration Rules
 
 - NEVER edit existing migration files. Always create a new migration to modify the database schema.

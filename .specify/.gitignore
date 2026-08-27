@@ -7,3 +7,6 @@ feature.json
 
 # Per-machine extension config overrides.
 extensions/*/local-config.yml
+
+# Regenerable extension catalog search cache.
+extensions/.cache/
