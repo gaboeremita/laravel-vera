@@ -2,15 +2,15 @@
 
 use App\Http\Controllers\Api\AiModelController;
 use App\Http\Controllers\Api\AiProviderController;
+use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\AssistantController;
+use App\Http\Controllers\Api\AssistantEmotionController;
 use App\Http\Controllers\Api\AssistantMemoryPromptController;
 use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\ConversationController;
-use App\Http\Controllers\Api\DiscordController;
 use App\Http\Controllers\Api\ConversationMemoryController;
-use App\Http\Controllers\Api\AssistantEmotionController;
+use App\Http\Controllers\Api\DiscordController;
 use App\Http\Controllers\Api\EmotionController;
-use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\ImageGenModelController;
 use App\Http\Controllers\Api\ImageGenProviderController;
 use App\Http\Controllers\Api\SettingsController;
@@ -51,12 +51,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/conversations/{id}/memory', [ConversationMemoryController::class, 'update'])->name('memory.update');
         Route::post('/conversations/{id}/memory/summarize', [ConversationMemoryController::class, 'summarize'])->name('memory.summarize');
         Route::post('/conversations/{id}/memory/unlock', [ConversationMemoryController::class, 'unlock'])->name('memory.unlock');
-		Route::get('/prompt', [AssistantPromptController::class, 'show'])->name('prompt.show');
-		Route::post('/prompt', [AssistantPromptController::class, 'store'])->name('prompt.store');
-		Route::put('/prompt', [AssistantPromptController::class, 'update'])->name('prompt.update');
-		Route::delete('/prompt', [AssistantPromptController::class, 'destroy'])->name('prompt.destroy');
-		Route::get('/memory-prompt', [AssistantMemoryPromptController::class, 'show'])->name('memory-prompt.show');
-		Route::put('/memory-prompt', [AssistantMemoryPromptController::class, 'update'])->name('memory-prompt.update');
+        Route::get('/prompt', [AssistantPromptController::class, 'show'])->name('prompt.show');
+        Route::post('/prompt', [AssistantPromptController::class, 'store'])->name('prompt.store');
+        Route::put('/prompt', [AssistantPromptController::class, 'update'])->name('prompt.update');
+        Route::delete('/prompt', [AssistantPromptController::class, 'destroy'])->name('prompt.destroy');
+        Route::get('/memory-prompt', [AssistantMemoryPromptController::class, 'show'])->name('memory-prompt.show');
+        Route::put('/memory-prompt', [AssistantMemoryPromptController::class, 'update'])->name('memory-prompt.update');
 
         Route::post('/voice/transcribe', [VoiceController::class, 'transcribe'])->name('voice.transcribe');
         Route::post('/voice/synthesize', [VoiceController::class, 'synthesize'])->name('voice.synthesize');

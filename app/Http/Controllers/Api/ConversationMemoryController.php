@@ -10,95 +10,95 @@ use Illuminate\Http\Request;
 
 class ConversationMemoryController extends Controller
 {
-	use ResolvesAssistantUser;
+    use ResolvesAssistantUser;
 
-	public function show(Request $request, int $assistant, int $id): JsonResponse
-	{
-		$conversation = $this->resolveAssistantUser($request, $assistant)
-			->conversations()
-			->findOrFail($id);
+    public function show(Request $request, int $assistant, int $id): JsonResponse
+    {
+        $conversation = $this->resolveAssistantUser($request, $assistant)
+            ->conversations()
+            ->findOrFail($id);
 
-		$checkpoint = $conversation->memory_checkpoint_message_id ?? 0;
-		$pendingCount = $conversation->messages()->where('id', '>', $checkpoint)->count();
+        $checkpoint = $conversation->memory_checkpoint_message_id ?? 0;
+        $pendingCount = $conversation->messages()->where('id', '>', $checkpoint)->count();
 
-		return response()->json([
-			'long_term_memory' => $conversation->long_term_memory,
-			'pending_count' => $pendingCount,
-			'is_summarizing' => $conversation->memory_summarizing_at !== null,
-			'auto_summarize_enabled' => $conversation->auto_summarize_enabled,
-		]);
-	}
+        return response()->json([
+            'long_term_memory' => $conversation->long_term_memory,
+            'pending_count' => $pendingCount,
+            'is_summarizing' => $conversation->memory_summarizing_at !== null,
+            'auto_summarize_enabled' => $conversation->auto_summarize_enabled,
+        ]);
+    }
 
-	public function update(Request $request, int $assistant, int $id): JsonResponse
-	{
-		$validated = $request->validate([
-			'long_term_memory' => ['sometimes', 'nullable', 'string'],
-			'auto_summarize_enabled' => ['sometimes', 'boolean'],
-		]);
+    public function update(Request $request, int $assistant, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'long_term_memory' => ['sometimes', 'nullable', 'string'],
+            'auto_summarize_enabled' => ['sometimes', 'boolean'],
+        ]);
 
-		$conversation = $this->resolveAssistantUser($request, $assistant)
-			->conversations()
-			->findOrFail($id);
+        $conversation = $this->resolveAssistantUser($request, $assistant)
+            ->conversations()
+            ->findOrFail($id);
 
-		if ($conversation->memory_summarizing_at !== null) {
-			return response()->json(['message' => 'Memory is being summarized in the background.'], 409);
-		}
+        if ($conversation->memory_summarizing_at !== null) {
+            return response()->json(['message' => 'Memory is being summarized in the background.'], 409);
+        }
 
-		$conversation->update($validated);
+        $conversation->update($validated);
 
-		return response()->json([
-			'long_term_memory' => $conversation->long_term_memory,
-			'auto_summarize_enabled' => $conversation->auto_summarize_enabled,
-		]);
-	}
+        return response()->json([
+            'long_term_memory' => $conversation->long_term_memory,
+            'auto_summarize_enabled' => $conversation->auto_summarize_enabled,
+        ]);
+    }
 
-	public function summarize(Request $request, int $assistant, int $id): JsonResponse
-	{
-		$validated = $request->validate([
-			'mode' => ['sometimes', 'string', 'in:since_last,full'],
-		]);
+    public function summarize(Request $request, int $assistant, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'mode' => ['sometimes', 'string', 'in:since_last,full'],
+        ]);
 
-		$mode = $validated['mode'] ?? 'since_last';
+        $mode = $validated['mode'] ?? 'since_last';
 
-		$conversation = $this->resolveAssistantUser($request, $assistant)
-			->conversations()
-			->findOrFail($id);
+        $conversation = $this->resolveAssistantUser($request, $assistant)
+            ->conversations()
+            ->findOrFail($id);
 
-		if ($mode === 'full') {
-			$conversation->update(['memory_checkpoint_message_id' => 0]);
-		}
+        if ($mode === 'full') {
+            $conversation->update(['memory_checkpoint_message_id' => 0]);
+        }
 
-		$upToMessageId = $conversation->messages()->max('id');
-		$checkpoint = $conversation->memory_checkpoint_message_id ?? 0;
+        $upToMessageId = $conversation->messages()->max('id');
+        $checkpoint = $conversation->memory_checkpoint_message_id ?? 0;
 
-		if (! $upToMessageId || $upToMessageId <= $checkpoint) {
-			return response()->json(['queued' => false]);
-		}
+        if (! $upToMessageId || $upToMessageId <= $checkpoint) {
+            return response()->json(['queued' => false]);
+        }
 
-		$lockedAt = now()->toDateTimeString();
+        $lockedAt = now()->toDateTimeString();
 
-		$locked = $conversation->newQuery()
-			->whereKey($conversation->id)
-			->whereNull('memory_summarizing_at')
-			->update(['memory_summarizing_at' => $lockedAt]);
+        $locked = $conversation->newQuery()
+            ->whereKey($conversation->id)
+            ->whereNull('memory_summarizing_at')
+            ->update(['memory_summarizing_at' => $lockedAt]);
 
-		if ($locked !== 1) {
-			return response()->json(['queued' => false, 'already_summarizing' => true]);
-		}
+        if ($locked !== 1) {
+            return response()->json(['queued' => false, 'already_summarizing' => true]);
+        }
 
-		SummarizeConversation::dispatch($conversation, $upToMessageId, $lockedAt, $mode);
+        SummarizeConversation::dispatch($conversation, $upToMessageId, $lockedAt, $mode);
 
-		return response()->json(['queued' => true]);
-	}
+        return response()->json(['queued' => true]);
+    }
 
-	public function unlock(Request $request, int $assistant, int $id): JsonResponse
-	{
-		$conversation = $this->resolveAssistantUser($request, $assistant)
-			->conversations()
-			->findOrFail($id);
+    public function unlock(Request $request, int $assistant, int $id): JsonResponse
+    {
+        $conversation = $this->resolveAssistantUser($request, $assistant)
+            ->conversations()
+            ->findOrFail($id);
 
-		$conversation->update(['memory_summarizing_at' => null]);
+        $conversation->update(['memory_summarizing_at' => null]);
 
-		return response()->json(['long_term_memory' => $conversation->long_term_memory]);
-	}
+        return response()->json(['long_term_memory' => $conversation->long_term_memory]);
+    }
 }

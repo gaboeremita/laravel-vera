@@ -14,5 +14,5 @@ Route::post('/logout', [AuthController::class, 'logout']);
 Route::get('/vendor/vad/{file}', VadAssetController::class)->where('file', '.*\.mjs$');
 
 Route::get('/{any}', function () {
-	return view('welcome');
+    return view('welcome');
 })->where('any', '.*');

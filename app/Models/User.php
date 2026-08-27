@@ -18,7 +18,7 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * Get the attributes that should be cast.
@@ -33,40 +33,40 @@ class User extends Authenticatable
         ];
     }
 
-	public function settings(): HasMany
-	{
-		return $this->hasMany(Settings::class);
-	}
+    public function settings(): HasMany
+    {
+        return $this->hasMany(Settings::class);
+    }
 
-	public function conversations(): HasMany
-	{
-		return $this->hasMany(Conversation::class);
-	}
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
+    }
 
-	public function archives(): HasMany
-	{
-		return $this->hasMany(Archive::class);
-	}
+    public function archives(): HasMany
+    {
+        return $this->hasMany(Archive::class);
+    }
 
-	public function tags(): HasMany
-	{
-		return $this->hasMany(Tag::class);
-	}
+    public function tags(): HasMany
+    {
+        return $this->hasMany(Tag::class);
+    }
 
-	public function aiProviders(): HasMany
-	{
-		return $this->hasMany(AiProvider::class);
-	}
+    public function aiProviders(): HasMany
+    {
+        return $this->hasMany(AiProvider::class);
+    }
 
-	public function imageGenProviders(): HasMany
-	{
-		return $this->hasMany(ImageGenProvider::class);
-	}
+    public function imageGenProviders(): HasMany
+    {
+        return $this->hasMany(ImageGenProvider::class);
+    }
 
-	public function assistants(): BelongsToMany
-	{
-		return $this->belongsToMany(Assistant::class)
-			->using(AssistantUser::class)
-			->withTimestamps();
-	}
+    public function assistants(): BelongsToMany
+    {
+        return $this->belongsToMany(Assistant::class)
+            ->using(AssistantUser::class)
+            ->withTimestamps();
+    }
 }

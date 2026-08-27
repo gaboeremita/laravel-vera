@@ -15,73 +15,73 @@ use Symfony\Component\HttpFoundation\Response;
 
 class VoiceController extends Controller
 {
-	use ResolvesAssistantUser;
+    use ResolvesAssistantUser;
 
-	public function transcribe(Request $request, int $assistant, SttProvider $stt): JsonResponse
-	{
-		$this->resolveAssistantUser($request, $assistant);
+    public function transcribe(Request $request, int $assistant, SttProvider $stt): JsonResponse
+    {
+        $this->resolveAssistantUser($request, $assistant);
 
-		$validated = $request->validate([
-			'audio' => ['required', 'file', 'max:10480', 'mimetypes:audio/wav,audio/x-wav,audio/webm,audio/ogg,audio/mpeg,audio/mp4'],
-		]);
+        $validated = $request->validate([
+            'audio' => ['required', 'file', 'max:10480', 'mimetypes:audio/wav,audio/x-wav,audio/webm,audio/ogg,audio/mpeg,audio/mp4'],
+        ]);
 
-		$audio = file_get_contents($validated['audio']->getRealPath());
+        $audio = file_get_contents($validated['audio']->getRealPath());
 
-		if ($audio === false) {
-			return response()->json(['message' => 'Failed to read uploaded audio'], 422);
-		}
+        if ($audio === false) {
+            return response()->json(['message' => 'Failed to read uploaded audio'], 422);
+        }
 
-		try {
-			$text = $stt->transcribe($audio);
-		} catch (\RuntimeException $e) {
-			return response()->json(['message' => $e->getMessage()], 502);
-		}
+        try {
+            $text = $stt->transcribe($audio);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 502);
+        }
 
-		return response()->json(['text' => $text]);
-	}
+        return response()->json(['text' => $text]);
+    }
 
-	public function synthesize(Request $request, int $assistant, TtsManager $ttsManager): Response
-	{
-		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+    public function synthesize(Request $request, int $assistant, TtsManager $ttsManager): Response
+    {
+        $assistantUser = $this->resolveAssistantUser($request, $assistant);
 
-		$validated = $request->validate([
-			'text' => ['required', 'string'],
-			'instructions' => ['sometimes', 'nullable', 'string'],
-		]);
+        $validated = $request->validate([
+            'text' => ['required', 'string'],
+            'instructions' => ['sometimes', 'nullable', 'string'],
+        ]);
 
-		$voiceSettings = Cache::rememberForever(
-			Settings::voiceCacheKey($assistantUser->user_id, $assistantUser->assistant_id),
-			function () use ($assistantUser) {
-				$data = $assistantUser->user->settings()
-					->where('assistant_id', $assistantUser->assistant_id)
-					->first()?->data ?? [];
+        $voiceSettings = Cache::rememberForever(
+            Settings::voiceCacheKey($assistantUser->user_id, $assistantUser->assistant_id),
+            function () use ($assistantUser) {
+                $data = $assistantUser->user->settings()
+                    ->where('assistant_id', $assistantUser->assistant_id)
+                    ->first()?->data ?? [];
 
-				return [
-					'tts_model_id' => $data['tts_model_id'] ?? null,
-					'tts_voice' => $data['tts_voice'] ?? null,
-				];
-			}
-		);
+                return [
+                    'tts_model_id' => $data['tts_model_id'] ?? null,
+                    'tts_voice' => $data['tts_voice'] ?? null,
+                ];
+            }
+        );
 
-		$options = [];
-		if (! empty($validated['instructions'])) {
-			$options['instructions'] = $validated['instructions'];
-		}
+        $options = [];
+        if (! empty($validated['instructions'])) {
+            $options['instructions'] = $validated['instructions'];
+        }
 
-		try {
-			$tts = $voiceSettings['tts_model_id']
-				? $ttsManager->fromModel(VoiceModel::with('provider')->findOrFail($voiceSettings['tts_model_id']))
-				: $ttsManager->fromConfig();
+        try {
+            $tts = $voiceSettings['tts_model_id']
+                ? $ttsManager->fromModel(VoiceModel::with('provider')->findOrFail($voiceSettings['tts_model_id']))
+                : $ttsManager->fromConfig();
 
-			$audio = $tts->synthesize(
-				text: $validated['text'],
-				voice: $voiceSettings['tts_voice'],
-				options: $options,
-			);
-		} catch (\RuntimeException $e) {
-			return response()->json(['message' => $e->getMessage()], 502);
-		}
+            $audio = $tts->synthesize(
+                text: $validated['text'],
+                voice: $voiceSettings['tts_voice'],
+                options: $options,
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 502);
+        }
 
-		return response($audio, 200)->header('Content-Type', $tts->contentType());
-	}
+        return response($audio, 200)->header('Content-Type', $tts->contentType());
+    }
 }

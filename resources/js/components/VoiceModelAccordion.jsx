@@ -36,9 +36,15 @@ export default function VoiceModelAccordion({
 		addToast
 	);
 
-	useEffect(() => {
+	// Reset the local input whenever the active voice changes externally,
+	// computed here instead of in an effect so it applies before the next
+	// paint rather than one render later.
+	const activeVoiceKey = `${isActive}|${activeVoice}`;
+	const [lastActiveVoiceKey, setLastActiveVoiceKey] = useState(activeVoiceKey);
+	if (activeVoiceKey !== lastActiveVoiceKey) {
+		setLastActiveVoiceKey(activeVoiceKey);
 		setVoiceInput(isActive ? (activeVoice || '') : '');
-	}, [isActive, activeVoice]);
+	}
 
 	const commit = () => {
 		const value = voiceInput.trim();

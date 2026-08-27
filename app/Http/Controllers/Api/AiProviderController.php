@@ -28,7 +28,7 @@ class AiProviderController extends Controller
             'url' => ['required', 'string', 'url', 'max:255'],
             'api_key' => ['nullable', 'string'],
             'prompt' => ['nullable', 'string'],
-			'format' => ['required', new Enum(AiProviderFormat::class)],
+            'format' => ['required', new Enum(AiProviderFormat::class)],
             'config_schema' => ['nullable', 'array'],
         ]);
 
@@ -50,7 +50,7 @@ class AiProviderController extends Controller
             'url' => ['sometimes', 'string', 'url', 'max:255'],
             'api_key' => ['sometimes', 'string'],
             'prompt' => ['nullable', 'string'],
-			'format' => ['required', new Enum(AiProviderFormat::class)],
+            'format' => ['required', new Enum(AiProviderFormat::class)],
             'config_schema' => ['nullable', 'array'],
         ]);
 

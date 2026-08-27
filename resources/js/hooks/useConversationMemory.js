@@ -32,10 +32,11 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 
 	useEffect(() => {
 		let cancelled = false;
-		setIsLoading(true);
-		setIsLocked(false);
 
 		const load = async () => {
+			setIsLoading(true);
+			setIsLocked(false);
+
 			try {
 				const data = await fetchStatus();
 				if (!cancelled) applyShowData(data);

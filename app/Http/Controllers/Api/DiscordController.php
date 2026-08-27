@@ -16,149 +16,149 @@ use Illuminate\Support\Facades\Http;
 
 class DiscordController extends Controller
 {
-	use ResolvesAssistantUser;
+    use ResolvesAssistantUser;
 
-	public function discovery(Request $request, int $assistant): JsonResponse
-	{
-		$apiConfig = config('ai.discord');
-		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+    public function discovery(Request $request, int $assistant): JsonResponse
+    {
+        $apiConfig = config('ai.discord');
+        $assistantUser = $this->resolveAssistantUser($request, $assistant);
 
-		try {
-			$response = Http::timeout($apiConfig['timeout'])
-				->withHeaders(['X-Internal-Secret' => $apiConfig['api_secret']])
-				->get("{$apiConfig['api_url']}/assistants/{$assistant}/discovery");
-		} catch (\Throwable $e) {
-			return response()->json(['guilds' => [], 'message' => 'discord-api is unreachable'], 502);
-		}
+        try {
+            $response = Http::timeout($apiConfig['timeout'])
+                ->withHeaders(['X-Internal-Secret' => $apiConfig['api_secret']])
+                ->get("{$apiConfig['api_url']}/assistants/{$assistant}/discovery");
+        } catch (\Throwable $e) {
+            return response()->json(['guilds' => [], 'message' => 'discord-api is unreachable'], 502);
+        }
 
-		if ($response->notFound()) {
-			return response()->json(['guilds' => [], 'message' => 'No Discord bot configured for this assistant']);
-		}
+        if ($response->notFound()) {
+            return response()->json(['guilds' => [], 'message' => 'No Discord bot configured for this assistant']);
+        }
 
-		if ($response->failed()) {
-			return response()->json(['guilds' => [], 'message' => 'discord-api request failed'], 502);
-		}
+        if ($response->failed()) {
+            return response()->json(['guilds' => [], 'message' => 'discord-api request failed'], 502);
+        }
 
-		$guilds = $response->json('guilds', []);
-		$servers = $this->syncGuilds($guilds);
+        $guilds = $response->json('guilds', []);
+        $servers = $this->syncGuilds($guilds);
 
-		$serverPrompts = AssistantDiscordServer::where('assistant_user_id', $assistantUser->id)
-			->whereIn('discord_server_id', $servers->pluck('id'))
-			->get()
-			->keyBy('discord_server_id');
+        $serverPrompts = AssistantDiscordServer::where('assistant_user_id', $assistantUser->id)
+            ->whereIn('discord_server_id', $servers->pluck('id'))
+            ->get()
+            ->keyBy('discord_server_id');
 
-		$channelConfigs = AssistantDiscordChannel::where('assistant_user_id', $assistantUser->id)
-			->whereIn('discord_channel_id', $servers->flatMap->channels->pluck('id'))
-			->get()
-			->keyBy('discord_channel_id');
+        $channelConfigs = AssistantDiscordChannel::where('assistant_user_id', $assistantUser->id)
+            ->whereIn('discord_channel_id', $servers->flatMap->channels->pluck('id'))
+            ->get()
+            ->keyBy('discord_channel_id');
 
-		foreach ($guilds as &$guild) {
-			$server = $servers->firstWhere('discord_guild_id', $guild['id']);
-			$guild['prompt'] = $serverPrompts->get($server->id)?->prompt ?? [];
+        foreach ($guilds as &$guild) {
+            $server = $servers->firstWhere('discord_guild_id', $guild['id']);
+            $guild['prompt'] = $serverPrompts->get($server->id)?->prompt ?? [];
 
-			foreach ($guild['channels'] as &$channel) {
-				$dbChannel = $server->channels->firstWhere('discord_channel_id', $channel['id']);
-				$channelConfig = $channelConfigs->get($dbChannel->id);
-				$channel['trigger_mode'] = $channelConfig?->trigger_mode ?? 'off';
-				$channel['prompt'] = $channelConfig?->prompt ?? [];
-			}
-		}
+            foreach ($guild['channels'] as &$channel) {
+                $dbChannel = $server->channels->firstWhere('discord_channel_id', $channel['id']);
+                $channelConfig = $channelConfigs->get($dbChannel->id);
+                $channel['trigger_mode'] = $channelConfig?->trigger_mode ?? 'off';
+                $channel['prompt'] = $channelConfig?->prompt ?? [];
+            }
+        }
 
-		return response()->json(['guilds' => $guilds, 'dms' => $this->dms($assistantUser)]);
-	}
+        return response()->json(['guilds' => $guilds, 'dms' => $this->dms($assistantUser)]);
+    }
 
-	/**
-	 * DM channels aren't discoverable through discord-api ahead of time — a bot only learns
-	 * about one once a message arrives (see ConversationController::sendDiscordMessage), so
-	 * this reads what's already been recorded locally instead of calling out to discord-api.
-	 *
-	 * @return array<int, array{id: string, name: string, prompt: array}>
-	 */
-	private function dms(AssistantUser $assistantUser): array
-	{
-		$dmChannels = DiscordChannel::whereNull('discord_server_id')->get();
+    /**
+     * DM channels aren't discoverable through discord-api ahead of time — a bot only learns
+     * about one once a message arrives (see ConversationController::sendDiscordMessage), so
+     * this reads what's already been recorded locally instead of calling out to discord-api.
+     *
+     * @return array<int, array{id: string, name: string, prompt: array}>
+     */
+    private function dms(AssistantUser $assistantUser): array
+    {
+        $dmChannels = DiscordChannel::whereNull('discord_server_id')->get();
 
-		$channelConfigs = AssistantDiscordChannel::where('assistant_user_id', $assistantUser->id)
-			->whereIn('discord_channel_id', $dmChannels->pluck('id'))
-			->get()
-			->keyBy('discord_channel_id');
+        $channelConfigs = AssistantDiscordChannel::where('assistant_user_id', $assistantUser->id)
+            ->whereIn('discord_channel_id', $dmChannels->pluck('id'))
+            ->get()
+            ->keyBy('discord_channel_id');
 
-		return $dmChannels->map(fn (DiscordChannel $channel) => [
-			'id' => $channel->discord_channel_id,
-			'name' => $channel->name,
-			'prompt' => $channelConfigs->get($channel->id)?->prompt ?? [],
-		])->values()->all();
-	}
+        return $dmChannels->map(fn (DiscordChannel $channel) => [
+            'id' => $channel->discord_channel_id,
+            'name' => $channel->name,
+            'prompt' => $channelConfigs->get($channel->id)?->prompt ?? [],
+        ])->values()->all();
+    }
 
-	public function updateServerPrompt(Request $request, int $assistant, string $guildId): JsonResponse
-	{
-		$validated = $request->validate(['prompt' => ['present', 'array']]);
+    public function updateServerPrompt(Request $request, int $assistant, string $guildId): JsonResponse
+    {
+        $validated = $request->validate(['prompt' => ['present', 'array']]);
 
-		$assistantUser = $this->resolveAssistantUser($request, $assistant);
-		$server = DiscordServer::where('discord_guild_id', $guildId)->firstOrFail();
+        $assistantUser = $this->resolveAssistantUser($request, $assistant);
+        $server = DiscordServer::where('discord_guild_id', $guildId)->firstOrFail();
 
-		$pivot = AssistantDiscordServer::updateOrCreate(
-			['assistant_user_id' => $assistantUser->id, 'discord_server_id' => $server->id],
-			['prompt' => $validated['prompt']],
-		);
+        $pivot = AssistantDiscordServer::updateOrCreate(
+            ['assistant_user_id' => $assistantUser->id, 'discord_server_id' => $server->id],
+            ['prompt' => $validated['prompt']],
+        );
 
-		return response()->json(['prompt' => $pivot->prompt]);
-	}
+        return response()->json(['prompt' => $pivot->prompt]);
+    }
 
-	public function updateChannelPrompt(Request $request, int $assistant, string $channelId): JsonResponse
-	{
-		$validated = $request->validate(['prompt' => ['present', 'array']]);
+    public function updateChannelPrompt(Request $request, int $assistant, string $channelId): JsonResponse
+    {
+        $validated = $request->validate(['prompt' => ['present', 'array']]);
 
-		$assistantUser = $this->resolveAssistantUser($request, $assistant);
-		$channel = DiscordChannel::where('discord_channel_id', $channelId)->firstOrFail();
+        $assistantUser = $this->resolveAssistantUser($request, $assistant);
+        $channel = DiscordChannel::where('discord_channel_id', $channelId)->firstOrFail();
 
-		// A DM has no trigger mode to set first, so its pivot is created here on first prompt save.
-		if ($channel->discord_server_id === null) {
-			$pivot = AssistantDiscordChannel::updateOrCreate(
-				['assistant_user_id' => $assistantUser->id, 'discord_channel_id' => $channel->id],
-				['prompt' => $validated['prompt']],
-			);
+        // A DM has no trigger mode to set first, so its pivot is created here on first prompt save.
+        if ($channel->discord_server_id === null) {
+            $pivot = AssistantDiscordChannel::updateOrCreate(
+                ['assistant_user_id' => $assistantUser->id, 'discord_channel_id' => $channel->id],
+                ['prompt' => $validated['prompt']],
+            );
 
-			return response()->json(['prompt' => $pivot->prompt]);
-		}
+            return response()->json(['prompt' => $pivot->prompt]);
+        }
 
-		$pivot = AssistantDiscordChannel::where('assistant_user_id', $assistantUser->id)
-			->where('discord_channel_id', $channel->id)
-			->first();
+        $pivot = AssistantDiscordChannel::where('assistant_user_id', $assistantUser->id)
+            ->where('discord_channel_id', $channel->id)
+            ->first();
 
-		if (! $pivot) {
-			return response()->json(['message' => 'Set a trigger mode for this channel before adding a prompt.'], 422);
-		}
+        if (! $pivot) {
+            return response()->json(['message' => 'Set a trigger mode for this channel before adding a prompt.'], 422);
+        }
 
-		$pivot->update(['prompt' => $validated['prompt']]);
+        $pivot->update(['prompt' => $validated['prompt']]);
 
-		return response()->json(['prompt' => $pivot->prompt]);
-	}
+        return response()->json(['prompt' => $pivot->prompt]);
+    }
 
-	/**
-	 * Keep the internal discord_servers/discord_channels records in sync with what
-	 * discord-api actually sees live, so per-assistant config can reference a stable
-	 * internal id instead of raw Discord identifiers.
-	 *
-	 * @param  array<int, array{id: string, name: string, channels: array<int, array{id: string, name: string}>}>  $guilds
-	 * @return Collection<int, DiscordServer>
-	 */
-	private function syncGuilds(array $guilds): Collection
-	{
-		return collect($guilds)->map(function (array $guild) {
-			$server = DiscordServer::updateOrCreate(
-				['discord_guild_id' => $guild['id']],
-				['name' => $guild['name']],
-			);
+    /**
+     * Keep the internal discord_servers/discord_channels records in sync with what
+     * discord-api actually sees live, so per-assistant config can reference a stable
+     * internal id instead of raw Discord identifiers.
+     *
+     * @param  array<int, array{id: string, name: string, channels: array<int, array{id: string, name: string}>}>  $guilds
+     * @return Collection<int, DiscordServer>
+     */
+    private function syncGuilds(array $guilds): Collection
+    {
+        return collect($guilds)->map(function (array $guild) {
+            $server = DiscordServer::updateOrCreate(
+                ['discord_guild_id' => $guild['id']],
+                ['name' => $guild['name']],
+            );
 
-			$server->setRelation('channels', collect($guild['channels'])->map(
-				fn (array $channel) => DiscordChannel::updateOrCreate(
-					['discord_channel_id' => $channel['id']],
-					['discord_server_id' => $server->id, 'name' => $channel['name']],
-				)
-			));
+            $server->setRelation('channels', collect($guild['channels'])->map(
+                fn (array $channel) => DiscordChannel::updateOrCreate(
+                    ['discord_channel_id' => $channel['id']],
+                    ['discord_server_id' => $server->id, 'name' => $channel['name']],
+                )
+            ));
 
-			return $server;
-		});
-	}
+            return $server;
+        });
+    }
 }

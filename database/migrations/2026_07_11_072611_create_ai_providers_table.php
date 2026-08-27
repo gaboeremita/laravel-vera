@@ -14,15 +14,15 @@ return new class extends Migration
     {
         Schema::create('ai_providers', function (Blueprint $table) {
             $table->id();
-			$table->foreignId('user_id')->constrained()->cascadeOnDelete();
-			$table->string('name');
-			$table->string('url');
-			$table->text('api_key');
-			$table->text('prompt')->nullable();
-			$table->json('config_schema')->nullable();
-			$table->enum('format', array_column(AiProviderFormat::cases(), 'value'))
-				->default(AiProviderFormat::Generic->value);
-			$table->unique(['user_id', 'name']);
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->string('name');
+            $table->string('url');
+            $table->text('api_key');
+            $table->text('prompt')->nullable();
+            $table->json('config_schema')->nullable();
+            $table->enum('format', array_column(AiProviderFormat::cases(), 'value'))
+                ->default(AiProviderFormat::Generic->value);
+            $table->unique(['user_id', 'name']);
             $table->timestamps();
         });
     }

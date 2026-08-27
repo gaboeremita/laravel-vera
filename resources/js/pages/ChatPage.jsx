@@ -24,8 +24,10 @@ export default function ChatPage() {
 		conversations,
 	} = useOutletContext();
 
+	const draftKey = `chatDraft:${assistantId}:${id}`;
+
 	const [messages, setMessages] = useState([]);
-	const [input, setInput] = useState('');
+	const [input, setInput] = useState(() => localStorage.getItem(draftKey) || '');
 	const [isLoading, setIsLoading] = useState(false);
 	const [hasError, setHasError] = useState(false);
 	const [pendingImage, setPendingImage] = useState(null);
@@ -42,11 +44,15 @@ export default function ChatPage() {
 	const draftTimeoutRef = useRef(null);
 
 	const conversationTitle = conversations.find((c) => c.id === Number(id))?.title || '';
-	const draftKey = `chatDraft:${assistantId}:${id}`;
 
 	// Restore draft when switching conversations
-	useEffect(() => {
+	const [restoredDraftKey, setRestoredDraftKey] = useState(draftKey);
+	if (draftKey !== restoredDraftKey) {
+		setRestoredDraftKey(draftKey);
 		setInput(localStorage.getItem(draftKey) || '');
+	}
+
+	useEffect(() => {
 		return () => clearTimeout(draftTimeoutRef.current);
 	}, [draftKey]);
 

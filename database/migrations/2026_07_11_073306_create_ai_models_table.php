@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::create('ai_models', function (Blueprint $table) {
             $table->id();
-			$table->foreignId('provider_id')->constrained('ai_providers')->cascadeOnDelete();
-			$table->string('name');
-			$table->text('prompt')->nullable();
-			$table->json('config')->nullable();
-			$table->boolean('thinking')->default(false);
+            $table->foreignId('provider_id')->constrained('ai_providers')->cascadeOnDelete();
+            $table->string('name');
+            $table->text('prompt')->nullable();
+            $table->json('config')->nullable();
+            $table->boolean('thinking')->default(false);
             $table->timestamps();
         });
     }

@@ -22,12 +22,12 @@ export default function ArchivePage() {
 	const allCollapsed = entries.every((e) => e.collapsed);
 
 	useEffect(() => {
-		if (!archiveId) {
-			setIsLoading(false);
-			return;
-		}
-
 		const load = async () => {
+			if (!archiveId) {
+				setIsLoading(false);
+				return;
+			}
+
 			try {
 				const res = await api.get(route('archives.show', { id: archiveId }));
 

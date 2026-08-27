@@ -16,125 +16,125 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ArchiveController extends Controller
 {
-	/**
-	 * List all archives belonging to the authenticated user.
-	 */
-	public function index(Request $request): JsonResponse
-	{
-		$archives = $request->user()
-			->archives()
-			->get(['id', 'name']);
+    /**
+     * List all archives belonging to the authenticated user.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $archives = $request->user()
+            ->archives()
+            ->get(['id', 'name']);
 
-		return response()->json($archives);
-	}
+        return response()->json($archives);
+    }
 
-	/**
-	 * Return a specific archive with its entries and tags.
-	 */
-	public function show(Request $request, int $id): JsonResponse
-	{
-		$archive = $request->user()
-			->archives()
-			->with('entries.tags')
-			->findOrFail($id);
+    /**
+     * Return a specific archive with its entries and tags.
+     */
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $archive = $request->user()
+            ->archives()
+            ->with('entries.tags')
+            ->findOrFail($id);
 
-		return response()->json($archive);
-	}
+        return response()->json($archive);
+    }
 
-	/**
-	 * Create or update an archive and all its entries in a single save.
-	 * If {id} is provided, updates that archive. Otherwise creates a new one.
-	 */
-	public function save(Request $request, ?int $id = null): JsonResponse
-	{
-		$validated = $request->validate([
-			'name' => ['required', 'string', 'max:100'],
-			'description' => ['required', 'string'],
-			'entries' => ['present', 'array'],
-			'entries.*.id' => ['sometimes', 'integer'],
-			'entries.*.title' => ['required', 'string', 'max:100'],
-			'entries.*.content' => ['required', 'string'],
-			'entries.*.keywords' => ['nullable', 'array'],
-			'entries.*.keywords.*' => ['string', 'max:50'],
-			'entries.*.tags' => ['nullable', 'array'],
-			'entries.*.tags.*' => ['string', 'max:50'],
-		]);
+    /**
+     * Create or update an archive and all its entries in a single save.
+     * If {id} is provided, updates that archive. Otherwise creates a new one.
+     */
+    public function save(Request $request, ?int $id = null): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'description' => ['required', 'string'],
+            'entries' => ['present', 'array'],
+            'entries.*.id' => ['sometimes', 'integer'],
+            'entries.*.title' => ['required', 'string', 'max:100'],
+            'entries.*.content' => ['required', 'string'],
+            'entries.*.keywords' => ['nullable', 'array'],
+            'entries.*.keywords.*' => ['string', 'max:50'],
+            'entries.*.tags' => ['nullable', 'array'],
+            'entries.*.tags.*' => ['string', 'max:50'],
+        ]);
 
-		return DB::transaction(function () use ($request, $validated, $id) {
-			if ($id) {
-				$archive = $request->user()->archives()->findOrFail($id);
-				$archive->update([
-					'name' => $validated['name'],
-					'description' => $validated['description'],
-				]);
-			} else {
-				$archive = $request->user()->archives()->create([
-					'name' => $validated['name'],
-					'description' => $validated['description'],
-				]);
-			}
+        return DB::transaction(function () use ($request, $validated, $id) {
+            if ($id) {
+                $archive = $request->user()->archives()->findOrFail($id);
+                $archive->update([
+                    'name' => $validated['name'],
+                    'description' => $validated['description'],
+                ]);
+            } else {
+                $archive = $request->user()->archives()->create([
+                    'name' => $validated['name'],
+                    'description' => $validated['description'],
+                ]);
+            }
 
-			$incomingIds = collect($validated['entries'])
-				->pluck('id')
-				->filter()
-				->all();
+            $incomingIds = collect($validated['entries'])
+                ->pluck('id')
+                ->filter()
+                ->all();
 
-			$archive->entries()
-				->whereNotIn('id', $incomingIds)
-				->delete();
+            $archive->entries()
+                ->whereNotIn('id', $incomingIds)
+                ->delete();
 
-			foreach ($validated['entries'] as $entryData) {
-				$entry = $archive->entries()->updateOrCreate(
-					['id' => $entryData['id'] ?? null],
-					[
-						'title' => $entryData['title'],
-						'content' => $entryData['content'],
-						'keywords' => $entryData['keywords'] ?? [],
-					],
-				);
+            foreach ($validated['entries'] as $entryData) {
+                $entry = $archive->entries()->updateOrCreate(
+                    ['id' => $entryData['id'] ?? null],
+                    [
+                        'title' => $entryData['title'],
+                        'content' => $entryData['content'],
+                        'keywords' => $entryData['keywords'] ?? [],
+                    ],
+                );
 
-				if (isset($entryData['tags'])) {
-					$tagIds = collect($entryData['tags'])->map(function (string $name) use ($request) {
-						return Tag::firstOrCreate(
-							['name' => $name, 'user_id' => auth()->id()],
-						)->id;
-					})->all();
+                if (isset($entryData['tags'])) {
+                    $tagIds = collect($entryData['tags'])->map(function (string $name) {
+                        return Tag::firstOrCreate(
+                            ['name' => $name, 'user_id' => auth()->id()],
+                        )->id;
+                    })->all();
 
-					$entry->tags()->sync($tagIds);
-				} else {
-					$entry->tags()->detach();
-				}
+                    $entry->tags()->sync($tagIds);
+                } else {
+                    $entry->tags()->detach();
+                }
 
-				if ($entry->wasChanged('content') || $entry->wasRecentlyCreated) {
-					EmbedArchiveEntry::dispatch($entry);
-				}
-			}
+                if ($entry->wasChanged('content') || $entry->wasRecentlyCreated) {
+                    EmbedArchiveEntry::dispatch($entry);
+                }
+            }
 
-			return response()->json(
-				$archive->fresh(['entries.tags']),
-			);
-		});
-	}
+            return response()->json(
+                $archive->fresh(['entries.tags']),
+            );
+        });
+    }
 
-	/**
-	 * Export an archive and its entries as a Markdown file.
-	 */
-	public function export(Request $request, int $id, BuildArchiveFile $buildArchiveFile): BinaryFileResponse
-	{
-		$archive = $request->user()
-			->archives()
-			->with('entries.tags')
-			->findOrFail($id);
+    /**
+     * Export an archive and its entries as a Markdown file.
+     */
+    public function export(Request $request, int $id, BuildArchiveFile $buildArchiveFile): BinaryFileResponse
+    {
+        $archive = $request->user()
+            ->archives()
+            ->with('entries.tags')
+            ->findOrFail($id);
 
-		$markdown = $buildArchiveFile->handle($archive);
+        $markdown = $buildArchiveFile->handle($archive);
 
-		$filename = (Str::slug($archive->name) ?: 'archive').'.md';
-		$path = 'exports/'.Str::uuid().'.md';
+        $filename = (Str::slug($archive->name) ?: 'archive').'.md';
+        $path = 'exports/'.Str::uuid().'.md';
 
-		Storage::disk('local')->put($path, $markdown);
+        Storage::disk('local')->put($path, $markdown);
 
-		return response()
-			->download(Storage::disk('local')->path($path), $filename)
-			->deleteFileAfterSend(true);
-	}
+        return response()
+            ->download(Storage::disk('local')->path($path), $filename)
+            ->deleteFileAfterSend(true);
+    }
 }

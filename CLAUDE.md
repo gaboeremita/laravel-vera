@@ -159,9 +159,9 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 </laravel-boost-guidelines>
 
-## Git Rules
+## Project Constitution
 
-- NEVER commit or push changes unless the user explicitly asks you to. Making code changes does not imply permission to commit or push them.
+- Product, architecture, and quality principles for this repo (code style gates, data isolation, testing approach, and more) live in `.specify/memory/constitution.md` — consult it for anything not covered by the operational rules below.
 
 ## Migration Rules
 
@@ -169,7 +169,8 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Linting
 
-- At the moment, we are not using lint. Do not run `eslint` or add a `lint` script.
+- PHP code must be Pint-compliant: run `vendor/bin/pint --test` before considering PHP changes done, and `vendor/bin/pint` to fix violations.
+- Frontend code must be ESLint-compliant: run `npm run lint` before considering JS/TS changes done.
 
 ## Before Taking Action
 

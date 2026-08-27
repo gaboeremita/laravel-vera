@@ -11,16 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-		Schema::create('videos', function (Blueprint $table) {
-			$table->id();
-			$table->morphs('videoable');
-			$table->string('name');
-			$table->string('path');
-			$table->string('disk')->default('public');
-			$table->string('mime_type')->nullable();
-			$table->unsignedBigInteger('size')->nullable();
-			$table->timestamps();
-		});
+        Schema::create('videos', function (Blueprint $table) {
+            $table->id();
+            $table->morphs('videoable');
+            $table->string('name');
+            $table->string('path');
+            $table->string('disk')->default('public');
+            $table->string('mime_type')->nullable();
+            $table->unsignedBigInteger('size')->nullable();
+            $table->timestamps();
+        });
     }
 
     /**

@@ -11,16 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-		Schema::create('images', function (Blueprint $table) {
-			$table->id();
-			$table->morphs('imageable');
-			$table->string('path');
-			$table->string('disk')->default('public');
-			$table->string('mime_type')->nullable();
-			$table->unsignedBigInteger('size')->nullable();
-			$table->string('original_name')->nullable();
-			$table->timestamps();
-		});
+        Schema::create('images', function (Blueprint $table) {
+            $table->id();
+            $table->morphs('imageable');
+            $table->string('path');
+            $table->string('disk')->default('public');
+            $table->string('mime_type')->nullable();
+            $table->unsignedBigInteger('size')->nullable();
+            $table->string('original_name')->nullable();
+            $table->timestamps();
+        });
     }
 
     /**

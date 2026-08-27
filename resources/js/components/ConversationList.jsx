@@ -37,11 +37,17 @@ export default function ConversationList({ assistantId, conversations, onSelect,
 		listRef.current?.focus();
 	}, []);
 
-	useEffect(() => {
-		if (activeRow >= conversations.length) {
+	// A row becoming invalid (e.g. the list shrinking) forces the column back
+	// to "select" — computed here instead of in an effect so it applies before
+	// the next paint rather than one render later.
+	const columnResetKey = activeRow >= conversations.length;
+	const [wasRowInvalid, setWasRowInvalid] = useState(columnResetKey);
+	if (columnResetKey !== wasRowInvalid) {
+		setWasRowInvalid(columnResetKey);
+		if (columnResetKey) {
 			setActiveColumn("select");
 		}
-	}, [activeRow, conversations.length]);
+	}
 
 	const handleKeyDown = (e) => {
 		if (pendingDeleteId) return;

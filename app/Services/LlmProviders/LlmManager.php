@@ -11,57 +11,58 @@ use App\Models\Settings;
 
 class LlmManager
 {
-	public function forAssistantUser(AssistantUser $assistantUser): LlmProvider
-	{
-		$settings = Settings::where('user_id', $assistantUser->user_id)
-			->where('assistant_id', $assistantUser->assistant_id)
-			->first();
+    public function forAssistantUser(AssistantUser $assistantUser): LlmProvider
+    {
+        $settings = Settings::where('user_id', $assistantUser->user_id)
+            ->where('assistant_id', $assistantUser->assistant_id)
+            ->first();
 
-		$selectedModelId = $settings?->data['ai_model_id'] ?? null;
+        $selectedModelId = $settings?->data['ai_model_id'] ?? null;
 
-		if ($selectedModelId) {
-			$aiModel = AiModel::with('provider')->findOrFail($selectedModelId);
-			return $this->fromModel($aiModel);
-		}
+        if ($selectedModelId) {
+            $aiModel = AiModel::with('provider')->findOrFail($selectedModelId);
 
-		return $this->fromConfig();
-	}
+            return $this->fromModel($aiModel);
+        }
 
-	public function fromModel(AiModel $aiModel): LlmProvider
-	{
-		$class = $aiModel->provider->format->providerClass();
+        return $this->fromConfig();
+    }
 
-		return $class::fromModel($aiModel);
-	}
+    public function fromModel(AiModel $aiModel): LlmProvider
+    {
+        $class = $aiModel->provider->format->providerClass();
 
-	public function fromConfig(): LlmProvider
-	{
-		$config = config('ai.default');
+        return $class::fromModel($aiModel);
+    }
 
-		if (! $config || ! $config['url']) {
-			throw new \InvalidArgumentException('No default LLM provider configured.');
-		}
+    public function fromConfig(): LlmProvider
+    {
+        $config = config('ai.default');
 
-		$format = AiProviderFormat::from($config['format'] ?? 'generic');
-		$class = $format->providerClass();
+        if (! $config || ! $config['url']) {
+            throw new \InvalidArgumentException('No default LLM provider configured.');
+        }
 
-		$aiProvider = new AiProvider([
-			'url' => $config['url'],
-			'api_key' => $config['key'] ?? '',
-			'format' => $format,
-			'config_schema' => [
-				'thinking_key' => $config['config']['thinking_key'] ?? null,
-			],
-		]);
+        $format = AiProviderFormat::from($config['format'] ?? 'generic');
+        $class = $format->providerClass();
 
-		$aiModel = new AiModel([
-			'name' => $config['model'],
-			'endpoint' => $config['model'],
-			'thinking' => $config['thinking'] ?? false,
-			'config' => $config['config'] ?? [],
-		]);
-		$aiModel->setRelation('provider', $aiProvider);
+        $aiProvider = new AiProvider([
+            'url' => $config['url'],
+            'api_key' => $config['key'] ?? '',
+            'format' => $format,
+            'config_schema' => [
+                'thinking_key' => $config['config']['thinking_key'] ?? null,
+            ],
+        ]);
 
-		return $class::fromModel($aiModel);
-	}
+        $aiModel = new AiModel([
+            'name' => $config['model'],
+            'endpoint' => $config['model'],
+            'thinking' => $config['thinking'] ?? false,
+            'config' => $config['config'] ?? [],
+        ]);
+        $aiModel->setRelation('provider', $aiProvider);
+
+        return $class::fromModel($aiModel);
+    }
 }

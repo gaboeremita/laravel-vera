@@ -7,11 +7,17 @@ export default function Portrait({ emotion, authenticated, hasAssistant = true, 
 	const src = getImageUrl(emotion) || getImageUrl('default');
 	const videoSrc = getVideoUrl(emotion);
 
-	useEffect(() => {
+	// Starting video playback is triggered by emotion/auth/video changing,
+	// computed here instead of in an effect so it applies before the next
+	// paint rather than one render later.
+	const triggerKey = `${emotion}|${authenticated}|${videoSrc ?? ''}`;
+	const [lastTriggerKey, setLastTriggerKey] = useState(triggerKey);
+	if (triggerKey !== lastTriggerKey) {
+		setLastTriggerKey(triggerKey);
 		if (videoSrc && emotion === "default" && authenticated) {
 			setPlayingVideo(true);
 		}
-	}, [emotion, authenticated, videoSrc]);
+	}
 
 	if (authenticated && !hasAssistant) {
 		return (

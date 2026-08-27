@@ -15,10 +15,10 @@ class Conversation extends Model
     /** @use HasFactory<ConversationFactory> */
     use HasFactory;
 
-	public function assistantUser(): BelongsTo
-	{
-		return $this->belongsTo(AssistantUser::class);
-	}
+    public function assistantUser(): BelongsTo
+    {
+        return $this->belongsTo(AssistantUser::class);
+    }
 
     public function messages(): HasMany
     {

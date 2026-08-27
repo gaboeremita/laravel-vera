@@ -7,6 +7,7 @@ use App\Contracts\LlmProvider;
 use App\DTOs\LlmResponse;
 use App\Models\AiModel;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class GenericProvider implements LlmProvider
 {
@@ -62,14 +63,14 @@ class GenericProvider implements LlmProvider
             ->post($this->url, $payload);
 
         if ($response->failed()) {
-            \Illuminate\Support\Facades\Log::error('[GenericProvider] LLM request failed', ['status' => $response->status(), 'body' => $response->body()]);
+            Log::error('[GenericProvider] LLM request failed', ['status' => $response->status(), 'body' => $response->body()]);
             throw new \RuntimeException('LLM request failed: '.$response->body());
         }
 
         $data = $response->json();
 
         if (isset($data['error'])) {
-            \Illuminate\Support\Facades\Log::error('[GenericProvider] LLM error', ['error' => $data['error']]);
+            Log::error('[GenericProvider] LLM error', ['error' => $data['error']]);
             throw new \RuntimeException('LLM error: '.($data['error']['message'] ?? 'Unknown error'));
         }
 

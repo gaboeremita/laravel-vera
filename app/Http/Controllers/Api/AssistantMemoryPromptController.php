@@ -10,38 +10,38 @@ use Illuminate\Http\Request;
 
 class AssistantMemoryPromptController extends Controller
 {
-	use ResolvesAssistantUser;
+    use ResolvesAssistantUser;
 
-	public function show(Request $request, int $assistant): JsonResponse
-	{
-		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+    public function show(Request $request, int $assistant): JsonResponse
+    {
+        $assistantUser = $this->resolveAssistantUser($request, $assistant);
 
-		return response()->json($assistantUser->memory_prompt ?? (object) []);
-	}
+        return response()->json($assistantUser->memory_prompt ?? (object) []);
+    }
 
-	public function update(Request $request, int $assistant): JsonResponse
-	{
-		$assistantUser = $this->resolveAssistantUser($request, $assistant);
+    public function update(Request $request, int $assistant): JsonResponse
+    {
+        $assistantUser = $this->resolveAssistantUser($request, $assistant);
 
-		$validated = $request->validate([
-			'memory_prompt' => [
-				'present',
-				'nullable',
-				'array',
-				function (string $attribute, mixed $value, \Closure $fail): void {
-					if ($value === null || $value === []) {
-						return;
-					}
+        $validated = $request->validate([
+            'memory_prompt' => [
+                'present',
+                'nullable',
+                'array',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value === null || $value === []) {
+                        return;
+                    }
 
-					(new ValidPromptStructure())->validate($attribute, $value, $fail);
-				},
-			],
-		]);
+                    (new ValidPromptStructure)->validate($attribute, $value, $fail);
+                },
+            ],
+        ]);
 
-		$assistantUser->update([
-			'memory_prompt' => ($validated['memory_prompt'] ?? null) ?: null,
-		]);
+        $assistantUser->update([
+            'memory_prompt' => ($validated['memory_prompt'] ?? null) ?: null,
+        ]);
 
-		return response()->json($assistantUser->memory_prompt ?? (object) []);
-	}
+        return response()->json($assistantUser->memory_prompt ?? (object) []);
+    }
 }

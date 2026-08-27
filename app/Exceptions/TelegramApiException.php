@@ -20,7 +20,7 @@ class TelegramApiException extends RuntimeException
         $data = $response->json();
 
         return new self(
-            message: "Telegram {$method} failed: " . ($data['description'] ?? $response->body()),
+            message: "Telegram {$method} failed: ".($data['description'] ?? $response->body()),
             errorCode: $data['error_code'] ?? $response->status(),
             retryAfter: $data['parameters']['retry_after'] ?? null,
         );

@@ -8,21 +8,21 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Archive extends Model
 {
-	protected $table = 'archives';
+    protected $table = 'archives';
 
-	protected $fillable = [
-		'name',
-		'description',
-		'user_id'
-	];
+    protected $fillable = [
+        'name',
+        'description',
+        'user_id',
+    ];
 
-	public function user(): BelongsTo
-	{
-		return $this->belongsTo(User::class);
-	}
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
-	public function entries(): HasMany
-	{
-		return $this->hasMany(ArchiveEntry::class);
-	}
+    public function entries(): HasMany
+    {
+        return $this->hasMany(ArchiveEntry::class);
+    }
 }
