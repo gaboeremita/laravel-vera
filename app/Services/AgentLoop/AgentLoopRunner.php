@@ -44,7 +44,7 @@ class AgentLoopRunner
 
                 $messages[] = [
                     'role' => 'assistant',
-                    'content' => $response->content,
+                    'content' => $response->content !== '' ? $response->content : null,
                     'tool_calls' => array_map(fn (ToolCallRequest $call) => [
                         'id' => $call->id,
                         'name' => $call->name,
