@@ -5,6 +5,7 @@ namespace App\Services\LlmProviders;
 use App\Builders\ParameterBuilder;
 use App\Contracts\LlmProvider;
 use App\DTOs\LlmResponse;
+use App\DTOs\ToolCallRequest;
 use App\Models\AiModel;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -43,7 +44,7 @@ class GenericProvider implements LlmProvider
         );
     }
 
-    public function chat(array $messages, array $options = []): LlmResponse
+    public function chat(array $messages, array $options = [], array $tools = []): LlmResponse
     {
         $payload = [
             'model' => $this->model,
@@ -52,6 +53,17 @@ class GenericProvider implements LlmProvider
             ...$this->params,
             ...$options,
         ];
+
+        if (! empty($tools)) {
+            $payload['tools'] = array_map(fn (array $tool) => [
+                'type' => 'function',
+                'function' => [
+                    'name' => $tool['name'],
+                    'description' => $tool['description'],
+                    'parameters' => $tool['parameters'],
+                ],
+            ], $tools);
+        }
 
         $headers = [];
         if ($this->apiKey) {
@@ -76,14 +88,44 @@ class GenericProvider implements LlmProvider
 
         $choice = $data['choices'][0]['message'] ?? [];
 
+        $toolCalls = array_map(fn (array $toolCall) => new ToolCallRequest(
+            id: $toolCall['id'],
+            name: $toolCall['function']['name'],
+            arguments: json_decode($toolCall['function']['arguments'], associative: true) ?? [],
+        ), $choice['tool_calls'] ?? []);
+
         return new LlmResponse(
             content: $choice['content'] ?? '',
             thinking: $this->thinkingKey ? ($choice[$this->thinkingKey] ?? null) : null,
+            toolCalls: $toolCalls,
         );
     }
 
     private function formatMessage(array $message): array
     {
+        if ($message['role'] === 'tool') {
+            return [
+                'role' => 'tool',
+                'tool_call_id' => $message['tool_call_id'],
+                'content' => $message['content'] ?? '',
+            ];
+        }
+
+        if (! empty($message['tool_calls'])) {
+            return [
+                'role' => 'assistant',
+                'content' => $message['content'] ?? null,
+                'tool_calls' => array_map(fn (array $toolCall) => [
+                    'id' => $toolCall['id'],
+                    'type' => 'function',
+                    'function' => [
+                        'name' => $toolCall['name'],
+                        'arguments' => json_encode($toolCall['arguments']),
+                    ],
+                ], $message['tool_calls']),
+            ];
+        }
+
         if (empty($message['images'])) {
             return [
                 'role' => $message['role'],

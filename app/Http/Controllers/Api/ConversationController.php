@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Directors\PromptDirector;
 use App\DTOs\LlmResponse;
+use App\Enums\AssistantMode;
 use App\Http\Controllers\Controller;
 use App\Jobs\SummarizeConversation;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\DiscordChannel;
 use App\Models\Image;
+use App\Services\AgentLoop\AgentLoopRunner;
+use App\Services\AgentLoop\Tools\BasicCalculatorTool;
+use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\ImageGenProviders\ImageGenManager;
 use App\Services\ImageGenProviders\ImageGenPromptEnhancer;
 use App\Services\LlmProviders\LlmManager;
@@ -52,6 +56,7 @@ class ConversationController extends Controller
         $limit = self::MESSAGES_PER_PAGE;
 
         $query = $conversation->messages()
+            ->where('role', '!=', 'tool_call')
             ->with('image')
             ->orderByDesc('created_at');
 
@@ -230,16 +235,47 @@ class ConversationController extends Controller
         $systemPrompt = $director->build();
 
         $tts = $voiceModel ? (new TtsManager)->fromModel($voiceModel) : null;
+        $agentToolCalls = null;
 
         try {
-            $llm = (new LlmManager)->forAssistantUser($assistantUser);
-            $response = $llm->chat(
-                messages: [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ...$validated['messages'],
-                ],
-                options: $tts?->llmOptions() ?? [],
-            );
+            $llmManager = new LlmManager;
+            $aiModel = $llmManager->resolveModelForAssistantUser($assistantUser);
+            $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
+
+            if ($assistantModel->mode === AssistantMode::Agent) {
+                if (! $aiModel) {
+                    return response()->json(['message' => 'This assistant is in agent mode and requires an explicitly selected AI model that supports tool-calling.'], 422);
+                }
+
+                if (! $aiModel->supports_tools) {
+                    return response()->json(['message' => 'This assistant is in agent mode and requires a model that supports tool-calling.'], 422);
+                }
+
+                $runner = new AgentLoopRunner($llm, [
+                    new GetCurrentDatetimeTool,
+                    new BasicCalculatorTool,
+                ]);
+
+                $agentResult = $runner->run(
+                    assistant: $assistantModel,
+                    messages: [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ...$validated['messages'],
+                    ],
+                    conversation: $conversation,
+                );
+
+                $agentToolCalls = $agentResult->toolCalls;
+                $response = new LlmResponse(content: $agentResult->content);
+            } else {
+                $response = $llm->chat(
+                    messages: [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ...$validated['messages'],
+                    ],
+                    options: $tts?->llmOptions() ?? [],
+                );
+            }
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 502);
         }
@@ -265,6 +301,7 @@ class ConversationController extends Controller
             'content' => $content,
             'thinking' => $response->thinking,
             'tts_instructions' => $ttsInstructions,
+            'tool_calls' => $agentToolCalls,
         ]);
     }
 

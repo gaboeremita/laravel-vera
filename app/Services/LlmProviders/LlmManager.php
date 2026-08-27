@@ -13,19 +13,24 @@ class LlmManager
 {
     public function forAssistantUser(AssistantUser $assistantUser): LlmProvider
     {
+        $aiModel = $this->resolveModelForAssistantUser($assistantUser);
+
+        return $aiModel ? $this->fromModel($aiModel) : $this->fromConfig();
+    }
+
+    /**
+     * Returns the assistant's explicitly selected `AiModel`, or null when it falls
+     * back to the config-defined default (which has no `supports_tools` flag to check).
+     */
+    public function resolveModelForAssistantUser(AssistantUser $assistantUser): ?AiModel
+    {
         $settings = Settings::where('user_id', $assistantUser->user_id)
             ->where('assistant_id', $assistantUser->assistant_id)
             ->first();
 
         $selectedModelId = $settings?->data['ai_model_id'] ?? null;
 
-        if ($selectedModelId) {
-            $aiModel = AiModel::with('provider')->findOrFail($selectedModelId);
-
-            return $this->fromModel($aiModel);
-        }
-
-        return $this->fromConfig();
+        return $selectedModelId ? AiModel::with('provider')->findOrFail($selectedModelId) : null;
     }
 
     public function fromModel(AiModel $aiModel): LlmProvider

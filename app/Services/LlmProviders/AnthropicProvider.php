@@ -5,6 +5,7 @@ namespace App\Services\LlmProviders;
 use App\Builders\ParameterBuilder;
 use App\Contracts\LlmProvider;
 use App\DTOs\LlmResponse;
+use App\DTOs\ToolCallRequest;
 use App\Models\AiModel;
 use Illuminate\Support\Facades\Http;
 
@@ -43,7 +44,7 @@ class AnthropicProvider implements LlmProvider
         );
     }
 
-    public function chat(array $messages, array $options = []): LlmResponse
+    public function chat(array $messages, array $options = [], array $tools = []): LlmResponse
     {
         $systemPrompt = null;
         $chatMessages = [];
@@ -67,6 +68,14 @@ class AnthropicProvider implements LlmProvider
             $body['system'] = $systemPrompt;
         }
 
+        if (! empty($tools)) {
+            $body['tools'] = array_map(fn (array $tool) => [
+                'name' => $tool['name'],
+                'description' => $tool['description'],
+                'input_schema' => $tool['parameters'],
+            ], $tools);
+        }
+
         $response = Http::timeout(config('ai.default.config.timeout', 120))
             ->withHeaders([
                 'x-api-key' => $this->key,
@@ -82,23 +91,69 @@ class AnthropicProvider implements LlmProvider
 
         $content = '';
         $thinking = null;
+        $toolCalls = [];
 
         foreach ($data['content'] ?? [] as $block) {
             if ($block['type'] === 'text') {
                 $content = $block['text'];
             } elseif ($block['type'] === 'thinking') {
                 $thinking = $block['thinking'];
+            } elseif ($block['type'] === 'tool_use') {
+                $toolCalls[] = new ToolCallRequest(
+                    id: $block['id'],
+                    name: $block['name'],
+                    arguments: $block['input'],
+                );
             }
         }
 
         return new LlmResponse(
             content: $content,
             thinking: $thinking,
+            toolCalls: $toolCalls,
         );
     }
 
     private function formatMessage(array $message): array
     {
+        if ($message['role'] === 'tool') {
+            $content = $message['content'] ?? '';
+            $decoded = json_decode($content, true);
+            $isError = is_array($decoded) && array_key_exists('error', $decoded);
+
+            return [
+                'role' => 'user',
+                'content' => [[
+                    'type' => 'tool_result',
+                    'tool_use_id' => $message['tool_call_id'],
+                    'content' => $isError ? (string) ($decoded['error'] ?? $content) : $content,
+                    'is_error' => $isError,
+                ]],
+            ];
+        }
+
+        if (! empty($message['tool_calls'])) {
+            $parts = [];
+
+            if (! empty($message['content'])) {
+                $parts[] = ['type' => 'text', 'text' => $message['content']];
+            }
+
+            foreach ($message['tool_calls'] as $toolCall) {
+                $parts[] = [
+                    'type' => 'tool_use',
+                    'id' => $toolCall['id'],
+                    'name' => $toolCall['name'],
+                    'input' => $toolCall['arguments'],
+                ];
+            }
+
+            return [
+                'role' => 'assistant',
+                'content' => $parts,
+            ];
+        }
+
         if (empty($message['images'])) {
             return [
                 'role' => $message['role'],

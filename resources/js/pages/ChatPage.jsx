@@ -7,6 +7,7 @@ import { parseEmotionFromResponse, stripForSpeech } from '../utils/parsers.js';
 import { useVoiceMode } from '../hooks/useVoiceMode.js';
 import ChatMessage from '../components/ChatMessage.jsx';
 import Header from '../components/Header.jsx';
+import AgentProgressIndicator from '../components/AgentProgressIndicator.jsx';
 import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';
 
 export default function ChatPage() {
@@ -320,7 +321,7 @@ export default function ChatPage() {
 				setHasError(false);
 				setMessages([
 					...updatedMessages,
-					{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions },
+					{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions, toolCalls: data.tool_calls || null },
 				]);
 				setIsLoading(false);
 				if (voiceMode && !voiceMuted) {
@@ -481,6 +482,7 @@ export default function ChatPage() {
 				{messages.map((msg) => (
 					<ChatMessage key={msg.id} msg={msg} assistantName={assistantName} />
 				))}
+				<AgentProgressIndicator assistantId={assistantId} conversationId={id} active={isLoading} />
 			</div>
 
 			{pendingImage && (

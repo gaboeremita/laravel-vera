@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AssistantMode;
 use App\Enums\Theme;
 use App\Http\Controllers\Controller;
+use App\Models\AiModel;
 use App\Models\AssistantDiscordChannel;
 use App\Models\DiscordChannel;
 use App\Models\DiscordServer;
@@ -97,6 +99,16 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'ai_model_id' => ['nullable', 'integer', 'exists:ai_models,id'],
         ]);
+
+        $assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+        if ($validated['ai_model_id'] && $assistantUser->assistant->mode === AssistantMode::Agent) {
+            $supportsTools = AiModel::whereKey($validated['ai_model_id'])->value('supports_tools');
+
+            if (! $supportsTools) {
+                return response()->json(['message' => 'This assistant is in agent mode and requires a model that supports tool-calling.'], 422);
+            }
+        }
 
         $settings = $request->user()->settings()
             ->where('assistant_id', $assistant)

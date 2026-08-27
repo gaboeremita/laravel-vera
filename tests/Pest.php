@@ -1,5 +1,12 @@
 <?php
 
+use App\Models\AiModel;
+use App\Models\AiProvider;
+use App\Models\Assistant;
+use App\Models\AssistantUser;
+use App\Models\Conversation;
+use App\Models\Settings;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,7 +51,72 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function setUpAgentAssistant(string $mode = 'agent'): array
 {
-    // ..
+    $user = User::factory()->create();
+
+    $provider = AiProvider::create([
+        'user_id' => $user->id,
+        'name' => 'Fake Provider',
+        'url' => 'https://fake-llm.test/chat/completions',
+        'api_key' => 'test-key',
+        'config_schema' => [],
+        'format' => 'generic',
+    ]);
+
+    $aiModel = AiModel::create([
+        'provider_id' => $provider->id,
+        'name' => 'Fake Model',
+        'endpoint' => 'fake-model',
+        'config' => [],
+        'supports_tools' => true,
+    ]);
+
+    $assistant = Assistant::factory()->create([
+        'mode' => $mode,
+    ]);
+
+    $assistantUser = AssistantUser::factory()->create([
+        'user_id' => $user->id,
+        'assistant_id' => $assistant->id,
+    ]);
+
+    Settings::create([
+        'user_id' => $user->id,
+        'assistant_id' => $assistant->id,
+        'data' => ['ai_model_id' => $aiModel->id],
+    ]);
+
+    $conversation = Conversation::factory()->create([
+        'assistant_user_id' => $assistantUser->id,
+    ]);
+
+    return [$user, $assistant, $conversation];
+}
+
+function finalAnswerResponse(string $content): array
+{
+    return [
+        'choices' => [[
+            'message' => ['content' => $content],
+            'finish_reason' => 'stop',
+        ]],
+    ];
+}
+
+function toolCallResponse(string $callId, string $toolName, array $arguments): array
+{
+    return [
+        'choices' => [[
+            'message' => [
+                'content' => null,
+                'tool_calls' => [[
+                    'id' => $callId,
+                    'type' => 'function',
+                    'function' => ['name' => $toolName, 'arguments' => json_encode($arguments)],
+                ]],
+            ],
+            'finish_reason' => 'tool_calls',
+        ]],
+    ];
 }

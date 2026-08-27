@@ -22,6 +22,7 @@ class AiModelController extends Controller
             'config' => ['nullable', 'array', new ValidModelConfig($provider->config_schema ?? [])],
             'additional_config' => ['nullable', 'array'],
             'prompt' => ['nullable', 'string'],
+            'supports_tools' => ['sometimes', 'boolean'],
         ]);
 
         $model = $provider->models()->create($validated);
@@ -44,6 +45,7 @@ class AiModelController extends Controller
             'config' => ['nullable', 'array', new ValidModelConfig($provider->config_schema ?? [])],
             'additional_config' => ['nullable', 'array'],
             'prompt' => ['nullable', 'string'],
+            'supports_tools' => ['sometimes', 'boolean'],
         ]);
 
         $model->update($validated);
