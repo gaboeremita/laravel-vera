@@ -243,8 +243,12 @@ class ConversationController extends Controller
             $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
 
             if ($assistantModel->mode === AssistantMode::Agent) {
-                if (! $aiModel?->supports_tools) {
-                    return response()->json(['message' => 'This assistant is in agent mode, but its selected AI model does not support tool-calling.'], 422);
+                if (! $aiModel) {
+                    return response()->json(['message' => 'This assistant is in agent mode and requires an explicitly selected AI model that supports tool-calling.'], 422);
+                }
+
+                if (! $aiModel->supports_tools) {
+                    return response()->json(['message' => 'This assistant is in agent mode and requires a model that supports tool-calling.'], 422);
                 }
 
                 $runner = new AgentLoopRunner($llm, [
