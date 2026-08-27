@@ -30,6 +30,7 @@ A user gives an agent-mode assistant a task that requires looking something up o
 1. **Given** an agent-mode assistant and a task that requires one tool call, **When** the user submits the task, **Then** the assistant calls the tool, incorporates the result, and returns a final answer without requiring another user message.
 2. **Given** an assistant not in agent mode, **When** the user submits any message, **Then** the assistant responds exactly as it does today, with no tool call and no change in behavior.
 3. **Given** an agent-mode assistant and a task that does not require any tool, **When** the user submits it, **Then** the assistant answers directly without calling a tool, the same way it would today.
+4. **Given** an agent-mode assistant, **When** the user asks what today's date or the current time is, **Then** the assistant calls the date/time tool and answers correctly using its result.
 
 ---
 
@@ -107,5 +108,5 @@ If the assistant has not finished a task after a set number of steps, it stops a
 - The user sees live visibility into what the assistant is doing at each step, but this display is not persisted — a durable, queryable record of past runs (an agent-run action log) is separate, later work.
 - The user does not send a new message to steer or interrupt the assistant mid-task as part of this feature — mid-run steering is out of scope.
 - The safety step limit's exact numeric value is an implementation decision to be made during planning, not fixed by this specification.
-- At least one tool must exist for this capability to be exercised or tested; which tools exist and how they are registered (MCP servers) is separate, later work.
+- This feature includes exactly one concrete, built-in tool — a current date/time lookup — to prove the loop end-to-end. Dynamically registering additional tools (MCP servers) remains separate, later work.
 - Delegating to other assistants (subagents), granting an assistant access to a code repository, and recording a detailed log of what the assistant did during a run are explicitly out of scope for this feature.
