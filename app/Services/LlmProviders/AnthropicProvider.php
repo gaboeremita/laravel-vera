@@ -117,12 +117,17 @@ class AnthropicProvider implements LlmProvider
     private function formatMessage(array $message): array
     {
         if ($message['role'] === 'tool') {
+            $content = $message['content'] ?? '';
+            $decoded = json_decode($content, true);
+            $isError = is_array($decoded) && array_key_exists('error', $decoded);
+
             return [
                 'role' => 'user',
                 'content' => [[
                     'type' => 'tool_result',
                     'tool_use_id' => $message['tool_call_id'],
-                    'content' => $message['content'] ?? '',
+                    'content' => $isError ? (string) ($decoded['error'] ?? $content) : $content,
+                    'is_error' => $isError,
                 ]],
             ];
         }
