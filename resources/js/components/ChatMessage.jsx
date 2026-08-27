@@ -3,9 +3,12 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ThinkingBlock from "./ThinkingBlock";
 import VoiceInstructionsBlock from "./VoiceInstructionsBlock";
+import AgentToolCallsTrace from "./AgentToolCallsTrace";
 import veraAvatar from '../../images/vera-avatar.png';
 
 function InlineText({ text }) {
+    if (!text) return null;
+
     // Split on VERA-specific patterns: *actions* and (thoughts)
     const parts = [];
     const regex = /(\*[^*]+\*|\([^)]+\))/g;
@@ -43,13 +46,25 @@ function InlineText({ text }) {
     return <>{parts}</>;
 }
 
+function containsBlockElement(node) {
+    if (node == null || typeof node !== 'object') {
+        return false;
+    }
+
+    if (Array.isArray(node)) {
+        return node.some(containsBlockElement);
+    }
+
+    if (node.type === 'pre' || node.type === 'div') {
+        return true;
+    }
+
+    return containsBlockElement(node.props?.children);
+}
+
 const markdownComponents = {
     p: ({ children }) => {
-        const hasBlock = Array.isArray(children)
-            ? children.some((child) => child?.type === 'pre' || child?.type === 'div')
-            : children?.type === 'pre' || children?.type === 'div';
-
-        return hasBlock
+        return containsBlockElement(children)
             ? <div className="mb-2 last:mb-0">{children}</div>
             : <p className="mb-2 last:mb-0">{children}</p>;
     },
@@ -58,16 +73,21 @@ const markdownComponents = {
     h3: ({ children }) => <h3 className="text-accent-3 font-bold text-sm mt-2 mb-1">{children}</h3>,
     strong: ({ children }) => <strong className="font-bold text-fg-1">{children}</strong>,
     em: ({ children }) => <em className="italic text-fg-2">{children}</em>,
-    code: ({ inline, children }) =>
-        inline ? (
-            <code className="bg-bg-1 border border-line-1 text-accent text-[0.8em] px-1 py-0.5 rounded font-mono">
-                {children}
-            </code>
-        ) : (
-            <pre className="bg-bg-1 border border-line-1 text-accent text-[0.8em] p-3 my-2 overflow-x-auto font-mono">
-                <code>{children}</code>
-            </pre>
-        ),
+    // react-markdown v10 no longer passes an `inline` prop to `code` — it never
+    // did in this version, so `inline ? ... : <pre>` always took the block
+    // branch. Instead, `code` and `pre` are separate components: a fenced block
+    // is `pre > code` in the parsed tree; inline code is a bare `code` with no
+    // `pre` ancestor at all, so there's nothing to distinguish inside `code` itself.
+    code: ({ children }) => (
+        <code className="bg-bg-1 border border-line-1 text-accent text-[0.8em] px-1 py-0.5 rounded font-mono">
+            {children}
+        </code>
+    ),
+    pre: ({ children }) => (
+        <pre className="bg-bg-1 border border-line-1 text-accent text-[0.8em] p-3 my-2 overflow-x-auto font-mono [&>code]:border-0 [&>code]:bg-transparent [&>code]:p-0">
+            {children}
+        </pre>
+    ),
     ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 my-1 text-fg-1">{children}</ul>,
     ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 my-1 text-fg-1">{children}</ol>,
     li: ({ children }) => <li className="text-fg-1">{children}</li>,
@@ -103,6 +123,7 @@ function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
                 <ThinkingBlock content={msg.thinking} label={msg.image ? 'Image Prompt' : 'Thinking Process'} />
             )}
             {isAssistant && msg.ttsInstructions && <VoiceInstructionsBlock content={msg.ttsInstructions} />}
+            {isAssistant && msg.toolCalls && <AgentToolCallsTrace toolCalls={msg.toolCalls} />}
 
             {msg.image && (
                 <img

@@ -321,7 +321,7 @@ export default function ChatPage() {
 				setHasError(false);
 				setMessages([
 					...updatedMessages,
-					{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions },
+					{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions, toolCalls: data.tool_calls || null },
 				]);
 				setIsLoading(false);
 				if (voiceMode && !voiceMuted) {

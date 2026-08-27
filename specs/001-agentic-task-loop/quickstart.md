@@ -7,6 +7,7 @@ Manual end-to-end validation for the three user stories in [spec.md](spec.md), o
 - Migrations run (`php artisan migrate`) — adds `assistants.mode`, `assistants.agent_config`, `ai_models.supports_tools`, `messages.tool_calls`.
 - An assistant with `mode = agent`, whose configured `AiModel` has `supports_tools = true`.
 - The `get_current_datetime` and `basic_calculator` tools (contracts/get-current-datetime-tool.md, contracts/basic-calculator-tool.md) are registered for that assistant — no MCP setup needed, both are built into this feature.
+- **A hard page refresh, not just in-app navigation**, if the browser tab was already open before `routes/api.php` picked up `conversations.agent-progress`. Ziggy's route list (`@routes` in `resources/views/welcome.blade.php`) is injected once, server-side, at page load — a stale tab won't know the route exists, and `AgentProgressIndicator`'s poll will fail every time.
 
 ## Scenario 1 — Single tool call (User Story 1, P1)
 

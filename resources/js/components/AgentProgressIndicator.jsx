@@ -28,8 +28,10 @@ export default function AgentProgressIndicator({ assistantId, conversationId, ac
 				if (!res.ok || cancelled) return;
 				const data = await res.json();
 				if (!cancelled) setStatus(data.status);
-			} catch {
-				// Transient poll failures are ignored — the next tick retries.
+			} catch (err) {
+				// The next tick still retries, but the failure itself must be visible —
+				// an empty catch here would hide real bugs (Constitution Principle V).
+				console.error('[AgentProgressIndicator] poll failed', err);
 			}
 		};
 

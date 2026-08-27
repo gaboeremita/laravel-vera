@@ -71,7 +71,20 @@ export default function ModelAccordion({ model, configSchema, onUpdate, onSave, 
 				/>
 			</div>
 
-			{/* Prompt */}
+			{/* Supports Tools */}
+				<div>
+					<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase flex items-center gap-2 cursor-pointer w-fit">
+						<input
+							type="checkbox"
+							checked={!!model.supports_tools}
+							onChange={(e) => onUpdate('supports_tools', e.target.checked)}
+							className="accent-accent"
+						/>
+						Supports Tool Calling
+					</label>
+				</div>
+
+				{/* Prompt */}
 			<div>
 				<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
 					Model Prompt

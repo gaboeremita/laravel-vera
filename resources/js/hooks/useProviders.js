@@ -208,6 +208,7 @@ export default function useProviders(addToast, assistantId) {
 				endpoint: model.endpoint,
 				thinking_key: model.thinking_key || null,
 				prompt: model.prompt || null,
+				supports_tools: !!model.supports_tools,
 			};
 
 			if (typeof model.config === 'string' && model.config.trim()) {

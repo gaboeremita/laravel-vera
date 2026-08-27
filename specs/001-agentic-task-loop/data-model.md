@@ -21,7 +21,7 @@ Existing table: `ai_models`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `supports_tools` | boolean, default `false` | Set explicitly per model (research.md #6). Agent mode is unavailable for an assistant whose selected model has this `false` (FR-007). |
+| `supports_tools` | boolean, default `false` | Editable via the existing AI model management UI/API (`AiModelController`, `ModelAccordion.jsx`), not just a gate condition — FR-016. Agent mode is unavailable for an assistant whose selected model has this `false` (FR-007). |
 
 ## Message (extended)
 

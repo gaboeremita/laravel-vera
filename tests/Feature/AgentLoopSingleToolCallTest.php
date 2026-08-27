@@ -25,6 +25,11 @@ test('a single get_current_datetime call is incorporated into the final answer',
     $toolCallMessage = $conversation->messages()->where('role', 'tool_call')->first();
     expect($toolCallMessage)->not->toBeNull();
     expect($toolCallMessage->tool_calls[0]['name'])->toBe('get_current_datetime');
+
+    // The response carries a session-only summary the frontend attaches to this
+    // message locally (FR-010a) — separate from the persisted tool_call row above.
+    expect($response->json('tool_calls'))->toHaveCount(1);
+    expect($response->json('tool_calls.0.name'))->toBe('get_current_datetime');
 });
 
 test('a single basic_calculator call is incorporated into the final answer', function () {
@@ -80,4 +85,5 @@ test('a non-agent-mode assistant is entirely unaffected', function () {
 
     Http::assertSentCount(1);
     expect($conversation->messages()->whereNotNull('tool_calls')->exists())->toBeFalse();
+    expect($response->json('tool_calls'))->toBeNull();
 });

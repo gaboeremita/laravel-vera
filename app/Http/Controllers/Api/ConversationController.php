@@ -56,6 +56,7 @@ class ConversationController extends Controller
         $limit = self::MESSAGES_PER_PAGE;
 
         $query = $conversation->messages()
+            ->where('role', '!=', 'tool_call')
             ->with('image')
             ->orderByDesc('created_at');
 
@@ -234,6 +235,7 @@ class ConversationController extends Controller
         $systemPrompt = $director->build();
 
         $tts = $voiceModel ? (new TtsManager)->fromModel($voiceModel) : null;
+        $agentToolCalls = null;
 
         try {
             $llmManager = new LlmManager;
@@ -250,7 +252,7 @@ class ConversationController extends Controller
                     new BasicCalculatorTool,
                 ]);
 
-                $content = $runner->run(
+                $agentResult = $runner->run(
                     assistant: $assistantModel,
                     messages: [
                         ['role' => 'system', 'content' => $systemPrompt],
@@ -259,7 +261,8 @@ class ConversationController extends Controller
                     conversation: $conversation,
                 );
 
-                $response = new LlmResponse(content: $content);
+                $agentToolCalls = $agentResult->toolCalls;
+                $response = new LlmResponse(content: $agentResult->content);
             } else {
                 $response = $llm->chat(
                     messages: [
@@ -294,6 +297,7 @@ class ConversationController extends Controller
             'content' => $content,
             'thinking' => $response->thinking,
             'tts_instructions' => $ttsInstructions,
+            'tool_calls' => $agentToolCalls,
         ]);
     }
 

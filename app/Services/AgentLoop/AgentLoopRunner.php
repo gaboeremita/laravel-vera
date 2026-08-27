@@ -4,6 +4,7 @@ namespace App\Services\AgentLoop;
 
 use App\Contracts\AgentTool;
 use App\Contracts\LlmProvider;
+use App\DTOs\AgentRunResult;
 use App\DTOs\ToolCallRequest;
 use App\Models\Assistant;
 use App\Models\Conversation;
@@ -23,7 +24,7 @@ class AgentLoopRunner
     /**
      * @param  array<int, array<string, mixed>>  $messages
      */
-    public function run(Assistant $assistant, array $messages, Conversation $conversation): string
+    public function run(Assistant $assistant, array $messages, Conversation $conversation): AgentRunResult
     {
         $stepLimit = data_get($assistant->agent_config, 'step_limit', config('agent.step_limit'));
         $maxConsecutiveFailures = config('agent.tool_retry_attempts');
@@ -31,13 +32,14 @@ class AgentLoopRunner
 
         $consecutiveFailures = 0;
         $step = 0;
+        $toolCallsSummary = [];
 
         try {
             while ($step < $stepLimit) {
                 $response = $this->provider->chat($messages, tools: $toolDefinitions);
 
                 if ($response->isFinal()) {
-                    return $response->content;
+                    return new AgentRunResult($response->content, $toolCallsSummary);
                 }
 
                 $messages[] = [
@@ -64,7 +66,7 @@ class AgentLoopRunner
                             'content' => json_encode($result),
                         ];
 
-                        $this->recordToolCall($conversation, $toolCall, result: $result);
+                        $toolCallsSummary[] = $this->recordToolCall($conversation, $toolCall, result: $result);
                     } catch (\Throwable $e) {
                         $consecutiveFailures++;
 
@@ -79,10 +81,13 @@ class AgentLoopRunner
                             'content' => json_encode(['error' => $e->getMessage()]),
                         ];
 
-                        $this->recordToolCall($conversation, $toolCall, error: $e->getMessage());
+                        $toolCallsSummary[] = $this->recordToolCall($conversation, $toolCall, error: $e->getMessage());
 
                         if ($consecutiveFailures >= $maxConsecutiveFailures) {
-                            return "I wasn't able to complete this task after a few different attempts — {$e->getMessage()}";
+                            return new AgentRunResult(
+                                "I wasn't able to complete this task after a few different attempts — {$e->getMessage()}",
+                                $toolCallsSummary,
+                            );
                         }
                     }
 
@@ -92,24 +97,30 @@ class AgentLoopRunner
                 }
             }
 
-            return $this->requestFinalSummary($messages);
+            return new AgentRunResult($this->requestFinalSummary($messages), $toolCallsSummary);
         } finally {
             $this->clearProgress($conversation->id);
         }
     }
 
-    private function recordToolCall(Conversation $conversation, ToolCallRequest $toolCall, mixed $result = null, ?string $error = null): void
+    /**
+     * @return array{name: string, arguments: array<string, mixed>, result: array<string, mixed>|null, error: string|null}
+     */
+    private function recordToolCall(Conversation $conversation, ToolCallRequest $toolCall, mixed $result = null, ?string $error = null): array
     {
+        $entry = [
+            'name' => $toolCall->name,
+            'arguments' => $toolCall->arguments,
+            'result' => $result,
+            'error' => $error,
+        ];
+
         $conversation->messages()->create([
             'role' => 'tool_call',
-            'tool_calls' => [[
-                'id' => $toolCall->id,
-                'name' => $toolCall->name,
-                'arguments' => $toolCall->arguments,
-                'result' => $result,
-                'error' => $error,
-            ]],
+            'tool_calls' => [['id' => $toolCall->id, ...$entry]],
         ]);
+
+        return $entry;
     }
 
     /**

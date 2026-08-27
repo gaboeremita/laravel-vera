@@ -14,6 +14,7 @@
 
 - Q: When an agent-mode assistant is given a task that doesn't actually need any tool, should it just answer directly like it does today, or must it always attempt at least one tool call? → A: Assistant decides per task whether a tool is needed; answers directly with no tool call when none is needed.
 - Q: Does the user see any indication the assistant is still working while it's mid-loop, or does the user wait with no visible update until the final answer arrives? → A: Full live, step-by-step visibility into what the assistant is doing while it works — but not persisted; a durable, queryable record of past runs stays out of scope for this feature (a separate, later spec).
+- Q (refined 2026-08-27, after live testing): "Not persisted" meant not written to the database — it did not mean the tool-call summary should disappear from the screen the instant the task finishes. → A: Once a task completes, what tools were used stays visible in the UI for the rest of that browser session (frontend state only) — gone on a page reload, since nothing is written to the database, but not gone the moment the response arrives.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -86,11 +87,13 @@ If the assistant has not finished a task after a set number of steps, it stops a
 - **FR-008**: System MUST inform the assistant when a tool call it made fails, so it can react instead of the whole task failing outright.
 - **FR-009**: Assistants not in agent mode MUST be unaffected by this feature and continue to operate as a single message-response exchange.
 - **FR-010**: System MUST show the user a live indication of what the assistant is currently doing at each step while it works through a task (e.g., which tool is being called), updated as the task progresses.
-- **FR-011**: System MUST NOT persist a queryable record of a task's steps beyond this live, in-progress display — a durable history of past agent runs is out of scope for this feature.
+- **FR-010a**: System MUST keep a summary of the tools used for a completed task visible in the UI for the remainder of that browser session — not gone the instant the task finishes.
+- **FR-011**: System MUST NOT write a queryable record of a task's steps to the database — the summary in FR-010a is frontend session state only, not a durable history; it does not survive a page reload.
 - **FR-012**: System MUST retry a failed tool call up to 3 times before treating it as exhausted.
 - **FR-013**: System MUST, after exhausting retries, allow up to 3 different approaches before giving up on that path — stopping earlier than 3 if the assistant determines further attempts are unlikely to succeed, rather than being forced through the full count.
 - **FR-014**: System MUST, when both retries and alternative approaches are exhausted, stop and clearly explain to the user what happened, rather than continuing indefinitely or failing silently.
 - **FR-015**: System MUST enforce a configurable timeout on each individual tool call, independent of the existing LLM request timeout, defaulting to 60 seconds.
+- **FR-016**: System MUST allow marking whether an AI model supports tool-calling, editable through the same interface already used to configure AI models — a model that supports tool-calling must be an editable property of that model, not only a gate that silently blocks agent mode with no way to satisfy it (defaults to not-supporting, per FR-007).
 
 ### Key Entities
 
@@ -110,7 +113,7 @@ If the assistant has not finished a task after a set number of steps, it stops a
 
 ## Assumptions
 
-- The user sees live visibility into what the assistant is doing at each step, but this display is not persisted — a durable, queryable record of past runs (an agent-run action log) is separate, later work.
+- The user sees live visibility into what the assistant is doing at each step, and a summary of the tools used for a completed task stays visible in the UI for the rest of that session (FR-010a) — but none of this is written to the database. A page reload loses it, and a durable, queryable, cross-session record of past runs (an agent-run action log) is separate, later work.
 - The user does not send a new message to steer or interrupt the assistant mid-task as part of this feature — mid-run steering is out of scope.
 - The safety step limit defaults to 10 steps per task, configurable — high enough for a real multi-step task plus retries without risking runaway cost.
 - This feature includes exactly two concrete, built-in tools — a current date/time lookup and a basic calculator (addition, subtraction, multiplication, division) — to prove the loop end-to-end, including genuine chaining between them. A scientific calculator (percentages, powers, roots) and dynamically registering additional tools (MCP servers) both remain separate, later work.
