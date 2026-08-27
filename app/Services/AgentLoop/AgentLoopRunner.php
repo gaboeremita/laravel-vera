@@ -152,6 +152,12 @@ class AgentLoopRunner
     {
         $timeout = config('agent.tool_timeout');
 
+        if (! function_exists('pcntl_alarm') || ! function_exists('pcntl_signal') || ! function_exists('pcntl_async_signals') || ! function_exists('pcntl_signal_get_handler')) {
+            throw new \RuntimeException('Tool call timeout enforcement requires the pcntl extension.');
+        }
+
+        $previousHandler = pcntl_signal_get_handler(SIGALRM);
+
         pcntl_async_signals(true);
         pcntl_signal(SIGALRM, function () use ($timeout): never {
             throw new \RuntimeException("Tool call timed out after {$timeout} seconds.");
@@ -162,7 +168,7 @@ class AgentLoopRunner
             return $tool->handle($arguments);
         } finally {
             pcntl_alarm(0);
-            pcntl_signal(SIGALRM, SIG_DFL);
+            pcntl_signal(SIGALRM, $previousHandler);
         }
     }
 
