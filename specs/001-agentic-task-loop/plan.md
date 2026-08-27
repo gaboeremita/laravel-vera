@@ -24,7 +24,7 @@ Add a tool-calling loop to VERA's existing chat pipeline. When an agent-mode ass
 
 **Project Type**: Web service — existing single-project layout, not a new project or service.
 
-**Performance Goals**: No numeric target is fixed by the spec (documented as an Assumption — the step limit's exact value is a planning decision). A conservative default step limit and per-step timeout are proposed in `research.md`, bounded by the request timeout already used for one LLM call today (`config('ai.default.config.timeout')`).
+**Performance Goals**: Step limit defaults to 10 per task, tool-call timeout to 60s, tool-call retries to 3 — all centralized in a new `config/agent.php` (research.md #10), independent of the existing LLM request timeout (`config('ai.default.config.timeout')`).
 
 **Constraints**: The loop executes synchronously within the existing `ConversationController@sendMessage` request — the spec requires live progress visibility (FR-010) but does not require background/async execution, so no new job/queue/broadcast infrastructure is introduced for this feature (confirmed no Reverb/Pusher is installed; `broadcasting.default` is `log`). Both provider implementations must support tool-calling with each handling its own wire format — no shared translation layer, per the existing architectural decision. Assistants not in agent mode must be provably unaffected (FR-009).
 
@@ -89,6 +89,9 @@ app/
 │   └── Message.php                  # add tool-call turn persistence
 └── Enums/
     └── AssistantMode.php            # new
+
+config/
+└── agent.php                        # new: step_limit, tool_timeout, tool_retry_attempts, progress_cache_ttl (research.md #10)
 
 database/migrations/
 ├── ..._add_mode_to_assistants_table.php

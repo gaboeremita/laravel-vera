@@ -34,7 +34,7 @@
 
 ## 5. Live progress signal (FR-010)
 
-**Decision**: While the loop runs (synchronously, inside the existing `sendMessage` request), each step writes a short-lived status string (e.g., "Calling tool: get_weather") to cache, keyed by conversation ID, with a short TTL. A new lightweight endpoint (`GET /api/assistants/{assistant}/conversations/{id}/agent-progress`) returns the current cached status. The frontend polls this endpoint on a short interval only while an agent-mode send is in flight, and stops polling once the main request resolves.
+**Decision**: While the loop runs (synchronously, inside the existing `sendMessage` request), each step writes a status string (e.g., "Calling tool: basic_calculator") to cache, keyed by conversation ID, with a 10-second TTL (`config('agent.progress_cache_ttl')`, #10 below) — long enough to outlast the frontend's polling interval even with some jitter. A new lightweight endpoint (`GET /api/assistants/{assistant}/conversations/{id}/agent-progress`) returns the current cached status. The frontend polls this endpoint every 2 seconds (a plain constant in the frontend code, not backend config — `config/agent.php` isn't reachable by the React app) only while an agent-mode send is in flight, and stops polling once the main request resolves.
 
 **Rationale**: The spec requires live visibility (FR-010) but not persistence (FR-011), and not any particular delivery mechanism. VERA has no broadcasting infrastructure today (`broadcasting.default` is `log`, no Reverb/Pusher installed) — introducing one solely for this feature would be exactly the kind of scope growth Constitution Principle VII rules out. Polling a cache-backed value is the smallest mechanism that satisfies FR-010 as written.
 
@@ -75,3 +75,22 @@
 `eval()` was explicitly rejected as unsafe: it executes its argument as arbitrary PHP, so a manipulated expression string could run arbitrary code with the app's own permissions, not just fail to compute correctly. A hand-rolled parser scoped to numbers/operators/parentheses has no execution path other than producing a number, regardless of input. A library (e.g. `symfony/expression-language`) was considered and set aside for this basic scope — reasonable for the *scientific* calculator later, but more general-purpose (and a new dependency requiring approval) than four-function arithmetic needs now, per Constitution Principle VII.
 
 **Remaining limitation**: User Story 3 (step-limit exhaustion) still can't be reliably forced in a live manual conversation with either tool — no combination of real tools reliably coaxes a real model into looping past an arbitrary cap on demand. That story stays Pest-only (mocked sequences), which is inherent to testing a hard limit, not specific to which tools exist.
+
+## 10. Agent loop configuration (`config/agent.php`)
+
+**Decision**: A new config file, plain array values (not necessarily `env()`-backed — the user's explicit preference was simplicity now, changeable directly in the file later if needed, over exposing every value as a deployment-time environment variable):
+
+```php
+return [
+    'tool_timeout' => 60,           // seconds, per individual tool call — independent of the LLM request timeout (FR-015)
+    'step_limit' => 10,             // max steps per task, default (FR-004)
+    'tool_retry_attempts' => 3,     // max retries of a failed tool call before trying a different approach (FR-012)
+    'progress_cache_ttl' => 10,     // seconds — how long a live-progress cache entry lives (research.md #5)
+];
+```
+
+`assistants.agent_config` (data-model.md) can override `step_limit` (and, if ever needed, the others) per assistant; `config/agent.php` provides the system-wide default.
+
+**Rationale**: Centralizes every numeric knob this feature introduces in one place rather than scattering magic numbers through code, without over-engineering deployment-time overrides nobody asked for.
+
+**Explicitly not configurable here**: the alternative-approach attempt count (FR-013, fixed at 3 in the spec itself, not config) and the frontend polling interval (2 seconds, a plain JS constant — `config/agent.php` is PHP-only and not reachable by the React frontend without new plumbing this feature doesn't need).

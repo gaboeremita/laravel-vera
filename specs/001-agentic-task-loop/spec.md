@@ -67,9 +67,9 @@ If the assistant has not finished a task after a set number of steps, it stops a
 
 ### Edge Cases
 
-- What happens when a tool call itself fails or returns an error? The assistant is informed of the failure and can react to it — retry, try a different approach, or explain to the user why it could not complete the task — rather than the whole task failing outright.
+- What happens when a tool call itself fails or returns an error? The assistant retries the same call up to 3 times. If still failing, it tries different approaches — a different tool, different arguments, or a different way of framing the request — up to 3 attempts, stopping earlier if it judges further attempts unlikely to succeed. If nothing reasonable succeeds, it stops and explains to the user what happened and why the task couldn't be completed. These attempts count toward the overall step limit — a low step limit may cut this process short, in which case the step-limit stop behavior (FR-005) applies instead.
 - How does the system handle an assistant whose configured AI model does not support tool-calling at all? Agent mode is unavailable for that assistant/model combination, and this is communicated clearly rather than failing silently or confusingly mid-task.
-- What happens if a single tool call takes an unusually long time to return? It is bounded by the same request-timeout handling already used for a single model call today — this feature does not introduce a new indefinite-hang risk.
+- What happens if a single tool call takes an unusually long time to return? It's bounded by a configurable timeout specific to tool calls (separate from the existing per-request LLM call timeout), defaulting to 60 seconds.
 
 ## Requirements *(mandatory)*
 
@@ -87,6 +87,10 @@ If the assistant has not finished a task after a set number of steps, it stops a
 - **FR-009**: Assistants not in agent mode MUST be unaffected by this feature and continue to operate as a single message-response exchange.
 - **FR-010**: System MUST show the user a live indication of what the assistant is currently doing at each step while it works through a task (e.g., which tool is being called), updated as the task progresses.
 - **FR-011**: System MUST NOT persist a queryable record of a task's steps beyond this live, in-progress display — a durable history of past agent runs is out of scope for this feature.
+- **FR-012**: System MUST retry a failed tool call up to 3 times before treating it as exhausted.
+- **FR-013**: System MUST, after exhausting retries, allow up to 3 different approaches before giving up on that path — stopping earlier than 3 if the assistant determines further attempts are unlikely to succeed, rather than being forced through the full count.
+- **FR-014**: System MUST, when both retries and alternative approaches are exhausted, stop and clearly explain to the user what happened, rather than continuing indefinitely or failing silently.
+- **FR-015**: System MUST enforce a configurable timeout on each individual tool call, independent of the existing LLM request timeout, defaulting to 60 seconds.
 
 ### Key Entities
 
@@ -108,6 +112,6 @@ If the assistant has not finished a task after a set number of steps, it stops a
 
 - The user sees live visibility into what the assistant is doing at each step, but this display is not persisted — a durable, queryable record of past runs (an agent-run action log) is separate, later work.
 - The user does not send a new message to steer or interrupt the assistant mid-task as part of this feature — mid-run steering is out of scope.
-- The safety step limit's exact numeric value is an implementation decision to be made during planning, not fixed by this specification.
+- The safety step limit defaults to 10 steps per task, configurable — high enough for a real multi-step task plus retries without risking runaway cost.
 - This feature includes exactly two concrete, built-in tools — a current date/time lookup and a basic calculator (addition, subtraction, multiplication, division) — to prove the loop end-to-end, including genuine chaining between them. A scientific calculator (percentages, powers, roots) and dynamically registering additional tools (MCP servers) both remain separate, later work.
 - Delegating to other assistants (subagents), granting an assistant access to a code repository, and recording a detailed log of what the assistant did during a run are explicitly out of scope for this feature.

@@ -9,9 +9,11 @@ Existing table: `assistants`.
 | Field | Type | Notes |
 |---|---|---|
 | `mode` | string, backed by `App\Enums\AssistantMode` (`Assistant`, `Agent`) | Default `assistant`. Determines whether `ConversationController@sendMessage` routes through the agent loop at all (FR-009: non-agent-mode assistants are provably unaffected). |
-| `agent_config` | json, nullable | Present only when `mode = agent`. Holds the step limit and any other loop-tuning values (research.md #3), mirroring the existing `AiModel.config`/`additional_config` pattern rather than adding more flat columns. |
+| `agent_config` | json, nullable | Present only when `mode = agent`. May override `config('agent.step_limit')` (research.md #10) for this specific assistant; absent means the system-wide default applies. Mirrors the existing `AiModel.config`/`additional_config` pattern rather than adding more flat columns. |
 
 **Validation**: `agent_config` is only meaningful when `mode = agent`; enforced at the application layer (form request), not a DB constraint — same approach as other JSON-config columns in this codebase (`AiProvider.config_schema`).
+
+**Relationship to `config/agent.php`**: the config file (research.md #10) holds the system-wide defaults for every loop-tuning value (`step_limit`, `tool_timeout`, `tool_retry_attempts`, `progress_cache_ttl`). Only `step_limit` is exposed for a per-assistant override via `agent_config` — the others apply uniformly across all agent-mode assistants for this feature.
 
 ## AiModel (extended)
 
