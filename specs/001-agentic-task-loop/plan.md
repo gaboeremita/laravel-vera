@@ -8,7 +8,7 @@
 
 ## Summary
 
-Add a tool-calling loop to VERA's existing chat pipeline. When an agent-mode assistant handles a task, it can call a tool, receive the result, and continue — chaining further calls as needed — until it produces a final answer or hits a configurable step limit, without the user sending another message. This requires: (1) extending `LlmProvider`/`LlmResponse` so both `AnthropicProvider` (`tool_use` blocks) and `GenericProvider` (`tool_calls`) can send tool definitions and return structured tool-call requests, each in its own wire format; (2) an orchestrating loop above the providers that executes tools and re-calls the model until done; (3) extending `Message` to persist a tool-call turn, not just plain text; (4) a lightweight live-progress signal the frontend can poll while the loop runs, satisfying FR-010 without building new async/queue infrastructure; and (5) a single built-in tool — `get_current_datetime` (contracts/get-current-datetime-tool.md) — to prove the loop end-to-end, since dynamically registering additional tools (MCP) is explicitly out of scope for this feature.
+Add a tool-calling loop to VERA's existing chat pipeline. When an agent-mode assistant handles a task, it can call a tool, receive the result, and continue — chaining further calls as needed — until it produces a final answer or hits a configurable step limit, without the user sending another message. This requires: (1) extending `LlmProvider`/`LlmResponse` so both `AnthropicProvider` (`tool_use` blocks) and `GenericProvider` (`tool_calls`) can send tool definitions and return structured tool-call requests, each in its own wire format; (2) an orchestrating loop above the providers that executes tools and re-calls the model until done; (3) extending `Message` to persist a tool-call turn, not just plain text; (4) a lightweight live-progress signal the frontend can poll while the loop runs, satisfying FR-010 without building new async/queue infrastructure; and (5) two built-in tools — `get_current_datetime` and `basic_calculator` (contracts/get-current-datetime-tool.md, contracts/basic-calculator-tool.md) — to prove the loop end-to-end, including genuine dependent chaining between them, since dynamically registering additional tools (MCP) is explicitly out of scope for this feature.
 
 ## Technical Context
 
@@ -42,12 +42,12 @@ Add a tool-calling loop to VERA's existing chat pipeline. When an agent-mode ass
 | IV. Data Isolation by Ownership | The loop must resolve tools/state through the requesting assistant's own `AssistantUser`/`Conversation`, via the existing `ResolvesAssistantUser` trait — never inferred from account-level defaults | Pass, called out explicitly in data-model.md |
 | V. Errors Fail Loudly | Tool-call failures must be surfaced to the model (FR-008) and logged, never silently swallowed | Pass |
 | VI. Feature-Test-First, Factory-Backed | Pest feature tests planned for all three user stories, using existing factories | Pass |
-| VII. No Speculative Abstraction | Builds one real, parameterless tool (`get_current_datetime`) and the loop only — no generic MCP client, no pluggable tool-registration system, since the spec explicitly defers that | Pass — this is the deciding principle for the MCP-scope question below |
+| VII. No Speculative Abstraction | Builds two real, minimal tools (`get_current_datetime`, `basic_calculator` — hand-rolled, no new dependency) and the loop only — no generic MCP client, no pluggable tool-registration system, no scientific-calculator scope creep | Pass — this is the deciding principle for the MCP-scope question below |
 | VIII. State Derivation During Render | Live-progress polling state on the frontend must be derived during render, not set in a `useEffect` | Pass, called out explicitly for the frontend polling component |
 
 No violations. Complexity Tracking is not needed.
 
-**Post-Phase 1 re-check**: data-model.md, contracts/, and quickstart.md introduce no new tables, no new project/service boundary, and no speculative abstraction beyond what research.md justified (one normalized tool-call shape, one cache-backed progress signal, one parameterless `get_current_datetime` tool). Gate still passes.
+**Post-Phase 1 re-check**: data-model.md, contracts/, and quickstart.md introduce no new tables, no new project/service boundary, and no speculative abstraction beyond what research.md justified (one normalized tool-call shape, one cache-backed progress signal, `get_current_datetime` plus a hand-rolled, dependency-free `basic_calculator`). Gate still passes.
 
 ## Project Structure
 
@@ -79,7 +79,8 @@ app/
 │   └── AgentLoop/                   # new: orchestrates the tool-call loop
 │       ├── AgentLoopRunner.php
 │       └── Tools/
-│           └── GetCurrentDatetimeTool.php  # contracts/get-current-datetime-tool.md
+│           ├── GetCurrentDatetimeTool.php  # contracts/get-current-datetime-tool.md
+│           └── BasicCalculatorTool.php     # contracts/basic-calculator-tool.md
 ├── Http/Controllers/Api/
 │   ├── ConversationController.php   # sendMessage invokes the loop when assistant is agent mode
 │   └── AgentProgressController.php  # new: polled live-progress endpoint (FR-010)

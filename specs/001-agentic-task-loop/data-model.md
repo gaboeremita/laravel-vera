@@ -33,9 +33,9 @@ Existing table: `messages`.
 
 **Relationships**: unchanged — `Message belongsTo Conversation`.
 
-## Built-in tool (not a data entity)
+## Built-in tools (not data entities)
 
-The one tool this feature ships with, `get_current_datetime`, is a stateless PHP class, not a database row — there is no tools table for this feature (tool *registration* as data is MCP's job, out of scope here). Full contract: contracts/get-current-datetime-tool.md.
+The two tools this feature ships with, `get_current_datetime` and `basic_calculator`, are stateless PHP classes, not database rows — there is no tools table for this feature (tool *registration* as data is MCP's job, out of scope here). Full contracts: contracts/get-current-datetime-tool.md, contracts/basic-calculator-tool.md.
 
 ## Task (conceptual, not a new table)
 

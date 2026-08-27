@@ -50,11 +50,11 @@
 
 ## 7. Testing strategy for the loop
 
-**Decision**: Pest feature tests fake the outbound LLM HTTP calls with `Http::fake()`, sequencing responses (e.g., a `tool_use` response followed by a final-answer response) to deterministically exercise each user story without calling a real model. The one built-in tool, `get_current_datetime` (contracts/get-current-datetime-tool.md), is used across all three test scenarios; Carbon's test clock (`Carbon::setTestNow()`) makes its output deterministic.
+**Decision**: Pest feature tests fake the outbound LLM HTTP calls with `Http::fake()`, sequencing responses (e.g., a `tool_use` response followed by a final-answer response) to deterministically exercise each user story without calling a real model. The two built-in tools, `get_current_datetime` and `basic_calculator` (contracts/get-current-datetime-tool.md, contracts/basic-calculator-tool.md), are used across all three test scenarios; Carbon's test clock (`Carbon::setTestNow()`) makes date/time output deterministic.
 
 **Rationale**: Matches Constitution Principle VI (feature-test-first, factory-backed) and the project's existing Pest convention; `Http::fake()` is already how this kind of external-call testing is done elsewhere in a Laravel app of this shape.
 
-**Alternatives considered**: None for the faking approach — this is the standard, already-idiomatic approach for this codebase. For the tool itself, several genuinely useful options were weighed (web search, VERA's own archive search, a calculator, weather lookup, reminders/notes) before settling on date/time lookup — see #8 below.
+**Alternatives considered**: None for the faking approach — this is the standard, already-idiomatic approach for this codebase. For the tools themselves, several genuinely useful options were weighed (web search, VERA's own archive search, a calculator, weather lookup, reminders/notes) before settling on date/time lookup plus a calculator — see #8 and #9 below.
 
 ## 8. The built-in tool: `get_current_datetime`
 
@@ -62,6 +62,16 @@
 
 **Rationale**: Genuinely useful to a companion assistant (a real, everyday question, not a manufactured fixture) rather than the internal-only stand-in ("lookup_record" over fake fixture data) considered first. Requires no new external dependency or credential — unlike a web search or weather API, it needs no HTTP call at all.
 
-**Alternatives considered**: Weather lookup (Open-Meteo, free/keyless) and a calculator/expression evaluator were the closest runners-up — both are real and simple, but were passed over once date/time was explicitly chosen. Web search was rejected as introducing a new external dependency and behaving inconsistently across providers (Anthropic has a native, provider-side web-search tool; generic OpenAI-compatible endpoints do not, which would conflict with FR-006's cross-model consistency requirement). VERA's own archive search (exposing `RetrievalService` as an agent-callable tool instead of always-on retrieval) and a reminders/notes tool were both rejected as larger in scope than a single proving-the-loop tool warrants — the latter would need new persistence, which Constitution Principle VII cautions against for this feature.
+**Alternatives considered**: Weather lookup (Open-Meteo, free/keyless) and a calculator/expression evaluator were the closest runners-up — both are real and simple. Web search was rejected as introducing a new external dependency and behaving inconsistently across providers (Anthropic has a native, provider-side web-search tool; generic OpenAI-compatible endpoints do not, which would conflict with FR-006's cross-model consistency requirement). VERA's own archive search (exposing `RetrievalService` as an agent-callable tool instead of always-on retrieval) and a reminders/notes tool were both rejected as larger in scope than a proving-the-loop tool warrants — the latter would need new persistence, which Constitution Principle VII cautions against for this feature.
 
-**Known limitation**: no parameters means this tool cannot itself force a dependent second call or a long step-limit-exhausting chain — User Story 2 and User Story 3 are validated through Pest test sequencing (#7 above), not a real multi-step interaction with this specific tool in the product. This was an accepted tradeoff, not an oversight.
+**Superseded limitation note**: an earlier version of this document said a single parameterless tool couldn't force a dependent second call, so User Story 2 would only be testable via Pest sequencing. Adding `basic_calculator` (#9) resolves this — see below.
+
+## 9. The second built-in tool: `basic_calculator`
+
+**Decision**: A second built-in tool, `basic_calculator`, evaluating an arithmetic expression (`+ - * /` and parentheses only). Hand-rolled tokenizer + recursive-descent evaluator — no `eval()`, no new Composer dependency. Full contract in contracts/basic-calculator-tool.md.
+
+**Rationale**: Chosen specifically to make User Story 2 (dependent chaining) real and live-testable rather than Pest-only: a task like "what's today's day of the month, tripled?" genuinely requires calling `get_current_datetime` first, then feeding its result into `basic_calculator` — no single parameterless tool could do this alone. Scope was deliberately kept to the four basic operations after a broader "percentages, powers, roots" version was considered and set aside as a separate, later "scientific calculator" — see spec.md Assumptions.
+
+`eval()` was explicitly rejected as unsafe: it executes its argument as arbitrary PHP, so a manipulated expression string could run arbitrary code with the app's own permissions, not just fail to compute correctly. A hand-rolled parser scoped to numbers/operators/parentheses has no execution path other than producing a number, regardless of input. A library (e.g. `symfony/expression-language`) was considered and set aside for this basic scope — reasonable for the *scientific* calculator later, but more general-purpose (and a new dependency requiring approval) than four-function arithmetic needs now, per Constitution Principle VII.
+
+**Remaining limitation**: User Story 3 (step-limit exhaustion) still can't be reliably forced in a live manual conversation with either tool — no combination of real tools reliably coaxes a real model into looping past an arbitrary cap on demand. That story stays Pest-only (mocked sequences), which is inherent to testing a hard limit, not specific to which tools exist.

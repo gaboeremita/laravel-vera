@@ -31,6 +31,7 @@ A user gives an agent-mode assistant a task that requires looking something up o
 2. **Given** an assistant not in agent mode, **When** the user submits any message, **Then** the assistant responds exactly as it does today, with no tool call and no change in behavior.
 3. **Given** an agent-mode assistant and a task that does not require any tool, **When** the user submits it, **Then** the assistant answers directly without calling a tool, the same way it would today.
 4. **Given** an agent-mode assistant, **When** the user asks what today's date or the current time is, **Then** the assistant calls the date/time tool and answers correctly using its result.
+5. **Given** an agent-mode assistant, **When** the user asks it to compute a basic arithmetic expression, **Then** the assistant calls the calculator tool and answers correctly using its result.
 
 ---
 
@@ -44,7 +45,7 @@ The assistant calls a tool, and based on what comes back, determines it needs to
 
 **Acceptance Scenarios**:
 
-1. **Given** a task requiring two dependent tool calls, **When** the user submits it, **Then** the assistant calls the first tool, uses its result to call the second, and returns a final answer incorporating both results.
+1. **Given** a task requiring two dependent tool calls, **When** the user submits it, **Then** the assistant calls the first tool, uses its result to call the second, and returns a final answer incorporating both results. For example: asking "what's today's day of the month, tripled?" requires calling the date/time tool first, then feeding that result into the calculator tool.
 2. **Given** a task requiring more than two dependent tool calls, **When** the user submits it, **Then** the assistant continues calling tools in sequence, each informed by the prior result, until it reaches a final answer or the safety step limit.
 3. **Given** a task in progress with multiple tool calls, **When** the assistant is working through them, **Then** the user sees a live indication of what the assistant is currently doing, updated as each step happens.
 
@@ -108,5 +109,5 @@ If the assistant has not finished a task after a set number of steps, it stops a
 - The user sees live visibility into what the assistant is doing at each step, but this display is not persisted — a durable, queryable record of past runs (an agent-run action log) is separate, later work.
 - The user does not send a new message to steer or interrupt the assistant mid-task as part of this feature — mid-run steering is out of scope.
 - The safety step limit's exact numeric value is an implementation decision to be made during planning, not fixed by this specification.
-- This feature includes exactly one concrete, built-in tool — a current date/time lookup — to prove the loop end-to-end. Dynamically registering additional tools (MCP servers) remains separate, later work.
+- This feature includes exactly two concrete, built-in tools — a current date/time lookup and a basic calculator (addition, subtraction, multiplication, division) — to prove the loop end-to-end, including genuine chaining between them. A scientific calculator (percentages, powers, roots) and dynamically registering additional tools (MCP servers) both remain separate, later work.
 - Delegating to other assistants (subagents), granting an assistant access to a code repository, and recording a detailed log of what the assistant did during a run are explicitly out of scope for this feature.
