@@ -100,6 +100,7 @@ If the assistant has not finished a task after a set number of steps, it stops a
 - **Task**: A unit of work a user gives an agent-mode assistant, which may take multiple steps before it produces a final answer.
 - **Tool Call**: A single action the assistant takes while working on a task, together with the result it produced.
 - **Step Limit**: The maximum number of tool calls an assistant may make while working on one task before it must stop and report its progress.
+- **Tool-Call Summary**: A record of which tools a completed task used, kept visible in the UI for the rest of that browser session (FR-010a). Distinct from a Tool Call itself — this is a session-scoped display artifact, not written to the database, and does not survive a page reload (FR-011).
 
 ## Success Criteria *(mandatory)*
 
@@ -109,7 +110,7 @@ If the assistant has not finished a task after a set number of steps, it stops a
 - **SC-002**: An agent-mode assistant completes a task requiring multiple, sequentially dependent tool calls in a single exchange.
 - **SC-003**: 100% of tasks that reach the safety step limit return a clear, readable result to the user rather than an unexplained failure or an indefinite wait.
 - **SC-004**: Assistants not in agent mode show zero behavior change from before this feature existed.
-- **SC-005**: At every step of a multi-step task, a user can tell the assistant is actively working and roughly what it's doing, without needing to wait for the final answer to find out.
+- **SC-005**: For a task that runs longer than one polling interval, a user can tell the assistant is actively working and roughly what it's doing, without needing to wait for the final answer to find out. (Not a per-step guarantee — a step that completes within a single polling window can finish unseen; this reflects what the polling mechanism in research.md #5 can actually promise, verified live in practice.)
 
 ## Assumptions
 

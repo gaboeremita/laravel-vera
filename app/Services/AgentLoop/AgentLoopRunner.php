@@ -124,10 +124,8 @@ class AgentLoopRunner
     }
 
     /**
-     * Retries the exact same call up to `agent.tool_retry_attempts` times (FR-012).
-     * Neither built-in tool performs I/O, so there's nothing here that can hang —
-     * a future tool that calls out over HTTP is responsible for its own
-     * `agent.tool_timeout` enforcement (e.g. via `Http::timeout()`), not this loop.
+     * Retries the exact same call up to `agent.tool_retry_attempts` times (FR-012),
+     * each attempt bounded by `agent.tool_timeout` (FR-015).
      */
     private function executeWithRetries(ToolCallRequest $toolCall): array
     {
@@ -136,7 +134,7 @@ class AgentLoopRunner
 
         for ($attempt = 1; $attempt <= $attempts; $attempt++) {
             try {
-                return $tool->handle($toolCall->arguments);
+                return $this->executeWithTimeout($tool, $toolCall->arguments);
             } catch (\Throwable $e) {
                 if ($attempt === $attempts) {
                     throw $e;
@@ -145,6 +143,27 @@ class AgentLoopRunner
         }
 
         throw new \RuntimeException('Unreachable.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $arguments
+     */
+    private function executeWithTimeout(AgentTool $tool, array $arguments): array
+    {
+        $timeout = config('agent.tool_timeout');
+
+        pcntl_async_signals(true);
+        pcntl_signal(SIGALRM, function () use ($timeout): never {
+            throw new \RuntimeException("Tool call timed out after {$timeout} seconds.");
+        });
+        pcntl_alarm($timeout);
+
+        try {
+            return $tool->handle($arguments);
+        } finally {
+            pcntl_alarm(0);
+            pcntl_signal(SIGALRM, SIG_DFL);
+        }
     }
 
     private function findTool(string $name): AgentTool

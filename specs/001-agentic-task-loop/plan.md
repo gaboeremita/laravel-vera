@@ -68,24 +68,31 @@ specs/001-agentic-task-loop/
 ```text
 app/
 ├── Contracts/
-│   └── LlmProvider.php              # extend: tools param, structured tool-call return
+│   ├── LlmProvider.php              # extend: tools param, structured tool-call return
+│   └── AgentTool.php                # new: shared interface both built-in tools implement
 ├── DTOs/
-│   └── LlmResponse.php              # extend: carry tool-call requests, not just content
+│   ├── LlmResponse.php              # extend: carry tool-call requests, not just content
+│   ├── ToolCallRequest.php          # new: normalized {id, name, arguments} shape
+│   └── AgentRunResult.php           # new: content + tool-call summary returned by AgentLoopRunner::run()
 ├── Services/
 │   ├── LlmProviders/
 │   │   ├── AnthropicProvider.php    # tool_use / tool_result wire format
 │   │   ├── GenericProvider.php      # tool_calls / role:tool wire format
-│   │   └── LlmManager.php           # unchanged entry point
+│   │   └── LlmManager.php           # + resolveModelForAssistantUser() for supports_tools gating
 │   └── AgentLoop/                   # new: orchestrates the tool-call loop
-│       ├── AgentLoopRunner.php
+│       ├── AgentLoopRunner.php      # + pcntl_alarm-based per-call timeout enforcement (research.md #11)
 │       └── Tools/
 │           ├── GetCurrentDatetimeTool.php  # contracts/get-current-datetime-tool.md
 │           └── BasicCalculatorTool.php     # contracts/basic-calculator-tool.md
 ├── Http/Controllers/Api/
 │   ├── ConversationController.php   # sendMessage invokes the loop when assistant is agent mode
-│   └── AgentProgressController.php  # new: polled live-progress endpoint (FR-010)
+│   ├── AgentProgressController.php  # new: polled live-progress endpoint (FR-010)
+│   ├── AiModelController.php        # + supports_tools on store/update (FR-016)
+│   ├── AssistantController.php      # + mode validation on store/update
+│   └── SettingsController.php       # + supports_tools gating in selectModel (FR-007)
 ├── Models/
 │   ├── Assistant.php                # add mode + agent config
+│   ├── AiModel.php                  # add supports_tools
 │   └── Message.php                  # add tool-call turn persistence
 └── Enums/
     └── AssistantMode.php            # new
@@ -94,18 +101,31 @@ config/
 └── agent.php                        # new: step_limit, tool_timeout, tool_retry_attempts, progress_cache_ttl (research.md #10)
 
 database/migrations/
-├── ..._add_mode_to_assistants_table.php
-└── ..._add_tool_call_data_to_messages_table.php
+├── ..._add_mode_and_agent_config_to_assistants_table.php
+├── ..._add_supports_tools_to_ai_models_table.php
+└── ..._add_tool_calls_to_messages_table.php
+
+routes/api.php                       # + GET .../conversations/{id}/agent-progress
 
 resources/js/
 ├── components/
-│   └── AgentProgressIndicator.jsx   # new: polls AgentProgressController while loop runs
-└── pages/ChatPage.jsx               # renders progress indicator during agent-mode sends
+│   ├── AgentProgressIndicator.jsx   # new: polls AgentProgressController while loop runs
+│   ├── AgentToolCallsTrace.jsx      # new: session-visible tool-call summary after completion (FR-010a)
+│   ├── ChatMessage.jsx              # + tool_call role filtering safety, code/pre split, renders AgentToolCallsTrace
+│   └── ModelAccordion.jsx           # + supports_tools checkbox (FR-016)
+├── hooks/useProviders.js            # + supports_tools in the model save payload
+└── pages/
+    ├── ChatPage.jsx                 # renders progress indicator + attaches tool-call summary to new messages
+    ├── CreateAssistantPage.jsx      # + Agent Mode toggle
+    └── EditAssistantPage.jsx        # + Agent Mode toggle
 
 tests/Feature/
-├── AgentLoopSingleToolCallTest.php   # User Story 1
-├── AgentLoopChainedToolCallsTest.php # User Story 2
-└── AgentLoopStepLimitTest.php        # User Story 3
+├── AgentLoopSingleToolCallTest.php        # User Story 1
+├── AgentLoopChainedToolCallsTest.php      # User Story 2
+├── AgentLoopStepLimitTest.php             # User Story 3
+├── AgentLoopToolTimeoutTest.php           # FR-015 enforcement (research.md #11)
+├── AiModelSupportsToolsTest.php           # FR-016
+└── ConversationShowExcludesToolCallsTest.php  # FR-011 (tool_call rows never reach the UI listing)
 ```
 
 **Structure Decision**: Existing single Laravel + React project — no new project or service boundary. The loop lives in a new `App\Services\AgentLoop` namespace alongside the existing `LlmProviders` namespace it depends on, following the project's existing service-class convention rather than introducing a new architectural layer.

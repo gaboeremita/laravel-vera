@@ -91,6 +91,16 @@ return [
 
 `assistants.agent_config` (data-model.md) can override `step_limit` (and, if ever needed, the others) per assistant; `config/agent.php` provides the system-wide default.
 
+## 11. Enforcing `agent.tool_timeout` (FR-015)
+
+**Decision**: `AgentLoopRunner::executeWithTimeout()` wraps each individual tool call in `pcntl_alarm($timeout)` + `pcntl_signal(SIGALRM, ...)` (with `pcntl_async_signals(true)`), throwing a catchable exception if the alarm fires before the call returns, then cancelling the alarm and resetting the handler in a `finally` block regardless of outcome.
+
+**Corrected from an earlier version of this document**: the config value was originally added with only a code comment deferring real enforcement, reasoning that neither built-in tool performs I/O and PHP has no clean way to bound synchronous code without `pcntl`, which is "typically unavailable in FPM contexts." That reasoning was never actually checked against this environment — `php -m` confirms `pcntl` is loaded here, and `pcntl_alarm`/`pcntl_async_signals` both exist and work. The deferral was an unverified assumption, not a checked constraint.
+
+**Verified, not assumed**: `pcntl_alarm` is a CLI-SAPI-associated pattern, so whether it behaves the same inside a PHP-FPM web worker (how this loop actually runs — inside a live HTTP request, not CLI) needed checking, not just Pest coverage (`php artisan test` runs under CLI SAPI, not FPM). Confirmed with a temporary, unauthenticated test route hit via real `curl` through Herd's actual PHP-FPM: a `sleep(5)` call was interrupted after 1 second (`{"outcome":"interrupted: interrupted","elapsed":1}`), then the route was removed immediately after. `SIGALRM` is not one of the signals FPM's own master/worker process management reserves (that's `SIGTERM`/`SIGQUIT`/`SIGUSR1`/`SIGUSR2`/`SIGWINCH`), consistent with the clean result.
+
+**Scope**: applies per attempt inside `executeWithRetries` — each retry (FR-012) gets its own fresh timeout window, not one shared budget across all attempts.
+
 **Rationale**: Centralizes every numeric knob this feature introduces in one place rather than scattering magic numbers through code, without over-engineering deployment-time overrides nobody asked for.
 
 **Explicitly not configurable here**: the alternative-approach attempt count (FR-013, fixed at 3 in the spec itself, not config) and the frontend polling interval (2 seconds, a plain JS constant — `config/agent.php` is PHP-only and not reachable by the React frontend without new plumbing this feature doesn't need).
