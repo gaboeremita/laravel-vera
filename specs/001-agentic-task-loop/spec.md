@@ -8,6 +8,13 @@
 
 **Input**: User description: "Add an agentic task loop for agent-mode assistants in VERA. Today, every assistant is single-turn: a user sends a message and gets one response, with no way for the assistant to call a tool, see the result, and keep working before answering. An assistant in agent mode should keep working on a task — calling one or more tools, checking their results, and continuing — until it produces a final answer or reaches a safety step limit, without the user needing to send another message in between. This should work the same regardless of which AI model is configured for that assistant. Out of scope: which tools are available (MCP servers), delegating to other assistants (subagents), repo access, and a log of what the agent did during a run — those are separate, later work."
 
+## Clarifications
+
+### Session 2026-08-26
+
+- Q: When an agent-mode assistant is given a task that doesn't actually need any tool, should it just answer directly like it does today, or must it always attempt at least one tool call? → A: Assistant decides per task whether a tool is needed; answers directly with no tool call when none is needed.
+- Q: Does the user see any indication the assistant is still working while it's mid-loop, or does the user wait with no visible update until the final answer arrives? → A: Full live, step-by-step visibility into what the assistant is doing while it works — but not persisted; a durable, queryable record of past runs stays out of scope for this feature (a separate, later spec).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Single tool call to completion (Priority: P1)
@@ -22,6 +29,7 @@ A user gives an agent-mode assistant a task that requires looking something up o
 
 1. **Given** an agent-mode assistant and a task that requires one tool call, **When** the user submits the task, **Then** the assistant calls the tool, incorporates the result, and returns a final answer without requiring another user message.
 2. **Given** an assistant not in agent mode, **When** the user submits any message, **Then** the assistant responds exactly as it does today, with no tool call and no change in behavior.
+3. **Given** an agent-mode assistant and a task that does not require any tool, **When** the user submits it, **Then** the assistant answers directly without calling a tool, the same way it would today.
 
 ---
 
@@ -37,6 +45,7 @@ The assistant calls a tool, and based on what comes back, determines it needs to
 
 1. **Given** a task requiring two dependent tool calls, **When** the user submits it, **Then** the assistant calls the first tool, uses its result to call the second, and returns a final answer incorporating both results.
 2. **Given** a task requiring more than two dependent tool calls, **When** the user submits it, **Then** the assistant continues calling tools in sequence, each informed by the prior result, until it reaches a final answer or the safety step limit.
+3. **Given** a task in progress with multiple tool calls, **When** the assistant is working through them, **Then** the user sees a live indication of what the assistant is currently doing, updated as each step happens.
 
 ---
 
@@ -64,7 +73,8 @@ If the assistant has not finished a task after a set number of steps, it stops a
 
 ### Functional Requirements
 
-- **FR-001**: System MUST allow an agent-mode assistant to call a tool mid-task and receive its result before producing a final answer.
+- **FR-001**: System MUST allow an agent-mode assistant to determine, per task, whether a tool is needed, and when it is, call the tool mid-task and receive its result before producing a final answer.
+- **FR-001a**: System MUST allow an agent-mode assistant to answer a task directly, without calling any tool, when it determines none is needed — behaving the same as a non-agent-mode assistant for that task.
 - **FR-002**: System MUST allow an agent-mode assistant to chain multiple tool calls in sequence within a single task, where a later call can depend on an earlier call's result.
 - **FR-003**: System MUST NOT require the user to send an additional message for the assistant to continue working after a tool call.
 - **FR-004**: System MUST enforce a configurable safety limit on the number of steps an assistant can take within a single task.
@@ -73,6 +83,8 @@ If the assistant has not finished a task after a set number of steps, it stops a
 - **FR-007**: System MUST clearly indicate when an assistant cannot operate in agent mode because its configured AI model does not support tool-calling.
 - **FR-008**: System MUST inform the assistant when a tool call it made fails, so it can react instead of the whole task failing outright.
 - **FR-009**: Assistants not in agent mode MUST be unaffected by this feature and continue to operate as a single message-response exchange.
+- **FR-010**: System MUST show the user a live indication of what the assistant is currently doing at each step while it works through a task (e.g., which tool is being called), updated as the task progresses.
+- **FR-011**: System MUST NOT persist a queryable record of a task's steps beyond this live, in-progress display — a durable history of past agent runs is out of scope for this feature.
 
 ### Key Entities
 
@@ -88,10 +100,11 @@ If the assistant has not finished a task after a set number of steps, it stops a
 - **SC-002**: An agent-mode assistant completes a task requiring multiple, sequentially dependent tool calls in a single exchange.
 - **SC-003**: 100% of tasks that reach the safety step limit return a clear, readable result to the user rather than an unexplained failure or an indefinite wait.
 - **SC-004**: Assistants not in agent mode show zero behavior change from before this feature existed.
+- **SC-005**: At every step of a multi-step task, a user can tell the assistant is actively working and roughly what it's doing, without needing to wait for the final answer to find out.
 
 ## Assumptions
 
-- The user does not see intermediate tool calls in real time as part of this feature — visibility into what the assistant did during a run is separate, later work (an agent-run action log).
+- The user sees live visibility into what the assistant is doing at each step, but this display is not persisted — a durable, queryable record of past runs (an agent-run action log) is separate, later work.
 - The user does not send a new message to steer or interrupt the assistant mid-task as part of this feature — mid-run steering is out of scope.
 - The safety step limit's exact numeric value is an implementation decision to be made during planning, not fixed by this specification.
 - At least one tool must exist for this capability to be exercised or tested; which tools exist and how they are registered (MCP servers) is separate, later work.
