@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Directors\PromptDirector;
 use App\DTOs\LlmResponse;
+use App\Enums\AssistantMode;
 use App\Http\Controllers\Controller;
 use App\Jobs\SummarizeConversation;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\DiscordChannel;
 use App\Models\Image;
+use App\Services\AgentLoop\AgentLoopRunner;
+use App\Services\AgentLoop\Tools\BasicCalculatorTool;
+use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\ImageGenProviders\ImageGenManager;
 use App\Services\ImageGenProviders\ImageGenPromptEnhancer;
 use App\Services\LlmProviders\LlmManager;
@@ -232,14 +236,39 @@ class ConversationController extends Controller
         $tts = $voiceModel ? (new TtsManager)->fromModel($voiceModel) : null;
 
         try {
-            $llm = (new LlmManager)->forAssistantUser($assistantUser);
-            $response = $llm->chat(
-                messages: [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ...$validated['messages'],
-                ],
-                options: $tts?->llmOptions() ?? [],
-            );
+            $llmManager = new LlmManager;
+            $aiModel = $llmManager->resolveModelForAssistantUser($assistantUser);
+            $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
+
+            if ($assistantModel->mode === AssistantMode::Agent) {
+                if (! $aiModel?->supports_tools) {
+                    return response()->json(['message' => 'This assistant is in agent mode, but its selected AI model does not support tool-calling.'], 422);
+                }
+
+                $runner = new AgentLoopRunner($llm, [
+                    new GetCurrentDatetimeTool,
+                    new BasicCalculatorTool,
+                ]);
+
+                $content = $runner->run(
+                    assistant: $assistantModel,
+                    messages: [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ...$validated['messages'],
+                    ],
+                    conversation: $conversation,
+                );
+
+                $response = new LlmResponse(content: $content);
+            } else {
+                $response = $llm->chat(
+                    messages: [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ...$validated['messages'],
+                    ],
+                    options: $tts?->llmOptions() ?? [],
+                );
+            }
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 502);
         }

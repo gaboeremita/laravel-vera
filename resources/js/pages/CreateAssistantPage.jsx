@@ -30,6 +30,9 @@ export default function CreateAssistantPage() {
 	const [archives, setArchives] = useState([]);
 	const [selectedArchiveId, setSelectedArchiveId] = useState('');
 
+	// Agent mode
+	const [assistantMode, setAssistantMode] = useState('assistant');
+
 	useEffect(() => {
 		api.get(route('archives.index'))
 			.then((res) => res.json())
@@ -114,6 +117,7 @@ export default function CreateAssistantPage() {
 			formData.append('slug', slug.trim());
 			formData.append('description', description.trim());
 			formData.append('opening_message', openingMessage.trim());
+			formData.append('mode', assistantMode);
 
 			if (promptMode === 'json') {
 				try {
@@ -243,6 +247,20 @@ export default function CreateAssistantPage() {
 							{archives.map((a) => (
 								<option key={a.id} value={a.id}>{a.name}</option>
 							))}
+						</select>
+					</div>
+
+					<div>
+						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+							Mode
+						</label>
+						<select
+							value={assistantMode}
+							onChange={(e) => setAssistantMode(e.target.value)}
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+						>
+							<option value="assistant">Assistant</option>
+							<option value="agent">Agent</option>
 						</select>
 					</div>
 				</div>

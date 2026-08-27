@@ -24,6 +24,7 @@ export default function EditAssistantPage() {
 	const defaultImageRef = useRef(null);
 	const [archives, setArchives] = useState([]);
 	const [selectedArchiveId, setSelectedArchiveId] = useState('');
+	const [mode, setMode] = useState('assistant');
 	const [promptMode, setPromptMode] = useState('manual');
 	const [promptJson, setPromptJson] = useState('');
 	const [promptJsonError, setPromptJsonError] = useState(null);
@@ -52,6 +53,7 @@ export default function EditAssistantPage() {
 				setDescription(data.description || '');
 				setOpeningMessage(data.opening_message || '');
 				setSelectedArchiveId(data.archive_id ? String(data.archive_id) : '');
+				setMode(data.mode || 'assistant');
 				const loadedEmotions = data.emotions || [];
 				setEmotions(loadedEmotions);
 				setRestrictedEmotions(data.restricted_emotions || []);
@@ -81,6 +83,7 @@ export default function EditAssistantPage() {
 				description: description.trim() || null,
 				opening_message: openingMessage.trim() || null,
 				archive_id: selectedArchiveId ? Number(selectedArchiveId) : null,
+				mode,
 			});
 
 			if (!res.ok) {
@@ -283,6 +286,20 @@ export default function EditAssistantPage() {
 							{archives.map((a) => (
 								<option key={a.id} value={a.id}>{a.name}</option>
 							))}
+						</select>
+					</div>
+
+					<div>
+						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+							Mode
+						</label>
+						<select
+							value={mode}
+							onChange={(e) => setMode(e.target.value)}
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+						>
+							<option value="assistant">Assistant</option>
+							<option value="agent">Agent</option>
 						</select>
 					</div>
 

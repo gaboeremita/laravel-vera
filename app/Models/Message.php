@@ -21,7 +21,15 @@ class Message extends Model
         'thinking',
         'image',
         'emotion',
+        'tool_calls',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'tool_calls' => 'array',
+        ];
+    }
 
     public function conversation(): BelongsTo
     {

@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AssistantMode;
 use App\Http\Controllers\Controller;
 use App\Models\Assistant;
 use App\Models\Image;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rules\Enum;
 
 class AssistantController extends Controller
 {
@@ -96,6 +98,7 @@ class AssistantController extends Controller
             'opening_message' => ['nullable', 'string'],
             'prompt' => ['nullable', 'array'],
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
+            'mode' => ['sometimes', new Enum(AssistantMode::class)],
             'emotions' => ['required', 'array', 'min:1'],
             'emotions.*.name' => ['required', 'string', 'max:255'],
             'emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
@@ -123,6 +126,7 @@ class AssistantController extends Controller
                 'opening_message' => $validated['opening_message'] ?? null,
                 'prompt' => $validated['prompt'] ?? [],
                 'archive_id' => $validated['archive_id'] ?? null,
+                'mode' => $validated['mode'] ?? AssistantMode::Assistant->value,
             ]);
 
             // Create the pivot
@@ -172,6 +176,7 @@ class AssistantController extends Controller
             'opening_message' => ['nullable', 'string'],
             'prompt' => ['nullable', 'array'],
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
+            'mode' => ['sometimes', new Enum(AssistantMode::class)],
         ]);
 
         $assistant->update($validated);

@@ -20,8 +20,8 @@ description: "Task list for the agentic task loop feature"
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `config/agent.php` with `tool_timeout` (60), `step_limit` (10), `tool_retry_attempts` (3), `progress_cache_ttl` (10) — research.md #10
-- [ ] T002 [P] Create `App\Enums\AssistantMode` (`Assistant`, `Agent` cases) in `app/Enums/AssistantMode.php`
+- [X] T001 Create `config/agent.php` with `tool_timeout` (60), `step_limit` (10), `tool_retry_attempts` (3), `progress_cache_ttl` (10) — research.md #10
+- [X] T002 [P] Create `App\Enums\AssistantMode` (`Assistant`, `Agent` cases) in `app/Enums/AssistantMode.php`
 
 ---
 
@@ -29,23 +29,23 @@ description: "Task list for the agentic task loop feature"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete — every story depends on the loop, both tools, and an assistant actually being configurable as agent-mode.
 
-- [ ] T003 Migration: add `mode` (string, default `assistant`) and `agent_config` (json, nullable) to `assistants` table in `database/migrations/`
-- [ ] T004 [P] Migration: add `supports_tools` (boolean, default `false`) to `ai_models` table in `database/migrations/`
-- [ ] T005 [P] Migration: add `tool_calls` (json, nullable) to `messages` table in `database/migrations/`
-- [ ] T006 Update `app/Models/Assistant.php`: add `mode` (cast to `AssistantMode`) and `agent_config` to `#[Fillable]` (depends on T002, T003)
-- [ ] T007 [P] Update `app/Models/AiModel.php`: add `supports_tools` to `#[Fillable]` (depends on T004)
-- [ ] T008 [P] Update `app/Models/Message.php`: add `tool_calls` to `$fillable` (depends on T005)
-- [ ] T009 Extend `app/DTOs/LlmResponse.php`: add `toolCalls` (array of normalized `{id, name, arguments}`) and `isFinal` (bool) — contracts/llm-provider.md
-- [ ] T010 Extend `app/Contracts/LlmProvider.php`: add `$tools` param to `chat()` — contracts/llm-provider.md (depends on T009)
-- [ ] T011 Implement tool-calling wire format in `app/Services/LlmProviders/AnthropicProvider.php` (`tool_use`/`tool_result` blocks) — research.md #1 (depends on T010)
-- [ ] T012 [P] Implement tool-calling wire format in `app/Services/LlmProviders/GenericProvider.php` (`tool_calls`/`role: tool`) — research.md #2 (depends on T010)
-- [ ] T013 [P] Create `app/Services/AgentLoop/Tools/GetCurrentDatetimeTool.php` — contracts/get-current-datetime-tool.md
-- [ ] T014 [P] Create `app/Services/AgentLoop/Tools/BasicCalculatorTool.php` — hand-rolled tokenizer/evaluator, no `eval()` — contracts/basic-calculator-tool.md
-- [ ] T015 Create `app/Services/AgentLoop/AgentLoopRunner.php`: calls `LlmProvider::chat()` in a loop; executes each step's tool call(s) sequentially (multiple calls in one step run one after another, not concurrently — plan.md Constraints); retries a failed call up to `config('agent.tool_retry_attempts')` times (FR-012); after exhausting retries, tries different approaches up to the same cap, stopping earlier if further attempts look futile (FR-013); stops and explains to the user when both are exhausted (FR-014); enforces `config('agent.tool_timeout')` per tool call (FR-015); enforces the step limit from `assistant.agent_config['step_limit'] ?? config('agent.step_limit')` (FR-004/FR-005) (depends on T011, T012, T013, T014)
-- [ ] T016 Wire `app/Http/Controllers/Api/ConversationController.php@sendMessage`: route through `AgentLoopRunner` when the assistant's `mode` is `Agent`; assistants with `mode = Assistant` take the existing unchanged path (FR-009) (depends on T015)
-- [ ] T017 Create `app/Http/Controllers/Api/AgentProgressController.php@show` + route `GET /api/assistants/{assistant}/conversations/{id}/agent-progress` in `routes/api.php` — contracts/agent-progress-endpoint.md (depends on T015)
-- [ ] T018 Add `supports_tools` gating to `app/Http/Controllers/Api/AssistantController.php` validation: reject/warn when `mode = Agent` is selected for an `AiModel` with `supports_tools = false` (FR-007) (depends on T006, T007)
-- [ ] T019 [P] Add an "Agent Mode" toggle to `resources/js/pages/CreateAssistantPage.jsx` and `resources/js/pages/EditAssistantPage.jsx`
+- [X] T003 Migration: add `mode` (string, default `assistant`) and `agent_config` (json, nullable) to `assistants` table in `database/migrations/`
+- [X] T004 [P] Migration: add `supports_tools` (boolean, default `false`) to `ai_models` table in `database/migrations/`
+- [X] T005 [P] Migration: add `tool_calls` (json, nullable) to `messages` table in `database/migrations/`
+- [X] T006 Update `app/Models/Assistant.php`: add `mode` (cast to `AssistantMode`) and `agent_config` to `#[Fillable]` (depends on T002, T003)
+- [X] T007 [P] Update `app/Models/AiModel.php`: add `supports_tools` to `#[Fillable]` (depends on T004)
+- [X] T008 [P] Update `app/Models/Message.php`: add `tool_calls` to `$fillable` (depends on T005)
+- [X] T009 Extend `app/DTOs/LlmResponse.php`: add `toolCalls` (array of normalized `{id, name, arguments}`) and `isFinal` (bool) — contracts/llm-provider.md
+- [X] T010 Extend `app/Contracts/LlmProvider.php`: add `$tools` param to `chat()` — contracts/llm-provider.md (depends on T009)
+- [X] T011 Implement tool-calling wire format in `app/Services/LlmProviders/AnthropicProvider.php` (`tool_use`/`tool_result` blocks) — research.md #1 (depends on T010)
+- [X] T012 [P] Implement tool-calling wire format in `app/Services/LlmProviders/GenericProvider.php` (`tool_calls`/`role: tool`) — research.md #2 (depends on T010)
+- [X] T013 [P] Create `app/Services/AgentLoop/Tools/GetCurrentDatetimeTool.php` — contracts/get-current-datetime-tool.md
+- [X] T014 [P] Create `app/Services/AgentLoop/Tools/BasicCalculatorTool.php` — hand-rolled tokenizer/evaluator, no `eval()` — contracts/basic-calculator-tool.md
+- [X] T015 Create `app/Services/AgentLoop/AgentLoopRunner.php`: calls `LlmProvider::chat()` in a loop; executes each step's tool call(s) sequentially (multiple calls in one step run one after another, not concurrently — plan.md Constraints); retries a failed call up to `config('agent.tool_retry_attempts')` times (FR-012); after exhausting retries, tries different approaches up to the same cap, stopping earlier if further attempts look futile (FR-013); stops and explains to the user when both are exhausted (FR-014); enforces `config('agent.tool_timeout')` per tool call (FR-015); enforces the step limit from `assistant.agent_config['step_limit'] ?? config('agent.step_limit')` (FR-004/FR-005) (depends on T011, T012, T013, T014)
+- [X] T016 Wire `app/Http/Controllers/Api/ConversationController.php@sendMessage`: route through `AgentLoopRunner` when the assistant's `mode` is `Agent`; assistants with `mode = Assistant` take the existing unchanged path (FR-009) (depends on T015)
+- [X] T017 Create `app/Http/Controllers/Api/AgentProgressController.php@show` + route `GET /api/assistants/{assistant}/conversations/{id}/agent-progress` in `routes/api.php` — contracts/agent-progress-endpoint.md (depends on T015)
+- [X] T018 Add `supports_tools` gating: reject selecting a tool-incapable model for an agent-mode assistant (FR-007) — implemented in `app/Http/Controllers/Api/SettingsController.php@selectModel` rather than `AssistantController`, since model selection lives in `Settings`, not on the `Assistant` record itself (depends on T006, T007)
+- [X] T019 [P] Add an "Agent Mode" toggle to `resources/js/pages/CreateAssistantPage.jsx` and `resources/js/pages/EditAssistantPage.jsx`
 
 **Checkpoint**: Foundation ready — an assistant can be put into agent mode, the loop mechanism exists, both tools exist, and progress is queryable.
 
@@ -57,8 +57,8 @@ description: "Task list for the agentic task loop feature"
 
 **Independent Test**: quickstart.md Scenario 1.
 
-- [ ] T020 [P] [US1] Feature test `tests/Feature/AgentLoopSingleToolCallTest.php`: single `get_current_datetime` call answered correctly; single `basic_calculator` call answered correctly; a task needing no tool is answered directly (FR-001a); a non-agent-mode assistant is unaffected (FR-009) — all via `Http::fake()`-sequenced responses and `Carbon::setTestNow()`
-- [ ] T021 [US1] Run quickstart.md Scenario 1 manually against a real agent-mode assistant to confirm the automated test matches real behavior
+- [X] T020 [P] [US1] Feature test `tests/Feature/AgentLoopSingleToolCallTest.php`: single `get_current_datetime` call answered correctly; single `basic_calculator` call answered correctly; a task needing no tool is answered directly (FR-001a); a non-agent-mode assistant is unaffected (FR-009) — all via `Http::fake()`-sequenced responses and `Carbon::setTestNow()` — **4/4 passing**
+- [ ] T021 [US1] Run quickstart.md Scenario 1 manually against a real agent-mode assistant — **not done**: needs a real, configured LLM API key/model, which isn't available in this session
 
 **Checkpoint**: User Story 1 is fully functional and independently testable — this is the MVP.
 
@@ -70,10 +70,10 @@ description: "Task list for the agentic task loop feature"
 
 **Independent Test**: quickstart.md Scenario 2.
 
-- [ ] T022 [P] [US2] Feature test `tests/Feature/AgentLoopChainedToolCallsTest.php`: two dependent tool calls resolved in one exchange; more than two dependent calls chained up to the step limit — via `Http::fake()`-sequenced responses (research.md #9's accepted limitation: chaining is validated here, not via a real model's live tool choice)
-- [ ] T023 [US2] Create `resources/js/components/AgentProgressIndicator.jsx`: polls `AgentProgressController`'s endpoint every 2 seconds while a send is in flight, stops on resolve — state derived during render per Constitution Principle VIII, not set in a `useEffect` (depends on T017)
-- [ ] T024 [US2] Wire `AgentProgressIndicator` into `resources/js/pages/ChatPage.jsx` for agent-mode sends (depends on T023)
-- [ ] T025 [US2] Run quickstart.md Scenario 2 manually ("what's today's day of the month, tripled?") against a real agent-mode assistant
+- [X] T022 [P] [US2] Feature test `tests/Feature/AgentLoopChainedToolCallsTest.php` — **2/2 passing**
+- [X] T023 [US2] Create `resources/js/components/AgentProgressIndicator.jsx` — state derived during render per Constitution Principle VIII (ESLint's `set-state-in-effect` rule caught a real violation of this on the first pass, fixed using the same pattern as `ConversationList.jsx`)
+- [X] T024 [US2] Wire `AgentProgressIndicator` into `resources/js/pages/ChatPage.jsx` for agent-mode sends
+- [ ] T025 [US2] Run quickstart.md Scenario 2 manually — **not done**: needs a real, configured LLM API key/model
 
 **Checkpoint**: User Stories 1 and 2 both work independently; live progress is visible during multi-step work.
 
@@ -85,8 +85,8 @@ description: "Task list for the agentic task loop feature"
 
 **Independent Test**: quickstart.md Scenario 3.
 
-- [ ] T026 [P] [US3] Feature test `tests/Feature/AgentLoopStepLimitTest.php`: a task exceeding a configured step limit stops and returns a clear partial result, not an error or a hang — via `Http::fake()`-sequenced responses longer than the limit
-- [ ] T027 [US3] Run quickstart.md Scenario 3 manually with a low `agent_config` step-limit override
+- [X] T026 [P] [US3] Feature test `tests/Feature/AgentLoopStepLimitTest.php` — **2/2 passing**
+- [ ] T027 [US3] Run quickstart.md Scenario 3 manually — **not done**: needs a real, configured LLM API key/model
 
 **Checkpoint**: All three user stories are independently functional.
 
@@ -94,9 +94,9 @@ description: "Task list for the agentic task loop feature"
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T028 [P] `vendor/bin/pint --test` passes with zero errors (Constitution Principle I)
-- [ ] T029 [P] `npm run lint` passes with zero errors (Constitution Principle I)
-- [ ] T030 Run the full quickstart.md validation guide end-to-end
+- [X] T028 [P] `vendor/bin/pint --test` passes with zero errors (Constitution Principle I) — **passing**
+- [X] T029 [P] `npm run lint` passes with zero errors (Constitution Principle I) — **0 errors, 47 pre-existing warnings unrelated to this feature**
+- [X] T030 Run the full quickstart.md validation guide end-to-end — **automated portions done** (full `php artisan test` suite: 16/16 passing, no regressions); the three manual live-chat scenarios (T021/T025/T027) remain undone — need a real LLM API key/model, not available in this session
 
 ---
 

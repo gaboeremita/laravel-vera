@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AgentProgressController;
 use App\Http\Controllers\Api\AiModelController;
 use App\Http\Controllers\Api\AiProviderController;
 use App\Http\Controllers\Api\ArchiveController;
@@ -47,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/discord-messages', [ConversationController::class, 'sendDiscordMessage'])->name('conversations.sendDiscordMessage');
         Route::delete('/conversations/{id}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
         Route::patch('/conversations/{id}', [ConversationController::class, 'update'])->name('conversations.update');
+        Route::get('/conversations/{id}/agent-progress', [AgentProgressController::class, 'show'])->name('conversations.agent-progress');
         Route::get('/conversations/{id}/memory', [ConversationMemoryController::class, 'show'])->name('memory.show');
         Route::put('/conversations/{id}/memory', [ConversationMemoryController::class, 'update'])->name('memory.update');
         Route::post('/conversations/{id}/memory/summarize', [ConversationMemoryController::class, 'summarize'])->name('memory.summarize');
