@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\BuildArchiveFile;
+use App\Actions\SearchArchiveEntries;
 use App\Http\Controllers\Controller;
 use App\Jobs\EmbedArchiveEntry;
 use App\Models\Archive;
@@ -114,6 +115,22 @@ class ArchiveController extends Controller
                 $archive->fresh(['entries.tags']),
             );
         });
+    }
+
+    /**
+     * Search an archive's entries by keyword and semantic similarity.
+     */
+    public function search(Request $request, int $id, SearchArchiveEntries $searchArchiveEntries): JsonResponse
+    {
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'min:2'],
+        ]);
+
+        $archive = $request->user()->archives()->findOrFail($id);
+
+        return response()->json([
+            'results' => $searchArchiveEntries->handle($archive->id, $validated['q']),
+        ]);
     }
 
     /**

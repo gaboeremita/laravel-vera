@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { route } from 'ziggy-js';
+import { Search, X } from 'lucide-react';
 import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import { AnimatePresence } from 'framer-motion';
@@ -19,7 +20,68 @@ export default function ArchivePage() {
 	const [isSaving, setIsSaving] = useState(false);
 	const [isExporting, setIsExporting] = useState(false);
 	const [deleteIndex, setDeleteIndex] = useState(null);
+	const [searchQuery, setSearchQuery] = useState('');
+	const [vectorResults, setVectorResults] = useState(null);
+	const [isSearching, setIsSearching] = useState(false);
 	const allCollapsed = entries.every((e) => e.collapsed);
+
+	const normalizedQuery = searchQuery.trim().toLowerCase();
+	const instantMatches = normalizedQuery
+		? entries.filter((entry) =>
+			[entry.title, entry.content, entry.keywords, entry.tags].some((field) =>
+				(field ?? '').toLowerCase().includes(normalizedQuery),
+			),
+		)
+		: entries;
+	const instantMatchIds = new Set(instantMatches.map((entry) => entry.id));
+	const vectorRank = new Map((vectorResults ?? []).map((result, index) => [result.id, index]));
+
+	const bothMatched = entries
+		.filter((entry) => instantMatchIds.has(entry.id) && vectorRank.has(entry.id))
+		.sort((a, b) => vectorRank.get(a.id) - vectorRank.get(b.id));
+	const instantOnly = instantMatches.filter((entry) => !vectorRank.has(entry.id));
+	const semanticOnly = entries
+		.filter((entry) => vectorRank.has(entry.id) && !instantMatchIds.has(entry.id))
+		.sort((a, b) => vectorRank.get(a.id) - vectorRank.get(b.id));
+
+	const visibleEntries = normalizedQuery ? [...bothMatched, ...instantOnly, ...semanticOnly] : entries;
+	const semanticOnlyIds = new Set(semanticOnly.map((entry) => entry.id));
+
+	const isQueryEligible = searchQuery.trim().length >= 2;
+	const [wasQueryEligible, setWasQueryEligible] = useState(isQueryEligible);
+	if (isQueryEligible !== wasQueryEligible) {
+		setWasQueryEligible(isQueryEligible);
+		if (!isQueryEligible) {
+			setVectorResults(null);
+			setIsSearching(false);
+		}
+	}
+
+	useEffect(() => {
+		if (!isQueryEligible) {
+			return;
+		}
+
+		const timer = setTimeout(async () => {
+			setIsSearching(true);
+
+			try {
+				const res = await api.get(route('archives.search', { id: archiveId, q: searchQuery }));
+
+				if (!res.ok) throw new Error('Search failed');
+
+				const data = await res.json();
+				setVectorResults(data.results);
+			} catch (error) {
+				console.error(error);
+				setVectorResults(null);
+			} finally {
+				setIsSearching(false);
+			}
+		}, 400);
+
+		return () => clearTimeout(timer);
+	}, [searchQuery, archiveId, isQueryEligible]);
 
 	useEffect(() => {
 		const load = async () => {
@@ -241,11 +303,37 @@ export default function ArchivePage() {
 
 				<hr className="border-t border-line-1" />
 
+				{/* Search */}
+				<div className="relative">
+					<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-3" />
+					<input
+						type="text"
+						name="search"
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
+						className="w-full bg-bg-1 border border-line-1 text-accent text-sm pl-9 pr-9 py-2 outline-none focus:border-accent/50 transition-colors"
+						placeholder="Search entries..."
+						aria-label="Search entries"
+					/>
+					{isSearching && (
+						<span className="absolute right-9 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+					)}
+					{searchQuery && (
+						<button
+							onClick={() => setSearchQuery('')}
+							aria-label="Clear search"
+							className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-3 hover:text-accent transition-colors cursor-pointer"
+						>
+							<X className="w-4 h-4" />
+						</button>
+					)}
+				</div>
+
 				{/* Entries */}
 				<div>
 					<div className="flex items-center justify-between mb-3">
 						<span className="text-fg-3 text-[0.7rem] tracking-[0.15em] uppercase">
-							Entries ({entries.length})
+							Entries ({visibleEntries.length})
 						</span>
 						{entries.length > 0 && (
 							<button
@@ -261,23 +349,35 @@ export default function ArchivePage() {
 					</div>
 
 					<AnimatePresence initial={false}>
-						{entries.map((entry, index) => (
-							<EntryAccordion
-								key={entry.id ?? entry.uid}
-								entry={entry}
-								index={index}
-								onUpdate={(field, value) => updateEntry(index, field, value)}
-								onDelete={() => setDeleteIndex(index)}
-							/>
-						))}
+						{visibleEntries.map((entry) => {
+							const index = entries.indexOf(entry);
+
+							return (
+								<EntryAccordion
+									key={entry.id ?? entry.uid}
+									entry={entry}
+									index={index}
+									isSemanticMatch={semanticOnlyIds.has(entry.id)}
+									onUpdate={(field, value) => updateEntry(index, field, value)}
+									onDelete={() => setDeleteIndex(index)}
+								/>
+							);
+						})}
 
 						{entries.length === 0 && (
-							<div className="text-fg-3 text-sm text-center py-8">
+							<div key="empty-archive" className="text-fg-3 text-sm text-center py-8">
 								No entries yet.
 							</div>
 						)}
 
+						{entries.length > 0 && visibleEntries.length === 0 && (
+							<div key="no-search-match" className="text-fg-3 text-sm text-center py-8">
+								No entries match your search.
+							</div>
+						)}
+
 						<button
+							key="add-entry-button"
 							onClick={addEntry}
 							className="w-full border border-dashed border-line-1 text-success text-[0.75rem] tracking-[0.1em] cursor-pointer hover:border-success/50 hover:bg-green-400/5 transition-colors py-3 mt-4"
 						>

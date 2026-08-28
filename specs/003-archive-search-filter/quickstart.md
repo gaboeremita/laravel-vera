@@ -35,6 +35,7 @@ Open the Archive page for the seeded archive in the browser.
 - Type a term with no literal overlap but conceptual relevance → after a brief pause (~400ms), the semantically related entry should appear, visually marked as a semantic match, without displacing the instant matches already shown (User Story 2).
 - Clear the search box → full entry list returns, "Add Entry" and existing CRUD actions remain available throughout (spec Edge Cases / brief §8).
 - Search for something matching nothing → a clear "no matching entries" message appears, distinguishable from an empty archive.
+- Type a nonsense/gibberish string → results should stay empty (or genuinely near-empty), not return a large fraction of the archive marked as semantic matches. This directly exercises the `minSimilarity` threshold in `SearchArchiveEntries` (research.md §3) — a threshold that's too low will flood results for any input.
 
 ## 5. Confirm quality gates
 

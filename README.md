@@ -74,7 +74,7 @@ Archive entry embeddings are dispatched as async jobs. To process them, run the 
 php artisan queue:work
 ```
 
-This is only needed if you use the Archive feature. Without it, archive entries will be saved but won't have embeddings, so retrieval won't return results.
+This is only needed if you use the Archive feature. Without it, archive entries will be saved but won't have embeddings, so retrieval won't return results and Archive search's semantic matching won't surface them either (literal text matching still works without embeddings).
 
 ## Configuration
 
@@ -301,6 +301,7 @@ laravel-vera/
 ├── app/
 │   ├── Actions/
 │   │   ├── BuildArchiveFile.php               # Renders an archive + entries to Markdown via FileBuilder
+│   │   ├── SearchArchiveEntries.php           # Hybrid (full-text + vector) archive entry search, merged via Reciprocal Rank Fusion
 │   │   └── SummarizeConversation.php          # Long-term memory summarization logic (wrapped by the queued job)
 │   ├── Builders/
 │   │   ├── FileBuilder.php                   # heading()/paragraph()/keyValue() → Markdown string
@@ -327,7 +328,7 @@ laravel-vera/
 │   │   └── Api/
 │   │       ├── AiProviderController.php      # CRUD for AI providers
 │   │       ├── AiModelController.php         # CRUD for AI models (thinking_key, supports_tools, config, additional_config)
-│   │       ├── ArchiveController.php         # Archive read/save (with async embedding) + Markdown export
+│   │       ├── ArchiveController.php         # Archive read/save (with async embedding), hybrid search, + Markdown export
 │   │       ├── AssistantController.php       # CRUD for assistants (multipart, emotion images)
 │   │       ├── AssistantEmotionController.php# Per-assistant emotion store/update/destroy
 │   │       ├── AssistantMemoryPromptController.php # Show/update per-assistant memory summarization instructions
@@ -414,7 +415,7 @@ laravel-vera/
 │   │   ├── ConversationsPage.jsx             # Conversation list
 │   │   ├── ChatPage.jsx                      # Main chat interface; debounced localStorage draft persistence
 │   │   ├── MemoryPage.jsx                    # Conversation long-term memory editor + auto-summarize toggle
-│   │   ├── ArchivePage.jsx                   # Archive editor (RAG knowledge base) + Markdown export
+│   │   ├── ArchivePage.jsx                   # Archive editor (RAG knowledge base), hybrid search, + Markdown export
 │   │   ├── PromptPage.jsx                    # Visual prompt editor
 │   │   ├── SettingsPage.jsx                  # Theme only
 │   │   ├── ProvidersPage.jsx                 # AI provider/model management
@@ -488,6 +489,7 @@ laravel-vera/
 - **Conversation persistence** — messages stored in PostgreSQL
 - **Conversation management UI** — list, create, delete, and rename conversations
 - **Archive with RAG** — editable knowledge base with semantic retrieval injected into the system prompt; exportable as a Markdown file
+- **Archive hybrid search** — instant client-side text matching across title/content/tags/keywords, plus a debounced server-side search combining full-text and semantic (vector) matching, merged and ranked via Reciprocal Rank Fusion
 - **Conversation memory** — manual or automatic long-term summarization of a conversation, injected back into the system prompt, with per-assistant summarization instructions. See [Conversation Memory](#conversation-memory)
 - **Chat draft persistence** — an unsent message survives navigating away and coming back, per (assistant, conversation), stored client-side
 - **Toast notifications** — non-intrusive feedback for UI actions

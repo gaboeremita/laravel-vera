@@ -53,6 +53,7 @@ Browser (React SPA — React Router)
     |-- PATCH /api/voice-providers/{provider}/models/{model}     (VoiceModelController@updatePrompt — prompt only)
     |-- GET|POST /api/archives
     |-- GET|POST /api/archives/{id}
+    |-- GET /api/archives/{id}/search                             (hybrid full-text + vector search)
     |
 Laravel Backend (API)
     |
@@ -160,6 +161,7 @@ All routes behind `auth:sanctum` middleware:
 | GET | `/api/archives` | `ArchiveController@index` |
 | GET | `/api/archives/{id}` | `ArchiveController@show` |
 | GET | `/api/archives/{id}/export` | `ArchiveController@export` — downloads as Markdown |
+| GET | `/api/archives/{id}/search` | `ArchiveController@search` — hybrid full-text + vector search, returns ranked `{id, score}` pairs |
 | POST | `/api/archives` | `ArchiveController@save` (create) |
 | POST | `/api/archives/{id}` | `ArchiveController@save` (update) |
 
@@ -249,6 +251,10 @@ Unauthenticated, registered in `web.php` (not `api.php`). Serves `.mjs` files fr
 **`ArchiveController`**
 Reads and saves the user's archives (RAG knowledge base). Each archive has a name, description, and a set of entries with title, content, keywords, and tags. The `save` action (POST) handles both create and update in a single endpoint — if `{id}` is provided, it updates; otherwise creates. Entries not present in the payload are deleted. On entry create or content change, `EmbedArchiveEntry` is dispatched for async embedding.
 - `export` — builds the archive (name, description, every entry's title/content/keywords/tags) into a single Markdown document via `BuildArchiveFile`/`FileBuilder` and returns it as a downloadable `.md` file, filename slugified from the archive name
+- `search` — hybrid entry search scoped to the owning archive, via `SearchArchiveEntries`; returns ranked `{id, score}` pairs only (the frontend already holds full entry data), never the entries themselves
+
+**`SearchArchiveEntries`** (`app/Actions/SearchArchiveEntries.php`)
+Runs two ranked queries against an archive's entries and merges them via Reciprocal Rank Fusion (k=60): a full-text keyword query (`whereFullText` over `title`/`content`) and a vector similarity query (`whereVectorSimilarTo` over `embedding`, `minSimilarity: 0.50` — empirically tuned against real data, not a guessed constant; see `specs/003-archive-search-filter/research.md`). Entries with no embedding yet are still reachable via the keyword leg.
 
 **`ConversationMemoryController`**
 Scoped to `assistants/{assistant}/conversations/{id}/memory`. See [Conversation Memory](#conversation-memory) for the full system.
@@ -514,6 +520,8 @@ Conversation memory editor (`/assistants/:id/conversations/:id/memory`), via `us
 
 **`ArchivePage`**
 Archive editor. Displays entries with title, content, keywords, and tags. Saves via `POST /api/archives` or `POST /api/archives/{id}`. An "Export" action downloads the archive as a Markdown file via `GET /api/archives/{id}/export`.
+
+Hybrid search: a search input filters the entry list in two layers. Instant, purely client-side substring matching across title/content/keywords/tags runs on every keystroke against already-loaded entries — no network call. A 400ms-debounced call to `GET /api/archives/{id}/search` adds semantically related entries once the query reaches 2+ characters; results are merged with the instant matches (deduplicated by entry id, both-matched entries ranked above single-criterion ones) and rendered during render, not via a synced effect. Entries found only via the semantic leg get a Sparkles icon in `EntryAccordion`. If the debounced request fails, it's caught silently (logged via `console.error`) and the instant results stay visible unaffected.
 
 **`PromptPage`**
 Visual prompt editor for the active assistant. Renders the prompt JSON as an interactive tree of `PromptNode` components. Supports adding, renaming, and deleting sections at any depth. Each node can be a string, list of strings, or nested object. Changes are saved via `PUT /api/assistants/{assistant}/prompt` (or `POST` if no prompt exists yet). The entire prompt can also be deleted from this page. Raw JSON toggle available.
@@ -1054,6 +1062,7 @@ laravel-vera/
 ├── app/
 │   ├── Actions/
 │   │   ├── BuildArchiveFile.php                 renders an Archive + entries to Markdown via FileBuilder
+│   │   ├── SearchArchiveEntries.php             hybrid (full-text + vector) archive entry search, RRF-merged
 │   │   └── SummarizeConversation.php             the actual summarization work; wrapped by the queued Jobs\SummarizeConversation
 │   ├── Builders/
 │   │   ├── FileBuilder.php                       heading()/paragraph()/keyValue() → Markdown string
@@ -1078,7 +1087,7 @@ laravel-vera/
 │   │   └── Api/
 │   │       ├── AiProviderController.php        provider CRUD
 │   │       ├── AiModelController.php           model CRUD (name/endpoint/thinking_key/supports_tools/prompt/config/additional_config)
-│   │       ├── ArchiveController.php           archive read/save (with async embedding) + Markdown export
+│   │       ├── ArchiveController.php           archive read/save (with async embedding), hybrid search, + Markdown export
 │   │       ├── AssistantController.php         assistant CRUD (multipart, emotion images)
 │   │       ├── AssistantEmotionController.php  per-assistant emotion store/update/destroy
 │   │       ├── AssistantMemoryPromptController.php  show/update AssistantUser.memory_prompt
@@ -1152,7 +1161,7 @@ laravel-vera/
 │   │   ├── ConversationsPage.jsx
 │   │   ├── ChatPage.jsx                        localStorage draft persistence per (assistant, conversation)
 │   │   ├── MemoryPage.jsx                      conversation long-term memory editor + auto-summarize toggle
-│   │   ├── ArchivePage.jsx                     archive editor (RAG knowledge base) + Markdown export
+│   │   ├── ArchivePage.jsx                     archive editor (RAG knowledge base), hybrid search, + Markdown export
 │   │   ├── PromptPage.jsx
 │   │   ├── SettingsPage.jsx                    theme only
 │   │   ├── ProvidersPage.jsx
@@ -1174,7 +1183,7 @@ laravel-vera/
 │   │   ├── EmotionGrid.jsx                     emotion image manager (add/rename/replace/delete)
 │   │   ├── PromptEditor.jsx                    reusable prompt tree editor (assistant prompt + voice prompts)
 │   │   ├── PromptNode.jsx                      recursive prompt tree node editor
-│   │   ├── EntryAccordion.jsx                  archive entry form
+│   │   ├── EntryAccordion.jsx                  archive entry form; shows a semantic-match indicator when found only via search's vector leg
 │   │   ├── Header.jsx                          navigation header — no hardcoded assistant-name branding
 │   │   ├── Portrait.jsx                        expression display (3 render modes)
 │   │   ├── ChatMessage.jsx                     message rendering

@@ -16,15 +16,9 @@ Table `archive_entries` (model `app/Models/ArchiveEntry.php`), current columns u
 | `keywords` | json, nullable | free-text array |
 | `created_at` / `updated_at` | timestamps | |
 
-**New column** (via a new migration — the existing `2026_06_25_082004_create_lore_entries_table.php` is not modified, per Constitution Principle II):
+**New indexes** (via a new migration — the existing `2026_06_25_082004_create_lore_entries_table.php` is not modified, per Constitution Principle II):
 
-| Column | Type | Notes |
-|---|---|---|
-| `search_vector` | `tsvector`, generated always as `setweight(to_tsvector('english', coalesce(title,'')), 'A') || setweight(to_tsvector('english', coalesce(content,'')), 'B')`, stored | Title weighted above content. Requires a raw `DB::statement()` — Laravel's schema builder has no generated-tsvector helper. |
-
-**New indexes** (same migration):
-
-- GIN index on `search_vector`.
+- A composite full-text index over `title` and `content`, via Laravel's native `$table->fullText(['title', 'content'])->language('english')` — no new column needed; Laravel/Postgres builds the index directly from the existing columns.
 - HNSW index on `embedding` (`->index()` on the vector column) — none currently exists; a similarity query is a sequential scan today, acceptable at the confirmed small scale but worth adding since the migration is already touching this table.
 
 **Relationships**: unchanged — `belongsTo(Archive)`, `morphToMany(Tag)` via `taggables`.

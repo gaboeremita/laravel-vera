@@ -6,7 +6,7 @@
 
 ## Summary
 
-Add a single search input to the Archive page that filters the open archive's entries in two layers: an instant, purely client-side substring match across title/content/tags/keywords, and a 400ms-debounced server-side hybrid search (Postgres full-text `tsvector` ranking + native Laravel/pgvector similarity search) that also surfaces conceptually related entries. Results from both layers are merged and deduplicated with Reciprocal Rank Fusion, semantic-only matches are visually flagged, and README.md/ARCHITECTURE.md are updated to keep documentation accurate.
+Add a single search input to the Archive page that filters the open archive's entries in two layers: an instant, purely client-side substring match across title/content/tags/keywords, and a 400ms-debounced server-side hybrid search (Laravel's native full-text search + native pgvector similarity search) that also surfaces conceptually related entries. Results from both layers are merged and deduplicated with Reciprocal Rank Fusion, semantic-only matches are visually flagged, and README.md/ARCHITECTURE.md are updated to keep documentation accurate.
 
 ## Technical Context
 
@@ -16,7 +16,7 @@ Add a single search input to the Archive page that filters the open archive's en
 
 **Storage**: PostgreSQL with the `vector` extension — already installed on the app database, `archive_entries.embedding` is already a native `vector(768)` column.
 
-**Testing**: Pest v4 feature tests, factory-backed (Constitution Principle VI). No `ArchiveFactory`, `ArchiveEntryFactory`, or `TagFactory` currently exist, and none of `Archive`, `ArchiveEntry`, `Tag` use `HasFactory` — these must be added as a prerequisite, since there is currently zero test coverage for the Archive feature at all.
+**Testing**: Pest v4 feature tests, factory-backed (Constitution Principle VI), for backend behavior. No `ArchiveFactory`, `ArchiveEntryFactory`, or `TagFactory` currently exist, and none of `Archive`, `ArchiveEntry`, `Tag` use `HasFactory` — these were added as a prerequisite, since there was previously zero test coverage for the Archive feature at all. Frontend/browser-interaction behavior is verified manually per quickstart.md — Pest's browser-testing plugin was evaluated but its interaction methods proved incompatible with this environment (see tasks.md Notes for detail).
 
 **Target Platform**: Web application, served by Laravel Herd locally
 
@@ -35,8 +35,8 @@ Add a single search input to the Archive page that filters the open archive's en
 | Principle | Status | Notes |
 |---|---|---|
 | I. Lint-Enforced Code Style | PASS | New PHP/JS code must pass Pint/ESLint before considered done; no exception needed. |
-| II. Append-Only Migrations | PASS | The `search_vector` generated column and the HNSW index on `embedding` are added via a **new** migration; the original `2026_06_25_082004_create_lore_entries_table.php` is not touched. |
-| III. Comments Justify Only Non-Obvious Decisions | PASS | Default to no comments; the RRF constant (`60`) and the "why native `tsvector` needs raw SQL" points are the only candidates for a one-line comment, since both are genuinely non-obvious from the code alone. |
+| II. Append-Only Migrations | PASS | The full-text index and the HNSW index on `embedding` are added via a **new** migration; the original `2026_06_25_082004_create_lore_entries_table.php` is not touched. |
+| III. Comments Justify Only Non-Obvious Decisions | PASS | Default to no comments; the RRF constant (`60`) is the only candidate for a one-line comment, since it's genuinely non-obvious from the code alone. |
 | IV. Data Isolation by Ownership | PASS | The search endpoint MUST scope through `$request->user()->archives()->findOrFail($id)`, mirroring `show()`/`save()` — never a bare `Archive::find()`. Called out explicitly so it isn't dropped during implementation. |
 | V. Errors Fail Loudly | PASS | No new swallowed exceptions; embedding-provider failures during the semantic query must surface (e.g. as a normal exception response), not be caught and silently ignored — this is distinct from the *client* tolerating a slow/unavailable semantic layer (FR-011), which is a frontend UX concern (show instant results regardless), not a backend error-suppression concern. |
 | VI. Feature-Test-First, Factory-Backed | GATE — see below | Requires adding `HasFactory` + factories for `Archive`, `ArchiveEntry`, `Tag` first, since none exist. This is now a required prerequisite step, not optional cleanup. |
@@ -69,7 +69,7 @@ This is an existing Laravel + React monolith — no new top-level directories.
 
 ```text
 database/migrations/
-└── xxxx_xx_xx_add_search_to_archive_entries_table.php   # NEW: search_vector generated column + GIN index, HNSW index on embedding
+└── xxxx_xx_xx_add_search_to_archive_entries_table.php   # NEW: full-text index (title, content), HNSW index on embedding
 
 database/factories/
 ├── ArchiveFactory.php          # NEW — required prerequisite (Constitution VI)
@@ -82,7 +82,7 @@ app/
 │   ├── ArchiveEntry.php         # MODIFY — add HasFactory
 │   └── Tag.php                  # MODIFY — add HasFactory
 ├── Actions/
-│   └── SearchArchiveEntries.php # NEW — keyword (tsvector) + vector query, RRF merge, mirrors BuildArchiveFile's pattern
+│   └── SearchArchiveEntries.php # NEW — full-text keyword query + vector query, RRF merge, mirrors BuildArchiveFile's pattern
 └── Http/Controllers/Api/
     └── ArchiveController.php    # MODIFY — add search() method, scoped to the authenticated user's archive
 

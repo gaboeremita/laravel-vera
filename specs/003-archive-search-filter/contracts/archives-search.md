@@ -35,7 +35,7 @@ A `q` shorter than 2 characters returns a `422` validation error — the fronten
 
 - `results` is already sorted descending by `score` (post-RRF-merge).
 - Only entries belonging to the requested archive appear.
-- An entry with no `embedding` yet (FR-009) can still appear here via the keyword/`tsvector` leg alone — absence from the vector leg does not exclude it from this endpoint's results, only from semantic-only matches.
+- An entry with no `embedding` yet (FR-009) can still appear here via the full-text keyword leg alone — absence from the vector leg does not exclude it from this endpoint's results, only from semantic-only matches.
 - Empty `q` matches → `{"results": []}`, not an error. The frontend renders its own "no matching entries" state (FR-007) by combining this with the client-side instant layer's own empty result, not by inspecting this response's emptiness in isolation.
 - The response intentionally excludes entry content — the frontend already holds full entry data in state (spec Assumptions), so this keeps the payload minimal.
 
