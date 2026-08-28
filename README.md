@@ -12,7 +12,7 @@ VERA is a general-purpose multi-assistant AI platform. Each assistant has its ow
 - **Frontend:** React 19 (via Vite, React Router)
 - **LLM:** Any OpenAI-compatible API or Anthropic — configured via the Providers UI
 - **Voice input (STT):** whisper.cpp, local, single fixed backend (`.env`-configured)
-- **Voice output (TTS):** Any OpenAI-compatible `/v1/audio/speech` backend — DB-managed via the Voice UI, same pattern as LLM providers. Orpheus and KittenTTS confirmed working.
+- **Voice output (TTS):** DB-managed, fully user-editable via the Voice UI, same pattern as LLM providers. Four formats: self-hosted OpenAI-compatible (Orpheus, KittenTTS confirmed working), OpenAI TTS, Deepgram, ElevenLabs.
 - **Database:** PostgreSQL
 - **Styling:** Tailwind CSS v4
 - **Auth:** Laravel Sanctum (SPA mode)
@@ -151,18 +151,20 @@ The active model is selected per-user via the **SELECT** button in the Providers
 
 ### Voice Providers
 
-TTS is pluggable the same way LLM providers are — but unlike LLM providers, the catalog is **seeded, not user-editable**. There's no add/edit/delete UI for `VoiceProvider`/`VoiceModel` rows; they're populated by `php artisan db:seed --class=VoiceProviderSeeder` (see `database/seeders/VoiceProviderSeeder.php`), which you edit and re-run to add or update entries.
+TTS is pluggable and DB-managed the same way LLM providers are, with the same full add/edit/delete UI. `php artisan db:seed --class=VoiceProviderSeeder` (see `database/seeders/VoiceProviderSeeder.php`) still exists and still runs, but only as a convenience — it pre-populates two ready-to-use self-hosted entries (Orpheus, KittenTTS); it's not the only way to add a provider.
 
 Each provider has:
-- A base URL, format (currently only `openai_compatible` — any backend speaking the OpenAI TTS request shape: `{model, input, voice}` → raw audio), and optional API key
-- An `instructions` field — plain text shown in the Voice UI telling you what to run before selecting this provider (e.g. which local processes need to be started)
+- A base URL, a format, and an optional API key. Four formats are supported: `openai_compatible` (any backend speaking the OpenAI TTS request shape `{model, input, voice}` → raw audio — self-hosted backends like Orpheus/KittenTTS), `openai_tts` (OpenAI's own TTS API, adds a steerable `instructions` field), `deepgram`, and `elevenlabs`
+- An `instructions` field — plain text shown in the Voice UI telling you what to run before selecting this provider (most relevant to self-hosted backends; optional either way)
 - An optional JSON `prompt` — injected into voice-mode conversations while this provider is active (see [Prompt Configuration](#prompt-configuration) below)
 
 Each model has:
-- An `endpoint` (the model identifier sent in requests) and a `voices` list — a hint, not an enforced option set, since the actual valid voices depend on whatever's currently loaded on the backing server
-- An optional JSON `prompt`, same injection mechanism as the provider's, layered on top of it
+- An `endpoint` (the model identifier sent in requests) and a `voices` list you type in yourself — a hint for the picker, not an enforced option set, since the actual valid voices depend on whatever's currently available on the backend
+- Optional config (JSON, e.g. `timeout`) and an optional JSON `prompt`, same injection mechanism as the provider's, layered on top of it. For `openai_tts`, a `tts instructions` key inside this prompt tree also doubles as the base text for that provider's steerable delivery instructions
 
 Selection happens on the **Voice** page (`/assistants/:id/voice`): pick a voice from a model to activate it (SELECT is implicit — choosing a voice for an inactive model activates it in the same action). If no model is selected, `AI_TTS_*` from `.env` is used as a fallback, same pattern as the LLM side.
+
+Known issue: creating a new voice **model** via "+ ADD MODEL" is currently broken (backend bug, tracked separately) — editing and deleting existing models, and full CRUD on providers, work fine.
 
 ### Theming
 
@@ -308,10 +310,11 @@ laravel-vera/
 │   ├── Directors/
 │   │   └── PromptDirector.php                # Reads assistant prompt config, builds system prompt
 │   ├── DTOs/
-│   │   └── LlmResponse.php                   # Unified response: content + thinking
+│   │   ├── LlmResponse.php                   # Unified response: content + thinking
+│   │   └── VoiceModeResult.php               # content + ttsInstructions, from TtsProvider::parseLlmResponse()
 │   ├── Enums/
 │   │   ├── AiProviderFormat.php              # generic | anthropic
-│   │   └── VoiceProviderFormat.php           # openai_compatible → provider class
+│   │   └── VoiceProviderFormat.php           # openai_compatible | openai_tts | deepgram | elevenlabs
 │   ├── Http/Controllers/
 │   │   ├── Auth/
 │   │   │   └── AuthController.php            # Login/logout
@@ -330,8 +333,8 @@ laravel-vera/
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
 │   │       ├── SettingsController.php        # Theme + active LLM/voice model + voice selection + Discord trigger mode
 │   │       ├── VoiceController.php           # Transcribe / synthesize
-│   │       ├── VoiceProviderController.php   # Read-only catalog + prompt-only update
-│   │       └── VoiceModelController.php      # Prompt-only update
+│   │       ├── VoiceProviderController.php   # Full CRUD + prompt-only update
+│   │       └── VoiceModelController.php      # Full CRUD + prompt-only update (store() currently broken)
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions)
@@ -339,8 +342,8 @@ laravel-vera/
 │   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model, voice)
 │   │   ├── AiProvider.php                    # DB-managed LLM provider
 │   │   ├── AiModel.php                       # DB-managed LLM model
-│   │   ├── VoiceProvider.php                 # Seeded TTS provider catalog entry
-│   │   ├── VoiceModel.php                    # Seeded TTS model catalog entry
+│   │   ├── VoiceProvider.php                 # User-managed TTS provider (seeder pre-populates 2 convenience entries)
+│   │   ├── VoiceModel.php                    # User-managed TTS model
 │   │   ├── DiscordServer.php                 # Known Discord server (guild id + name)
 │   │   ├── DiscordChannel.php                # Known Discord channel, belongs to a DiscordServer
 │   │   ├── AssistantDiscordServer.php        # Per-assistant server prompt
@@ -366,7 +369,10 @@ laravel-vera/
 │       │   └── AnthropicProvider.php
 │       ├── TtsProviders/
 │       │   ├── TtsManager.php                # Resolves provider: DB model → config fallback (mirrors LlmManager)
-│       │   └── OpenAiCompatibleTtsProvider.php # Talks to any OpenAI-compatible /v1/audio/speech backend
+│       │   ├── OpenAiCompatibleTtsProvider.php # Self-hosted OpenAI-shaped backends (Orpheus, KittenTTS)
+│       │   ├── OpenAiTtsProvider.php          # OpenAI's TTS API; steerable instructions from [emotion] + prompt
+│       │   ├── DeepgramTtsProvider.php        # Token auth, model in query string
+│       │   └── ElevenLabsTtsProvider.php      # xi-api-key header, voice id in URL path
 │       └── TelegramService.php               # Telegram API wrapper
 ├── config/
 │   └── ai.php                                # Default LLM + embedding + stt + tts (fallback) + telegram + discord config
@@ -407,7 +413,7 @@ laravel-vera/
 │   │   ├── PromptPage.jsx                    # Visual prompt editor
 │   │   ├── SettingsPage.jsx                  # Theme only
 │   │   ├── ProvidersPage.jsx                 # AI provider/model management
-│   │   ├── VoicePage.jsx                     # Read-only voice catalog; select model/voice, edit prompts
+│   │   ├── VoicePage.jsx                     # Voice provider/model management; select model/voice, edit prompts
 │   │   └── DiscordPage.jsx                   # Discord servers/channels; trigger mode + prompt editor per channel
 │   ├── components/
 │   │   ├── common/
@@ -416,8 +422,8 @@ laravel-vera/
 │   │   │   └── Toggle.jsx                    # On/off switch
 │   │   ├── ModelAccordion.jsx                # Model config + select/deselect
 │   │   ├── ProviderAccordion.jsx             # Provider config + nested models
-│   │   ├── VoiceProviderAccordion.jsx        # Read-only provider info + prompt editor
-│   │   ├── VoiceModelAccordion.jsx           # Voice picker (free text + hints) + prompt editor
+│   │   ├── VoiceProviderAccordion.jsx        # Editable provider form + prompt editor
+│   │   ├── VoiceModelAccordion.jsx           # Editable model form + voice picker (free text + hints) + prompt editor
 │   │   ├── DiscordServerAccordion.jsx        # Server prompt editor + nested channel accordions
 │   │   ├── DiscordChannelAccordion.jsx       # Trigger mode select (4 modes) + channel prompt editor
 │   │   ├── AssistantMemoryPromptEditor.jsx   # Prompt-tree editor for per-assistant memory instructions
@@ -442,7 +448,7 @@ laravel-vera/
 │   │   ├── usePromptTree.js                  # Generic prompt tree editing state (reused by voice + Discord prompts)
 │   │   ├── useProviders.js                   # Provider/model CRUD + active model state
 │   │   ├── useConversationMemory.js          # Memory show/save/summarize/unlock, polls while summarizing
-│   │   ├── useVoiceProviders.js              # Read-only catalog + model/voice selection
+│   │   ├── useVoiceProviders.js              # Provider/model CRUD + model/voice selection
 │   │   ├── useDiscordSettings.js             # Discovery data + immediate-save trigger mode changes
 │   │   ├── useToast.js                       # Toast notification state
 │   │   └── useVoiceMode.js                   # Mic capture + voice activity detection
