@@ -31,4 +31,4 @@
 
 ## Notes
 
-- All items pass. No [NEEDS CLARIFICATION] markers were needed — every ambiguity in the request had a reasonable default derivable from the existing Archive page architecture (single-archive view, entries loaded together, tags vs. keywords as distinct existing fields), and defaults are recorded in the Assumptions section of spec.md.
+- All items pass. No [NEEDS CLARIFICATION] markers remain — the feature was clarified in two rounds: scale (small, client-side-sufficient), then search approach (hybrid instant + semantic matching, replacing the originally-planned standalone tag/keyword filter controls). Both rounds are logged in spec.md's Clarifications section, and decisions are reflected in Assumptions.

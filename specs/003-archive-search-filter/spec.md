@@ -1,4 +1,4 @@
-# Feature Specification: Archive Entry Search & Filter
+# Feature Specification: Archive Entry Hybrid Search
 
 **Feature Branch**: `003-archive-search-filter`
 
@@ -8,110 +8,98 @@
 
 **Input**: User description: "A new implementation, in the Archive page, a comprehensive search and filter inputs, we might filter by tags and keywords, and search might filter by title and content of the entries in realtime"
 
+A follow-up technical brief refined this into a hybrid search approach (instant text matching plus semantic matching, merged) and dropped the standalone tag/keyword filter controls in favor of a single search input. That brief is preserved in full at [technical-brief.md](technical-brief.md) for reference during planning.
+
 ## Clarifications
 
 ### Session 2026-08-28
 
 - Q: What's the typical or maximum number of entries you'd expect in a single archive that this search/filter feature needs to handle well? → A: Small — typically under 100 entries per archive; client-side filtering stays sufficient. Large, RAG-backed archives (potentially thousands of entries) are a future consideration, out of scope for this feature.
+- Q: Should this feature's search match literal text (case-insensitive substring on title/content) or use semantic/embedding-based matching against the archive entry's existing `embedding` column? → A: Both — hybrid search. Instant client-side matching (title, content, tags, keywords) runs on every keystroke; a debounced server-side semantic match, using the existing embedding infrastructure, adds conceptually related entries a short pause after typing stops. Results are merged and deduplicated, with entries found only via semantic match visually indicated.
+- Q: Should the dedicated tag/keyword filter controls (select a tag or keyword from a list to narrow results) still ship alongside this hybrid search box, or does the hybrid search box replace them entirely? → A: Replace. Dedicated tag/keyword selection controls are dropped; tags and keywords are searchable text matched by the search box, not a separate browsable filter.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Real-time text search across entries (Priority: P1)
+### User Story 1 - Instant search across entries (Priority: P1)
 
-A user viewing an archive with many entries wants to quickly find a specific entry without scrolling through the whole list. They type into a search field, and the visible entries narrow down to matches as they type — no button to press, no page reload.
+A user viewing an archive with many entries wants to quickly find a specific entry without scrolling through the whole list. They type into a search field, and matching entries appear immediately as they type — no button to press, no page reload, no waiting.
 
-**Why this priority**: This is the core capability requested and delivers value on its own: locating a known entry by name or by something it mentions, in a long archive, is the primary pain point being solved.
+**Why this priority**: This is the core capability requested and delivers value entirely on its own: locating a known entry by something in its title, content, tags, or keywords, in a long archive, is the primary pain point being solved, and it must feel instantaneous.
 
-**Independent Test**: Open an archive containing several entries with distinct titles and content. Type a word that appears in only one entry's title, and confirm only that entry remains visible. Type a word that appears only in another entry's content, and confirm that entry appears instead.
+**Independent Test**: Open an archive containing several entries with distinct titles, content, tags, and keywords. Type a word that appears in only one entry's title, and confirm only that entry remains visible immediately. Type a word that appears only in another entry's content, tags, or keywords, and confirm that entry appears instead, still immediately.
 
 **Acceptance Scenarios**:
 
-1. **Given** an archive with multiple entries, **When** the user types a word that matches part of one entry's title, **Then** only that entry is shown.
-2. **Given** an archive with multiple entries, **When** the user types a word that matches part of one entry's content but not its title, **Then** that entry is still shown.
-3. **Given** a search term is entered, **When** the user removes characters or clears the field, **Then** the entry list updates immediately to reflect the shorter or empty query, eventually restoring the full list when cleared.
-4. **Given** a search term matches no entry's title or content, **When** the results update, **Then** the user sees a clear "no matching entries" message instead of an empty, unexplained list.
+1. **Given** an archive with multiple entries, **When** the user types a word that matches part of one entry's title, **Then** only that entry is shown, with no perceptible delay.
+2. **Given** an archive with multiple entries, **When** the user types a word that matches an entry's content, tags, or keywords but not its title, **Then** that entry is still shown immediately.
+3. **Given** a search term is entered, **When** the user removes characters or clears the field, **Then** the entry list updates immediately to reflect the shorter or empty query, restoring the full list once cleared.
+4. **Given** a search term matches no entry, **When** results are shown, **Then** the user sees a clear "no matching entries" message instead of an empty, unexplained list.
 5. **Given** the user is typing, **When** each character is entered, **Then** the visible entry list updates without requiring the user to submit the search or reload the page.
 
 ---
 
-### User Story 2 - Filter entries by tag (Priority: P2)
+### User Story 2 - Conceptually related results via semantic search (Priority: P2)
 
-A user wants to see only the entries that belong to one or more tags they care about, without needing to remember or type exact wording.
+A user searches using a word or phrase that describes what an entry is *about*, even if that entry's title, content, tags, and keywords don't literally contain those words. After a brief pause in typing, entries that are conceptually related also appear, blended in with the instant text matches.
 
-**Why this priority**: Tags are an existing, structured way entries are already organized; filtering by them is high value and builds directly on data that already exists, but is secondary to free-text search for day-to-day lookup.
+**Why this priority**: This extends recall beyond exact wording, which matters for a personal archive where the user may not remember the exact phrasing they used when writing an entry. It builds on User Story 1 and is not usable without it, so it is secondary.
 
-**Independent Test**: Open an archive whose entries have a mix of tags. Select one tag from the filter control and confirm only entries carrying that tag remain visible. Select a second tag and confirm entries carrying either selected tag are shown.
-
-**Acceptance Scenarios**:
-
-1. **Given** an archive with tagged entries, **When** the user selects a single tag to filter by, **Then** only entries carrying that tag are shown.
-2. **Given** a tag filter is active, **When** the user selects an additional tag, **Then** entries carrying either selected tag are shown.
-3. **Given** a tag filter is active, **When** the user deselects all tags, **Then** the tag filter no longer restricts the list.
-4. **Given** an entry has no tags, **When** any tag filter is active, **Then** that entry is excluded from the filtered results.
-
----
-
-### User Story 3 - Filter entries by keyword (Priority: P3)
-
-A user wants to narrow the entry list using the free-form keywords already recorded on each entry, independently of tags.
-
-**Why this priority**: Keywords are a secondary, less structured classification than tags and are lower priority, but completing this facet delivers the "comprehensive" filtering the request calls for.
-
-**Independent Test**: Open an archive whose entries have keywords recorded. Select one keyword from the filter control and confirm only entries carrying that keyword remain visible.
+**Independent Test**: Open an archive with entries that have had time to generate their semantic representation. Search using a term that is thematically related to one entry but does not appear literally in that entry's title, content, tags, or keywords. Confirm that entry appears in the results a short pause after typing stops, and confirm it's visually distinguishable from entries matched by literal text.
 
 **Acceptance Scenarios**:
 
-1. **Given** an archive with entries that have keywords recorded, **When** the user selects a keyword to filter by, **Then** only entries carrying that keyword are shown.
-2. **Given** both a tag filter and a keyword filter are active, **When** results are shown, **Then** only entries satisfying both the tag filter and the keyword filter are visible.
-3. **Given** a text search, a tag filter, and a keyword filter are all active at once, **When** results are shown, **Then** only entries matching the search text and satisfying both filters are visible.
-4. **Given** a keyword filter is active, **When** the user deselects all keywords, **Then** the keyword filter no longer restricts the list.
+1. **Given** an entry whose title, content, tags, and keywords do not contain the search term but are conceptually related to it, **When** the user pauses after typing, **Then** that entry appears in the results, marked as a semantic match.
+2. **Given** an entry that matches both by literal text and by semantic relevance, **When** results are shown, **Then** the entry appears once, not duplicated, and ranks at or near the top.
+3. **Given** the user is actively typing, **When** each character is entered, **Then** semantic matching does not fire on every keystroke — only after the user pauses.
+4. **Given** a semantic match arrives after the instant text matches were already shown, **When** it is added, **Then** the previously visible instant matches remain visible and are not replaced or hidden.
 
 ---
 
 ### Edge Cases
 
-- What happens when the search term or selected tag/keyword matches zero entries? The system shows an explicit empty-results message distinct from an archive that has no entries at all.
-- What happens when an entry has an empty or very short title but long content that matches the search term? The entry must still surface via content matching.
-- What happens when the user searches using a partial word or with different letter casing than the stored text? Matches are found regardless of case, and on partial-word substrings.
-- What happens when no tags or keywords exist yet on any entry in the archive? The tag/keyword filter controls show no selectable options, or are hidden, rather than erroring.
-- What happens when the user clears the search box and all filters simultaneously? The full, unfiltered entry list is restored.
-- What happens when the same word is entered in the search box and also happens to be a tag or keyword? Text search and facet filters operate independently and both apply their own logic to the combined result.
+- What happens when the search term matches no entry, by text or by meaning? The system shows an explicit empty-results message distinct from an archive that has no entries at all.
+- What happens when the query is very short (e.g. a single character)? Instant text matching still applies; semantic matching does not fire until the query reaches a minimum meaningful length.
+- What happens when an entry was just created or edited and hasn't yet had its semantic representation generated? It remains findable via instant text matching, and simply doesn't yet appear via semantic matching until that representation is ready.
+- What happens when the user searches using different letter casing than the stored text? Instant text matching is case-insensitive.
+- What happens when the user clears the search box? The full, unfiltered entry list is restored and any in-progress or prior semantic results are discarded.
+- What happens if the semantic-matching capability is slow or temporarily unavailable? Instant text-match results still appear without delay; the user is not blocked or shown an error for the instant part of the experience.
+- What happens when the same entry is matched by both instant text matching and semantic matching? It is shown once, deduplicated, ranked at or above single-criterion matches.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The Archive page MUST provide a text search input that filters the currently displayed archive's entries as the user types, with no separate submit action required.
-- **FR-002**: The text search MUST match against both an entry's title and its content, case-insensitively, on partial (substring) matches.
-- **FR-003**: The Archive page MUST provide a way to filter entries by one or more tags already assigned to entries in that archive.
-- **FR-004**: The Archive page MUST provide a way to filter entries by one or more keywords already recorded on entries in that archive.
-- **FR-005**: When multiple tags are selected, an entry MUST be shown if it carries at least one of the selected tags (results expand within the tag facet).
-- **FR-006**: When multiple keywords are selected, an entry MUST be shown if it carries at least one of the selected keywords (results expand within the keyword facet).
-- **FR-007**: When text search, tag filter, and keyword filter are combined, an entry MUST be shown only if it satisfies all three that are currently active (results narrow across facets).
-- **FR-008**: The system MUST present a clear indication when no entries match the current search and/or filter combination, distinguishable from an archive containing no entries.
-- **FR-009**: The system MUST allow the user to clear the search text and/or any selected tag/keyword filters and return to viewing all of the archive's entries.
-- **FR-010**: The list of selectable tags and keywords offered in the filter controls MUST reflect only tags and keywords actually present on entries within the currently viewed archive.
-- **FR-011**: Search and filtering MUST operate only on the entries of the archive currently open, not across other archives.
+- **FR-001**: The Archive page MUST provide a single search input that filters the currently displayed archive's entries, with no separate submit action required.
+- **FR-002**: As the user types, the system MUST instantly show entries whose title, content, tags, or keywords contain the typed text, case-insensitively, with no network round-trip required for this instant layer.
+- **FR-003**: After a brief pause in typing, the system MUST additionally surface entries that are conceptually related to the search text, even when they share no literal matching words.
+- **FR-004**: Semantic matching MUST NOT fire on every keystroke; it MUST wait for the query to reach a minimum meaningful length and for typing to pause briefly.
+- **FR-005**: Instant text matches and semantic matches MUST be merged into a single result list, with each matching entry shown only once, ranked so entries matching by both criteria surface above entries matching by only one.
+- **FR-006**: Entries found only via semantic matching (not via literal text) MUST be visually distinguishable from entries found via literal text, so the user can tell why an entry appeared.
+- **FR-007**: The system MUST present a clear indication when no entries match the current search, distinguishable from an archive containing no entries.
+- **FR-008**: The system MUST allow the user to clear the search and return to viewing all of the archive's entries, discarding any in-flight or previously merged semantic results.
+- **FR-009**: An entry that does not yet have a semantic representation (e.g., newly created or recently edited) MUST remain findable via instant text matching, even though it is not yet eligible to be found via semantic matching.
+- **FR-010**: Search MUST operate only on the entries of the archive currently open, not across other archives.
+- **FR-011**: If semantic matching is slow or temporarily unavailable, instant text-match results MUST still display without delay or failure.
 
 ### Key Entities
 
-- **Archive Entry**: A single record within an archive, identified by a title and free-text content; may carry zero or more tags and zero or more keywords. Search and filtering act on these entries.
-- **Tag**: A reusable label a user can assign to one or more entries, used as a filter facet.
-- **Keyword**: A free-form term recorded directly on an entry, used as a separate filter facet from tags.
+- **Archive Entry**: A single record within an archive, identified by a title and free-text content; may carry zero or more tags and zero or more keywords. All of title, content, tags, and keywords are searchable text for both the instant and semantic matching layers. Tags and keywords are no longer exposed as standalone, selectable filter controls in this feature.
+- **Tag**: A reusable label a user can assign to one or more entries; contributes to search matching only.
+- **Keyword**: A free-form term recorded directly on an entry; contributes to search matching only.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: A user can locate a specific known entry within an archive of 50+ entries in under 10 seconds using search and/or filters.
-- **SC-002**: The visible entry list reflects the latest search text or filter selection with no perceptible delay, so the interaction feels instantaneous while typing or selecting.
-- **SC-003**: Filtering by a given tag or keyword shows every entry carrying it and no entry that doesn't, with zero missed or incorrect matches.
-- **SC-004**: Users can combine text search with tag and keyword filters in a single, uninterrupted interaction, without needing to apply or confirm each filter separately.
+- **SC-001**: A user can locate a specific known entry within an archive of 50+ entries in under 10 seconds using search.
+- **SC-002**: Instant text-match results appear with no perceptible delay as the user types; semantically related results are added within roughly half a second of the user pausing.
+- **SC-003**: A search using words that describe an entry's topic but don't literally appear in it still surfaces that entry via semantic matching, at a success rate comparable to literal-text searches for entries with matching wording.
+- **SC-004**: Users see a single, deduplicated, ranked result list regardless of whether an entry matched by text, by meaning, or by both, with zero visible duplicate entries.
 
 ## Assumptions
 
-- Search and filtering apply within the currently open archive's entries only, matching the existing page structure where one archive's entries are viewed at a time.
-- Filtering happens against the entries already loaded for the open archive, consistent with the current architecture where an archive's entries load together rather than in pages.
-- Multiple selections within the same filter facet (e.g., two tags) combine as "matches any"; the search text and the two filter facets combine with each other as "matches all" (an entry must satisfy every active criterion).
-- This feature targets archives of up to roughly 100 entries, consistent with the current single-request, unpaginated architecture; client-side filtering is sufficient and no new backend search endpoints are required at this scale.
-- Large, RAG-backed archives (potentially thousands of entries) are anticipated for a future iteration but are explicitly out of scope here; this feature's client-side approach is not required to scale to that case.
+- Archives are assumed to be small-to-medium scale (up to roughly 100 entries) for this iteration; the hybrid approach is designed to perform well at this scale.
+- This feature requires a new backend search capability that returns ranked, deduplicated entry matches; semantic matching cannot run purely client-side the way the instant text layer does.
+- This feature depends on the archive entry's existing semantic representation (embedding) and a working similarity-search capability at the data layer; that capability is referenced by existing chat-retrieval code but is not currently installed/functional, so enabling it here also unblocks that existing feature.
+- Entries without a populated semantic representation remain findable through instant text matching only, until that representation is generated asynchronously in the background.
+- Dedicated tag/keyword selection controls are out of scope for this feature; tags and keywords contribute to search matching but are not separately browsable or filterable via their own UI control.
