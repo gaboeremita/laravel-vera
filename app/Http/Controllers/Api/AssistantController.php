@@ -80,6 +80,7 @@ class AssistantController extends Controller
             'opening_message' => $assistant->opening_message,
             'prompt' => $assistant->prompt,
             'archive_id' => $assistant->archive_id,
+            'mode' => $assistant->mode,
             'emotions' => $emotions,
             'restricted_emotions' => $restrictedEmotions,
         ]);
