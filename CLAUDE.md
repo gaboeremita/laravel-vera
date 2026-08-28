@@ -182,12 +182,15 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - Default to zero comments. Only comment when the WHY is non-obvious (a hidden constraint, workaround, or gotcha).
 - Never write comments that narrate WHAT the code does — if the code needs that, the names are wrong.
-- Never write decision journals, design rationale essays, or development-context narration inline. That belongs in commit messages or PR descriptions.
+- Never write decision journals, design rationale essays, or development-context narration inline. That belongs in commit messages or PR descriptions — and even there, follow the rules below, not free-form narration.
 - Comments above code, never on the side.
 
-## Written Communication (commit messages, PRs, issues)
+## Written Communication (commit messages, PRs, issues, and ALL spec-kit docs)
 
-- No journal comments: don't narrate the path you took to get somewhere ("X, not Y", "instead of doing A we did B") when the reader has no context for A or Y. A reader who never saw the abandoned approach just sees a random, unexplained contrast — it reads as confused or self-congratulatory, not informative.
+This applies everywhere text is written for someone (including future-you) to read later — commit messages, PR descriptions, issue text, and every spec-kit artifact (spec.md, plan.md, research.md, data-model.md, tasks.md, quickstart.md, contracts/). There is no exception for "research.md has an Alternatives-considered section, so narration belongs there" — it doesn't.
+
+- No journal comments: don't narrate the path you took to get somewhere ("X, not Y", "instead of doing A we did B", "an earlier version of this did X, which was rejected") when the reader has no context for A or Y. A reader who never saw the abandoned approach just sees a random, unexplained contrast — it reads as confused or self-congratulatory, not informative.
 - State the current fact plainly. If something used to work a different way and this change fixes/replaces it, say that explicitly as a fix ("fixes X", "was previously Y, now Z because—"), not as a bare "not Y" aside dropped with no setup.
 - Don't justify implementation details that no reader asked about (e.g. why a file lives in one directory over another) unless it's the actual point of the change.
-- This is the same rule as the "not just X" / "X not Y" filler rule above, applied specifically to commit messages, PR descriptions, and issue text.
+- "Alternatives considered" sections in spec-kit docs mean genuine upfront design tradeoffs weighed before committing to an approach — not a record of what got tried, argued about, or reverted during the conversation that produced the document. If a decision was corrected mid-conversation, the document should read as though that was always the decision.
+- This is the same rule as the "not just X" / "X not Y" filler rule above — it is not scoped to commit messages, it is scoped to every piece of writing meant to outlive this conversation.
