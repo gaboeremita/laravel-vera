@@ -221,6 +221,8 @@ The display logic should work like this:
 - Entries without embeddings (newly created, queue not yet processed) → should still appear in keyword results, just not vector results.
 - Archive with zero entries → search input should still render, show "no entries" state.
 
-## Known Prerequisite Gap
+## Correction: pgvector Is Already Installed and Functional
 
-The pgvector Postgres extension and its `whereVectorSimilarTo()` scope are referenced by existing code (`RetrievalService`, `PromptDirector`) but are not currently installed or defined anywhere in this codebase — those call sites would throw at runtime today. Wiring up pgvector for this feature also fixes that pre-existing gap in chat retrieval.
+An earlier research pass in this session incorrectly concluded that pgvector and `whereVectorSimilarTo()` were unimplemented. That was wrong. Laravel 13 ships native vector/AI search support in the framework itself (`Blueprint::vector()` and `Query\Builder::whereVectorSimilarTo()` are real methods in `vendor/laravel/framework`, not custom macros), and the live `vera` Postgres database already has the `vector` extension installed with `archive_entries.embedding` as a genuine `vector(768)` column. The existing calls in `RetrievalService` and `PromptDirector` work as written — there is no prerequisite gap to fix here.
+
+What's still genuinely missing for this feature: an HNSW index on `embedding` (there is none yet, so a similarity query is currently a sequential scan — fine at the confirmed small scale, but worth adding via `->index()` on the vector column in the new migration for headroom) and the tsvector full-text column described below (no equivalent exists yet).

@@ -80,6 +80,7 @@ A user searches using a word or phrase that describes what an entry is *about*, 
 - **FR-009**: An entry that does not yet have a semantic representation (e.g., newly created or recently edited) MUST remain findable via instant text matching, even though it is not yet eligible to be found via semantic matching.
 - **FR-010**: Search MUST operate only on the entries of the archive currently open, not across other archives.
 - **FR-011**: If semantic matching is slow or temporarily unavailable, instant text-match results MUST still display without delay or failure.
+- **FR-012**: Project documentation that describes the Archive page's capabilities (README.md, ARCHITECTURE.md) MUST be updated to reflect the hybrid search behavior once implemented, so these documents do not go stale relative to the shipped feature.
 
 ### Key Entities
 
@@ -100,6 +101,7 @@ A user searches using a word or phrase that describes what an entry is *about*, 
 
 - Archives are assumed to be small-to-medium scale (up to roughly 100 entries) for this iteration; the hybrid approach is designed to perform well at this scale.
 - This feature requires a new backend search capability that returns ranked, deduplicated entry matches; semantic matching cannot run purely client-side the way the instant text layer does.
-- This feature depends on the archive entry's existing semantic representation (embedding) and a working similarity-search capability at the data layer; that capability is referenced by existing chat-retrieval code but is not currently installed/functional, so enabling it here also unblocks that existing feature.
+- This feature depends on the archive entry's existing semantic representation (embedding) and the similarity-search capability already used by existing chat-retrieval code; both are already installed and functional in this codebase.
 - Entries without a populated semantic representation remain findable through instant text matching only, until that representation is generated asynchronously in the background.
 - Dedicated tag/keyword selection controls are out of scope for this feature; tags and keywords contribute to search matching but are not separately browsable or filterable via their own UI control.
+- README.md and ARCHITECTURE.md already document the Archive feature in several places that this change affects: the API route list, the `ArchiveController` and `ArchivePage` descriptions, the project structure trees, and README's top-level feature list. These are the locations expected to need updates; a task for this documentation update should be included in `tasks.md`.
