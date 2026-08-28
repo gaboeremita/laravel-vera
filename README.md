@@ -1,6 +1,6 @@
 # VERA
 
-A multi-assistant AI platform with a dynamic visual expression system, built on Laravel, React, and a pluggable LLM backend.
+Multi-assistant AI platform with RAG-driven context, agentic capabilities, tool calling, pluggable LLM providers, voice I/O, image generation, external integration (Discord and Telegram), long term memory and themeable interfaces. Built with Laravel and React.
 
 ## Overview
 
