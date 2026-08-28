@@ -2,6 +2,7 @@
 
 use App\Models\AiModel;
 use App\Models\AiProvider;
+use App\Models\Archive;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
@@ -94,6 +95,20 @@ function setUpAgentAssistant(string $mode = 'agent'): array
     ]);
 
     return [$user, $assistant, $conversation];
+}
+
+function setUpAssistantWithArchive(): array
+{
+    $user = User::factory()->create();
+    $archive = Archive::factory()->create(['user_id' => $user->id]);
+    $assistant = Assistant::factory()->create(['archive_id' => $archive->id]);
+
+    AssistantUser::factory()->create([
+        'user_id' => $user->id,
+        'assistant_id' => $assistant->id,
+    ]);
+
+    return [$user, $assistant, $archive];
 }
 
 function finalAnswerResponse(string $content): array

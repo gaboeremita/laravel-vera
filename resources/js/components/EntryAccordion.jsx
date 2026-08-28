@@ -1,6 +1,7 @@
+import { Sparkles } from 'lucide-react';
 import Accordion from './common/Accordion.jsx';
 
-export default function EntryAccordion({ entry, index, onUpdate, onDelete }) {
+export default function EntryAccordion({ entry, index, isSemanticMatch, onUpdate, onDelete }) {
 	return (
 		<Accordion
 			label={`ENTRY ${index + 1}`}
@@ -8,6 +9,9 @@ export default function EntryAccordion({ entry, index, onUpdate, onDelete }) {
 			collapsed={entry.collapsed}
 			onToggle={() => onUpdate('collapsed', !entry.collapsed)}
 			onDelete={onDelete}
+			badge={isSemanticMatch && (
+				<Sparkles className="w-3.5 h-3.5 text-accent" aria-label="Semantic match" />
+			)}
 		>
 			{/* Title */}
 			<div>
