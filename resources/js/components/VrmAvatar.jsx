@@ -11,7 +11,7 @@ function VrmScene({ vrmUrl, emotion, onLoaded, onError }) {
 	const { scene } = useThree();
 	const vrmRef = useRef(null);
 	const currentWeightsRef = useRef({});
-	const blinkRef = useRef({ phase: 'waiting', phaseElapsed: 0, threshold: 2 + Math.random() * 4 });
+	const blinkRef = useRef({ phase: 'waiting', phaseElapsed: 0, threshold: 3 });
 	const elapsedRef = useRef(0);
 
 	useEffect(() => {
