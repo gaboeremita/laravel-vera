@@ -120,6 +120,19 @@ AI_TTS_FORMAT=openai_compatible
 AI_TTS_VOICE=tara
 AI_TTS_TIMEOUT=120
 
+# Image generation fallback (optional — only used if no image-gen model is selected in the UI)
+IMAGE_GEN_URL=https://openrouter.ai/api/v1/images
+IMAGE_GEN_API_KEY=
+IMAGE_GEN_MODEL=bytedance-seed/seedream-4.5
+IMAGE_GEN_FORMAT=openrouter        # openrouter | openai_compatible
+IMAGE_GEN_TIMEOUT=120
+
+# Agent mode (optional — tune tool-calling behavior for agent-mode assistants)
+AGENT_STEP_LIMIT=10
+AGENT_TOOL_TIMEOUT=60
+AGENT_TOOL_RETRY_ATTEMPTS=3
+AGENT_PROGRESS_CACHE_TTL=10
+
 # Telegram (optional)
 TELEGRAM_URL=https://api.telegram.org
 TELEGRAM_BOT_TOKEN=
@@ -162,6 +175,38 @@ Each model has:
 - An optional JSON `prompt`, same injection mechanism as the provider's, layered on top of it
 
 Selection happens on the **Voice** page (`/assistants/:id/voice`): pick a voice from a model to activate it (SELECT is implicit — choosing a voice for an inactive model activates it in the same action). If no model is selected, `AI_TTS_*` from `.env` is used as a fallback, same pattern as the LLM side.
+
+### Image Generation Providers
+
+Image generation is pluggable and user-editable, the same way LLM providers are (unlike voice, it's not seeder-managed). Providers and models are managed through the **Image Gen Providers** page in the UI (`/assistants/:id/image-gen-providers`). Each provider has:
+
+- A base URL and a format (`openrouter` or `openai_compatible`)
+- An API key (encrypted at rest)
+- Optional per-provider prompt instructions and a config schema
+
+Each model has:
+- An endpoint/model identifier (e.g. `bytedance-seed/seedream-4.5`)
+- Optional config (JSON, e.g. `timeout`) and prompt override
+
+The active model is selected per-user via the **SELECT** button in the Image Gen Providers UI. If no model is selected, the fallback config from `.env` (`IMAGE_GEN_*`) is used.
+
+Two ways to generate an image:
+- **Manual** — type `/create-image <description>` in any chat; the assistant enhances the prompt, generates the image, and replies in character about it.
+- **Agent tool** — an agent-mode assistant can call the `generate_image` tool on its own mid-conversation when asked to draw or show something. See [Agent Mode](#agent-mode) below.
+
+Both share the same enhancement/generation pipeline — see [ARCHITECTURE.md → Agent Mode & Image Generation](./ARCHITECTURE.md#agent-mode--image-generation) for the full flow.
+
+### Agent Mode
+
+Each assistant has a `mode`: **assistant** (default — a single reply per turn, no tools) or **agent** (the assistant can call tools across multiple steps before replying). Set on the assistant's edit page.
+
+Agent mode requires an explicitly selected LLM model that supports tool-calling — sending a message to an agent-mode assistant without one returns an error. Built-in tools:
+
+- `get_current_datetime` — current date/time
+- `basic_calculator` — arithmetic expressions
+- `generate_image` — generates and shows an image (shares the pipeline described above)
+
+Step limit, tool timeout, and retry behavior are configured via the `AGENT_*` env vars above, with an optional per-assistant `step_limit` override in `agent_config`. While an agent-mode turn is in progress, the chat UI shows the loop's current status (e.g. "Calling tool: generate_image"), polled from the backend. See [ARCHITECTURE.md → Agent Mode & Image Generation](./ARCHITECTURE.md#agent-mode--image-generation) for the full loop mechanics, timeout enforcement (requires the `pcntl` PHP extension), and known limitations.
 
 ### Theming
 
@@ -287,41 +332,51 @@ laravel-vera/
 │   │   ├── SyncEmotions.php                  # Seeds/syncs emotion records from config
 │   │   └── TelegramPollCommand.php           # Long-polls Telegram for incoming messages
 │   ├── Contracts/
+│   │   ├── AgentTool.php                     # Interface for agent-mode tools (name/description/parameters/handle)
 │   │   ├── LlmProvider.php                   # LLM interface (chat method)
 │   │   ├── SttProvider.php                   # STT interface (transcribe)
 │   │   └── TtsProvider.php                   # TTS interface (synthesize + fromModel)
 │   ├── Directors/
 │   │   └── PromptDirector.php                # Reads assistant prompt config, builds system prompt
 │   ├── DTOs/
-│   │   └── LlmResponse.php                   # Unified response: content + thinking
+│   │   ├── AgentRunResult.php                # Agent loop result: content + tool call summary
+│   │   ├── LlmResponse.php                   # Unified response: content + thinking
+│   │   └── ToolCallRequest.php               # Parsed LLM tool-call request: id/name/arguments
 │   ├── Enums/
 │   │   ├── AiProviderFormat.php              # generic | anthropic
+│   │   ├── AssistantMode.php                 # assistant | agent
+│   │   ├── ImageGenProviderFormat.php        # openrouter | openai_compatible
 │   │   └── VoiceProviderFormat.php           # openai_compatible → provider class
 │   ├── Http/Controllers/
 │   │   ├── Auth/
 │   │   │   └── AuthController.php            # Login/logout
 │   │   ├── VadAssetController.php            # Serves VAD's .mjs files with correct MIME type
 │   │   └── Api/
+│   │       ├── AgentProgressController.php   # Reads cached agent-loop status for the in-progress-turn indicator
 │   │       ├── AiProviderController.php      # CRUD for AI providers
 │   │       ├── AiModelController.php         # CRUD for AI models
 │   │       ├── ArchiveController.php         # Archive read/save (with async embedding)
-│   │       ├── AssistantController.php       # CRUD for assistants (multipart, emotion images)
+│   │       ├── AssistantController.php       # CRUD for assistants (multipart, emotion images, mode)
 │   │       ├── AssistantEmotionController.php# Per-assistant emotion store/update/destroy
 │   │       ├── AssistantPromptController.php # Prompt CRUD (show/store/update/destroy)
-│   │       ├── ConversationController.php    # CRUD + message sending (voice_mode flag, voice prompt injection, sendDiscordMessage)
+│   │       ├── ConversationController.php    # CRUD + message sending (voice_mode flag, /create-image, agent-mode dispatch, sendDiscordMessage)
 │   │       ├── DiscordController.php         # Discovery proxy (syncs discord_servers/channels) + server/channel prompt updates
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
-│   │       ├── SettingsController.php        # Theme + active LLM/voice model + voice selection + Discord trigger mode
+│   │       ├── ImageGenProviderController.php# CRUD for image-gen providers
+│   │       ├── ImageGenModelController.php   # CRUD for image-gen models
+│   │       ├── SettingsController.php        # Theme + active LLM/voice/image-gen model + voice selection + Discord trigger mode
 │   │       ├── VoiceController.php           # Transcribe / synthesize
 │   │       ├── VoiceProviderController.php   # Read-only catalog + prompt-only update
 │   │       └── VoiceModelController.php      # Prompt-only update
 │   ├── Models/
 │   │   ├── User.php
-│   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions)
+│   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions, mode, agent_config)
 │   │   ├── AssistantUser.php                 # Pivot: user ↔ assistant
-│   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model, voice)
+│   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model, voice, image-gen model)
 │   │   ├── AiProvider.php                    # DB-managed LLM provider
 │   │   ├── AiModel.php                       # DB-managed LLM model
+│   │   ├── ImageGenProvider.php               # User-managed image-gen provider
+│   │   ├── ImageGenModel.php                  # User-managed image-gen model
 │   │   ├── VoiceProvider.php                 # Seeded TTS provider catalog entry
 │   │   ├── VoiceModel.php                    # Seeded TTS model catalog entry
 │   │   ├── DiscordServer.php                 # Known Discord server (guild id + name)
@@ -342,6 +397,18 @@ laravel-vera/
 │   │   ├── AppServiceProvider.php            # Binds EmbeddingProvider, SttProvider
 │   │   └── Stt/WhisperSttProvider.php        # Talks to whisper-server
 │   └── Services/
+│       ├── AgentLoop/
+│       │   ├── AgentLoopRunner.php           # Tool-calling loop: chat → tool_calls → execute → repeat until final/step_limit
+│       │   └── Tools/
+│       │       ├── BasicCalculatorTool.php   # basic_calculator tool
+│       │       ├── GetCurrentDatetimeTool.php# get_current_datetime tool
+│       │       └── ImageGenerationTool.php   # generate_image tool
+│       ├── ImageGenProviders/
+│       │   ├── ImageGenManager.php           # Resolves provider: DB model → config fallback (mirrors LlmManager)
+│       │   ├── ImageGenerationService.php    # Shared generate() used by /create-image and the agent tool
+│       │   ├── ImageGenPromptEnhancer.php    # LLM rewrites the raw prompt using persona/RAG/history
+│       │   ├── OpenRouterImageGenProvider.php
+│       │   └── OpenAiCompatibleImageGenProvider.php
 │       ├── LlmProviders/
 │       │   ├── LlmManager.php                # Resolves provider: DB model → config fallback
 │       │   ├── GenericProvider.php           # OpenAI-compatible API
@@ -351,7 +418,10 @@ laravel-vera/
 │       │   └── OpenAiCompatibleTtsProvider.php # Talks to any OpenAI-compatible /v1/audio/speech backend
 │       └── TelegramService.php               # Telegram API wrapper
 ├── config/
-│   └── ai.php                                # Default LLM + embedding + stt + tts (fallback) + telegram + discord config
+│   ├── agent.php                             # Step limit, tool timeout, retry attempts, progress cache TTL
+│   └── ai.php                                # Default LLM + embedding + stt + tts + image_gen (fallback) + telegram + discord config
+├── .specify/                                 # Spec Kit (SDD) install: constitution, templates, extensions
+├── specs/                                    # Per-feature spec/plan/tasks artifacts (spec-driven features)
 ├── database/
 │   ├── migrations/
 │   │   ├── create_conversations_table.php
@@ -388,6 +458,7 @@ laravel-vera/
 │   │   ├── PromptPage.jsx                    # Visual prompt editor
 │   │   ├── SettingsPage.jsx                  # Theme only
 │   │   ├── ProvidersPage.jsx                 # AI provider/model management
+│   │   ├── ImageGenProvidersPage.jsx          # Image-gen provider/model management (same pattern as ProvidersPage)
 │   │   ├── VoicePage.jsx                     # Read-only voice catalog; select model/voice, edit prompts
 │   │   └── DiscordPage.jsx                   # Discord servers/channels; trigger mode + prompt editor per channel
 │   ├── components/
@@ -396,6 +467,9 @@ laravel-vera/
 │   │   │   └── ConfirmationModal.jsx         # Confirmation modal
 │   │   ├── ModelAccordion.jsx                # Model config + select/deselect
 │   │   ├── ProviderAccordion.jsx             # Provider config + nested models
+│   │   ├── ImageGenProviderAccordion.jsx     # Image-gen provider config + nested models
+│   │   ├── ImageGenModelAccordion.jsx        # Image-gen model config + select/deselect
+│   │   ├── AgentProgressIndicator.jsx        # Polls and shows agent-loop status during an in-progress turn
 │   │   ├── VoiceProviderAccordion.jsx        # Read-only provider info + prompt editor
 │   │   ├── VoiceModelAccordion.jsx           # Voice picker (free text + hints) + prompt editor
 │   │   ├── DiscordServerAccordion.jsx        # Server prompt editor + nested channel accordions
@@ -420,6 +494,7 @@ laravel-vera/
 │   │   ├── usePrompt.js                      # Prompt tree CRUD + save/destroy (assistant prompt)
 │   │   ├── usePromptTree.js                  # Generic prompt tree editing state (reused by voice + Discord prompts)
 │   │   ├── useProviders.js                   # Provider/model CRUD + active model state
+│   │   ├── useImageGenProviders.js           # Image-gen provider/model CRUD + active model state
 │   │   ├── useVoiceProviders.js              # Read-only catalog + model/voice selection
 │   │   ├── useDiscordSettings.js             # Discovery data + immediate-save trigger mode changes
 │   │   ├── useToast.js                       # Toast notification state
@@ -461,6 +536,8 @@ laravel-vera/
 - **Voice Mode** — speak to an assistant and hear replies read back; local STT (whisper.cpp, single fixed backend) and pluggable, DB-managed TTS. See [Voice Mode](#voice-mode)
 - **Provider-agnostic TTS** — any backend speaking the OpenAI-compatible `/v1/audio/speech` shape plugs in via a seeded `VoiceProvider`/`VoiceModel` row, no new code. Orpheus and KittenTTS confirmed working
 - **Per-provider/per-model voice prompts** — backend-specific instructions (e.g. Orpheus's inline vocal tags) live on the `VoiceProvider`/`VoiceModel` record and are injected only while that backend is active, via the same visual prompt-tree editor used for assistant prompts
+- **Agent mode** — assistants can be switched to an agentic loop that calls tools (`get_current_datetime`, `basic_calculator`, `generate_image`) across multiple steps before replying, with a step limit, per-tool timeout/retry, and a live progress indicator in the chat UI. See [Agent Mode](#agent-mode)
+- **Image generation** — DB-managed, user-editable provider/model catalog (same pattern as LLM providers); generate an image manually via `/create-image <description>` in chat, or let an agent-mode assistant call it as a tool. See [Image Generation Providers](#image-generation-providers)
 
 ### Planned / Nice-to-Have
 

@@ -170,12 +170,14 @@ Full conversation lifecycle, scoped to `assistants/{assistant}`:
 - `sendMessage`:
   1. Validates `messages[]` array (role/content/images)
   2. Saves the last user message; stores any attached image via `Image::storeFromBase64()`
-  3. Loads the `Assistant` model and its emotion set
-  4. Builds system prompt via `PromptDirector($assistant->prompt)` — prompt comes from the DB
-  5. Injects available emotions and runs RAG retrieval against the linked archive if available
-  6. Resolves the LLM provider via `LlmManager::forAssistantUser()`
-  7. Calls `chat()`, saves the assistant reply (content + thinking)
-  8. Returns `conversation_id`, `content`, `thinking`
+  3. If the message starts with `/create-image `, branches into the shared image-generation pipeline instead of the steps below — see [Agent Mode & Image Generation](#agent-mode--image-generation)
+  4. Loads the `Assistant` model and its emotion set
+  5. Builds system prompt via `PromptDirector($assistant->prompt)` — prompt comes from the DB
+  6. Injects available emotions and runs RAG retrieval against the linked archive if available
+  7. Resolves the LLM provider via `LlmManager::forAssistantUser()`
+  8. If `$assistant->mode === AssistantMode::Agent`, requires the resolved model to support tool-calling (422 otherwise) and runs the turn through `AgentLoopRunner` instead of a single `chat()` call; otherwise calls `chat()` directly
+  9. Saves the assistant reply (content + thinking)
+  10. Returns `conversation_id`, `content`, `thinking`, and — for agent-mode turns — `tool_calls` (the loop's tool-call summary, e.g. any images generated mid-turn)
 - `sendDiscordMessage` — the Discord equivalent, called by node-discord-api rather than the browser. Takes `channel_id`/`message_id`/`content`/`images` instead of a client-supplied history array. See [Discord Integration](#discord-integration) for the full flow; the auto-summarize checkpoint logic (`checkpointAutoSummarize`) is a private method shared between this and `sendMessage` rather than duplicated
 
 **`AiProviderController`**
@@ -183,6 +185,12 @@ CRUD for `AiProvider` records. API key is encrypted at rest and never returned i
 
 **`AiModelController`**
 CRUD for `AiModel` records nested under a provider. Manages `name`, `endpoint`, `thinking`, `prompt`, `config`.
+
+**`ImageGenProviderController`** / **`ImageGenModelController`**
+CRUD for `ImageGenProvider`/`ImageGenModel`, scoped to the authenticated user — structurally identical to `AiProviderController`/`AiModelController` (same encrypted `api_key`/`has_key` pattern, same nested-model shape), not seeded like the voice catalog. Selection is via `SettingsController::selectImageGenModel`, mirroring `selectModel`.
+
+**`AgentProgressController`**
+Single `show` action: reads `Cache::get("agent-progress:{$conversationId}")` and returns `{ in_progress, status }`. Polled by the frontend (`AgentProgressIndicator`) every 2s while an agent-mode turn is in flight — see [Agent Mode & Image Generation](#agent-mode--image-generation).
 
 **`SettingsController`**
 - `show` — returns `selected_theme`, `available_themes`, `ai_model_id`, `tts_model_id`, `tts_voice` (scoped to the given assistant). No `available_voices` — the voice picker on the Voice page sources its options from the active `VoiceModel.voices` (a hint list, not enforced), not from this endpoint
@@ -317,9 +325,10 @@ Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `on
 **`User`** — standard Laravel user; belongs to many `Assistant`s via `AssistantUser`
 
 **`Assistant`**
-- `name`, `slug`, `description`, `prompt` (JSON), `opening_message`, `archive_id` (nullable FK)
+- `name`, `slug`, `description`, `prompt` (JSON), `opening_message`, `archive_id` (nullable FK), `mode` (`AssistantMode` enum: `assistant` | `agent`), `agent_config` (nullable JSON — e.g. a per-assistant `step_limit` override)
 - Belongs to many `User`s via `AssistantUser`; has many `Emotion`s
 - `archive_id` links the assistant to a specific `Archive` for RAG injection
+- `mode` decides whether `ConversationController::sendMessage` calls the LLM directly or routes through `AgentLoopRunner` — see [Agent Mode & Image Generation](#agent-mode--image-generation)
 
 **`AssistantUser`** (pivot)
 - Links `User` ↔ `Assistant`; has many `Conversation`s scoped to this pairing
@@ -339,6 +348,15 @@ Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `on
 - `provider_id`, `name`, `endpoint`, `thinking` (boolean), `prompt`, `config` (JSON)
 - `endpoint` is the model identifier sent to the API (e.g. `google/gemma-4-26b-a4b-it`)
 - Belongs to `AiProvider`
+
+**`ImageGenProvider`**
+- `user_id`, `name`, `url`, `api_key` (encrypted), `format` (`ImageGenProviderFormat` enum: `openrouter` | `openai_compatible`), `prompt`, `config_schema` (JSON)
+- `api_key` hidden; `has_key` appended, same as `AiProvider`. User-owned CRUD (unlike `VoiceProvider`), same pattern as `AiProvider`
+- Has many `ImageGenModel`s
+
+**`ImageGenModel`**
+- `provider_id`, `name`, `endpoint`, `config` (JSON, e.g. `timeout`), `additional_config` (JSON), `prompt`
+- Belongs to `ImageGenProvider`
 
 **`VoiceProvider`**
 - `name`, `url`, `api_key` (nullable, encrypted), `format` (`VoiceProviderFormat` enum), `instructions` (text — shown in the Voice UI, e.g. what local processes to start), `prompt` (nullable JSON — injected into voice-mode conversations while this provider is active)
@@ -452,8 +470,9 @@ Lists conversations for the active assistant. Create, select (navigate to `conve
 **`ChatPage`**
 Main chat interface:
 - Message list with `ChatMessage` components
-- Input bar with image attachment
+- Input bar with image attachment; a leading `/create-image ` triggers the manual image-generation pipeline (see [Agent Mode & Image Generation](#agent-mode--image-generation))
 - Emotion tag parsed from each response → `Portrait` expression swap
+- For agent-mode assistants, `AgentProgressIndicator` polls and shows the loop's current status while a reply is in flight; images generated mid-loop by the `generate_image` tool arrive in the response's `tool_calls` and render inline alongside the reply
 - `BootSequence` plays on first load for a new conversation
 
 **`ArchivePage`**
@@ -471,6 +490,9 @@ AI provider and model management:
 - `ProviderAccordion` for each provider (collapsible config form)
 - `ModelAccordion` nested per model — shows SELECT button in header; clicking `● ACTIVE` deselects
 - Active model loaded from `GET /api/assistants/{assistant}/settings` on mount; selection saved to `PUT /api/assistants/{assistant}/settings/model`
+
+**`ImageGenProvidersPage`**
+Image-gen provider and model management — structurally identical to `ProvidersPage` (full CRUD, not read-only like `VoicePage`): `useImageGenProviders` hook, `ImageGenProviderAccordion` per provider, `ImageGenModelAccordion` nested per model showing `SELECT`/`● ACTIVE`. Selection persists to `Settings.data['image_gen_model_id']` via `PUT .../settings/image-gen-model`.
 
 **`VoicePage`**
 Voice provider/model catalog — structurally similar to `ProvidersPage` but read-only for everything except the `prompt` field:
@@ -497,6 +519,12 @@ Provider config form (name, URL, API key, format, prompt, config schema) inside 
 
 **`ModelAccordion`**
 Model config form (name, endpoint, thinking, prompt, config) inside an `Accordion`. Header shows `● ACTIVE` badge (clickable to deselect) and `SELECT` button when applicable.
+
+**`ImageGenProviderAccordion`** / **`ImageGenModelAccordion`**
+Same shape as `ProviderAccordion`/`ModelAccordion` (full editable config form, `SELECT`/`● ACTIVE` header badge) applied to `ImageGenProvider`/`ImageGenModel` instead of `AiProvider`/`AiModel`.
+
+**`AgentProgressIndicator`**
+Polls `GET .../agent-progress` every 2s while a `ChatPage` reply is in flight for an agent-mode assistant; renders the loop's current status text with a pulsing dot, or nothing if idle/no status. State reset (`wasActive`/`setStatus(null)`) is computed during render rather than in an effect, per [Constitution Principle VIII](./.specify/memory/constitution.md#viii-state-derivation-happens-during-render-not-in-effects).
 
 **`EmotionGrid`**
 Displays the current emotion set for an assistant. Supports adding new emotions (name + image upload), renaming, replacing images, and deleting. Used in `EditAssistantPage`.
@@ -570,6 +598,9 @@ When no assistant is active, renders a neutral waiting state.
 - No CRUD — the catalog is read-only from the frontend's perspective
 - `chooseVoice(modelId, voice)` — if `modelId` isn't already active, selects it first (`PUT .../settings/voice-model`), then sets the voice (`PUT .../settings/voice`); both write through the same cache `SettingsController` populates, so `VoiceController::synthesize` stays a cache hit
 - `deactivateModel()` — clears both `tts_model_id` and `tts_voice`, falling back to `.env`
+
+**`useImageGenProviders(addToast, assistantId)`**
+- Same shape as `useProviders` (full CRUD, not read-only): loads `GET /api/image-gen-providers` and the active `image_gen_model_id` from settings; create/update/delete for both providers and models; `selectModel`/`deselectModel` write through to `PUT .../settings/image-gen-model`
 
 **`useDiscordSettings(addToast, assistantId)`**
 - Loads everything from a single `GET .../discord/discovery` call — guilds, channels, trigger mode, and prompt all arrive together (unlike `useVoiceProviders`, which needs two requests), since `DiscordController@discovery` already merges the DB config in server-side
@@ -903,6 +934,99 @@ Excluded sections for Discord (`except(['opening_message', 'voice mode', 'emotio
 
 ---
 
+## Agent Mode & Image Generation
+
+Every assistant has a `mode`: `assistant` (the original behavior — one `chat()` call per turn, no tools) or `agent` (the turn runs through `AgentLoopRunner`, which can call tools across multiple steps before producing a final reply). Image generation ships two independent ways: a manual `/create-image <prompt>` chat command available in both modes, and a `generate_image` tool an agent-mode assistant can call on its own. Both share the same underlying pipeline.
+
+### Pipeline Diagram
+
+```mermaid
+sequenceDiagram
+    participant B as Browser (React)
+    participant L as ConversationController
+    participant AL as AgentLoopRunner
+    participant LLM as LLM Provider
+    participant IG as ImageGenerationService
+
+    B->>L: POST /conversations/{id}/messages
+    alt assistant.mode == agent
+        L->>AL: run(assistant, messages, conversation)
+        loop until final reply or step_limit
+            AL->>LLM: chat(messages, tools: [...])
+            LLM-->>AL: content, or tool_calls
+            opt tool call requested
+                AL->>AL: writeProgress() → Cache "agent-progress:{id}"
+                AL->>AL: executeWithRetries() → executeWithTimeout() (pcntl_alarm)
+                opt generate_image
+                    AL->>IG: generate(assistantUser, conversation, prompt)
+                    IG-->>AL: enhancedPrompt, imageData
+                end
+                AL->>AL: append tool result to messages, persist a tool_call message
+            end
+        end
+        AL-->>L: AgentRunResult(content, toolCallsSummary)
+    else assistant.mode == assistant
+        L->>LLM: chat(messages) — no tools
+        LLM-->>L: reply
+    end
+    L-->>B: { content, tool_calls }
+```
+
+While a turn is in flight, the frontend polls `GET /conversations/{id}/agent-progress` every 2s (`AgentProgressIndicator.jsx`) and shows the loop's current status (e.g. "Calling tool: generate_image"), written by `AgentLoopRunner::writeProgress()` and cleared in a `finally` block once the turn ends.
+
+### Tool Contract & Built-in Tools
+
+**`App\Contracts\AgentTool`**
+```php
+interface AgentTool {
+    public function name(): string;
+    public function description(): string;
+    public function parameters(): array;              // JSON Schema
+    public function handle(array $arguments): array;
+    public function timeoutSeconds(): int;
+    public function retryAttempts(): int;
+}
+```
+
+Three tools ship today, all in `app/Services/AgentLoop/Tools/`:
+
+| Tool | Purpose |
+|---|---|
+| `get_current_datetime` | Returns the current date/time in `config('app.timezone')`, ISO 8601 |
+| `basic_calculator` | Evaluates an arithmetic expression via a small hand-rolled recursive-descent parser (`+ - * /`, parentheses) — no `eval()` |
+| `generate_image` | Runs the shared image-generation pipeline (below) and returns `image_url` + the LLM-enhanced prompt actually sent to the provider |
+
+`AgentLoopRunner` is constructed with the tool list per request (`ConversationController::sendMessage` wires `[new GetCurrentDatetimeTool, new BasicCalculatorTool, new ImageGenerationTool(...)]`) — there's no service-container-wide tool registry to edit; adding a tool means implementing `AgentTool` and adding it to that array.
+
+### Loop Mechanics
+
+- **Step limit** — `config('agent.step_limit')` (`AGENT_STEP_LIMIT`, default 10), overridable per assistant via `agent_config.step_limit`. Each tool call consumes one step; if the limit is hit mid-loop, the runner asks the LLM for a final summary of what was and wasn't accomplished rather than returning nothing.
+- **Tool timeout** — each `handle()` call is bounded by `tool->timeoutSeconds()` (`config('agent.tool_timeout')`, `AGENT_TOOL_TIMEOUT`, default 60s; the image-gen tool adds 30s on top of the resolved image-gen provider's own timeout) via `pcntl_alarm` — **this requires the `pcntl` PHP extension**; without it, every tool call throws immediately. `pcntl` is unavailable on Windows and disabled by default on some hosts.
+- **Retries** — `executeWithRetries()` retries the identical call up to `tool->retryAttempts()` times (`config('agent.tool_retry_attempts')`, `AGENT_TOOL_RETRY_ATTEMPTS`, default 3) before surfacing the error to the LLM as a `tool` message. If `maxConsecutiveFailures` (same config value) is hit across *different* tool calls in a row, the loop ends early with an apologetic final message instead of continuing to burn steps.
+- **Tool-usage steering** — every request in the loop carries the same `tools` definitions, including the turn right after a tool result comes back. Without this, models observed in testing would sometimes describe an already-executed tool call as text instead of answering — `withToolUsageInstructions()` prepends an explicit system instruction to counter it.
+- **Model requirement** — agent mode requires an explicitly selected `AiModel` with `supports_tools: true`; `sendMessage` returns 422 if the assistant is in agent mode but no such model is selected.
+
+### Image Generation
+
+Both entry points below converge on **`ImageGenerationService::generate()`**:
+
+1. **`ImageGenManager::resolveImageGenModel()`** — looks up the `ImageGenModel` selected in `Settings.data['image_gen_model_id']` for this (user, assistant) pair; falls back to `config('ai.image_gen')` (`IMAGE_GEN_*` env vars) if nothing's selected, mirroring `LlmManager`.
+2. **`ImageGenPromptEnhancer::enhance()`** — rewrites the user's raw request into a concrete image prompt via an LLM call, using the assistant's own persona/prompt (with image-irrelevant sections like `style rules` and `emotion tags` excluded), archive RAG retrieval, recent conversation history, and any provider/model-specific `prompt` instructions — same layering pattern as [voice provider/model prompt injection](#voice-providermodel-prompt-injection).
+3. **The resolved provider's `generate()`** — `OpenRouterImageGenProvider` or `OpenAiCompatibleImageGenProvider`, selected via `ImageGenProviderFormat::providerClass()`.
+
+**Manual (`/create-image <prompt>`)** — detected by `ConversationController::sendMessage`/`sendDiscordMessage` via a leading-command regex, shared across every channel. After generation, a separate LLM call (`reactToGeneratedImage`) produces the assistant's in-character text reply to having just sent the image (parsing the usual `[emotion]`/`[intimate]` tags), and the image is attached to that reply message.
+
+**Agent tool (`generate_image`)** — called by the LLM mid-agent-loop like any other tool. `ImageGenerationTool::handle()` creates an empty carrier assistant message, attaches the generated image to it via `Image::storeFromBase64()`, and returns `{status, enhanced_prompt, image_url}` as the tool result — the image is already visible to the user by the time the loop's next step (or final reply) runs, so the model doesn't need to describe it.
+
+### Known Limitations
+
+- **`pcntl` dependency** — tool-call timeout enforcement hard-requires the `pcntl` extension (see [Loop Mechanics](#loop-mechanics)); there's no fallback timeout mechanism for environments without it.
+- **Mode is per-assistant, not per-message** — there's no way to run a single one-off tool-using turn with an otherwise plain assistant, or vice versa; switching modes means editing the assistant.
+- **Progress reporting is coarse** — `AgentProgressIndicator` polls a single cached status string every 2s; it shows *that* a tool is running, not intermediate output from a long-running tool call.
+- **Image-gen catalog is user-CRUD, unlike voice** — deliberately mirrors the LLM provider pattern (`AiProvider`/`AiModel`) rather than the seeded `VoiceProvider` pattern; no `ImageGenProviderSeeder` exists.
+
+---
+
 ## Authentication Flow
 
 The app uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
@@ -926,6 +1050,7 @@ The app uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
 - **Emotion not persisted** — the `emotion` column exists on `messages` but is never written. Emotion state is frontend-only.
 - **Voice mode implemented, with known gaps** — see [Voice Mode → Known Limitations](#known-limitations-1): notably Orpheus's 5-15s latency (backend-specific, not universal), no per-assistant speed control, no streaming, voice lists that can drift from what's actually loaded on hot-swappable backends, and a repo-wide test-DB issue blocking feature tests for the voice endpoints and the whole TTS provider system.
 - **Discord integration implemented, with known gaps** — see [Discord Integration → Known Limitations](#known-limitations-2): no real `@mention` capability yet (name-only awareness of other assistants), no member-list visibility, and node-discord-api is an unmanaged separate process with no test coverage on either side.
+- **Agent mode implemented, with known gaps** — see [Agent Mode & Image Generation → Known Limitations](#known-limitations-2): tool-call timeout enforcement hard-requires the `pcntl` extension, mode is per-assistant rather than per-message, and progress reporting is a single polled status string rather than granular step output.
 - **Metrics not implemented** — affection/trust/patience system planned but not built.
 
 ### Planned Features
@@ -947,39 +1072,50 @@ laravel-vera/
 │   │   ├── SyncEmotions.php                    seeds emotion records
 │   │   └── TelegramPollCommand.php             Telegram bot long-poll loop
 │   ├── Contracts/
+│   │   ├── AgentTool.php                       interface: name/description/parameters + handle() + timeoutSeconds/retryAttempts
 │   │   ├── LlmProvider.php                     interface: chat() + fromModel()
 │   │   ├── SttProvider.php                     interface: transcribe(audio): string
 │   │   └── TtsProvider.php                     interface: synthesize(text, voice?) + fromModel(VoiceModel)
 │   ├── Directors/PromptDirector.php            reads assistant prompt config, filters, builds
-│   ├── DTOs/LlmResponse.php                    content + thinking
+│   ├── DTOs/
+│   │   ├── AgentRunResult.php                  content + toolCalls summary, returned by AgentLoopRunner::run()
+│   │   ├── LlmResponse.php                     content + thinking
+│   │   └── ToolCallRequest.php                 id/name/arguments, parsed from an LLM tool-call response
 │   ├── Enums/
 │   │   ├── AiProviderFormat.php                generic | anthropic → provider class
+│   │   ├── AssistantMode.php                   assistant | agent
+│   │   ├── ImageGenProviderFormat.php           openrouter | openai_compatible → provider class
 │   │   └── VoiceProviderFormat.php             openai_compatible → provider class
 │   ├── Http/Controllers/
 │   │   ├── Auth/AuthController.php             login/logout
 │   │   ├── VadAssetController.php              serves VAD's .mjs files with correct MIME type
 │   │   └── Api/
+│   │       ├── AgentProgressController.php     show — reads cached agent-loop status, polled during agent-mode turns
 │   │       ├── AiProviderController.php        provider CRUD
 │   │       ├── AiModelController.php           model CRUD
 │   │       ├── ArchiveController.php           archive read/save (with async embedding)
-│   │       ├── AssistantController.php         assistant CRUD (multipart, emotion images)
+│   │       ├── AssistantController.php         assistant CRUD (multipart, emotion images, mode)
 │   │       ├── AssistantEmotionController.php  per-assistant emotion store/update/destroy
 │   │       ├── AssistantPromptController.php   prompt CRUD (show/store/update/destroy)
-│   │       ├── ConversationController.php      CRUD + sendMessage (voice_mode flag, voice provider/model prompt injection) + sendDiscordMessage
+│   │       ├── ConversationController.php      CRUD + sendMessage (voice_mode flag, /create-image, agent-mode dispatch) + sendDiscordMessage
 │   │       ├── DiscordController.php           discovery proxy (syncs discord_servers/channels) + server/channel prompt updates
 │   │       ├── EmotionController.php           serve emotions (locked/unlocked)
-│   │       ├── SettingsController.php          theme + LLM model + voice model + voice selection + Discord trigger mode
+│   │       ├── ImageGenProviderController.php  provider CRUD, same pattern as AiProviderController
+│   │       ├── ImageGenModelController.php     model CRUD, same pattern as AiModelController
+│   │       ├── SettingsController.php          theme + LLM model + voice model + voice selection + image-gen model + Discord trigger mode
 │   │       ├── VoiceController.php             transcribe / synthesize
 │   │       ├── VoiceProviderController.php     read-only catalog index; prompt-only update
 │   │       └── VoiceModelController.php        prompt-only update
 │   ├── Jobs/EmbedArchiveEntry.php              async vector embedding for archive entries
 │   ├── Models/
 │   │   ├── User.php
-│   │   ├── Assistant.php                       name/slug/prompt/opening_message/archive_id
+│   │   ├── Assistant.php                       name/slug/prompt/opening_message/archive_id/mode/agent_config
 │   │   ├── AssistantUser.php                   pivot; has many Conversations, AssistantDiscordServers/Channels
-│   │   ├── Settings.php                        data JSON (theme, ai_model_id, tts_model_id, tts_voice) + voiceCacheKey()
+│   │   ├── Settings.php                        data JSON (theme, ai_model_id, tts_model_id, tts_voice, image_gen_model_id) + voiceCacheKey()
 │   │   ├── AiProvider.php                      url/api_key(encrypted)/format/config_schema
 │   │   ├── AiModel.php                         name/endpoint/thinking/prompt/config
+│   │   ├── ImageGenProvider.php                url/api_key(encrypted)/format/config_schema — user-owned, same pattern as AiProvider
+│   │   ├── ImageGenModel.php                   provider_id/name/endpoint/config/additional_config/prompt
 │   │   ├── VoiceProvider.php                   name/url/api_key(encrypted)/format/instructions/prompt — seeded, not user_id-owned
 │   │   ├── VoiceModel.php                      provider_id/name/endpoint/voices/config/prompt
 │   │   ├── DiscordServer.php                   discord_guild_id/name — global catalog, synced from discovery
@@ -999,6 +1135,18 @@ laravel-vera/
 │   │   └── Stt/WhisperSttProvider.php           posts audio to whisper-server /inference
 │   ├── Rules/ValidPromptStructure.php          validates prompt tree (string/list/nested object)
 │   └── Services/
+│       ├── AgentLoop/
+│       │   ├── AgentLoopRunner.php             the tool-calling loop: chat → tool_calls → execute → repeat until final or step_limit
+│       │   └── Tools/
+│       │       ├── BasicCalculatorTool.php     arithmetic expression evaluator (hand-rolled parser, no eval())
+│       │       ├── GetCurrentDatetimeTool.php  current date/time in app timezone
+│       │       └── ImageGenerationTool.php     generate_image — wraps ImageGenerationService, attaches image to a carrier message
+│       ├── ImageGenProviders/
+│       │   ├── ImageGenManager.php             forAssistantUser() / resolveImageGenModel() / fromModel() / fromConfig()
+│       │   ├── ImageGenerationService.php      shared generate() used by both /create-image and the agent tool
+│       │   ├── ImageGenPromptEnhancer.php      LLM rewrites the raw request into a concrete image prompt (persona + RAG + history)
+│       │   ├── OpenRouterImageGenProvider.php  OpenRouter images API, fromModel()
+│       │   └── OpenAiCompatibleImageGenProvider.php  any OpenAI-compatible image-gen backend, fromModel()
 │       ├── LlmProviders/
 │       │   ├── LlmManager.php                  forAssistantUser() / fromConfig()
 │       │   ├── GenericProvider.php             OpenAI-compatible, fromModel()
@@ -1007,7 +1155,9 @@ laravel-vera/
 │       │   ├── TtsManager.php                  forAssistantUser() / resolveVoiceModel() / fromModel() / fromConfig()
 │       │   └── OpenAiCompatibleTtsProvider.php posts text to any /v1/audio/speech backend
 │       └── TelegramService.php                 getUpdates + sendMessage
-├── config/ai.php                               default provider + embedding + stt + tts (fallback) + telegram + discord
+├── config/
+│   ├── agent.php                               tool_timeout / step_limit / tool_retry_attempts / progress_cache_ttl
+│   └── ai.php                                  default provider + embedding + stt + tts (fallback) + image_gen (fallback) + telegram + discord
 ├── database/
 │   ├── migrations/                             all tables, incl. voice_providers/voice_models + discord_servers/channels + their prompt columns
 │   └── seeders/VoiceProviderSeeder.php         seeds the TTS catalog (Orpheus, KittenTTS); re-run to add more
