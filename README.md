@@ -4,7 +4,7 @@ A multi-assistant AI platform with a dynamic visual expression system, built on 
 
 ## Overview
 
-VERA is a general-purpose multi-assistant AI platform. Each assistant has its own personality, expression set, and prompt — all configured in the database. LLM providers and models are managed through the UI, making it easy to add, switch, and configure providers without touching config files. The interface supports multiple themes, selectable per-user and persisted in the database.
+VERA is a multi-assistant AI platform with agent mode, voice I/O, and deep integration across channels. Each assistant has its own independently configurable prompt, expression set, and knowledge base — all managed in the database. Assistants can operate in agent mode, calling tools across multiple steps to answer, calculate, or generate images. They respond through the web app, Telegram, and Discord. Voice mode lets you speak to an assistant and hear replies back, with pluggable STT and TTS backends. A RAG-powered archive injects relevant knowledge into every conversation, and long-term memory keeps assistants coherent across sessions. LLM, TTS, and image generation providers are all DB-managed and swappable from the UI — no config file edits needed.
 
 ## Tech Stack
 
