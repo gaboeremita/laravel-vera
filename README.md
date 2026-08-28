@@ -143,8 +143,9 @@ Providers and models are managed through the **Providers** page in the UI (`/ass
 
 Each model has:
 - An endpoint/model identifier (e.g. `google/gemma-4-26b-a4b-it`)
-- Optional thinking toggle and thinking budget
-- Per-model config (JSON) and prompt override
+- An optional **thinking key** — the JSON field name in the API response holding the model's reasoning/chain-of-thought text (e.g. `reasoning`, `reasoning_content`); left blank if the model doesn't expose one
+- A **supports tool calling** toggle — required for the model to be usable by an agent-mode assistant
+- Config (JSON, validated against the provider's schema) and additional config (JSON, merged into the request body as-is — an escape hatch for anything the schema doesn't cover) and a prompt override
 
 The active model is selected per-user via the **SELECT** button in the Providers UI. If no model is selected, the fallback config from `.env` is used.
 
@@ -192,6 +193,16 @@ Each assistant's prompt is stored as a JSON object in the `prompt` column of the
 The structure of the prompt JSON is flexible — any key becomes a section in the assembled system prompt. The `opening_message` field on the `Assistant` model is used as the first message when a new conversation is created.
 
 **Voice provider/model prompts** work the same way but live outside the assistant's own prompt: when voice mode is active, `voice provider prompt` and `voice model prompt` are appended as their own sections, sourced from the active `VoiceProvider`/`VoiceModel`'s `prompt` field (edited on the Voice page, not the Prompt page). This is how backend-specific instructions — e.g. Orpheus's inline `<laugh>`/`<chuckle>`/etc. vocal tags — stay out of the assistant's own prompt entirely, so switching to a provider without that capability (like KittenTTS) doesn't leave behind instructions for tags it can't produce.
+
+### Conversation Memory
+
+Conversations can accumulate a running text summary — `long_term_memory` — that's injected back into the system prompt so an assistant stays coherent about events outside the LLM's actual context window. Manage it from the **Memory** page (a link on the chat screen):
+
+- Edit the summary text directly, or trigger a summarization on demand ("Summarize since last" for just the new messages, "Summarize as far as possible" to redo the whole history)
+- Toggle **auto-summarize** to have it run automatically once 50 unsummarized messages accumulate, with no manual action needed
+- Customize *how* an assistant summarizes (tone, what to prioritize) via its per-assistant memory prompt, edited on the same page
+
+Summarization runs as a queued job (`SummarizeConversation`) — it needs the same [queue worker](#queue-worker-required-for-rag-embeddings) as Archive embeddings; without `php artisan queue:work` running, auto-summarize silently does nothing. See [ARCHITECTURE.md → Conversation Memory](./ARCHITECTURE.md#conversation-memory) for the full mechanics.
 
 ## Voice Mode
 
@@ -267,7 +278,7 @@ Any assistant can hold conversations in Discord, the same way it does through th
    php artisan tinker --execute 'echo App\Models\User::find(1)->createToken("discord-api")->plainTextToken;'
    ```
    Put that token in the bridge's own `.env` as `DISCORD_API_TOKEN` — it's how the bridge calls this app's `discord-messages` endpoint as you, separate from the shared secret above (which only protects the discovery endpoint).
-4. Go to an assistant's **Discord** page (`/assistants/:id/discord`) to see which Discord servers/channels its bot is currently in, set each channel's trigger mode (off / always / on mention), and write optional per-server and per-channel prompt context.
+4. Go to an assistant's **Discord** page (`/assistants/:id/discord`) to see which Discord servers/channels its bot is currently in, set each channel's trigger mode (off / always / on mention / on mention-by-name), and write optional per-server and per-channel prompt context.
 
 ### How it fits together
 
@@ -281,7 +292,11 @@ This app never talks to Discord directly and never stores a bot token. The bridg
 ```
 laravel-vera/
 ├── app/
+│   ├── Actions/
+│   │   ├── BuildArchiveFile.php               # Renders an archive + entries to Markdown via FileBuilder
+│   │   └── SummarizeConversation.php          # Long-term memory summarization logic (wrapped by the queued job)
 │   ├── Builders/
+│   │   ├── FileBuilder.php                   # heading()/paragraph()/keyValue() → Markdown string
 │   │   └── PromptBuilder.php                 # Assembles system prompt from assistant config
 │   ├── Console/Commands/
 │   │   ├── SyncEmotions.php                  # Seeds/syncs emotion records from config
@@ -303,12 +318,14 @@ laravel-vera/
 │   │   ├── VadAssetController.php            # Serves VAD's .mjs files with correct MIME type
 │   │   └── Api/
 │   │       ├── AiProviderController.php      # CRUD for AI providers
-│   │       ├── AiModelController.php         # CRUD for AI models
-│   │       ├── ArchiveController.php         # Archive read/save (with async embedding)
+│   │       ├── AiModelController.php         # CRUD for AI models (thinking_key, supports_tools, config, additional_config)
+│   │       ├── ArchiveController.php         # Archive read/save (with async embedding) + Markdown export
 │   │       ├── AssistantController.php       # CRUD for assistants (multipart, emotion images)
 │   │       ├── AssistantEmotionController.php# Per-assistant emotion store/update/destroy
+│   │       ├── AssistantMemoryPromptController.php # Show/update per-assistant memory summarization instructions
 │   │       ├── AssistantPromptController.php # Prompt CRUD (show/store/update/destroy)
 │   │       ├── ConversationController.php    # CRUD + message sending (voice_mode flag, voice prompt injection, sendDiscordMessage)
+│   │       ├── ConversationMemoryController.php # Show/update/summarize/unlock a conversation's long-term memory
 │   │       ├── DiscordController.php         # Discovery proxy (syncs discord_servers/channels) + server/channel prompt updates
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
 │   │       ├── SettingsController.php        # Theme + active LLM/voice model + voice selection + Discord trigger mode
@@ -318,7 +335,7 @@ laravel-vera/
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions)
-│   │   ├── AssistantUser.php                 # Pivot: user ↔ assistant
+│   │   ├── AssistantUser.php                 # Pivot: user ↔ assistant; memory_prompt (json)
 │   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model, voice)
 │   │   ├── AiProvider.php                    # DB-managed LLM provider
 │   │   ├── AiModel.php                       # DB-managed LLM model
@@ -328,7 +345,7 @@ laravel-vera/
 │   │   ├── DiscordChannel.php                # Known Discord channel, belongs to a DiscordServer
 │   │   ├── AssistantDiscordServer.php        # Per-assistant server prompt
 │   │   ├── AssistantDiscordChannel.php       # Per-assistant channel trigger mode + prompt
-│   │   ├── Conversation.php                  # discord_channel_id ties a conversation to a Discord channel
+│   │   ├── Conversation.php                  # discord_channel_id ties a conversation to a Discord channel; long_term_memory/memory_checkpoint_message_id/memory_summarizing_at/auto_summarize_enabled
 │   │   ├── Message.php                       # discord_message_id dedupes across assistants sharing a channel
 │   │   ├── Emotion.php                       # Expression name + restricted flag
 │   │   ├── Archive.php
@@ -337,7 +354,8 @@ laravel-vera/
 │   │   ├── Image.php                         # Polymorphic, stored on disk
 │   │   └── Video.php                         # Polymorphic, stored on disk
 │   ├── Jobs/
-│   │   └── EmbedArchiveEntry.php             # Async vector embedding for archive entries
+│   │   ├── EmbedArchiveEntry.php             # Async vector embedding for archive entries
+│   │   └── SummarizeConversation.php         # Queues Actions\SummarizeConversation; manages the memory_summarizing_at lock
 │   ├── Providers/
 │   │   ├── AppServiceProvider.php            # Binds EmbeddingProvider, SttProvider
 │   │   └── Stt/WhisperSttProvider.php        # Talks to whisper-server
@@ -383,8 +401,9 @@ laravel-vera/
 │   │   ├── CreateAssistantPage.jsx           # Multipart assistant creation form
 │   │   ├── EditAssistantPage.jsx             # Edit assistant + manage emotions
 │   │   ├── ConversationsPage.jsx             # Conversation list
-│   │   ├── ChatPage.jsx                      # Main chat interface
-│   │   ├── ArchivePage.jsx                   # Archive editor (RAG knowledge base)
+│   │   ├── ChatPage.jsx                      # Main chat interface; debounced localStorage draft persistence
+│   │   ├── MemoryPage.jsx                    # Conversation long-term memory editor + auto-summarize toggle
+│   │   ├── ArchivePage.jsx                   # Archive editor (RAG knowledge base) + Markdown export
 │   │   ├── PromptPage.jsx                    # Visual prompt editor
 │   │   ├── SettingsPage.jsx                  # Theme only
 │   │   ├── ProvidersPage.jsx                 # AI provider/model management
@@ -393,13 +412,15 @@ laravel-vera/
 │   ├── components/
 │   │   ├── common/
 │   │   │   ├── Accordion.jsx                 # Reusable collapsible accordion
-│   │   │   └── ConfirmationModal.jsx         # Confirmation modal
+│   │   │   ├── ConfirmationModal.jsx         # Confirmation modal
+│   │   │   └── Toggle.jsx                    # On/off switch
 │   │   ├── ModelAccordion.jsx                # Model config + select/deselect
 │   │   ├── ProviderAccordion.jsx             # Provider config + nested models
 │   │   ├── VoiceProviderAccordion.jsx        # Read-only provider info + prompt editor
 │   │   ├── VoiceModelAccordion.jsx           # Voice picker (free text + hints) + prompt editor
 │   │   ├── DiscordServerAccordion.jsx        # Server prompt editor + nested channel accordions
-│   │   ├── DiscordChannelAccordion.jsx       # Trigger mode select + channel prompt editor
+│   │   ├── DiscordChannelAccordion.jsx       # Trigger mode select (4 modes) + channel prompt editor
+│   │   ├── AssistantMemoryPromptEditor.jsx   # Prompt-tree editor for per-assistant memory instructions
 │   │   ├── PromptTreeEditor.jsx              # Manual/Paste-JSON toggle around a usePromptTree instance
 │   │   ├── EmotionGrid.jsx                   # Emotion image manager (add/rename/replace/delete)
 │   │   ├── PromptEditor.jsx                  # Local prompt tree editor (create/edit flows)
@@ -420,6 +441,7 @@ laravel-vera/
 │   │   ├── usePrompt.js                      # Prompt tree CRUD + save/destroy (assistant prompt)
 │   │   ├── usePromptTree.js                  # Generic prompt tree editing state (reused by voice + Discord prompts)
 │   │   ├── useProviders.js                   # Provider/model CRUD + active model state
+│   │   ├── useConversationMemory.js          # Memory show/save/summarize/unlock, polls while summarizing
 │   │   ├── useVoiceProviders.js              # Read-only catalog + model/voice selection
 │   │   ├── useDiscordSettings.js             # Discovery data + immediate-save trigger mode changes
 │   │   ├── useToast.js                       # Toast notification state
@@ -454,10 +476,12 @@ laravel-vera/
 - **Config fallback** — if no model is selected in the UI, the `.env` default is used
 - **Conversation persistence** — messages stored in PostgreSQL
 - **Conversation management UI** — list, create, delete, and rename conversations
-- **Archive with RAG** — editable knowledge base with semantic retrieval injected into the system prompt
+- **Archive with RAG** — editable knowledge base with semantic retrieval injected into the system prompt; exportable as a Markdown file
+- **Conversation memory** — manual or automatic long-term summarization of a conversation, injected back into the system prompt, with per-assistant summarization instructions. See [Conversation Memory](#conversation-memory)
+- **Chat draft persistence** — an unsent message survives navigating away and coming back, per (assistant, conversation), stored client-side
 - **Toast notifications** — non-intrusive feedback for UI actions
 - **Telegram integration** — long-poll bot for interacting with any configured assistant via Telegram
-- **Discord integration** — assistants respond in Discord via a separate bridge service, with per-channel trigger modes (off/always/on mention), per-server and per-channel prompt context, and shared awareness between assistants configured for the same channel. See [Discord Integration](#discord-integration)
+- **Discord integration** — assistants respond in Discord via a separate bridge service, with per-channel trigger modes (off/always/on mention/on mention-by-name), per-server and per-channel prompt context, and shared awareness between assistants configured for the same channel. See [Discord Integration](#discord-integration)
 - **Voice Mode** — speak to an assistant and hear replies read back; local STT (whisper.cpp, single fixed backend) and pluggable, DB-managed TTS. See [Voice Mode](#voice-mode)
 - **Provider-agnostic TTS** — any backend speaking the OpenAI-compatible `/v1/audio/speech` shape plugs in via a seeded `VoiceProvider`/`VoiceModel` row, no new code. Orpheus and KittenTTS confirmed working
 - **Per-provider/per-model voice prompts** — backend-specific instructions (e.g. Orpheus's inline vocal tags) live on the `VoiceProvider`/`VoiceModel` record and are injected only while that backend is active, via the same visual prompt-tree editor used for assistant prompts
