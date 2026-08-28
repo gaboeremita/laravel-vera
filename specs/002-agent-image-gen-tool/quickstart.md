@@ -19,7 +19,7 @@ Manual end-to-end validation for the three user stories in [spec.md](spec.md), o
 
 1. On the same assistant, manually send `/create-image a cyberpunk cat cafe`.
 2. Compare against Scenario 1's result.
-3. **Expected**: both images were generated using the same provider/model configuration for this assistant (`ImageGenerationService::generate()`, contracts/image-generation-service.md — the same underlying call in both paths), both are stored and rendered via the same `Image`/`msg.image_url` mechanism, and both look consistent with the assistant's configured style. The only visible difference is that the manual command's reaction text is combined with the image in one message, while the tool's image and the assistant's reaction land in two consecutive messages (research.md #3) — not a functional regression, an accepted consequence of running inside the loop instead of a dedicated single-shot command.
+3. **Expected**: both images were generated using the same provider/model configuration for this assistant (`ImageGenerationService::generate()`, contracts/image-generation-service.md — the same underlying call in both paths), both are stored and rendered via the same `Image`/`msg.image_url` mechanism, and both look consistent with the assistant's configured style. The only visible difference is that the manual command combines the image and its reaction text into one message, while the tool's image and the assistant's comment appear as two separate messages rather than one combined message (research.md #3) — not a functional regression, an accepted consequence of running inside the loop instead of a dedicated single-shot command.
 
 ## Scenario 3 — Slow or failing generation doesn't break the task (User Story 3, P3)
 

@@ -21,11 +21,13 @@ new ImageGenerationTool($imageGenerationService, $assistantUser, $conversation)
 1. Reject a missing or empty `prompt` argument with a thrown `\RuntimeException` (FR-008), the same pattern `BasicCalculatorTool` uses for a missing `expression` — never generate a placeholder image.
 2. Call `ImageGenerationService::generate($assistantUser, $conversation, $arguments['prompt'])` (research.md #1) to get `{enhancedPrompt, imageData}`.
 3. Create a new `assistant`-role `Message` on `$conversation` with empty `content`, then `Image::storeFromBase64($imageData, $carrierMessage, $storagePath)` using the same `"messages/{$assistantUser->user_id}/{$conversation->id}"` storage-path shape `sendMessage`/`generateImageMessage` already use (research.md #3).
-4. Return a short confirmation to the model — no image bytes (research.md #3):
+4. Return a short confirmation to the model, plus the stored image's URL — never the image bytes themselves (research.md #3; a URL is a short string, not the payload the research note warns against embedding):
 
 ```json
-{ "status": "success", "enhanced_prompt": "..." }
+{ "status": "success", "enhanced_prompt": "...", "image_url": "..." }
 ```
+
+`image_url` was added post-implementation (found via live testing): the frontend has no other way to learn about the carrier message/image created in step 3 within the same response — see plan.md's "Post-implementation additions."
 
 Any failure in steps 2-3 (unresolvable provider, HTTP failure, storage failure) MUST propagate as a thrown exception rather than being swallowed — `AgentLoopRunner`'s existing `\Throwable` catch around each tool call already surfaces it to the model and to the retry/failure-summary path (Constitution Principle V), so no new error-handling logic is needed inside the tool itself beyond letting real exceptions bubble up.
 
@@ -40,7 +42,7 @@ Any failure in steps 2-3 (unresolvable provider, HTTP failure, storage failure) 
 ## Output shape sent to the model
 
 ```json
-{ "status": "success", "enhanced_prompt": "a detailed, enhanced description of the generated image" }
+{ "status": "success", "enhanced_prompt": "a detailed, enhanced description of the generated image", "image_url": "https://.../messages/1/2/uuid.png" }
 ```
 
 On failure, the existing `AgentLoopRunner` failure path already wraps the exception message as `{"error": "..."}` — the tool does not need to produce its own error shape.

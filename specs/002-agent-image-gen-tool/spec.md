@@ -67,6 +67,7 @@ Unlike the assistant's existing instant tools (looking up the time, doing arithm
 - What happens when generation takes longer than the time normally allotted to a tool call? It is treated as a failed tool call and surfaced to both the assistant and the user, consistent with how other tool failures are already handled.
 - What happens when the assistant invokes the tool with a missing or empty prompt? The request is rejected with a clear error, without generating an image or crashing the task.
 - What happens if the assistant generates more than one image within the same task? Each generation is treated as its own tool call and counts toward the task's existing overall step limit; no separate image-specific limit applies.
+- What happens if the underlying model describes a tool call as text (e.g. writing out something that looks like a tool invocation) instead of actually using the tool-calling mechanism, after a real tool call has already completed? The system steers the model away from this by making clear, as part of every agent-mode request, that an already-returned tool result should be treated as done and that further tool use must go through the real tool-calling mechanism — not guaranteed to prevent every model's phrasing in every case, but addressing the general gap that allows it.
 
 ## Requirements *(mandatory)*
 

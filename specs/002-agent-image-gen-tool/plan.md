@@ -8,11 +8,13 @@
 
 ## Summary
 
-Add a third built-in agent tool, `generate_image`, alongside the existing `get_current_datetime` and `basic_calculator` (`001-agentic-task-loop`), so agent-mode assistants can generate and show an image mid-task without the user typing the manual `/create-image` command. The reusable core of `/create-image`'s existing pipeline (resolve the assistant's image-gen configuration, enhance the prompt, call the provider) is extracted from `ConversationController::generateImageMessage` into a new `App\Services\ImageGenProviders\ImageGenerationService`, called by both the existing manual command and the new tool — the concrete abstraction the user asked for. Three problems specific to this tool are resolved: (1) the `AgentTool` interface gains a `timeoutSeconds()` method so a slow, I/O-bound tool can have a longer per-call timeout budget than the two existing instant, in-process tools, derived from the assistant's actual resolved image-gen timeout rather than a second, independently-set config value; (2) the interface also gains a `retryAttempts()` method so a failed generation against a paid, slow provider is not retried three times by default like the two free, instant tools — it fails on the first attempt; and (3) since the tool executes before the loop's own final assistant message exists, it creates its own minimal carrier message and attaches the generated image to it immediately, reusing the existing `Image::storeFromBase64`/`msg.image_url` rendering path with zero new frontend code — the image and the assistant's in-character comment about it land in two separate messages rather than one combined bubble.
+Add a third built-in agent tool, `generate_image`, alongside the existing `get_current_datetime` and `basic_calculator` (`001-agentic-task-loop`), so agent-mode assistants can generate and show an image mid-task without the user typing the manual `/create-image` command. The reusable core of `/create-image`'s existing pipeline (resolve the assistant's image-gen configuration, enhance the prompt, call the provider) is extracted from `ConversationController::generateImageMessage` into a new `App\Services\ImageGenProviders\ImageGenerationService`, called by both the existing manual command and the new tool — the concrete abstraction the user asked for. Three problems specific to this tool are resolved: (1) the `AgentTool` interface gains a `timeoutSeconds()` method so a slow, I/O-bound tool can have a longer per-call timeout budget than the two existing instant, in-process tools, derived from the assistant's actual resolved image-gen timeout rather than a second, independently-set config value; (2) the interface also gains a `retryAttempts()` method so a failed generation against a paid, slow provider is not retried three times by default like the two free, instant tools — it fails on the first attempt; and (3) since the tool executes before the loop's own final assistant message exists, it creates its own minimal carrier message and attaches the generated image to it immediately, reusing the existing `Image::storeFromBase64`/`msg.image_url` rendering path — the image and the assistant's accompanying comment appear as two separate messages rather than one combined message.
+
+**Post-implementation additions (found via live testing, not in the original plan)**: (a) `ChatPage.jsx` required a real change after all — the agent-mode response handling had no path for an image at all (unlike the separate manual `/create-image` response shape), so a generated image never reached the screen until a full reload; fixed by returning `image_url` from the tool's result and rendering it client-side. (b) A live model was observed describing a tool call as text (`{"action": "generate_image", ...}`) instead of using the tool-calling mechanism, on the turn immediately after a real tool call already completed — traced to `AgentLoopRunner` offering the same `tools` definitions on every iteration with nothing telling the model what to do with a result it already has (a gap `/create-image` never hits, since it never sends `tools` at all). Fixed generally, in `AgentLoopRunner` itself, via `withToolUsageInstructions()`.
 
 ## Technical Context
 
-**Language/Version**: PHP 8.4 (Laravel 13) backend. No frontend changes required (research.md #3) — this feature reuses the existing image-on-message rendering path unchanged.
+**Language/Version**: PHP 8.4 (Laravel 13) backend. The original plan assumed no frontend changes (research.md #3), reusing the existing image-on-message rendering path unchanged; live testing found that assumption wrong for the agent-mode response path specifically — see Summary's "Post-implementation additions."
 
 **Primary Dependencies**: Existing `App\Contracts\AgentTool`, `App\Services\AgentLoop\AgentLoopRunner` (`001-agentic-task-loop`), `App\Services\ImageGenProviders\{ImageGenManager,ImageGenPromptEnhancer}`, `App\Models\{Image,Message,AssistantUser,Conversation}`, `App\Http\Controllers\Api\ConversationController`. No new package.
 
@@ -42,12 +44,14 @@ Add a third built-in agent tool, `generate_image`, alongside the existing `get_c
 | IV. Data Isolation by Ownership | `ImageGenerationTool` is constructed with the request's own resolved `AssistantUser`/`Conversation` and only ever calls `ImageGenManager::forAssistantUser($assistantUser)` — never an account-level default (data-model.md) | Pass |
 | V. Errors Fail Loudly | Generation failures propagate as exceptions through `AgentLoopRunner`'s existing `\Throwable` handling — no new swallowing (contracts/generate-image-tool.md) | Pass |
 | VI. Feature-Test-First, Factory-Backed | Pest feature tests planned for all three user stories, following `001-agentic-task-loop`'s established `Http::fake()` pattern, extended to also fake the image-gen HTTP call | Pass |
-| VII. No Speculative Abstraction | `ImageGenerationService` is extracted because there are now two real callers needing the same three steps (research.md #1) — not built in anticipation of a third. `timeoutSeconds()` and `retryAttempts()` are added to `AgentTool` for the same reason: a second real caller with genuinely different timing and retry-cost needs than the two existing free, instant tools (research.md #4, #5) | Pass — this is the deciding principle for both the service-extraction and interface-extension questions |
-| VIII. State Derivation During Render | No frontend changes in this feature | Pass (N/A) |
+| VII. No Speculative Abstraction | `ImageGenerationService` is extracted because there are now two real callers needing the same three steps (research.md #1) — not built in anticipation of a third. `timeoutSeconds()` and `retryAttempts()` are added to `AgentTool` for the same reason: a second real caller with genuinely different timing and retry-cost needs than the two existing free, instant tools (research.md #4, #5). Post-implementation: `AgentLoopRunner::withToolUsageInstructions()` (added after live testing surfaced a real model hallucinating a pseudo tool call) is applied loop-wide, not scoped to `generate_image` — justified the same way, since the gap it closes (no guidance on what to do with an already-returned tool result) applies to any tool, not a hypothetical one | Pass — this is the deciding principle for the service-extraction, interface-extension, and post-implementation prompt-instruction questions |
+| VIII. State Derivation During Render | Originally assessed as N/A (no frontend changes planned). Post-implementation: `ChatPage.jsx`'s new image-message mapping is computed inline from the `sendMessage` response during the existing state update, not derived in a `useEffect` | Pass |
 
 No violations. Complexity Tracking is not needed.
 
 **Post-Phase 1 re-check**: data-model.md, contracts/, and quickstart.md introduce no new tables, no new project/service boundary, and no abstraction beyond what research.md justified (one shared service with three narrow methods, one new interface method with a documented, non-speculative rationale). Gate still passes.
+
+**Post-implementation re-check**: the two live-testing fixes (`ChatPage.jsx` image rendering, `AgentLoopRunner::withToolUsageInstructions()`) were re-evaluated against this table above rather than left undocumented — both pass under the same principles the original design relied on (VII, VIII), no new violations introduced.
 
 ## Project Structure
 
@@ -71,11 +75,11 @@ app/
 │   └── AgentTool.php                       # + timeoutSeconds(), retryAttempts() (research.md #4, #5)
 ├── Services/
 │   ├── AgentLoop/
-│   │   ├── AgentLoopRunner.php             # executeWithTimeout()/executeWithRetries() call $tool->timeoutSeconds()/$tool->retryAttempts() instead of config('agent.tool_timeout')/config('agent.tool_retry_attempts') directly
+│   │   ├── AgentLoopRunner.php             # executeWithTimeout()/executeWithRetries() call $tool->timeoutSeconds()/$tool->retryAttempts() instead of config('agent.tool_timeout')/config('agent.tool_retry_attempts') directly; + withToolUsageInstructions() (post-implementation — see Summary)
 │   │   └── Tools/
 │   │       ├── GetCurrentDatetimeTool.php  # + timeoutSeconds()/retryAttempts() returning the existing global config values (unchanged behavior)
 │   │       ├── BasicCalculatorTool.php     # + timeoutSeconds()/retryAttempts() returning the existing global config values (unchanged behavior)
-│   │       └── ImageGenerationTool.php     # new: contracts/generate-image-tool.md
+│   │       └── ImageGenerationTool.php     # new: contracts/generate-image-tool.md — returns image_url in its result (post-implementation)
 │   └── ImageGenProviders/
 │       ├── ImageGenManager.php             # unchanged
 │       ├── ImageGenPromptEnhancer.php      # unchanged
@@ -83,13 +87,19 @@ app/
 └── Http/Controllers/Api/
     └── ConversationController.php          # generateImageMessage() calls ImageGenerationService::generate() instead of inlining resolve+enhance+generate; sendMessage() conditionally registers ImageGenerationTool
 
+resources/js/
+└── pages/
+    └── ChatPage.jsx                        # (post-implementation) maps a generate_image tool result's image_url into its own image bubble before the final text reply
+
 tests/Feature/
-├── ImageGenerationToolSingleCallTest.php     # User Story 1
+├── ImageGenerationToolSingleCallTest.php     # User Story 1 (also asserts image_url, post-implementation)
 ├── ImageGenerationToolConsistencyTest.php    # User Story 2 — same provider/model config as /create-image
 ├── ImageGenerationToolFailureTest.php        # User Story 3 — failure surfaced, not a hang
 ├── ImageGenerationToolTimeoutTest.php        # research.md #4 — timeoutSeconds() reflects resolved config, not the global default
 ├── ImageGenerationToolAvailabilityTest.php   # FR-005 — tool absent when unconfigured
-└── ImageGenerationToolMultipleCallsTest.php  # FR-009 — each call gets its own carrier message/image
+├── ImageGenerationToolMultipleCallsTest.php  # FR-009 — each call gets its own carrier message/image
+├── ImageGenerationToolEmptyPromptTest.php    # FR-008 — empty/missing prompt rejected (post-implementation)
+└── AgentLoopToolUsageInstructionsTest.php    # post-implementation — the instruction is present in every request, appended to the existing system message
 ```
 
 **Structure Decision**: Existing single Laravel + React project — no new project or service boundary. The new tool lives in `App\Services\AgentLoop\Tools`, alongside the existing two, and the new shared service lives in `App\Services\ImageGenProviders`, alongside the existing image-gen classes it wraps — both follow the project's existing service-class and tool-registration conventions rather than introducing a new architectural layer.
