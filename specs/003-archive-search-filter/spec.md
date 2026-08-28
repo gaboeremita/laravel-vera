@@ -8,6 +8,12 @@
 
 **Input**: User description: "A new implementation, in the Archive page, a comprehensive search and filter inputs, we might filter by tags and keywords, and search might filter by title and content of the entries in realtime"
 
+## Clarifications
+
+### Session 2026-08-28
+
+- Q: What's the typical or maximum number of entries you'd expect in a single archive that this search/filter feature needs to handle well? → A: Small — typically under 100 entries per archive; client-side filtering stays sufficient. Large, RAG-backed archives (potentially thousands of entries) are a future consideration, out of scope for this feature.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Real-time text search across entries (Priority: P1)
@@ -107,4 +113,5 @@ A user wants to narrow the entry list using the free-form keywords already recor
 - Search and filtering apply within the currently open archive's entries only, matching the existing page structure where one archive's entries are viewed at a time.
 - Filtering happens against the entries already loaded for the open archive, consistent with the current architecture where an archive's entries load together rather than in pages.
 - Multiple selections within the same filter facet (e.g., two tags) combine as "matches any"; the search text and the two filter facets combine with each other as "matches all" (an entry must satisfy every active criterion).
-- No new backend query parameters or endpoints are assumed to be required, since the archive's entries are already fully available where this feature would apply.
+- This feature targets archives of up to roughly 100 entries, consistent with the current single-request, unpaginated architecture; client-side filtering is sufficient and no new backend search endpoints are required at this scale.
+- Large, RAG-backed archives (potentially thousands of entries) are anticipated for a future iteration but are explicitly out of scope here; this feature's client-side approach is not required to scale to that case.
