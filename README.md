@@ -596,4 +596,4 @@ Emotions are now also manageable per-assistant directly through the UI on the Ed
 
 ## License
 
-Private. Not for distribution.
+MIT — see [LICENSE](LICENSE) for details.
