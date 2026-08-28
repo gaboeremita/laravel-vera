@@ -54,11 +54,12 @@ class ImageGenerationTool implements AgentTool
         ]);
 
         $storagePath = "messages/{$this->assistantUser->user_id}/{$this->conversation->id}";
-        Image::storeFromBase64($result['imageData'], $carrierMessage, $storagePath);
+        $image = Image::storeFromBase64($result['imageData'], $carrierMessage, $storagePath);
 
         return [
             'status' => 'success',
             'enhanced_prompt' => $result['enhancedPrompt'],
+            'image_url' => $image->url,
         ];
     }
 

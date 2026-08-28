@@ -30,4 +30,8 @@ test('a single generate_image call produces an image message and completes the t
 
     expect($response->json('tool_calls.0.name'))->toBe('generate_image');
     expect($response->json('tool_calls.0.result.status'))->toBe('success');
+
+    // The frontend has no other way to learn about the carrier message/image created
+    // above within this same response — it renders directly from this URL (ChatPage.jsx).
+    expect($response->json('tool_calls.0.result.image_url'))->toBe($imageMessage->image->url);
 });

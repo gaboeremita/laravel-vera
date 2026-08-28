@@ -26,6 +26,7 @@ class AgentLoopRunner
      */
     public function run(Assistant $assistant, array $messages, Conversation $conversation): AgentRunResult
     {
+        $messages = $this->withToolUsageInstructions($messages);
         $stepLimit = data_get($assistant->agent_config, 'step_limit', config('agent.step_limit'));
         $maxConsecutiveFailures = config('agent.tool_retry_attempts');
         $toolDefinitions = $this->toolDefinitions();
@@ -206,6 +207,30 @@ class AgentLoopRunner
         ];
 
         return $this->provider->chat($messages)->content;
+    }
+
+    /**
+     * Unlike a plain chat() call, every request in this loop carries the same $tools
+     * definitions — including the turn immediately after a tool result comes back,
+     * where the model is only expected to answer in natural language. Nothing else
+     * in the prompt says so; without it, a model can (and in practice does) treat an
+     * already-executed tool result as still needing a call, and describe one as text
+     * instead of either using the real tool-calling channel or just answering.
+     *
+     * @param  array<int, array<string, mixed>>  $messages
+     * @return array<int, array<string, mixed>>
+     */
+    private function withToolUsageInstructions(array $messages): array
+    {
+        $instruction = 'You have tools available for this task. Use the tool-calling mechanism provided by the API to call one — never describe a tool call as text or JSON in your reply. Once a tool result has been given back to you, treat that tool as already done: respond to the user in natural language, and only call a tool again if the task genuinely still needs it.';
+
+        if (($messages[0]['role'] ?? null) === 'system') {
+            $messages[0]['content'] = trim(($messages[0]['content'] ?? '')."\n\n{$instruction}");
+        } else {
+            array_unshift($messages, ['role' => 'system', 'content' => $instruction]);
+        }
+
+        return $messages;
     }
 
     private function writeProgress(int $conversationId, string $status): void
