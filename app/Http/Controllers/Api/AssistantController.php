@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\AssistantMode;
+use App\Enums\AssistantPortraitType;
 use App\Http\Controllers\Controller;
 use App\Models\Assistant;
 use App\Models\Image;
@@ -52,6 +53,7 @@ class AssistantController extends Controller
     {
         $assistant = $request->user()
             ->assistants()
+            ->with('vrm')
             ->findOrFail($id);
 
         $mapEmotion = fn ($emotion) => [
@@ -81,6 +83,8 @@ class AssistantController extends Controller
             'prompt' => $assistant->prompt,
             'archive_id' => $assistant->archive_id,
             'mode' => $assistant->mode,
+            'portrait_type' => $assistant->portrait_type->value,
+            'vrm_url' => $assistant->vrm?->url,
             'emotions' => $emotions,
             'restricted_emotions' => $restrictedEmotions,
         ]);
@@ -178,6 +182,7 @@ class AssistantController extends Controller
             'prompt' => ['nullable', 'array'],
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
+            'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
         ]);
 
         $assistant->update($validated);

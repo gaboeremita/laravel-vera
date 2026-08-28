@@ -25,6 +25,11 @@ export default function EditAssistantPage() {
 	const [archives, setArchives] = useState([]);
 	const [selectedArchiveId, setSelectedArchiveId] = useState('');
 	const [mode, setMode] = useState('assistant');
+	const [portraitType, setPortraitType] = useState('image');
+	const [vrmFilename, setVrmFilename] = useState(null);
+	const [isUploadingVrm, setIsUploadingVrm] = useState(false);
+	const [isDeletingVrm, setIsDeletingVrm] = useState(false);
+	const vrmInputRef = useRef(null);
 	const [promptMode, setPromptMode] = useState('manual');
 	const [promptJson, setPromptJson] = useState('');
 	const [promptJsonError, setPromptJsonError] = useState(null);
@@ -54,6 +59,8 @@ export default function EditAssistantPage() {
 				setOpeningMessage(data.opening_message || '');
 				setSelectedArchiveId(data.archive_id ? String(data.archive_id) : '');
 				setMode(data.mode || 'assistant');
+				setPortraitType(data.portrait_type || 'image');
+				setVrmFilename(data.vrm_url ? data.vrm_url.split('/').pop() : null);
 				const loadedEmotions = data.emotions || [];
 				setEmotions(loadedEmotions);
 				setRestrictedEmotions(data.restricted_emotions || []);
@@ -84,6 +91,7 @@ export default function EditAssistantPage() {
 				opening_message: openingMessage.trim() || null,
 				archive_id: selectedArchiveId ? Number(selectedArchiveId) : null,
 				mode,
+				portrait_type: portraitType,
 			});
 
 			if (!res.ok) {
@@ -96,6 +104,42 @@ export default function EditAssistantPage() {
 			addToast(e.message || 'Failed to save assistant', 'error');
 		} finally {
 			setIsSaving(false);
+		}
+	};
+
+	const handleVrmUpload = async (e) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+		setIsUploadingVrm(true);
+		try {
+			const formData = new FormData();
+			formData.append('vrm', file);
+			const res = await api.postForm(route('assistants.vrm.store', { id }), formData);
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Upload failed');
+			}
+			setVrmFilename(file.name);
+			addToast('VRM file uploaded', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to upload VRM file', 'error');
+		} finally {
+			setIsUploadingVrm(false);
+			if (vrmInputRef.current) vrmInputRef.current.value = '';
+		}
+	};
+
+	const handleVrmDelete = async () => {
+		setIsDeletingVrm(true);
+		try {
+			const res = await api.delete(route('assistants.vrm.destroy', { id }));
+			if (!res.ok) throw new Error('Delete failed');
+			setVrmFilename(null);
+			addToast('VRM file deleted', 'success');
+		} catch {
+			addToast('Failed to delete VRM file', 'error');
+		} finally {
+			setIsDeletingVrm(false);
 		}
 	};
 
@@ -302,6 +346,55 @@ export default function EditAssistantPage() {
 							<option value="agent">Agent</option>
 						</select>
 					</div>
+
+					<div>
+						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+							Portrait Type
+						</label>
+						<select
+							value={portraitType}
+							onChange={(e) => setPortraitType(e.target.value)}
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+						>
+							<option value="image">Image</option>
+							<option value="avatar3d">3D Avatar</option>
+						</select>
+					</div>
+
+					{portraitType === 'avatar3d' && (
+						<div className="space-y-2">
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+								VRM File
+							</label>
+							{vrmFilename ? (
+								<div className="flex items-center gap-2">
+									<span className="text-accent text-sm truncate flex-1">{vrmFilename}</span>
+									<button
+										onClick={handleVrmDelete}
+										disabled={isDeletingVrm}
+										className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-danger text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
+									>
+										{isDeletingVrm ? 'DELETING...' : 'DELETE'}
+									</button>
+								</div>
+							) : (
+								<button
+									onClick={() => vrmInputRef.current?.click()}
+									disabled={isUploadingVrm}
+									className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-line-1 text-fg-3 hover:border-fg-3 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
+								>
+									{isUploadingVrm ? 'UPLOADING...' : 'UPLOAD .VRM'}
+								</button>
+							)}
+							<input
+								ref={vrmInputRef}
+								type="file"
+								accept=".vrm"
+								onChange={handleVrmUpload}
+								className="hidden"
+							/>
+						</div>
+					)}
 
 					{/* Save basic fields */}
 					<div className="flex justify-end">

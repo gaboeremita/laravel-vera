@@ -5,12 +5,16 @@ import { api } from "../utils/api";
 export function useEmotions() {
 	const [emotions, setEmotions] = useState([]);
 	const [emotionsLoaded, setEmotionsLoaded] = useState(false);
+	const [portraitType, setPortraitType] = useState('image');
+	const [vrmUrl, setVrmUrl] = useState(null);
 
 	const fetchEmotions = async (assistantId) => {
 		try {
 			const res = await api.get(route('emotions.index', { assistant: assistantId }));
 			const data = await res.json();
-			setEmotions(data);
+			setEmotions(data.emotions ?? []);
+			setPortraitType(data.portrait_type ?? 'image');
+			setVrmUrl(data.vrm_url ?? null);
 			setEmotionsLoaded(true);
 		} catch {
 			// silent fail
@@ -34,5 +38,7 @@ export function useEmotions() {
 		fetchEmotions,
 		getImageUrl,
 		getVideoUrl,
+		portraitType,
+		vrmUrl,
 	};
 }

@@ -17,7 +17,7 @@
 
 **Purpose**: New frontend dependencies required by all subsequent phases.
 
-- [ ] T001 Install npm packages `three`, `@react-three/fiber`, `@pixiv/three-vrm` in `package.json`
+- [x] T001 Install npm packages `three`, `@react-three/fiber`, `@pixiv/three-vrm` in `package.json`
 
 **Checkpoint**: `npm install` completes without errors.
 
@@ -27,12 +27,12 @@
 
 **Purpose**: Backend models, migrations, and enum that every user story phase depends on. No user story work can begin until this phase is complete.
 
-- [ ] T002 Create `AssistantPortraitType` enum (`Image = 'image'`, `Avatar3d = 'avatar3d'`) in `app/Enums/AssistantPortraitType.php`
-- [ ] T003 [P] Create migration `add_portrait_type_to_assistants_table` — add `portrait_type` string column (default `'image'`) to `assistants` in `database/migrations/`
-- [ ] T004 [P] Create migration `create_vrm_files_table` — polymorphic columns (`vrmable_type`, `vrmable_id`), `path`, `disk`, `mime_type`, `size`, `original_name` nullable, unique index on morph columns in `database/migrations/`
-- [ ] T005 Create `VrmFile` model — fillable, `url` accessor via `Storage::disk()->url()`, `vrmable()` MorphTo in `app/Models/VrmFile.php` (after T004)
-- [ ] T006 [P] Create `VrmFileFactory` in `database/factories/VrmFileFactory.php`
-- [ ] T007 Update `Assistant` model — add `portrait_type` to fillable, cast `portrait_type` to `AssistantPortraitType`, add `vrm(): MorphOne` relationship to `VrmFile` in `app/Models/Assistant.php` (after T002, T003, T004, T005)
+- [x] T002 Create `AssistantPortraitType` enum (`Image = 'image'`, `Avatar3d = 'avatar3d'`) in `app/Enums/AssistantPortraitType.php`
+- [x] T003 [P] Create migration `add_portrait_type_to_assistants_table` — add `portrait_type` string column (default `'image'`) to `assistants` in `database/migrations/`
+- [x] T004 [P] Create migration `create_vrm_files_table` — polymorphic columns (`vrmable_type`, `vrmable_id`), `path`, `disk`, `mime_type`, `size`, `original_name` nullable, unique index on morph columns in `database/migrations/`
+- [x] T005 Create `VrmFile` model — fillable, `url` accessor via `Storage::disk()->url()`, `vrmable()` MorphTo in `app/Models/VrmFile.php` (after T004)
+- [x] T006 [P] Create `VrmFileFactory` in `database/factories/VrmFileFactory.php`
+- [x] T007 Update `Assistant` model — add `portrait_type` to fillable, cast `portrait_type` to `AssistantPortraitType`, add `vrm(): MorphOne` relationship to `VrmFile` in `app/Models/Assistant.php` (after T002, T003, T004, T005)
 
 **Checkpoint**: Run migrations (`php artisan migrate`) and confirm both new tables exist.
 
@@ -46,20 +46,20 @@
 
 ### Backend — User Story 1
 
-- [ ] T008 [P] [US1] Create `AssistantVrmController` with `store` (upload, validate `.vrm` extension and `max:51200`, replace existing, return `vrm_url`) and `destroy` (delete from storage and DB, 404 if none) in `app/Http/Controllers/Api/AssistantVrmController.php`
-- [ ] T009 [P] [US1] Register routes `POST /api/assistants/{id}/vrm` (name: `assistants.vrm.store`) and `DELETE /api/assistants/{id}/vrm` (name: `assistants.vrm.destroy`) inside the authenticated middleware group in `routes/api.php`
-- [ ] T010 [US1] Update `AssistantController::update` to accept and validate `portrait_type` (sometimes, enum `AssistantPortraitType`); update `AssistantController::show` to include `portrait_type` and `vrm_url` in the response in `app/Http/Controllers/Api/AssistantController.php`
-- [ ] T011 [US1] Update `EmotionController::index` — change flat array response to envelope `{ portrait_type, vrm_url, emotions: [...] }` in `app/Http/Controllers/Api/EmotionController.php`
-- [ ] T012 [US1] Write `AssistantVrmTest` (Pest feature test, factory-backed) covering: successful VRM upload returns 201 + vrm_url; file >50 MB rejected with 422; non-VRM file rejected with 422; upload is scoped to owner (other user gets 404); delete removes file and returns 200; delete non-existent returns 404; portrait_type persists via PATCH; emotions index returns new envelope shape in `tests/Feature/Api/AssistantVrmTest.php`
+- [x] T008 [P] [US1] Create `AssistantVrmController` with `store` (upload, validate `.vrm` extension and `max:51200`, replace existing, return `vrm_url`) and `destroy` (delete from storage and DB, 404 if none) in `app/Http/Controllers/Api/AssistantVrmController.php`
+- [x] T009 [P] [US1] Register routes `POST /api/assistants/{id}/vrm` (name: `assistants.vrm.store`) and `DELETE /api/assistants/{id}/vrm` (name: `assistants.vrm.destroy`) inside the authenticated middleware group in `routes/api.php`
+- [x] T010 [US1] Update `AssistantController::update` to accept and validate `portrait_type` (sometimes, enum `AssistantPortraitType`); update `AssistantController::show` to include `portrait_type` and `vrm_url` in the response in `app/Http/Controllers/Api/AssistantController.php`
+- [x] T011 [US1] Update `EmotionController::index` — change flat array response to envelope `{ portrait_type, vrm_url, emotions: [...] }` in `app/Http/Controllers/Api/EmotionController.php`
+- [x] T012 [US1] Write `AssistantVrmTest` (Pest feature test, factory-backed) covering: successful VRM upload returns 201 + vrm_url; file >50 MB rejected with 422; non-VRM file rejected with 422; upload is scoped to owner (other user gets 404); delete removes file and returns 200; delete non-existent returns 404; portrait_type persists via PATCH; emotions index returns new envelope shape in `tests/Feature/Api/AssistantVrmTest.php`
 
 ### Frontend — User Story 1
 
-- [ ] T013 [P] [US1] Update `useEmotions` hook — consume new envelope response shape, expose `portraitType` (default `'image'`) and `vrmUrl` (default `null`) alongside existing return values in `resources/js/hooks/useEmotions.js`
-- [ ] T014 [US1] Update `AuthenticatedLayout` — pass `portraitType` and `vrmUrl` (from `useEmotions`) as props to `<Portrait>` in `resources/js/layouts/AuthenticatedLayout.jsx` (after T013)
-- [ ] T015 [P] [US1] Create `VrmAvatar` component — R3F `<Canvas>` filling the portrait container, load VRM via `GLTFLoader` + `VRMLoaderPlugin`, camera positioned for bust framing, ambient + directional lighting, loading state while fetching, error fallback renders default VERA avatar image and logs the error in `resources/js/components/VrmAvatar.jsx`
-- [ ] T016 [US1] Update `Portrait` — accept `portraitType` and `vrmUrl` props (both optional, default to `'image'` / `null`); when `portraitType === 'avatar3d'` and `vrmUrl` is non-null render `<VrmAvatar vrmUrl={vrmUrl} emotion={emotion} />`; when `portraitType === 'avatar3d'` and `vrmUrl` is null render default VERA avatar image; all existing branches unchanged in `resources/js/components/Portrait.jsx` (after T015)
-- [ ] T017 [P] [US1] Update `EditAssistantPage` — add portrait type radio/select (image / 3D avatar); when "3D Avatar" selected show VRM file upload input wired to `POST /api/assistants/{id}/vrm`; show current VRM filename and a delete button wired to `DELETE /api/assistants/{id}/vrm`; PATCH assistant with `portrait_type` on save in `resources/js/pages/EditAssistantPage.jsx`
-- [ ] T018 [P] [US1] Update `CreateAssistantPage` — add portrait type toggle (defaults to image); when "3D Avatar" selected show optional VRM upload field (file stored via the VRM endpoint after assistant is created, or skip) in `resources/js/pages/CreateAssistantPage.jsx`
+- [x] T013 [P] [US1] Update `useEmotions` hook — consume new envelope response shape, expose `portraitType` (default `'image'`) and `vrmUrl` (default `null`) alongside existing return values in `resources/js/hooks/useEmotions.js`
+- [x] T014 [US1] Update `AuthenticatedLayout` — pass `portraitType` and `vrmUrl` (from `useEmotions`) as props to `<Portrait>` in `resources/js/layouts/AuthenticatedLayout.jsx` (after T013)
+- [x] T015 [P] [US1] Create `VrmAvatar` component — R3F `<Canvas>` filling the portrait container, load VRM via `GLTFLoader` + `VRMLoaderPlugin`, camera positioned for bust framing, ambient + directional lighting, loading state while fetching, error fallback renders default VERA avatar image and logs the error in `resources/js/components/VrmAvatar.jsx`
+- [x] T016 [US1] Update `Portrait` — accept `portraitType` and `vrmUrl` props (both optional, default to `'image'` / `null`); when `portraitType === 'avatar3d'` and `vrmUrl` is non-null render `<VrmAvatar vrmUrl={vrmUrl} emotion={emotion} />`; when `portraitType === 'avatar3d'` and `vrmUrl` is null render default VERA avatar image; all existing branches unchanged in `resources/js/components/Portrait.jsx` (after T015)
+- [x] T017 [P] [US1] Update `EditAssistantPage` — add portrait type radio/select (image / 3D avatar); when "3D Avatar" selected show VRM file upload input wired to `POST /api/assistants/{id}/vrm`; show current VRM filename and a delete button wired to `DELETE /api/assistants/{id}/vrm`; PATCH assistant with `portrait_type` on save in `resources/js/pages/EditAssistantPage.jsx`
+- [x] T018 [P] [US1] Update `CreateAssistantPage` — add portrait type toggle (defaults to image); when "3D Avatar" selected show optional VRM upload field (file stored via the VRM endpoint after assistant is created, or skip) in `resources/js/pages/CreateAssistantPage.jsx`
 
 **Checkpoint**: Scenarios 1, 2, 3, 7 from [quickstart.md](quickstart.md) pass. `php artisan test --compact --filter=AssistantVrm` is green.
 
@@ -71,8 +71,8 @@
 
 **Independent Test**: Send a message that produces `[happy]` — avatar transitions to happy expression. Send neutral — face smoothly returns to neutral.
 
-- [ ] T019 [US2] Create `vrmExpressions.js` — export `getBlendshapeTargets(emotionTag)` returning `Array<{ expression: string, weight: number }>` using the mapping from [research.md](research.md); returns empty array for unknown tags in `resources/js/utils/vrmExpressions.js`
-- [ ] T020 [US2] Update `VrmAvatar` — consume `emotion` prop; call `getBlendshapeTargets(emotion)` to compute targets; in `useFrame` lerp current `expressionManager` blendshape values toward targets each frame (~300 ms to converge); store current values in a mutable ref (not state) in `resources/js/components/VrmAvatar.jsx` (after T019)
+- [x] T019 [US2] Create `vrmExpressions.js` — export `getBlendshapeTargets(emotionTag)` returning `Array<{ expression: string, weight: number }>` using the mapping from [research.md](research.md); returns empty array for unknown tags in `resources/js/utils/vrmExpressions.js`
+- [x] T020 [US2] Update `VrmAvatar` — consume `emotion` prop; call `getBlendshapeTargets(emotion)` to compute targets; in `useFrame` lerp current `expressionManager` blendshape values toward targets each frame (~300 ms to converge); store current values in a mutable ref (not state) in `resources/js/components/VrmAvatar.jsx` (after T019)
 
 **Checkpoint**: Scenario 4 from [quickstart.md](quickstart.md) passes (visual verification).
 
@@ -84,7 +84,7 @@
 
 **Independent Test**: Leave the chat view open for 10 seconds with no messages — avatar blinks at least once and the head visibly sways.
 
-- [ ] T021 [US3] Update `VrmAvatar` — (1) add blink accumulator mutable ref in `useFrame`; advance by `delta`; when it exceeds a randomised threshold (2–6 s), lerp `blink` blendshape to 1.0 then back to 0.0 over ~150 ms, reset with a new random threshold; blink runs as a separate blendshape layer that does not conflict with expression state; (2) add continuous head sway by applying a small sinusoidal rotation to the VRM humanoid head bone ref on each frame (e.g. `Math.sin(elapsed * 0.6) * 0.03` radians on Y, `Math.sin(elapsed * 0.4) * 0.015` on Z) — store elapsed time in a mutable ref, not state in `resources/js/components/VrmAvatar.jsx`
+- [x] T021 [US3] Update `VrmAvatar` — (1) add blink accumulator mutable ref in `useFrame`; advance by `delta`; when it exceeds a randomised threshold (2–6 s), lerp `blink` blendshape to 1.0 then back to 0.0 over ~150 ms, reset with a new random threshold; blink runs as a separate blendshape layer that does not conflict with expression state; (2) add continuous head sway by applying a small sinusoidal rotation to the VRM humanoid head bone ref on each frame (e.g. `Math.sin(elapsed * 0.6) * 0.03` radians on Y, `Math.sin(elapsed * 0.4) * 0.015` on Z) — store elapsed time in a mutable ref, not state in `resources/js/components/VrmAvatar.jsx`
 
 **Checkpoint**: Scenarios 5 and the US3 scenario 2 (head sway) from [quickstart.md](quickstart.md) pass (visual verification).
 
@@ -92,10 +92,10 @@
 
 ## Phase 6: Polish & Lint
 
-- [ ] T022 [P] Run `vendor/bin/pint --dirty --format agent` and fix any violations across all PHP files changed in this feature
-- [ ] T023 [P] Run `php artisan test --compact --filter=AssistantVrm` and confirm all tests pass
-- [ ] T024 [P] Run `npm run lint` and fix any ESLint violations across all JS/JSX files changed in this feature
-- [ ] T025 Complete manual verification per [quickstart.md](quickstart.md) scenarios 1–7
+- [x] T022 [P] Run `vendor/bin/pint --dirty --format agent` and fix any violations across all PHP files changed in this feature
+- [x] T023 [P] Run `php artisan test --compact --filter=AssistantVrm` and confirm all tests pass
+- [x] T024 [P] Run `npm run lint` and fix any ESLint violations across all JS/JSX files changed in this feature
+- [x] T025 Complete manual verification per [quickstart.md](quickstart.md) scenarios 1–7
 
 ---
 

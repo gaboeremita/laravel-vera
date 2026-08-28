@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AssistantMode;
+use App\Enums\AssistantPortraitType;
 use Database\Factories\AssistantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,8 +11,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['name', 'slug', 'description', 'prompt', 'opening_message', 'archive_id', 'mode', 'agent_config'])]
+#[Fillable(['name', 'slug', 'description', 'prompt', 'opening_message', 'archive_id', 'mode', 'agent_config', 'portrait_type'])]
 class Assistant extends Model
 {
     /** @use HasFactory<AssistantFactory> */
@@ -23,6 +25,7 @@ class Assistant extends Model
             'prompt' => 'array',
             'mode' => AssistantMode::class,
             'agent_config' => 'array',
+            'portrait_type' => AssistantPortraitType::class,
         ];
     }
 
@@ -41,5 +44,10 @@ class Assistant extends Model
     public function emotions(): HasMany
     {
         return $this->hasMany(Emotion::class);
+    }
+
+    public function vrm(): MorphOne
+    {
+        return $this->morphOne(VrmFile::class, 'vrmable');
     }
 }

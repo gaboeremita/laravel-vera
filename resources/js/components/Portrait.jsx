@@ -1,7 +1,8 @@
-import {useState, useEffect} from "react";
+import {useState} from "react";
 import veraAvatar from "../../images/vera-avatar.png";
+import VrmAvatar from "./VrmAvatar.jsx";
 
-export default function Portrait({ emotion, authenticated, hasAssistant = true, getImageUrl, getVideoUrl }) {
+export default function Portrait({ emotion, authenticated, hasAssistant = true, getImageUrl, getVideoUrl, portraitType = 'image', vrmUrl = null }) {
 	const [playingVideo, setPlayingVideo] = useState(false);
 
 	const src = getImageUrl(emotion) || getImageUrl('default');
@@ -47,6 +48,30 @@ export default function Portrait({ emotion, authenticated, hasAssistant = true, 
 					<span className="nebula-blob nebula-blob-3" />
 				</div>
 				<div className="vera-avatar-idle relative z-10 w-2/3 aspect-square">
+					<img src={veraAvatar} alt="vera" className="w-full h-full object-contain" />
+					<img src={veraAvatar} alt="" aria-hidden="true" className="depth absolute inset-0 w-full h-full object-contain" />
+				</div>
+			</div>
+		);
+	}
+
+	if (portraitType === 'avatar3d') {
+		if (vrmUrl) {
+			return (
+				<div className="relative w-full h-full overflow-hidden portrait-bg">
+					<VrmAvatar vrmUrl={vrmUrl} emotion={emotion} />
+					<div className="absolute inset-0 pointer-events-none portrait-overlay" />
+					<div className="absolute bottom-3 left-3 bg-black/60 px-2.5 py-1 text-[0.6rem] tracking-[0.15em] text-accent uppercase">
+						mood: {emotion}
+					</div>
+				</div>
+			);
+		}
+
+		return (
+			<div className="relative w-full h-full overflow-hidden bg-bg-0 flex items-center justify-center">
+				<div className="absolute inset-0 bg-gradient-to-b from-accent/5 via-bg-0 to-accent/10" />
+				<div className="vera-avatar relative z-10 w-2/3 aspect-square">
 					<img src={veraAvatar} alt="vera" className="w-full h-full object-contain" />
 					<img src={veraAvatar} alt="" aria-hidden="true" className="depth absolute inset-0 w-full h-full object-contain" />
 				</div>

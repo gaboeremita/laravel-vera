@@ -33,6 +33,10 @@ export default function CreateAssistantPage() {
 	// Agent mode
 	const [assistantMode, setAssistantMode] = useState('assistant');
 
+	// Portrait type
+	const [portraitType, setPortraitType] = useState('image');
+	const [pendingVrmFile, setPendingVrmFile] = useState(null);
+
 	useEffect(() => {
 		api.get(route('archives.index'))
 			.then((res) => res.json())
@@ -118,6 +122,7 @@ export default function CreateAssistantPage() {
 			formData.append('description', description.trim());
 			formData.append('opening_message', openingMessage.trim());
 			formData.append('mode', assistantMode);
+			formData.append('portrait_type', portraitType);
 
 			if (promptMode === 'json') {
 				try {
@@ -154,6 +159,14 @@ export default function CreateAssistantPage() {
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
 				throw new Error(error.message || 'Failed to create assistant');
+			}
+
+			const created = await res.json();
+
+			if (pendingVrmFile && created.id) {
+				const vrmForm = new FormData();
+				vrmForm.append('vrm', pendingVrmFile);
+				await api.postForm(route('assistants.vrm.store', { id: created.id }), vrmForm);
 			}
 
 			addToast('Assistant created', 'success');
@@ -263,6 +276,37 @@ export default function CreateAssistantPage() {
 							<option value="agent">Agent</option>
 						</select>
 					</div>
+
+					<div>
+						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+							Portrait Type
+						</label>
+						<select
+							value={portraitType}
+							onChange={(e) => setPortraitType(e.target.value)}
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+						>
+							<option value="image">Image</option>
+							<option value="avatar3d">3D Avatar</option>
+						</select>
+					</div>
+
+					{portraitType === 'avatar3d' && (
+						<div className="space-y-1">
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+								VRM File <span className="text-fg-3 normal-case">(optional, can upload later)</span>
+							</label>
+							<input
+								type="file"
+								accept=".vrm"
+								onChange={(e) => setPendingVrmFile(e.target.files?.[0] ?? null)}
+								className="w-full text-sm text-accent file:mr-3 file:border file:border-line-1 file:bg-bg-1 file:text-fg-3 file:text-[0.65rem] file:tracking-[0.1em] file:px-3 file:py-1 file:cursor-pointer"
+							/>
+							{pendingVrmFile && (
+								<span className="text-fg-3 text-[0.65rem]">{pendingVrmFile.name}</span>
+							)}
+						</div>
+					)}
 				</div>
 
 				{/* Divider */}
