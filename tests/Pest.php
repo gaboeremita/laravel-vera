@@ -5,6 +5,8 @@ use App\Models\AiProvider;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
+use App\Models\ImageGenModel;
+use App\Models\ImageGenProvider;
 use App\Models\Settings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -100,6 +102,40 @@ function finalAnswerResponse(string $content): array
         'choices' => [[
             'message' => ['content' => $content],
             'finish_reason' => 'stop',
+        ]],
+    ];
+}
+
+function configureImageGenModel(User $user, Assistant $assistant, string $url, ?int $timeout = null): ImageGenModel
+{
+    $provider = ImageGenProvider::create([
+        'user_id' => $user->id,
+        'name' => 'Fake Image Provider',
+        'url' => $url,
+        'api_key' => 'fake-image-key',
+        'config_schema' => [],
+        'format' => 'openrouter',
+    ]);
+
+    $imageGenModel = ImageGenModel::create([
+        'provider_id' => $provider->id,
+        'name' => 'Fake Image Model',
+        'endpoint' => 'fake-image-model',
+        'config' => $timeout ? ['timeout' => $timeout] : [],
+    ]);
+
+    $settings = Settings::where('user_id', $user->id)->where('assistant_id', $assistant->id)->first();
+    $settings->update(['data' => [...$settings->data, 'image_gen_model_id' => $imageGenModel->id]]);
+
+    return $imageGenModel;
+}
+
+function imageGenHttpResponse(string $imageData = 'fake-image-bytes'): array
+{
+    return [
+        'data' => [[
+            'b64_json' => base64_encode($imageData),
+            'media_type' => 'image/png',
         ]],
     ];
 }

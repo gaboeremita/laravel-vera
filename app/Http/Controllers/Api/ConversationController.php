@@ -14,8 +14,8 @@ use App\Models\Image;
 use App\Services\AgentLoop\AgentLoopRunner;
 use App\Services\AgentLoop\Tools\BasicCalculatorTool;
 use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
-use App\Services\ImageGenProviders\ImageGenManager;
-use App\Services\ImageGenProviders\ImageGenPromptEnhancer;
+use App\Services\AgentLoop\Tools\ImageGenerationTool;
+use App\Services\ImageGenProviders\ImageGenerationService;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\TtsProviders\TtsManager;
 use App\Traits\ResolvesAssistantUser;
@@ -251,10 +251,17 @@ class ConversationController extends Controller
                     return response()->json(['message' => 'This assistant is in agent mode and requires a model that supports tool-calling.'], 422);
                 }
 
-                $runner = new AgentLoopRunner($llm, [
+                $imageGenerationService = new ImageGenerationService;
+                $tools = [
                     new GetCurrentDatetimeTool,
                     new BasicCalculatorTool,
-                ]);
+                ];
+
+                if ($imageGenerationService->isAvailableFor($assistantUser)) {
+                    $tools[] = new ImageGenerationTool($imageGenerationService, $assistantUser, $conversation);
+                }
+
+                $runner = new AgentLoopRunner($llm, $tools);
 
                 $agentResult = $runner->run(
                     assistant: $assistantModel,
@@ -326,13 +333,8 @@ class ConversationController extends Controller
      */
     private function generateImageMessage(Request $request, AssistantUser $assistantUser, Conversation $conversation, string $rawPrompt): array
     {
-        $imageGenManager = new ImageGenManager;
-        $imageGenModel = $imageGenManager->resolveImageGenModel($assistantUser);
-
-        $enhancedPrompt = (new ImageGenPromptEnhancer)->enhance($rawPrompt, $assistantUser, $conversation, $imageGenModel);
-
-        $provider = $imageGenModel ? $imageGenManager->fromModel($imageGenModel) : $imageGenManager->fromConfig();
-        $result = $provider->generate($enhancedPrompt);
+        $result = (new ImageGenerationService)->generate($assistantUser, $conversation, $rawPrompt);
+        $enhancedPrompt = $result['enhancedPrompt'];
 
         $reaction = $this->reactToGeneratedImage($request, $assistantUser, $conversation, $rawPrompt, $enhancedPrompt);
         $parsed = $this->extractEmotionTag($reaction->content);
@@ -344,7 +346,7 @@ class ConversationController extends Controller
         ]);
 
         $storagePath = "messages/{$request->user()->id}/{$conversation->id}";
-        $image = Image::storeFromBase64($result->imageData, $assistantMessage, $storagePath);
+        $image = Image::storeFromBase64($result['imageData'], $assistantMessage, $storagePath);
 
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
 

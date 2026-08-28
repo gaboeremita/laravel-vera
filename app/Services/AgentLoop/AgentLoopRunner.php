@@ -130,7 +130,7 @@ class AgentLoopRunner
     private function executeWithRetries(ToolCallRequest $toolCall): array
     {
         $tool = $this->findTool($toolCall->name);
-        $attempts = config('agent.tool_retry_attempts');
+        $attempts = $tool->retryAttempts();
 
         for ($attempt = 1; $attempt <= $attempts; $attempt++) {
             try {
@@ -150,7 +150,7 @@ class AgentLoopRunner
      */
     private function executeWithTimeout(AgentTool $tool, array $arguments): array
     {
-        $timeout = config('agent.tool_timeout');
+        $timeout = $tool->timeoutSeconds();
 
         if (! function_exists('pcntl_alarm') || ! function_exists('pcntl_signal') || ! function_exists('pcntl_async_signals') || ! function_exists('pcntl_signal_get_handler')) {
             throw new \RuntimeException('Tool call timeout enforcement requires the pcntl extension.');
