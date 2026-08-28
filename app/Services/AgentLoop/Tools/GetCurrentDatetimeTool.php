@@ -34,4 +34,14 @@ class GetCurrentDatetimeTool implements AgentTool
             'timezone' => $timezone,
         ];
     }
+
+    public function timeoutSeconds(): int
+    {
+        return config('agent.tool_timeout');
+    }
+
+    public function retryAttempts(): int
+    {
+        return config('agent.tool_retry_attempts');
+    }
 }

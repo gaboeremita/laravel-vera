@@ -39,6 +39,16 @@ class BasicCalculatorTool implements AgentTool
         return ['result' => $this->evaluate($arguments['expression'])];
     }
 
+    public function timeoutSeconds(): int
+    {
+        return config('agent.tool_timeout');
+    }
+
+    public function retryAttempts(): int
+    {
+        return config('agent.tool_retry_attempts');
+    }
+
     private function evaluate(string $expression): float|int
     {
         $tokens = $this->tokenize($expression);

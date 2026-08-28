@@ -43,6 +43,16 @@ test('a tool call that exceeds agent.tool_timeout is interrupted, not left to ru
 
             return ['result' => 'should never get here'];
         }
+
+        public function timeoutSeconds(): int
+        {
+            return config('agent.tool_timeout');
+        }
+
+        public function retryAttempts(): int
+        {
+            return config('agent.tool_retry_attempts');
+        }
     };
 
     $runner = new AgentLoopRunner(

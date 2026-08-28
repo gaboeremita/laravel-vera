@@ -317,10 +317,20 @@ export default function ChatPage() {
 					fetchEmotions(assistantId);
 				}
 
+				const generatedImageMessages = (data.tool_calls || [])
+					.filter((call) => call.result?.image_url)
+					.map((call, index) => ({
+						id: `temp-${Date.now()}-image-${index}`,
+						role: 'assistant',
+						content: '',
+						image: call.result.image_url,
+					}));
+
 				setCurrentEmotion(emotion);
 				setHasError(false);
 				setMessages([
 					...updatedMessages,
+					...generatedImageMessages,
 					{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions, toolCalls: data.tool_calls || null },
 				]);
 				setIsLoading(false);
