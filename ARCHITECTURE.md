@@ -498,7 +498,7 @@ Image-gen provider and model management — structurally identical to `Providers
 Voice provider/model catalog — structurally similar to `ProvidersPage` but read-only for everything except the `prompt` field:
 - Lists providers via `useVoiceProviders` hook; `VoiceProviderAccordion` per provider, `VoiceModelAccordion` nested per model
 - No add/save/delete for provider/model config — those come from the seeder. Each provider shows its `instructions` text (URLs auto-linked) explaining what to run before selecting it
-- Voice is a free-text input with the model's seeded `voices` offered via `<datalist>` as suggestions, not an enforced dropdown — the actual valid set depends on whatever's currently loaded on the backing server, which this app doesn't control (see [Known Limitations](#known-limitations-1))
+- Voice is a free-text input with the model's seeded `voices` offered via `<datalist>` as suggestions, not an enforced dropdown — the actual valid set depends on whatever's currently loaded on the backing server, which this app doesn't control (see [Known Limitations](#known-limitations))
 - Picking a voice for an inactive model activates that model in the same action (`useVoiceProviders.chooseVoice`) — no separate SELECT-then-pick-voice step
 - Each accordion embeds a `PromptTreeEditor` for that provider's/model's `prompt` field, saved independently via the narrow `updatePrompt` endpoints
 
@@ -730,7 +730,7 @@ interface SttProvider {
     public function transcribe(string $audio): string;
 }
 ```
-**`App\Providers\Stt\WhisperSttProvider`** — posts raw audio bytes as multipart to whisper.cpp's `/inference` endpoint, returns the transcript. Resolved from `config('ai.stt.*')` (`AI_STT_*` env vars), not swappable per assistant. whisper.cpp is the only realistic local STT option today, so building a full DB-backed catalog for a field of one wasn't worth it (see [Known Limitations](#known-limitations-1)).
+**`App\Providers\Stt\WhisperSttProvider`** — posts raw audio bytes as multipart to whisper.cpp's `/inference` endpoint, returns the transcript. Resolved from `config('ai.stt.*')` (`AI_STT_*` env vars), not swappable per assistant. whisper.cpp is the only realistic local STT option today, so building a full DB-backed catalog for a field of one wasn't worth it (see [Known Limitations](#known-limitations)).
 
 **`App\Contracts\TtsProvider`** — TTS was refactored to be provider-agnostic and DB-managed, mirroring the LLM side exactly:
 ```php
@@ -798,7 +798,7 @@ An earlier implementation tried to bridge these systems in code — a client-sid
 
 ### Voice Settings & Caching
 
-Per-(user, assistant) voice selection — `tts_model_id` (which `VoiceModel` is active) and `tts_voice` (a free-text value, not an enforced enum — see [Known Limitations](#known-limitations-1)) — is stored the same way as `ai_model_id`: keys inside `Settings.data`, scoped by `(user_id, assistant_id)`.
+Per-(user, assistant) voice selection — `tts_model_id` (which `VoiceModel` is active) and `tts_voice` (a free-text value, not an enforced enum — see [Known Limitations](#known-limitations)) — is stored the same way as `ai_model_id`: keys inside `Settings.data`, scoped by `(user_id, assistant_id)`.
 
 `VoiceController::synthesize` is on the hot path of every voice-mode turn, so it never queries `Settings` directly. Instead:
 
@@ -930,7 +930,7 @@ Excluded sections for Discord (`except(['opening_message', 'voice mode', 'emotio
 - **No full member-list awareness** — an assistant knows which *other assistants* share a channel (from `assistant_discord_channels`), not which human members can see or are active in it. Real member visibility would need the `GUILD_MEMBERS` privileged intent (a third Developer Portal toggle beyond `MESSAGE_CONTENT`) plus an explicit `guild.members.fetch()` call on node-discord-api's side, and there's no cheap way to scope that down to "who can see this specific channel" beyond fetching everyone and checking permissions per member. Deliberately out of scope for now.
 - **node-discord-api is a separate, unmanaged process** — like the voice-mode backends, it isn't started, monitored, or restarted by Laravel, Herd, or a queue. If it isn't running, `DiscordController@discovery` degrades gracefully (returns `{guilds: [], message: '...'}` with a 502 rather than a hard error, so the settings page still renders), but no assistant will actually respond in Discord until it's started again.
 - **A single unhandled `client.login()` failure crashes every bot in the process, not just the one that failed** — all bots run in one Node process for simplicity (letting them share the discovery HTTP server and see each other's `client.user.id` locally), so a transient network failure on one bot's login is an unhandled promise rejection that takes the whole process down, not just that bot. Restarts have been rare enough in practice that this hasn't been fixed with retry/backoff logic yet.
-- **No test coverage** — `sendDiscordMessage`, `DiscordController`, and the sibling-message merge/dedup logic have no automated tests yet, same repo-wide sqlite/`vector`-column blocker as the rest of the feature test suite (see [Voice Mode → Known Limitations](#known-limitations-1)).
+- **No test coverage** — `sendDiscordMessage`, `DiscordController`, and the sibling-message merge/dedup logic have no automated tests yet, same repo-wide sqlite/`vector`-column blocker as the rest of the feature test suite (see [Voice Mode → Known Limitations](#known-limitations)).
 
 ---
 
@@ -1048,8 +1048,8 @@ The app uses Sanctum's SPA cookie authentication — no tokens, no localStorage:
 ### Known Gaps
 
 - **Emotion not persisted** — the `emotion` column exists on `messages` but is never written. Emotion state is frontend-only.
-- **Voice mode implemented, with known gaps** — see [Voice Mode → Known Limitations](#known-limitations-1): notably Orpheus's 5-15s latency (backend-specific, not universal), no per-assistant speed control, no streaming, voice lists that can drift from what's actually loaded on hot-swappable backends, and a repo-wide test-DB issue blocking feature tests for the voice endpoints and the whole TTS provider system.
-- **Discord integration implemented, with known gaps** — see [Discord Integration → Known Limitations](#known-limitations-2): no real `@mention` capability yet (name-only awareness of other assistants), no member-list visibility, and node-discord-api is an unmanaged separate process with no test coverage on either side.
+- **Voice mode implemented, with known gaps** — see [Voice Mode → Known Limitations](#known-limitations): notably Orpheus's 5-15s latency (backend-specific, not universal), no per-assistant speed control, no streaming, voice lists that can drift from what's actually loaded on hot-swappable backends, and a repo-wide test-DB issue blocking feature tests for the voice endpoints and the whole TTS provider system.
+- **Discord integration implemented, with known gaps** — see [Discord Integration → Known Limitations](#known-limitations-1): no real `@mention` capability yet (name-only awareness of other assistants), no member-list visibility, and node-discord-api is an unmanaged separate process with no test coverage on either side.
 - **Agent mode implemented, with known gaps** — see [Agent Mode & Image Generation → Known Limitations](#known-limitations-2): tool-call timeout enforcement hard-requires the `pcntl` extension, mode is per-assistant rather than per-message, and progress reporting is a single polled status string rather than granular step output.
 - **Metrics not implemented** — affection/trust/patience system planned but not built.
 
