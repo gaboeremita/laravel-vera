@@ -8,6 +8,12 @@
 
 **Input**: User description: "Create a new tool or skill for creating images, which can be called by agents. This implementation must reuse the already created chat command /create-image, so most of the implementation might need to be abstracted into its own classes that both the skill and the command will call"
 
+## Clarifications
+
+### Session 2026-08-27
+
+- Q: Should the spec's "looks and behaves the same as the manual command" language (User Story 2, FR-004) be loosened to describe consistency in storage/rendering mechanism rather than requiring the image and the assistant's comment to land in one combined message? → A: Yes — update the spec to describe consistency as the same underlying storage and in-conversation rendering mechanism; the image and the assistant's accompanying comment may appear as two separate messages rather than one combined message.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Assistant generates an image mid-task (Priority: P1)
@@ -27,7 +33,7 @@ While an agent-mode assistant is working through a task, the user asks for an im
 
 ### User Story 2 - Consistent results with the existing manual command (Priority: P2)
 
-A user who sometimes manually asks for an image and sometimes lets the assistant generate one automatically expects the same experience either way: same visual style, same storage/display in the conversation, same per-assistant provider configuration.
+A user who sometimes manually asks for an image and sometimes lets the assistant generate one automatically expects the same experience either way: same visual style, same underlying storage and viewing mechanism in the conversation, same per-assistant provider configuration.
 
 **Why this priority**: Divergent behavior between the manual command and the automated tool would confuse users and make the assistant's image output feel inconsistent or lower quality depending on how it was triggered.
 
@@ -36,7 +42,7 @@ A user who sometimes manually asks for an image and sometimes lets the assistant
 **Acceptance Scenarios**:
 
 1. **Given** an assistant with a specific image generation provider/model configured, **When** an image is generated automatically by the assistant's tool, **Then** it uses that same configuration rather than a separate default.
-2. **Given** an image generated automatically by the assistant, **When** it is displayed in the conversation, **Then** it looks and behaves the same as an image generated through the manual command (stored, attached to the conversation, viewable the same way).
+2. **Given** an image generated automatically by the assistant, **When** it is displayed in the conversation, **Then** it uses the same underlying storage and viewing mechanism as an image generated through the manual command (stored, attached to the conversation, viewable the same way), even though the image and the assistant's accompanying comment may appear as two separate messages rather than one combined message.
 
 ---
 
@@ -69,7 +75,7 @@ Unlike the assistant's existing instant tools (looking up the time, doing arithm
 - **FR-001**: The system MUST allow agent-mode assistants to generate images as part of their automated tool-calling capability, without requiring the end user to invoke a manual image-generation command.
 - **FR-002**: Images generated through the assistant's tool MUST be produced using the same per-assistant image generation provider and model configuration already used for manually requested images.
 - **FR-003**: Images generated through the assistant's tool MUST have their prompts enhanced using the same enhancement process already applied to manually requested images.
-- **FR-004**: Images generated through the assistant's tool MUST be stored and displayed within the conversation in the same way as manually requested images.
+- **FR-004**: Images generated through the assistant's tool MUST use the same underlying storage and in-conversation rendering mechanism as manually requested images; the image and the assistant's accompanying comment MAY appear as two separate messages rather than one combined message.
 - **FR-005**: The system MUST only offer the image-generation tool to assistants that are both in agent mode and have image generation configured.
 - **FR-006**: If image generation fails for any reason (misconfiguration, provider error, timeout), the system MUST surface a clear failure to the assistant's task loop and to the user, rather than leaving the task stalled or silently incomplete.
 - **FR-007**: The system MUST accommodate the normal time a successful image generation takes without treating it as a tool failure due to timing alone.
