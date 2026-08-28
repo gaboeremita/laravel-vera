@@ -80,13 +80,13 @@
 
 ## Phase 5: User Story 3 — Idle Animations (Priority: P3)
 
-**Goal**: The avatar blinks at randomised intervals of 2–6 seconds while idle, making the portrait feel alive between responses.
+**Goal**: The avatar blinks at randomised intervals and exhibits continuous subtle head sway while idle, making the portrait feel alive between responses.
 
-**Independent Test**: Leave the chat view open for 10 seconds with no messages — avatar blinks at least once.
+**Independent Test**: Leave the chat view open for 10 seconds with no messages — avatar blinks at least once and the head visibly sways.
 
-- [ ] T021 [US3] Update `VrmAvatar` — add blink accumulator mutable ref in `useFrame`; advance accumulator by `delta`; when it exceeds a randomised threshold (2–6 s), trigger blink by lerping `blink` blendshape to 1.0 then back to 0.0 over ~150 ms, then reset accumulator with a new random threshold; blink must not conflict with expression state (run as a separate blendshape layer) in `resources/js/components/VrmAvatar.jsx`
+- [ ] T021 [US3] Update `VrmAvatar` — (1) add blink accumulator mutable ref in `useFrame`; advance by `delta`; when it exceeds a randomised threshold (2–6 s), lerp `blink` blendshape to 1.0 then back to 0.0 over ~150 ms, reset with a new random threshold; blink runs as a separate blendshape layer that does not conflict with expression state; (2) add continuous head sway by applying a small sinusoidal rotation to the VRM humanoid head bone ref on each frame (e.g. `Math.sin(elapsed * 0.6) * 0.03` radians on Y, `Math.sin(elapsed * 0.4) * 0.015` on Z) — store elapsed time in a mutable ref, not state in `resources/js/components/VrmAvatar.jsx`
 
-**Checkpoint**: Scenario 5 from [quickstart.md](quickstart.md) passes (visual verification).
+**Checkpoint**: Scenarios 5 and the US3 scenario 2 (head sway) from [quickstart.md](quickstart.md) pass (visual verification).
 
 ---
 
@@ -94,7 +94,8 @@
 
 - [ ] T022 [P] Run `vendor/bin/pint --dirty --format agent` and fix any violations across all PHP files changed in this feature
 - [ ] T023 [P] Run `php artisan test --compact --filter=AssistantVrm` and confirm all tests pass
-- [ ] T024 Complete manual verification per [quickstart.md](quickstart.md) scenarios 1–7
+- [ ] T024 [P] Run `npm run lint` and fix any ESLint violations across all JS/JSX files changed in this feature
+- [ ] T025 Complete manual verification per [quickstart.md](quickstart.md) scenarios 1–7
 
 ---
 
@@ -157,6 +158,7 @@ Sequential after group A:
 3. Phase 3: US1 backend (T008–T012), then US1 frontend (T013–T018)
 4. **Validate**: quickstart scenarios 1, 2, 3, 7 + `AssistantVrmTest` green
 5. **Stop here** — 3D avatar configurable and renders; expressions and idle deferred
+6. Run T022 (Pint), T023 (tests), T024 (ESLint)
 
 ### Full Delivery
 

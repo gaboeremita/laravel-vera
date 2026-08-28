@@ -30,8 +30,8 @@ A user opens the assistant settings page and switches the portrait type from the
 1. **Given** an assistant is in image portrait mode, **When** the user switches to 3D avatar mode and uploads a valid `.vrm` file and saves, **Then** the assistant portrait displays the 3D model in a neutral pose.
 2. **Given** the assistant is in 3D avatar mode, **When** the user switches back to image mode and saves (without deleting the VRM file), **Then** the portrait reverts to the image-based display and the VRM file is preserved — re-enabling 3D avatar mode later restores the avatar without re-uploading.
 3. **Given** the assistant is in image mode with a VRM file stored, **When** the user switches to 3D avatar mode and saves (without uploading new images), **Then** the existing emotion images are preserved and unaffected.
-3. **Given** the assistant is in 3D avatar mode with no VRM file uploaded, **When** the user views the chat, **Then** the portrait falls back gracefully (e.g., shows the default VERA avatar image) rather than crashing or showing a blank area.
-4. **Given** an assistant with a VRM file configured, **When** a different user's assistant is loaded, **Then** the VRM file is scoped to the correct assistant and not shared or leaked to others.
+4. **Given** the assistant is in 3D avatar mode with no VRM file uploaded, **When** the user views the chat, **Then** the portrait falls back gracefully (e.g., shows the default VERA avatar image) rather than crashing or showing a blank area.
+5. **Given** an assistant with a VRM file configured, **When** a different user's assistant is loaded, **Then** the VRM file is scoped to the correct assistant and not shared or leaked to others.
 
 ---
 
