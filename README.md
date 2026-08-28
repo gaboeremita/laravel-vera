@@ -12,7 +12,7 @@ VERA is a general-purpose multi-assistant AI platform. Each assistant has its ow
 - **Frontend:** React 19 (via Vite, React Router)
 - **LLM:** Any OpenAI-compatible API or Anthropic — configured via the Providers UI
 - **Voice input (STT):** whisper.cpp, local, single fixed backend (`.env`-configured)
-- **Voice output (TTS):** Any OpenAI-compatible `/v1/audio/speech` backend — DB-managed via the Voice UI, same pattern as LLM providers. Orpheus and KittenTTS confirmed working.
+- **Voice output (TTS):** DB-managed, fully user-editable via the Voice UI, same pattern as LLM providers. Four formats: self-hosted OpenAI-compatible (Orpheus, KittenTTS confirmed working), OpenAI TTS, Deepgram, ElevenLabs.
 - **Database:** PostgreSQL
 - **Styling:** Tailwind CSS v4
 - **Auth:** Laravel Sanctum (SPA mode)
@@ -139,6 +139,11 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_USER_ID=
 TELEGRAM_CHAT_ID=
 TELEGRAM_ASSISTANT_ID=
+TELEGRAM_POLL_TIMEOUT=30       # getUpdates long-poll duration
+TELEGRAM_SEND_TIMEOUT=15       # sendMessage HTTP timeout
+TELEGRAM_TYPING_TIMEOUT=10     # sendChatAction ("typing...") HTTP timeout
+TELEGRAM_FILE_TIMEOUT=15       # getFile HTTP timeout
+TELEGRAM_DOWNLOAD_TIMEOUT=30   # downloading an attached file's bytes
 
 # Discord (optional — see Discord Integration below)
 DISCORD_API_URL=http://localhost:3001
@@ -156,25 +161,28 @@ Providers and models are managed through the **Providers** page in the UI (`/ass
 
 Each model has:
 - An endpoint/model identifier (e.g. `google/gemma-4-26b-a4b-it`)
-- Optional thinking toggle and thinking budget
-- Per-model config (JSON) and prompt override
+- An optional **thinking key** — the JSON field name in the API response holding the model's reasoning/chain-of-thought text (e.g. `reasoning`, `reasoning_content`); left blank if the model doesn't expose one
+- A **supports tool calling** toggle — required for the model to be usable by an agent-mode assistant
+- Config (JSON, validated against the provider's schema) and additional config (JSON, merged into the request body as-is — an escape hatch for anything the schema doesn't cover) and a prompt override
 
 The active model is selected per-user via the **SELECT** button in the Providers UI. If no model is selected, the fallback config from `.env` is used.
 
 ### Voice Providers
 
-TTS is pluggable the same way LLM providers are — but unlike LLM providers, the catalog is **seeded, not user-editable**. There's no add/edit/delete UI for `VoiceProvider`/`VoiceModel` rows; they're populated by `php artisan db:seed --class=VoiceProviderSeeder` (see `database/seeders/VoiceProviderSeeder.php`), which you edit and re-run to add or update entries.
+TTS is pluggable and DB-managed the same way LLM providers are, with the same full add/edit/delete UI. `php artisan db:seed --class=VoiceProviderSeeder` (see `database/seeders/VoiceProviderSeeder.php`) still exists and still runs, but only as a convenience — it pre-populates two ready-to-use self-hosted entries (Orpheus, KittenTTS); it's not the only way to add a provider.
 
 Each provider has:
-- A base URL, format (currently only `openai_compatible` — any backend speaking the OpenAI TTS request shape: `{model, input, voice}` → raw audio), and optional API key
-- An `instructions` field — plain text shown in the Voice UI telling you what to run before selecting this provider (e.g. which local processes need to be started)
+- A base URL, a format, and an optional API key. Four formats are supported: `openai_compatible` (any backend speaking the OpenAI TTS request shape `{model, input, voice}` → raw audio — self-hosted backends like Orpheus/KittenTTS), `openai_tts` (OpenAI's own TTS API, adds a steerable `instructions` field), `deepgram`, and `elevenlabs`
+- An `instructions` field — plain text shown in the Voice UI telling you what to run before selecting this provider (most relevant to self-hosted backends; optional either way)
 - An optional JSON `prompt` — injected into voice-mode conversations while this provider is active (see [Prompt Configuration](#prompt-configuration) below)
 
 Each model has:
-- An `endpoint` (the model identifier sent in requests) and a `voices` list — a hint, not an enforced option set, since the actual valid voices depend on whatever's currently loaded on the backing server
-- An optional JSON `prompt`, same injection mechanism as the provider's, layered on top of it
+- An `endpoint` (the model identifier sent in requests) and a `voices` list you type in yourself — a hint for the picker, not an enforced option set, since the actual valid voices depend on whatever's currently available on the backend
+- Optional config (JSON, e.g. `timeout`) and an optional JSON `prompt`, same injection mechanism as the provider's, layered on top of it. For `openai_tts`, a `tts instructions` key inside this prompt tree also doubles as the base text for that provider's steerable delivery instructions
 
 Selection happens on the **Voice** page (`/assistants/:id/voice`): pick a voice from a model to activate it (SELECT is implicit — choosing a voice for an inactive model activates it in the same action). If no model is selected, `AI_TTS_*` from `.env` is used as a fallback, same pattern as the LLM side.
+
+Known issue: creating a new voice **model** via "+ ADD MODEL" is currently broken (backend bug, tracked separately) — editing and deleting existing models, and full CRUD on providers, work fine.
 
 ### Image Generation Providers
 
@@ -237,6 +245,16 @@ Each assistant's prompt is stored as a JSON object in the `prompt` column of the
 The structure of the prompt JSON is flexible — any key becomes a section in the assembled system prompt. The `opening_message` field on the `Assistant` model is used as the first message when a new conversation is created.
 
 **Voice provider/model prompts** work the same way but live outside the assistant's own prompt: when voice mode is active, `voice provider prompt` and `voice model prompt` are appended as their own sections, sourced from the active `VoiceProvider`/`VoiceModel`'s `prompt` field (edited on the Voice page, not the Prompt page). This is how backend-specific instructions — e.g. Orpheus's inline `<laugh>`/`<chuckle>`/etc. vocal tags — stay out of the assistant's own prompt entirely, so switching to a provider without that capability (like KittenTTS) doesn't leave behind instructions for tags it can't produce.
+
+### Conversation Memory
+
+Conversations can accumulate a running text summary — `long_term_memory` — that's injected back into the system prompt so an assistant stays coherent about events outside the LLM's actual context window. Manage it from the **Memory** page (a link on the chat screen):
+
+- Edit the summary text directly, or trigger a summarization on demand ("Summarize since last" for just the new messages, "Summarize as far as possible" to redo the whole history)
+- Toggle **auto-summarize** to have it run automatically once 50 unsummarized messages accumulate, with no manual action needed
+- Customize *how* an assistant summarizes (tone, what to prioritize) via its per-assistant memory prompt, edited on the same page
+
+Summarization runs as a queued job (`SummarizeConversation`) — it needs the same [queue worker](#queue-worker-required-for-rag-embeddings) as Archive embeddings; without `php artisan queue:work` running, auto-summarize silently does nothing. See [ARCHITECTURE.md → Conversation Memory](./ARCHITECTURE.md#conversation-memory) for the full mechanics.
 
 ## Voice Mode
 
@@ -312,7 +330,7 @@ Any assistant can hold conversations in Discord, the same way it does through th
    php artisan tinker --execute 'echo App\Models\User::find(1)->createToken("discord-api")->plainTextToken;'
    ```
    Put that token in the bridge's own `.env` as `DISCORD_API_TOKEN` — it's how the bridge calls this app's `discord-messages` endpoint as you, separate from the shared secret above (which only protects the discovery endpoint).
-4. Go to an assistant's **Discord** page (`/assistants/:id/discord`) to see which Discord servers/channels its bot is currently in, set each channel's trigger mode (off / always / on mention), and write optional per-server and per-channel prompt context.
+4. Go to an assistant's **Discord** page (`/assistants/:id/discord`) to see which Discord servers/channels its bot is currently in, set each channel's trigger mode (off / always / on mention / on mention-by-name), and write optional per-server and per-channel prompt context.
 
 ### How it fits together
 
@@ -326,7 +344,11 @@ This app never talks to Discord directly and never stores a bot token. The bridg
 ```
 laravel-vera/
 ├── app/
+│   ├── Actions/
+│   │   ├── BuildArchiveFile.php               # Renders an archive + entries to Markdown via FileBuilder
+│   │   └── SummarizeConversation.php          # Long-term memory summarization logic (wrapped by the queued job)
 │   ├── Builders/
+│   │   ├── FileBuilder.php                   # heading()/paragraph()/keyValue() → Markdown string
 │   │   └── PromptBuilder.php                 # Assembles system prompt from assistant config
 │   ├── Console/Commands/
 │   │   ├── SyncEmotions.php                  # Seeds/syncs emotion records from config
@@ -340,13 +362,15 @@ laravel-vera/
 │   │   └── PromptDirector.php                # Reads assistant prompt config, builds system prompt
 │   ├── DTOs/
 │   │   ├── AgentRunResult.php                # Agent loop result: content + tool call summary
+│   │   ├── ImageGenResult.php                 # Generated image: raw data + content type + enhanced prompt
 │   │   ├── LlmResponse.php                   # Unified response: content + thinking
-│   │   └── ToolCallRequest.php               # Parsed LLM tool-call request: id/name/arguments
+│   │   ├── ToolCallRequest.php               # Parsed LLM tool-call request: id/name/arguments
+│   │   └── VoiceModeResult.php               # content + ttsInstructions, from TtsProvider::parseLlmResponse()
 │   ├── Enums/
 │   │   ├── AiProviderFormat.php              # generic | anthropic
 │   │   ├── AssistantMode.php                 # assistant | agent
 │   │   ├── ImageGenProviderFormat.php        # openrouter | openai_compatible
-│   │   └── VoiceProviderFormat.php           # openai_compatible → provider class
+│   │   └── VoiceProviderFormat.php           # openai_compatible | openai_tts | deepgram | elevenlabs
 │   ├── Http/Controllers/
 │   │   ├── Auth/
 │   │   │   └── AuthController.php            # Login/logout
@@ -354,36 +378,38 @@ laravel-vera/
 │   │   └── Api/
 │   │       ├── AgentProgressController.php   # Reads cached agent-loop status for the in-progress-turn indicator
 │   │       ├── AiProviderController.php      # CRUD for AI providers
-│   │       ├── AiModelController.php         # CRUD for AI models
-│   │       ├── ArchiveController.php         # Archive read/save (with async embedding)
+│   │       ├── AiModelController.php         # CRUD for AI models (thinking_key, supports_tools, config, additional_config)
+│   │       ├── ArchiveController.php         # Archive read/save (with async embedding) + Markdown export
 │   │       ├── AssistantController.php       # CRUD for assistants (multipart, emotion images, mode)
 │   │       ├── AssistantEmotionController.php# Per-assistant emotion store/update/destroy
+│   │       ├── AssistantMemoryPromptController.php # Show/update per-assistant memory summarization instructions
 │   │       ├── AssistantPromptController.php # Prompt CRUD (show/store/update/destroy)
 │   │       ├── ConversationController.php    # CRUD + message sending (voice_mode flag, /create-image, agent-mode dispatch, sendDiscordMessage)
+│   │       ├── ConversationMemoryController.php # Show/update/summarize/unlock a conversation's long-term memory
 │   │       ├── DiscordController.php         # Discovery proxy (syncs discord_servers/channels) + server/channel prompt updates
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
 │   │       ├── ImageGenProviderController.php# CRUD for image-gen providers
 │   │       ├── ImageGenModelController.php   # CRUD for image-gen models
 │   │       ├── SettingsController.php        # Theme + active LLM/voice/image-gen model + voice selection + Discord trigger mode
 │   │       ├── VoiceController.php           # Transcribe / synthesize
-│   │       ├── VoiceProviderController.php   # Read-only catalog + prompt-only update
-│   │       └── VoiceModelController.php      # Prompt-only update
+│   │       ├── VoiceProviderController.php   # Full CRUD + prompt-only update
+│   │       └── VoiceModelController.php      # Full CRUD + prompt-only update (store() currently broken)
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions, mode, agent_config)
-│   │   ├── AssistantUser.php                 # Pivot: user ↔ assistant
+│   │   ├── AssistantUser.php                 # Pivot: user ↔ assistant; memory_prompt (json)
 │   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model, voice, image-gen model)
 │   │   ├── AiProvider.php                    # DB-managed LLM provider
 │   │   ├── AiModel.php                       # DB-managed LLM model
 │   │   ├── ImageGenProvider.php               # User-managed image-gen provider
 │   │   ├── ImageGenModel.php                  # User-managed image-gen model
-│   │   ├── VoiceProvider.php                 # Seeded TTS provider catalog entry
-│   │   ├── VoiceModel.php                    # Seeded TTS model catalog entry
+│   │   ├── VoiceProvider.php                 # User-managed TTS provider (seeder pre-populates 2 convenience entries)
+│   │   ├── VoiceModel.php                    # User-managed TTS model
 │   │   ├── DiscordServer.php                 # Known Discord server (guild id + name)
 │   │   ├── DiscordChannel.php                # Known Discord channel, belongs to a DiscordServer
 │   │   ├── AssistantDiscordServer.php        # Per-assistant server prompt
 │   │   ├── AssistantDiscordChannel.php       # Per-assistant channel trigger mode + prompt
-│   │   ├── Conversation.php                  # discord_channel_id ties a conversation to a Discord channel
+│   │   ├── Conversation.php                  # discord_channel_id ties a conversation to a Discord channel; long_term_memory/memory_checkpoint_message_id/memory_summarizing_at/auto_summarize_enabled
 │   │   ├── Message.php                       # discord_message_id dedupes across assistants sharing a channel
 │   │   ├── Emotion.php                       # Expression name + restricted flag
 │   │   ├── Archive.php
@@ -392,7 +418,8 @@ laravel-vera/
 │   │   ├── Image.php                         # Polymorphic, stored on disk
 │   │   └── Video.php                         # Polymorphic, stored on disk
 │   ├── Jobs/
-│   │   └── EmbedArchiveEntry.php             # Async vector embedding for archive entries
+│   │   ├── EmbedArchiveEntry.php             # Async vector embedding for archive entries
+│   │   └── SummarizeConversation.php         # Queues Actions\SummarizeConversation; manages the memory_summarizing_at lock
 │   ├── Providers/
 │   │   ├── AppServiceProvider.php            # Binds EmbeddingProvider, SttProvider
 │   │   └── Stt/WhisperSttProvider.php        # Talks to whisper-server
@@ -415,7 +442,10 @@ laravel-vera/
 │       │   └── AnthropicProvider.php
 │       ├── TtsProviders/
 │       │   ├── TtsManager.php                # Resolves provider: DB model → config fallback (mirrors LlmManager)
-│       │   └── OpenAiCompatibleTtsProvider.php # Talks to any OpenAI-compatible /v1/audio/speech backend
+│       │   ├── OpenAiCompatibleTtsProvider.php # Self-hosted OpenAI-shaped backends (Orpheus, KittenTTS)
+│       │   ├── OpenAiTtsProvider.php          # OpenAI's TTS API; steerable instructions from [emotion] + prompt
+│       │   ├── DeepgramTtsProvider.php        # Token auth, model in query string
+│       │   └── ElevenLabsTtsProvider.php      # xi-api-key header, voice id in URL path
 │       └── TelegramService.php               # Telegram API wrapper
 ├── config/
 │   ├── agent.php                             # Step limit, tool timeout, retry attempts, progress cache TTL
@@ -453,27 +483,30 @@ laravel-vera/
 │   │   ├── CreateAssistantPage.jsx           # Multipart assistant creation form
 │   │   ├── EditAssistantPage.jsx             # Edit assistant + manage emotions
 │   │   ├── ConversationsPage.jsx             # Conversation list
-│   │   ├── ChatPage.jsx                      # Main chat interface
-│   │   ├── ArchivePage.jsx                   # Archive editor (RAG knowledge base)
+│   │   ├── ChatPage.jsx                      # Main chat interface; debounced localStorage draft persistence
+│   │   ├── MemoryPage.jsx                    # Conversation long-term memory editor + auto-summarize toggle
+│   │   ├── ArchivePage.jsx                   # Archive editor (RAG knowledge base) + Markdown export
 │   │   ├── PromptPage.jsx                    # Visual prompt editor
 │   │   ├── SettingsPage.jsx                  # Theme only
 │   │   ├── ProvidersPage.jsx                 # AI provider/model management
 │   │   ├── ImageGenProvidersPage.jsx          # Image-gen provider/model management (same pattern as ProvidersPage)
-│   │   ├── VoicePage.jsx                     # Read-only voice catalog; select model/voice, edit prompts
+│   │   ├── VoicePage.jsx                     # Voice provider/model management; select model/voice, edit prompts
 │   │   └── DiscordPage.jsx                   # Discord servers/channels; trigger mode + prompt editor per channel
 │   ├── components/
 │   │   ├── common/
 │   │   │   ├── Accordion.jsx                 # Reusable collapsible accordion
-│   │   │   └── ConfirmationModal.jsx         # Confirmation modal
+│   │   │   ├── ConfirmationModal.jsx         # Confirmation modal
+│   │   │   └── Toggle.jsx                    # On/off switch
 │   │   ├── ModelAccordion.jsx                # Model config + select/deselect
 │   │   ├── ProviderAccordion.jsx             # Provider config + nested models
 │   │   ├── ImageGenProviderAccordion.jsx     # Image-gen provider config + nested models
 │   │   ├── ImageGenModelAccordion.jsx        # Image-gen model config + select/deselect
 │   │   ├── AgentProgressIndicator.jsx        # Polls and shows agent-loop status during an in-progress turn
-│   │   ├── VoiceProviderAccordion.jsx        # Read-only provider info + prompt editor
-│   │   ├── VoiceModelAccordion.jsx           # Voice picker (free text + hints) + prompt editor
+│   │   ├── VoiceProviderAccordion.jsx        # Editable provider form + prompt editor
+│   │   ├── VoiceModelAccordion.jsx           # Editable model form + voice picker (free text + hints) + prompt editor
 │   │   ├── DiscordServerAccordion.jsx        # Server prompt editor + nested channel accordions
-│   │   ├── DiscordChannelAccordion.jsx       # Trigger mode select + channel prompt editor
+│   │   ├── DiscordChannelAccordion.jsx       # Trigger mode select (4 modes) + channel prompt editor
+│   │   ├── AssistantMemoryPromptEditor.jsx   # Prompt-tree editor for per-assistant memory instructions
 │   │   ├── PromptTreeEditor.jsx              # Manual/Paste-JSON toggle around a usePromptTree instance
 │   │   ├── EmotionGrid.jsx                   # Emotion image manager (add/rename/replace/delete)
 │   │   ├── PromptEditor.jsx                  # Local prompt tree editor (create/edit flows)
@@ -495,7 +528,8 @@ laravel-vera/
 │   │   ├── usePromptTree.js                  # Generic prompt tree editing state (reused by voice + Discord prompts)
 │   │   ├── useProviders.js                   # Provider/model CRUD + active model state
 │   │   ├── useImageGenProviders.js           # Image-gen provider/model CRUD + active model state
-│   │   ├── useVoiceProviders.js              # Read-only catalog + model/voice selection
+│   │   ├── useConversationMemory.js          # Memory show/save/summarize/unlock, polls while summarizing
+│   │   ├── useVoiceProviders.js              # Provider/model CRUD + model/voice selection
 │   │   ├── useDiscordSettings.js             # Discovery data + immediate-save trigger mode changes
 │   │   ├── useToast.js                       # Toast notification state
 │   │   └── useVoiceMode.js                   # Mic capture + voice activity detection
@@ -529,10 +563,12 @@ laravel-vera/
 - **Config fallback** — if no model is selected in the UI, the `.env` default is used
 - **Conversation persistence** — messages stored in PostgreSQL
 - **Conversation management UI** — list, create, delete, and rename conversations
-- **Archive with RAG** — editable knowledge base with semantic retrieval injected into the system prompt
+- **Archive with RAG** — editable knowledge base with semantic retrieval injected into the system prompt; exportable as a Markdown file
+- **Conversation memory** — manual or automatic long-term summarization of a conversation, injected back into the system prompt, with per-assistant summarization instructions. See [Conversation Memory](#conversation-memory)
+- **Chat draft persistence** — an unsent message survives navigating away and coming back, per (assistant, conversation), stored client-side
 - **Toast notifications** — non-intrusive feedback for UI actions
 - **Telegram integration** — long-poll bot for interacting with any configured assistant via Telegram
-- **Discord integration** — assistants respond in Discord via a separate bridge service, with per-channel trigger modes (off/always/on mention), per-server and per-channel prompt context, and shared awareness between assistants configured for the same channel. See [Discord Integration](#discord-integration)
+- **Discord integration** — assistants respond in Discord via a separate bridge service, with per-channel trigger modes (off/always/on mention/on mention-by-name), per-server and per-channel prompt context, and shared awareness between assistants configured for the same channel. See [Discord Integration](#discord-integration)
 - **Voice Mode** — speak to an assistant and hear replies read back; local STT (whisper.cpp, single fixed backend) and pluggable, DB-managed TTS. See [Voice Mode](#voice-mode)
 - **Provider-agnostic TTS** — any backend speaking the OpenAI-compatible `/v1/audio/speech` shape plugs in via a seeded `VoiceProvider`/`VoiceModel` row, no new code. Orpheus and KittenTTS confirmed working
 - **Per-provider/per-model voice prompts** — backend-specific instructions (e.g. Orpheus's inline vocal tags) live on the `VoiceProvider`/`VoiceModel` record and are injected only while that backend is active, via the same visual prompt-tree editor used for assistant prompts
