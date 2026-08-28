@@ -126,6 +126,11 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_USER_ID=
 TELEGRAM_CHAT_ID=
 TELEGRAM_ASSISTANT_ID=
+TELEGRAM_POLL_TIMEOUT=30       # getUpdates long-poll duration
+TELEGRAM_SEND_TIMEOUT=15       # sendMessage HTTP timeout
+TELEGRAM_TYPING_TIMEOUT=10     # sendChatAction ("typing...") HTTP timeout
+TELEGRAM_FILE_TIMEOUT=15       # getFile HTTP timeout
+TELEGRAM_DOWNLOAD_TIMEOUT=30   # downloading an attached file's bytes
 
 # Discord (optional — see Discord Integration below)
 DISCORD_API_URL=http://localhost:3001
