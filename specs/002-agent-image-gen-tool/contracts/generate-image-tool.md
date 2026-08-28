@@ -33,6 +33,10 @@ Any failure in steps 2-3 (unresolvable provider, HTTP failure, storage failure) 
 
 `timeoutSeconds()` returns `ImageGenerationService::resolveTimeoutFor($assistantUser) + 30` (research.md #4) — not the global `config('agent.tool_timeout')` the other two tools use.
 
+## Retries
+
+`retryAttempts()` returns `1` — no retry (research.md #5) — not the global `config('agent.tool_retry_attempts')` (3) the other two tools use. A failed generation is surfaced to the model immediately rather than retried against a paid, slow provider.
+
 ## Output shape sent to the model
 
 ```json

@@ -28,11 +28,12 @@ Implements the (extended) `App\Contracts\AgentTool` interface — a stateless-pe
 
 ## AgentTool (extended interface, not a data entity)
 
-Existing interface (`app/Contracts/AgentTool.php`) gains one new required method:
+Existing interface (`app/Contracts/AgentTool.php`) gains two new required methods:
 
 | Method | Notes |
 |---|---|
 | `timeoutSeconds(): int` | Per-tool timeout budget for `AgentLoopRunner::executeWithTimeout` (research.md #4). `GetCurrentDatetimeTool` and `BasicCalculatorTool` both return `config('agent.tool_timeout')`, preserving today's behavior exactly. `ImageGenerationTool` returns the resolved image-gen timeout plus a fixed buffer. |
+| `retryAttempts(): int` | Per-tool retry budget for `AgentLoopRunner::executeWithRetries` (research.md #5). `GetCurrentDatetimeTool` and `BasicCalculatorTool` both return `config('agent.tool_retry_attempts')`, preserving today's behavior exactly. `ImageGenerationTool` returns `1` — no retry — to bound the cost/latency of a repeatedly failing paid API call. |
 
 ## Data isolation (Constitution Principle IV)
 
