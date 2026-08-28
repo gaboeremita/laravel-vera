@@ -1,0 +1,47 @@
+# Contract: `generate_image` Tool
+
+The built-in image-generation tool for agent-mode assistants (spec.md User Story 1). Registered directly in code, alongside `get_current_datetime` and `basic_calculator` — not MCP-sourced. Only offered to assistants for whom `ImageGenerationService::isAvailableFor()` returns `true` (research.md #6, spec.md FR-005).
+
+## Definition
+
+- **Name**: `generate_image`
+- **Description**: "Generates an image from a text description and shows it to the user. Use when the user asks to see, generate, draw, or create a picture or image of something."
+- **Parameters**: `{prompt: string}` — a free-text description of the desired image, enhanced internally the same way `/create-image`'s argument already is (research.md #1).
+
+## Construction
+
+Unlike `GetCurrentDatetimeTool`/`BasicCalculatorTool` (parameterless constructors), `ImageGenerationTool` is constructed per-request with the resolved `AssistantUser` and `Conversation` already available in `ConversationController::sendMessage` at the point the tool list is built (`ConversationController.php:254-257`), plus an `ImageGenerationService` instance:
+
+```php
+new ImageGenerationTool($imageGenerationService, $assistantUser, $conversation)
+```
+
+## Behavior
+
+1. Reject a missing or empty `prompt` argument with a thrown `\RuntimeException` (FR-008), the same pattern `BasicCalculatorTool` uses for a missing `expression` — never generate a placeholder image.
+2. Call `ImageGenerationService::generate($assistantUser, $conversation, $arguments['prompt'])` (research.md #1) to get `{enhancedPrompt, imageData}`.
+3. Create a new `assistant`-role `Message` on `$conversation` with empty `content`, then `Image::storeFromBase64($imageData, $carrierMessage, $storagePath)` using the same `"messages/{$assistantUser->user_id}/{$conversation->id}"` storage-path shape `sendMessage`/`generateImageMessage` already use (research.md #3).
+4. Return a short confirmation to the model — no image bytes (research.md #3):
+
+```json
+{ "status": "success", "enhanced_prompt": "..." }
+```
+
+Any failure in steps 2-3 (unresolvable provider, HTTP failure, storage failure) MUST propagate as a thrown exception rather than being swallowed — `AgentLoopRunner`'s existing `\Throwable` catch around each tool call already surfaces it to the model and to the retry/failure-summary path (Constitution Principle V), so no new error-handling logic is needed inside the tool itself beyond letting real exceptions bubble up.
+
+## Timeout
+
+`timeoutSeconds()` returns `ImageGenerationService::resolveTimeoutFor($assistantUser) + 30` (research.md #4) — not the global `config('agent.tool_timeout')` the other two tools use.
+
+## Output shape sent to the model
+
+```json
+{ "status": "success", "enhanced_prompt": "a detailed, enhanced description of the generated image" }
+```
+
+On failure, the existing `AgentLoopRunner` failure path already wraps the exception message as `{"error": "..."}` — the tool does not need to produce its own error shape.
+
+## Behavior notes
+
+- Non-deterministic and I/O-bound, unlike the other two built-in tools — Pest tests fake the outbound HTTP call (`Http::fake()`) the same way `001-agentic-task-loop`'s tests fake the LLM call, per research.md #8.
+- Calling this tool more than once in the same task is allowed (FR-009) and produces one carrier `Message`/`Image` pair per call, each independent of the others (data-model.md).
