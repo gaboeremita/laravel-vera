@@ -18,21 +18,27 @@ class AssistantImageController extends Controller
         ]);
 
         $file = $validated['image'];
-
-        if ($assistant->cardImage) {
-            Storage::disk($assistant->cardImage->disk)->delete($assistant->cardImage->path);
-            $assistant->cardImage->delete();
-        }
+        $previousPath = $assistant->cardImage?->path;
+        $previousDisk = $assistant->cardImage?->disk;
 
         $path = $file->store("card/{$assistant->id}", 'public');
 
-        $image = $assistant->cardImage()->create([
-            'path' => $path,
-            'disk' => 'public',
-            'mime_type' => $file->getMimeType(),
-            'size' => $file->getSize(),
-            'original_name' => $file->getClientOriginalName(),
-        ]);
+        try {
+            $image = $assistant->cardImage()->updateOrCreate([], [
+                'path' => $path,
+                'disk' => 'public',
+                'mime_type' => $file->getMimeType(),
+                'size' => $file->getSize(),
+                'original_name' => $file->getClientOriginalName(),
+            ]);
+        } catch (\Throwable $e) {
+            Storage::disk('public')->delete($path);
+            throw $e;
+        }
+
+        if ($previousPath) {
+            Storage::disk($previousDisk)->delete($previousPath);
+        }
 
         return response()->json(['image_url' => $image->url], 201);
     }

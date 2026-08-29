@@ -26,7 +26,7 @@
 
 **Decision**: Per-assistant, database-backed mapping. The `emotions` table (already used for image-mode emotion records) gains a `vrm_blendshapes` JSON column: `array<{expression: string, weight: float}>`, nullable. Each assistant defines its own emotion names and blendshape targets via the assistant settings UI (`VrmEmotionEditor`) — there is no fixed application-level list of emotion names or expression names.
 
-`Assistant::promptEmotionNames()` reads the assistant's actual `Emotion` records for both portrait types (previously it returned a hardcoded list for `avatar3d` assistants, since they had no `Emotion` records to draw from — that fallback is gone now that avatar3d assistants create real `Emotion` rows too).
+`Assistant::promptEmotionNames()` reads the assistant's actual `Emotion` records for both portrait types (previously it returned a hardcoded list for `avatar3d` assistants, since they had no `Emotion` records to draw from — that fallback is gone now that avatar3d assistants create real `Emotion` rows too). `Emotion` rows are optional for `avatar3d` assistants — creation permits zero emotions. When none exist, `promptEmotionNames()` returns empty `regular` and `intimate` arrays, and `ConversationController` passes those empty arrays to the LLM, so no emotion tags are available or emitted until the user adds emotions via `VrmEmotionEditor`.
 
 On the frontend, `VrmAvatar`'s `useFrame` loop lerps whatever expression names appear in the resolved `blendshapes` prop (sourced from `useEmotions().getVrmBlendshapes(name)`), with no fixed list of expression names to iterate — any name the user's VRM model actually exposes works.
 

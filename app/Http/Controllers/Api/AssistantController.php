@@ -108,7 +108,7 @@ class AssistantController extends Controller
             $request->merge(['prompt' => json_decode($request->input('prompt'), true)]);
         }
 
-        $isAvatarMode = $request->input('portrait_type') === AssistantPortraitType::Avatar3d->value;
+        $isAvatarMode = $request->input('portrait_type') === AssistantPortraitType::Avatar3D->value;
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -120,20 +120,31 @@ class AssistantController extends Controller
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
             'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
             'emotions' => [$isAvatarMode ? 'nullable' : 'required', 'array', $isAvatarMode ? 'min:0' : 'min:1'],
-            'emotions.*.name' => ['required', 'string', 'max:255'],
+            'emotions.*.name' => ['required', 'string', 'max:255', 'distinct'],
             'emotions.*.image' => [$isAvatarMode ? 'sometimes' : 'required', 'file', 'image', 'max:10480'],
             'emotions.*.vrm_blendshapes' => ['sometimes', 'array'],
             'emotions.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'emotions.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
             'restricted_emotions' => ['sometimes', 'array'],
-            'restricted_emotions.*.name' => ['required', 'string', 'max:255'],
+            'restricted_emotions.*.name' => ['required', 'string', 'max:255', 'distinct'],
             'restricted_emotions.*.image' => [$isAvatarMode ? 'sometimes' : 'required', 'file', 'image', 'max:10480'],
             'restricted_emotions.*.vrm_blendshapes' => ['sometimes', 'array'],
             'restricted_emotions.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'restricted_emotions.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
 
-        // In image mode a "default" emotion is required
+        $duplicateAcrossArrays = collect($validated['emotions'] ?? [])
+            ->pluck('name')
+            ->intersect(collect($validated['restricted_emotions'] ?? [])->pluck('name'))
+            ->isNotEmpty();
+
+        if ($duplicateAcrossArrays) {
+            return response()->json([
+                'message' => 'Emotion names must be unique across emotions and restricted_emotions.',
+                'errors' => ['emotions' => ['Emotion names must be unique across emotions and restricted_emotions.']],
+            ], 422);
+        }
+
         if (! $isAvatarMode) {
             $hasDefault = collect($validated['emotions'] ?? [])
                 ->contains(fn ($e) => $e['name'] === 'default');
@@ -158,10 +169,8 @@ class AssistantController extends Controller
                 'portrait_type' => $validated['portrait_type'] ?? AssistantPortraitType::Image->value,
             ]);
 
-            // Create the pivot
             $request->user()->assistants()->attach($assistant->id);
 
-            // Store emotions with images and/or VRM blendshape mappings
             $storeEmotion = function (array $emotionData, bool $restricted) use ($assistant): void {
                 $emotion = $assistant->emotions()->create([
                     'name' => $emotionData['name'],

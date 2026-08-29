@@ -24,7 +24,10 @@ function VrmScene({ vrmUrl, emotion, blendshapes, onLoaded, onError }) {
 		loader.load(
 			vrmUrl,
 			(gltf) => {
-				if (cancelled) return;
+				if (cancelled) {
+					VRMUtils.deepDispose(gltf.scene);
+					return;
+				}
 				const vrm = gltf.userData.vrm;
 				VRMUtils.rotateVRM0(vrm);
 				vrmRef.current = vrm;
@@ -89,8 +92,9 @@ function VrmScene({ vrmUrl, emotion, blendshapes, onLoaded, onError }) {
 		// also lerp any previously-active expression down to 0 even if it's
 		// no longer targeted, so switching emotions doesn't leave it stuck.
 		const targets = expressionActive ? blendshapes : [];
-		const targetMap = Object.fromEntries(targets.map((t) => [t.expression, t.weight]));
+		const targetMap = Object.fromEntries(targets.filter((t) => t.expression !== 'blink').map((t) => [t.expression, t.weight]));
 		const activeExpressions = new Set([...Object.keys(currentWeightsRef.current), ...Object.keys(targetMap)]);
+		activeExpressions.delete('blink');
 		for (const expr of activeExpressions) {
 			const target = targetMap[expr] ?? 0;
 			const current = currentWeightsRef.current[expr] ?? 0;
@@ -138,6 +142,13 @@ function VrmScene({ vrmUrl, emotion, blendshapes, onLoaded, onError }) {
 export default function VrmAvatar({ vrmUrl, emotion, blendshapes = [] }) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [loadError, setLoadError] = useState(false);
+	const [syncedUrl, setSyncedUrl] = useState(vrmUrl);
+
+	if (syncedUrl !== vrmUrl) {
+		setSyncedUrl(vrmUrl);
+		setIsLoading(true);
+		setLoadError(false);
+	}
 
 	if (loadError) {
 		return (

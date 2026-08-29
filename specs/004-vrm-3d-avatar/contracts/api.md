@@ -143,7 +143,7 @@ Uploads a card image for the assistant, used as the assistants-menu thumbnail. R
 
 | Field | Type | Required | Validation |
 |---|---|---|---|
-| `image` | file | yes | image, max 10 240 KB (10 MB) |
+| `image` | file | yes | image, max 10 480 KB (~10.2 MB) |
 
 **Response** `201 Created`:
 ```json

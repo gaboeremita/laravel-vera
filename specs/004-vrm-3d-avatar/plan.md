@@ -30,7 +30,7 @@ Add a per-assistant "3D Avatar" portrait mode that renders a VRoid-exported `.vr
 
 | Principle | Status | Notes |
 |---|---|---|
-| I. Lint-Enforced Code Style | ✓ | All new PHP run through Pint; all new JS through ESLint before done |
+| I. Lint-Enforced Code Style | ✓ | All new PHP run through Pint; all new JS through `npm run lint` before done |
 | II. Append-Only Migrations | ✓ | Two new migrations; no edits to existing files |
 | III. Comments — Non-Obvious Only | ✓ | One comment warranted in `VrmAvatar.jsx` for the lerp accumulator pattern |
 | IV. Data Isolation by Ownership | ✓ | VRM upload/delete endpoints use `$request->user()->assistants()->findOrFail()` |
