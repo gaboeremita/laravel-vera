@@ -28,7 +28,7 @@ Migration: `create_poses_table`
 | `pose_id` | bigint FK → `poses.id`, unique | no | cascade delete; one animation file per pose |
 | `path` | string | no | storage path |
 | `disk` | string | no | storage disk (`public`) |
-| `mime_type` | string | no | `application/octet-stream`, same convention as `vrm_files.mime_type` |
+| `mime_type` | string | no | `application/octet-stream`, same convention as `vrm_files.mime_type` (covers both `.vrma` and `.fbx`) |
 | `size` | unsigned bigint | no | bytes |
 | `original_name` | string | yes | original filename from upload |
 | `created_at` / `updated_at` | timestamp | | |
@@ -36,6 +36,8 @@ Migration: `create_poses_table`
 Migration: `create_pose_animation_files_table`
 
 No polymorphism — see [research.md Decision 1](research.md#decision-1-pose--pose-animation-file-storage-model) for why this differs from `vrm_files`.
+
+No dedicated `format` column: a pose animation file may be `.vrma` or `.fbx` (see [research.md Decision 9](research.md#decision-9-fbx-animation-support-via-mixamo-retargeting)); the format is read from the stored file's extension (`path`/`original_name`) at load time rather than tracked as separate state.
 
 ---
 

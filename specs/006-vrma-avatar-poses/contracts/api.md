@@ -100,13 +100,13 @@ Deletes the pose and, if present, its associated animation file (both the databa
 
 ### `POST /api/assistants/{assistantId}/poses/{pose}/animation`
 
-Uploads a `.vrma` animation file for the pose. Replaces any existing animation file on that pose. Independent of the pose's `vrm_blendshapes`.
+Uploads an animation file for the pose — `.vrma` or `.fbx`. Replaces any existing animation file on that pose. Independent of the pose's `vrm_blendshapes`. `.fbx` uploads are retargeted onto the avatar's skeleton at playback time using a Mixamo bone-naming mapping (see [research.md Decision 9](../research.md#decision-9-fbx-animation-support-via-mixamo-retargeting)) — non-Mixamo `.fbx` rigs are accepted by validation but not guaranteed to animate correctly.
 
 **Request**: `multipart/form-data`
 
 | Field | Type | Required | Validation |
 |---|---|---|---|
-| `animation` | file | yes | `.vrma` extension, max 10 240 KB (10 MB) |
+| `animation` | file | yes | `.vrma` or `.fbx` extension, max 10 240 KB (10 MB) |
 
 **Response** `201 Created`:
 ```json

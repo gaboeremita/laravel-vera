@@ -31,4 +31,4 @@
 
 ## Notes
 
-- All items pass. Clarifications resolved 2026-08-29: `.vrma` max file size (10 MB, FR-014), playback behavior (play once then idle, FR-015), and pose configuration model (blendshape weights and uploaded animation are combinable, not an exclusive toggle — US1, FR-002 through FR-004, FR-010 through FR-012). Ready for `/speckit-plan`.
+- All items pass. Clarifications resolved 2026-08-29: `.vrma` max file size (10 MB, FR-014), playback behavior (play once then idle, FR-015), pose configuration model (blendshape weights and uploaded animation are combinable, not an exclusive toggle — US1, FR-002 through FR-004, FR-010 through FR-012), and animation format (both `.vrma` and Mixamo-rigged `.fbx` accepted, FR-005, FR-010, FR-017). Plan artifacts (plan.md, research.md, data-model.md, contracts/, quickstart.md) updated to match the `.fbx` addition.

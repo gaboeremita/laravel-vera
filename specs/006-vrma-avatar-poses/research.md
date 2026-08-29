@@ -90,8 +90,20 @@ Loading a `.vrma` clip is async, so it is done inside a `useEffect` with a closu
 
 ---
 
-## Decision 8: `.vrma` File Size Limit
+## Decision 8: Animation File Size Limit
 
-**Decision**: 10 MB (`max:10240` in Laravel's kilobyte-based validation), enforced at the API layer, per the resolved clarification in spec.md.
+**Decision**: 10 MB (`max:10240` in Laravel's kilobyte-based validation), enforced at the API layer for both `.vrma` and `.fbx` uploads, per the resolved clarification in spec.md.
 
-**Rationale**: Matches the existing image/emotion upload ceiling (`AssistantEmotionController`, `AssistantImageController`) rather than the much larger 50 MB VRM model ceiling — `.vrma` files carry only animation curve data, not mesh/texture data, so they are expected to be far smaller than a full avatar model.
+**Rationale**: Matches the existing image/emotion upload ceiling (`AssistantEmotionController`, `AssistantImageController`) rather than the much larger 50 MB VRM model ceiling — both formats carry only animation curve data (bone tracks, optionally blendshape curves for `.vrma`), not mesh/texture data, so they are expected to be far smaller than a full avatar model. A single ceiling for both formats keeps validation simple; nothing about `.fbx` animation-only exports needs a materially different limit than `.vrma`.
+
+**Alternatives considered**: A separate, larger limit for `.fbx` — rejected; Mixamo-sourced `.fbx` animation exports are typically well under 10 MB (mesh-free), so a shared limit doesn't meaningfully constrain the common case.
+
+---
+
+## Decision 9: `.fbx` Animation Support via Mixamo Retargeting
+
+**Decision**: Accept `.fbx` as a second valid pose animation format alongside `.vrma`. `.fbx` files are parsed with `THREE.FBXLoader` (`three/addons/loaders/FBXLoader.js` — already available via the installed `three` package, no new dependency) and retargeted onto the avatar's VRM humanoid skeleton via a small, in-house bone-name mapping table (Mixamo skeleton names → VRM humanoid bone names), ported from the reference approach in `@pixiv/three-vrm`'s own Mixamo-animation example. The format is detected from the uploaded file's extension at playback time (no new schema field — see [data-model.md](data-model.md)), branching between the `.vrma` (`VRMAnimationLoaderPlugin`) and `.fbx` (`FBXLoader` + retargeter) load paths.
+
+**Rationale**: `@pixiv/three-vrm` does not retarget FBX animations automatically — this was verified directly (searched `pixiv/three-vrm` GitHub discussions and community tooling before committing to this design). The two well-supported paths are: (a) `@pixiv/three-vrm`'s own official example code for loading Mixamo FBX animations, and (b) third-party libraries such as `vrm-mixamo-retargeter`, both of which are scoped to Mixamo's specific bone-naming convention, not arbitrary FBX rigs. Porting the small, official reference mapping in-house avoids taking on an unofficial third-party dependency for a bone-name lookup table that's simple enough to own directly, and keeps the feature dependency-free for this half of the format support (unlike `.vrma`, which does need the new `@pixiv/three-vrm-animation` package per Decision 6).
+
+**Alternatives considered**: (1) Require users to convert `.fbx` to `.vrma` externally before uploading — rejected; this is exactly the extra conversion step the feature request was raised to avoid. (2) Add the third-party `vrm-mixamo-retargeter` package — rejected in favor of porting the mapping directly; the retargeting logic itself is a short, stable bone-name table, not a large surface worth an external dependency. (3) General-purpose retargeting that infers bone mapping from arbitrary FBX skeletons — rejected as out of scope; no reliable general solution exists without the source rig's naming convention, and Mixamo is the dominant source of externally-sourced humanoid FBX animation in practice.

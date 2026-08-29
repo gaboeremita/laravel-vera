@@ -13,7 +13,7 @@ Two new props added. All existing props (`emotion`, `getVrmBlendshapes`, `portra
 | Prop | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `poseBlendshapes` | `Array<{expression: string, weight: number}>` | no | `[]` | The active pose's blendshape targets, from `useEmotions().getPoseBlendshapes(pose)` |
-| `poseAnimationUrl` | `string \| null` | no | `null` | URL to the active pose's `.vrma` file, from `useEmotions().getPoseAnimationUrl(pose)` |
+| `poseAnimationUrl` | `string \| null` | no | `null` | URL to the active pose's animation file (`.vrma` or `.fbx`), from `useEmotions().getPoseAnimationUrl(pose)` |
 
 When `portraitType === 'avatar3d'` and `vrmUrl` is non-null: both props are passed through to `<VrmAvatar>` alongside the existing `emotion`/`blendshapes` props. When no pose is currently active, both are their default empty values and `VrmAvatar` behaves exactly as it does today.
 
@@ -28,10 +28,11 @@ Two new props added. All existing props (`vrmUrl`, `emotion`, `blendshapes`, `as
 | Prop | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `poseBlendshapes` | `Array<{expression: string, weight: number}>` | no | `[]` | Facial blendshape targets from the active pose, merged with `blendshapes` (emotion) into the same lerp target map |
-| `poseAnimationUrl` | `string \| null` | no | `null` | URL to a `.vrma` clip to play once on the body skeleton |
+| `poseAnimationUrl` | `string \| null` | no | `null` | URL to an animation clip (`.vrma` or `.fbx`) to play once on the body skeleton |
 
 **New behaviour**:
-- When `poseAnimationUrl` changes to a non-null value: loads the clip via `VRMAnimationLoaderPlugin` (`@pixiv/three-vrm-animation`), plays it once through a `THREE.AnimationMixer`, and pauses the existing idle head-sway for the duration (idle blink and blendshape expression continue independently — see [research.md Decision 6](../research.md#decision-6-vrma-playback--interaction-with-existing-idle-expression-animation)). On the mixer's `finished` event, resumes idle head-sway; `poseAnimationUrl` reverting to `null` (or the same clip's completion) marks the pose as no longer active.
+- When `poseAnimationUrl` changes to a non-null value: branches on the file's extension. A `.vrma` URL loads via `VRMAnimationLoaderPlugin` (`@pixiv/three-vrm-animation`); a `.fbx` URL loads via `THREE.FBXLoader` and is retargeted onto the avatar's humanoid bones through the Mixamo bone-name mapping (see [research.md Decision 9](../research.md#decision-9-fbx-animation-support-via-mixamo-retargeting)). Either path produces a clip played once through a `THREE.AnimationMixer`, pausing the existing idle head-sway for the duration (idle blink and blendshape expression continue independently — see [research.md Decision 6](../research.md#decision-6-vrma-playback--interaction-with-existing-idle-expression-animation)). On the mixer's `finished` event, resumes idle head-sway; `poseAnimationUrl` reverting to `null` (or the same clip's completion) marks the pose as no longer active.
+- A `.fbx` clip that fails to retarget cleanly (non-Mixamo bone names) is treated as a load failure — logged, pose animation dropped, rest of the avatar unaffected — same as any other load error.
 - `poseBlendshapes` targets are merged into the same lerp/target map already used for `blendshapes` (emotion) — both are applied concurrently, satisfying spec FR-012 / SC-006 and FR-016 / SC-007 (pose + emotion concurrently).
 - Load failures for the animation clip are logged and do not affect the rest of the avatar (facial expression and idle behavior continue normally) — the pose signal is simply dropped, mirroring how a VRM model load failure falls back gracefully rather than crashing.
 
@@ -73,7 +74,7 @@ New export `parsePoseFromResponse(text, validPoseNames)`, mirroring the existing
 
 **File**: `resources/js/components/PoseEditor.jsx`
 
-Per-assistant pose editor, shown on Create/Edit assistant pages when `portraitType === 'avatar3d'`, below the existing `VrmEmotionEditor` sections. Each pose row holds an optional set of `{expression, weight%}` blendshape sub-rows (reuses the existing `BlendshapeRows` component from `VrmEmotionEditor.jsx`) and an optional `.vrma` file upload/delete control (reuses the upload-button-with-filename pattern already used for the assistant-level VRM upload in `EditAssistantPage.jsx`).
+Per-assistant pose editor, shown on Create/Edit assistant pages when `portraitType === 'avatar3d'`, below the existing `VrmEmotionEditor` sections. Each pose row holds an optional set of `{expression, weight%}` blendshape sub-rows (reuses the existing `BlendshapeRows` component from `VrmEmotionEditor.jsx`) and an optional animation file upload/delete control accepting `.vrma` or `.fbx` (reuses the upload-button-with-filename pattern already used for the assistant-level VRM upload in `EditAssistantPage.jsx`).
 
 | Prop | Type | Description |
 |---|---|---|
@@ -81,7 +82,7 @@ Per-assistant pose editor, shown on Create/Edit assistant pages when `portraitTy
 | `onAdd` | `(name: string, blendshapes: Array) => void` | Called when a new pose row is added |
 | `onDelete` | `(pose) => void` | Called when a pose row is deleted |
 | `onUpdateBlendshapes` | `(pose, blendshapes: Array) => void` | Called when an existing row's blendshape Save button is pressed |
-| `onUploadAnimation` | `(pose, file: File) => void` | Called when a `.vrma` file is selected for a pose |
+| `onUploadAnimation` | `(pose, file: File) => void` | Called when a `.vrma` or `.fbx` file is selected for a pose |
 | `onDeleteAnimation` | `(pose) => void` | Called when a pose's animation file is deleted |
 
 Unlike `VrmEmotionEditor`, blendshapes and the animation file are both optional and independent — the UI does not force a choice between them; a row can have neither, either, or both.

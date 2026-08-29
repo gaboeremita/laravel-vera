@@ -15,12 +15,13 @@
 - Q: What is the maximum allowed `.vrma` file size for an uploaded pose animation? → A: 10 MB, matching the existing image/emotion upload ceiling (FR-014 updated accordingly).
 - Q: Should a triggered pose animation play once and return to idle, or loop until interrupted? → A: Play once, then return to the avatar's existing idle animation loop; the idle loop itself is pre-existing behavior, unaffected by this feature (FR-015 updated accordingly).
 - Q: Should a pose require an exclusive choice between default blendshape weights or an uploaded `.vrma` file? → A: No — the two are combinable rather than mutually exclusive. A pose may have blendshape weights, an uploaded animation file, or both at once, since `.vrma` animations typically drive only the body skeleton and leave facial blendshapes untouched. User Story 1, FR-002 through FR-004, FR-010 through FR-012, Key Entities, and Assumptions have been rewritten accordingly.
+- Q: Should the uploaded pose animation be limited to `.vrma`, or also accept `.fbx`? → A: Accept both `.fbx` and `.vrma` as valid pose animation uploads. `.fbx` animations retarget onto the avatar's skeleton, so this only works reliably for Mixamo-rigged `.fbx` files (the common case for externally sourced humanoid animations, e.g. from Mixamo's own library) — `.fbx` files from other rigging pipelines are not guaranteed to retarget correctly. FR-005 and FR-010 updated accordingly; a new edge case and assumption cover the Mixamo-rig scope.
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Configure a Pose for an Assistant (Priority: P1)
 
-A user editing an assistant that has 3D avatar mode enabled adds a new pose entry — for example, "happy" or "spin" — and names it. For that pose, they may set default blendshape weights (the same kind of weighted-expression controls already used for emotions, e.g. an expression at 80% intensity) for a facial expression, upload a `.vrma` animation file for the body to play back, or both — the two are independent and can be combined on the same pose.
+A user editing an assistant that has 3D avatar mode enabled adds a new pose entry — for example, "happy" or "spin" — and names it. For that pose, they may set default blendshape weights (the same kind of weighted-expression controls already used for emotions, e.g. an expression at 80% intensity) for a facial expression, upload an animation file (`.vrma` or `.fbx`) for the body to play back, or both — the two are independent and can be combined on the same pose.
 
 **Why this priority**: Without a way to define poses and their configuration, no other part of the feature can function. This is the foundational setup step every other story depends on.
 
@@ -29,9 +30,9 @@ A user editing an assistant that has 3D avatar mode enabled adds a new pose entr
 **Acceptance Scenarios**:
 
 1. **Given** an assistant with 3D avatar mode enabled, **When** the user adds a new pose named "happy" and sets default blendshape weights (e.g., an expression at 80%) without uploading a file, **Then** the pose is saved with only the weighted facial expression configured.
-2. **Given** an assistant with 3D avatar mode enabled, **When** the user adds a new pose named "spin" and uploads a valid `.vrma` file without setting blendshape weights, **Then** the pose is saved with only the body animation configured.
-3. **Given** an assistant with 3D avatar mode enabled, **When** the user adds a new pose named "wave" and both sets blendshape weights and uploads a valid `.vrma` file, **Then** the pose is saved with both the facial expression and the body animation configured, to be applied together.
-4. **Given** a pose already configured with blendshape weights, **When** the user additionally uploads a `.vrma` file to the same pose, **Then** the previously entered weight values are retained and the pose now has both configurations active.
+2. **Given** an assistant with 3D avatar mode enabled, **When** the user adds a new pose named "spin" and uploads a valid `.vrma` or `.fbx` file without setting blendshape weights, **Then** the pose is saved with only the body animation configured.
+3. **Given** an assistant with 3D avatar mode enabled, **When** the user adds a new pose named "wave" and both sets blendshape weights and uploads a valid animation file, **Then** the pose is saved with both the facial expression and the body animation configured, to be applied together.
+4. **Given** a pose already configured with blendshape weights, **When** the user additionally uploads an animation file to the same pose, **Then** the previously entered weight values are retained and the pose now has both configurations active.
 5. **Given** an assistant with 3D avatar mode disabled (image portrait mode), **When** the user views the assistant edit page, **Then** no pose configuration controls are shown, since poses only apply to 3D avatar mode.
 6. **Given** a pose configured for one assistant, **When** a different assistant's edit page or chat session is loaded, **Then** that pose is not visible or usable by the other assistant.
 
@@ -47,7 +48,7 @@ During a conversation with a 3D avatar assistant, the user asks the character to
 
 **Acceptance Scenarios**:
 
-1. **Given** an assistant with a "spin" pose configured using only an uploaded `.vrma` file, **When** the user asks the character to spin and the LLM response signals the pose, **Then** the avatar plays the uploaded spin animation once and returns to its idle state.
+1. **Given** an assistant with a "spin" pose configured using only an uploaded animation file (`.vrma` or `.fbx`), **When** the user asks the character to spin and the LLM response signals the pose, **Then** the avatar plays the uploaded spin animation once and returns to its idle state.
 2. **Given** an assistant with a "happy" pose configured using only default blendshape weights, **When** the LLM response signals that pose, **Then** the avatar applies the configured weighted expression, the same way the existing emotion system applies weighted expressions.
 3. **Given** an assistant with a "wave" pose configured with both blendshape weights and an uploaded `.vrma` file, **When** the LLM response signals that pose, **Then** the avatar plays the body animation and applies the facial expression simultaneously.
 4. **Given** an assistant with no poses configured, **When** the user asks the character to perform a physical action, **Then** the LLM is not prompted with any pose options and does not attempt to signal a pose.
@@ -75,12 +76,13 @@ The assistant's system prompt is updated to describe the pose system to the LLM:
 ### Edge Cases
 
 - What happens when a pose is triggered while a previously triggered pose's animation is still playing?
-- What happens when an uploaded `.vrma` file is malformed or not a valid VRMA-format animation?
-- What happens when an uploaded `.vrma` animation references a skeleton or bone structure incompatible with the assistant's avatar model?
+- What happens when an uploaded animation file is malformed or not a valid `.vrma`/`.fbx` file?
+- What happens when an uploaded animation references a skeleton or bone structure incompatible with the assistant's avatar model?
+- What happens when an uploaded `.fbx` file is not Mixamo-rigged (different bone-naming convention than the supported retargeting mapping expects)?
 - What happens when a pose is signaled by the LLM for an assistant currently in image portrait mode?
 - What happens when a user deletes a pose that has an uploaded animation file — is the file removed too?
 - What happens when a pose's own configured blendshape weights and a simultaneously active emotion's blendshape weights target the same facial expression?
-- What is the maximum acceptable `.vrma` file size, and what happens when it is exceeded?
+- What is the maximum acceptable animation file size, and what happens when it is exceeded?
 - What happens when two poses are given the same name on the same assistant?
 - What happens when a pose has neither blendshape weights nor an uploaded file configured (an empty pose)?
 
@@ -90,25 +92,26 @@ The assistant's system prompt is updated to describe the pose system to the LLM:
 
 - **FR-001**: System MUST allow users to define one or more named poses per assistant, independently of that assistant's existing emotions list.
 - **FR-002**: System MUST only expose pose configuration controls for assistants in 3D avatar portrait mode; poses are not applicable to image portrait mode.
-- **FR-003**: For each pose, users MUST be able to configure default blendshape-weight facial expression, an uploaded `.vrma` body animation file, or both simultaneously — the two are independent and combinable rather than mutually exclusive.
+- **FR-003**: For each pose, users MUST be able to configure default blendshape-weight facial expression, an uploaded body animation file, or both simultaneously — the two are independent and combinable rather than mutually exclusive.
 - **FR-004**: System MUST allow a user to add, change, or remove a pose's blendshape weights and its uploaded animation file independently of one another, without one affecting the other's configured data.
-- **FR-005**: System MUST validate uploaded pose files are valid `.vrma` format and reject uploads that are not.
-- **FR-006**: System MUST store each uploaded `.vrma` file associated with the specific pose and assistant that owns it, scoped so no other assistant can access it.
+- **FR-005**: System MUST validate uploaded pose files are valid `.vrma` or `.fbx` format and reject uploads that are neither.
+- **FR-006**: System MUST store each uploaded animation file associated with the specific pose and assistant that owns it, scoped so no other assistant can access it.
 - **FR-007**: System MUST allow users to rename, reconfigure, and delete existing poses.
 - **FR-008**: System MUST include each assistant's configured pose names in the system prompt sent to the LLM, alongside guidance that poses represent physical actions or gestures the character can perform, distinct from emotional expressions.
 - **FR-009**: System MUST omit pose-related prompt guidance entirely for assistants with no poses configured, and for assistants in image portrait mode.
-- **FR-010**: System MUST play the assigned `.vrma` animation on the 3D avatar's body when the LLM signals a pose that has an uploaded animation file configured, during an active chat session with that assistant in 3D avatar mode.
+- **FR-010**: System MUST play the assigned animation (`.vrma` or `.fbx`) on the 3D avatar's body when the LLM signals a pose that has an uploaded animation file configured, during an active chat session with that assistant in 3D avatar mode.
 - **FR-011**: System MUST apply the pose's configured blendshape weights as a facial expression when the LLM signals a pose that has blendshape weights configured, using the same expression-application mechanism as the existing emotion system.
 - **FR-012**: System MUST apply both the body animation and the facial expression together, without either blocking the other, when the LLM signals a pose that has both an uploaded file and blendshape weights configured.
 - **FR-013**: System MUST NOT error or crash the chat session if a pose is signaled for an assistant currently in image portrait mode; the signal is silently ignored for display purposes.
-- **FR-014**: System MUST enforce a maximum `.vrma` file size of 10 MB per upload.
+- **FR-014**: System MUST enforce a maximum animation file size of 10 MB per upload, regardless of format (`.vrma` or `.fbx`).
 - **FR-015**: A triggered pose animation MUST play once and then return the avatar to its existing idle animation loop; the idle loop itself is pre-existing behavior and is unaffected by this feature.
 - **FR-016**: System MUST allow a pose signal and an emotion tag to be applied to the avatar concurrently within the same response without either overriding the other.
+- **FR-017**: System MUST retarget an uploaded `.fbx` animation onto the assistant's avatar skeleton using a Mixamo bone-naming mapping; `.fbx` files rigged with a different bone-naming convention are not guaranteed to animate correctly.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Pose**: A named, per-assistant configuration representing a physical action or gesture the 3D avatar can perform. Has a name (the tag the LLM uses to invoke it), and optionally: weighted-expression data for a facial expression (structurally similar to the existing per-emotion blendshape weights) and an association to an uploaded `.vrma` animation file for a body animation. Either, both, or (transiently) neither may be set.
-- **Pose Animation File**: A stored `.vrma`-format asset associated with exactly one pose, containing a playable body animation clip for the 3D avatar.
+- **Pose**: A named, per-assistant configuration representing a physical action or gesture the 3D avatar can perform. Has a name (the tag the LLM uses to invoke it), and optionally: weighted-expression data for a facial expression (structurally similar to the existing per-emotion blendshape weights) and an association to an uploaded animation file (`.vrma` or `.fbx`) for a body animation. Either, both, or (transiently) neither may be set.
+- **Pose Animation File**: A stored `.vrma` or `.fbx` asset associated with exactly one pose, containing a playable body animation clip for the 3D avatar. `.fbx` uploads are retargeted onto the avatar's skeleton at playback using a Mixamo bone-naming mapping.
 
 ## Success Criteria *(mandatory)*
 
@@ -117,7 +120,7 @@ The assistant's system prompt is updated to describe the pose system to the LLM:
 - **SC-001**: A user can add a new pose to an assistant, configure blendshape weights and/or an uploaded file, and save it in under 2 minutes.
 - **SC-002**: When a chat message clearly requests a configured pose (e.g., "do a spin"), the avatar begins performing the corresponding animation and/or expression within 2 seconds of the response being received.
 - **SC-003**: Assistants with no poses configured, and assistants in image portrait mode, show zero behavior change from the pose system — full backward compatibility with existing emotion and image behavior.
-- **SC-004**: Uploading a file that is not valid `.vrma` format is rejected with a clear error message 100% of the time.
+- **SC-004**: Uploading a file that is not a valid `.vrma` or `.fbx` format is rejected with a clear error message 100% of the time.
 - **SC-005**: Adding or removing a pose's blendshape weights or its uploaded animation file leaves the other, independently configured half of that pose unaffected, with no data loss.
 - **SC-006**: A pose configured with both a body animation and a facial expression displays both simultaneously when triggered, with no dropped signal.
 - **SC-007**: An assistant with both a pose and an emotion signaled in the same response displays both simultaneously with no visual conflict or dropped signal.
@@ -125,12 +128,13 @@ The assistant's system prompt is updated to describe the pose system to the LLM:
 ## Assumptions
 
 - Poses apply only to assistants in 3D avatar portrait mode; the feature has no effect on assistants using the existing image-based portrait system.
-- `.vrma` files are authored externally (e.g., via motion-capture or animation tooling compatible with the VRM ecosystem) and uploaded by the user; the application does not generate or edit animation content.
-- `.vrma` animation clips typically animate the body skeleton (arms, spine, legs, etc.) and do not include facial blendshape data. This is why a pose's uploaded animation and its blendshape-weight expression can be configured and applied together without conflicting on the same channels.
+- Animation files (`.vrma` and `.fbx`) are authored externally (e.g., via motion-capture tooling, the VRM ecosystem, or Mixamo's animation library) and uploaded by the user; the application does not generate or edit animation content.
+- Uploaded animation clips (`.vrma` and `.fbx`) typically animate the body skeleton (arms, spine, legs, etc.) and do not include facial blendshape data. This is why a pose's uploaded animation and its blendshape-weight expression can be configured and applied together without conflicting on the same channels.
+- `.fbx` support in v1 is scoped to Mixamo-rigged animations — the common case for externally sourced humanoid animations (e.g. downloaded directly from Mixamo's library). An `.fbx` file exported from a different rigging pipeline, with different bone names, is accepted by upload validation but is not guaranteed to retarget or animate correctly on playback.
 - The blendshape-weight side of a pose configuration reuses the same weighting mechanism already used by the emotion system (name plus intensity) — it is not a new kind of control.
 - Pose names and emotion names are independent, separately-purposed tag namespaces communicated to the LLM in separate parts of the system prompt; the same name (e.g., "happy") may exist as both an emotion and a pose on the same assistant without conflict.
 - If a pose's own blendshape weights and a simultaneously active emotion's weights target the same facial expression, the more recently triggered signal takes precedence; this is not expected to be a common configuration since poses are intended primarily for body movement.
 - There is no hard limit on the number of poses an assistant can define, consistent with there being no stated limit on emotions today.
 - Pose animation playback is a client-side visual effect layered on top of an ongoing chat session; triggering a pose does not block or delay the LLM's response generation.
-- `.vrma` file storage follows the same underlying storage mechanism already used for VRM model files and emotion images/videos in the application.
+- Animation file storage (`.vrma` and `.fbx`) follows the same underlying storage mechanism already used for VRM model files and emotion images/videos in the application.
 - Deleting a pose also deletes its associated uploaded animation file, mirroring how other per-assistant uploaded assets are cleaned up when their owning record is removed.

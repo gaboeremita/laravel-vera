@@ -11,7 +11,8 @@ This guide covers the runnable scenarios that prove the feature works end-to-end
 - App running locally (Herd)
 - At least one user account and one assistant configured with portrait type "3D Avatar" and a valid `.vrm` file uploaded (per `004-vrm-3d-avatar/quickstart.md` Scenario 1)
 - A valid `.vrma` animation file (any publicly available sample VRMA clip compatible with the uploaded VRM's skeleton works)
-- A `.vrma` file >10 MB handy (for rejection test)
+- A valid Mixamo-sourced `.fbx` animation file (downloaded directly from Mixamo's library)
+- An animation file >10 MB handy (for rejection test)
 
 ---
 
@@ -32,8 +33,10 @@ This guide covers the runnable scenarios that prove the feature works end-to-end
 1. Add a pose named "spin", upload a valid `.vrma` file, and do not set any blendshape weights.
 2. Save.
 3. **Expected**: The pose is listed with an animation file and no blendshape configuration.
+4. Repeat with a second pose named "jump", uploading a valid Mixamo-sourced `.fbx` file instead.
+5. **Expected**: Same result — the pose is listed with an animation file and no blendshape configuration, regardless of which format was uploaded.
 
-**Verifies**: FR-003 (upload-only path), FR-005, FR-006, US1 Scenario 2
+**Verifies**: FR-003 (upload-only path), FR-005, FR-006, FR-017, US1 Scenario 2
 
 ---
 
@@ -62,9 +65,11 @@ This guide covers the runnable scenarios that prove the feature works end-to-end
 ## Scenario 5: Triggering a Pose in Chat
 
 1. In the chat view for the configured assistant, ask the character to "do a spin."
-2. **Expected**: Within 2 seconds, the avatar plays the "spin" animation once, then returns to its normal idle behavior (blink/head-sway resume).
+2. **Expected**: Within 2 seconds, the avatar plays the "spin" (`.vrma`) animation once, then returns to its normal idle behavior (blink/head-sway resume).
+3. Ask the character to "jump."
+4. **Expected**: Same result for the "jump" pose (`.fbx`, Mixamo-retargeted) — plays once, then returns to idle.
 
-**Verifies**: FR-010, FR-015, SC-002
+**Verifies**: FR-010, FR-015, FR-017, SC-002
 
 **Note**: Visual verification only — no automated test covers 3D rendering behavior.
 
@@ -92,12 +97,14 @@ This guide covers the runnable scenarios that prove the feature works end-to-end
 
 ## Scenario 8: File Size and Format Rejection
 
-1. In assistant settings, attempt to upload a `.vrma` file larger than 10 MB to a pose.
+1. In assistant settings, attempt to upload an animation file (`.vrma` or `.fbx`) larger than 10 MB to a pose.
 2. **Expected**: The upload is rejected with a clear error message.
-3. Attempt to upload a non-`.vrma` file (e.g., a `.png`) to a pose's animation field.
+3. Attempt to upload a file that is neither `.vrma` nor `.fbx` (e.g., a `.png`) to a pose's animation field.
 4. **Expected**: The upload is rejected with a clear error message.
+5. Upload a non-Mixamo `.fbx` file (different bone-naming convention) to a pose.
+6. **Expected**: The upload itself succeeds (extension validation only checks format, not rig compatibility), but triggering the pose in chat does not animate the body correctly — this is a known v1 scope limit (FR-017), not a bug.
 
-**Verifies**: FR-005, FR-014, SC-004
+**Verifies**: FR-005, FR-014, FR-017, SC-004
 
 ---
 

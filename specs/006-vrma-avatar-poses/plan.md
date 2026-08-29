@@ -6,13 +6,13 @@
 
 ## Summary
 
-Add a per-assistant "pose" system for 3D avatar mode: each pose has a name, and independently-configurable blendshake weights (facial expression) and/or an uploaded `.vrma` animation file (body movement) — the two are combinable, not an exclusive choice. Poses are prompted to the LLM separately from emotions, as physical actions/gestures rather than emotional states, and triggered via a `[pose: name]` tag. All research decisions are documented in [research.md](research.md).
+Add a per-assistant "pose" system for 3D avatar mode: each pose has a name, and independently-configurable blendshake weights (facial expression) and/or an uploaded animation file — `.vrma` or `.fbx` — for body movement. The two configuration halves are combinable, not an exclusive choice. Poses are prompted to the LLM separately from emotions, as physical actions/gestures rather than emotional states, and triggered via a `[pose: name]` tag. All research decisions are documented in [research.md](research.md).
 
 ## Technical Context
 
 **Language/Version**: PHP 8.4 / JavaScript (ESNext) / React 19
 
-**Primary Dependencies**: Laravel 13, React Three Fiber, `@pixiv/three-vrm` (existing), `@pixiv/three-vrm-animation` (new — VRMA clip loading/playback), Three.js `AnimationMixer`
+**Primary Dependencies**: Laravel 13, React Three Fiber, `@pixiv/three-vrm` (existing), `@pixiv/three-vrm-animation` (new — `.vrma` clip loading/playback), `THREE.FBXLoader` (existing addon, already bundled with the installed `three` package — used for `.fbx` uploads), Three.js `AnimationMixer`
 
 **Storage**: PostgreSQL (`poses`, `pose_animation_files` tables) + public disk file storage (same as VRM/emotion files)
 
@@ -22,7 +22,7 @@ Add a per-assistant "pose" system for 3D avatar mode: each pose has a name, and 
 
 **Performance Goals**: A signaled pose begins animating/expressing within 2 seconds of the response being received (spec SC-002)
 
-**Constraints**: 10 MB max `.vrma` file size; pose animations play once then return to the existing idle loop; no server-side rendering
+**Constraints**: 10 MB max animation file size (`.vrma` or `.fbx`); `.fbx` retargeting scoped to Mixamo-rigged animations; pose animations play once then return to the existing idle loop; no server-side rendering
 
 **Scale/Scope**: Per-assistant configuration; unlimited poses per assistant; no per-user pose customization
 
@@ -36,10 +36,10 @@ Add a per-assistant "pose" system for 3D avatar mode: each pose has a name, and 
 | II. Append-Only Migrations | ✓ | Two new migrations (`poses`, `pose_animation_files`); no edits to existing files |
 | III. Comments — Non-Obvious Only | ✓ | Comment warranted in `VrmAvatar.jsx` explaining why idle head-sway pauses during pose playback (bone-track conflict, not obvious from the code alone) |
 | IV. Data Isolation by Ownership | ✓ | Pose CRUD/animation endpoints scope through `$request->user()->assistants()->findOrFail($assistantId)->poses()->findOrFail($poseId)` |
-| V. Errors Fail Loudly | ✓ | `.vrma` load errors logged to console and fall back to no pose animation (facial/idle unaffected), not silently swallowed |
+| V. Errors Fail Loudly | ✓ | Animation load/retarget errors (`.vrma` or `.fbx`) logged to console and fall back to no pose animation (facial/idle unaffected), not silently swallowed |
 | VI. Feature-Test-First, Factory-Backed | ✓ | `AssistantPoseTest` (CRUD) and `AssistantPoseAnimationTest` (file upload) cover all API behavior; `PoseFactory`, `PoseAnimationFileFactory` created |
-| VII. No Speculative Abstraction | ✓ | `Pose`/`PoseAnimationFile` use direct FKs, not polymorphism (no second owner type exists — see research.md Decision 1); blendshape normalization is extracted to a shared trait now that `Pose` is a genuine second caller (Decision 7) |
-| VIII. State Derivation During Render | ✓ | `.vrma` clip loading is async work in a `useEffect` with a locally-scoped closure, mirroring the existing VRM-model-loading pattern; idle-sway pause/resume is a mutable ref flipped in the render loop (`useFrame`), not effect-driven state |
+| VII. No Speculative Abstraction | ✓ | `Pose`/`PoseAnimationFile` use direct FKs, not polymorphism (no second owner type exists — see research.md Decision 1); blendshape normalization is extracted to a shared trait now that `Pose` is a genuine second caller (Decision 7); `.fbx` retargeting ports a small, official reference bone-mapping rather than adding a third-party package or building general-purpose retargeting no story requires (Decision 9) |
+| VIII. State Derivation During Render | ✓ | Animation clip loading (`.vrma` or `.fbx`) is async work in a `useEffect` with a locally-scoped closure, mirroring the existing VRM-model-loading pattern; idle-sway pause/resume is a mutable ref flipped in the render loop (`useFrame`), not effect-driven state |
 
 ## Project Structure
 
@@ -97,7 +97,8 @@ resources/js/
 ├── hooks/
 │   └── useEmotions.js                         (modified — poses, getPoseBlendshapes, getPoseAnimationUrl)
 ├── utils/
-│   └── parsers.js                             (modified — parsePoseFromResponse)
+│   ├── parsers.js                             (modified — parsePoseFromResponse)
+│   └── mixamoRetargeting.js                   (new — Mixamo→VRM bone-name mapping for .fbx playback)
 ├── layouts/
 │   └── AuthenticatedLayout.jsx                (modified — currentPose state)
 └── pages/
@@ -119,7 +120,7 @@ resources/js/
 5. Create `PoseAnimationFile` model (fillable, `pose()`, `url` accessor) + `PoseAnimationFileFactory`
 6. Update `Assistant` model: add `poses()` HasMany, `promptPoseNames(): array<string>`
 7. Create `AssistantPoseController` (`store`, `update`, `destroy`) with user-scoped auth
-8. Create `AssistantPoseAnimationController` (`store`, `destroy`) with user-scoped auth, `.vrma` validation (max 10 240 KB)
+8. Create `AssistantPoseAnimationController` (`store`, `destroy`) with user-scoped auth, `.vrma`/`.fbx` extension validation (max 10 240 KB)
 9. Register 5 new routes under `/api/assistants/{assistantId}/poses...` (see [contracts/api.md](contracts/api.md))
 10. Update `EmotionController::index` — add `poses` array to the response envelope
 11. Update `ConversationController`: add `POSE_TAG_INSTRUCTION` constant, conditionally append `pose tags` prompt section using `promptPoseNames()`
@@ -136,13 +137,14 @@ resources/js/
 
 ### Phase C: Frontend — Pose Configuration UI
 
-1. Create `PoseEditor.jsx`: pose rows with optional `BlendshapeRows` (reused from `VrmEmotionEditor.jsx`) and optional `.vrma` upload/delete control
+1. Create `PoseEditor.jsx`: pose rows with optional `BlendshapeRows` (reused from `VrmEmotionEditor.jsx`) and an optional animation file (`.vrma`/`.fbx`) upload/delete control
 2. Update `EditAssistantPage`/`CreateAssistantPage`: render `<PoseEditor>` below the existing `VrmEmotionEditor` sections when `portraitType === 'avatar3d'`, wired to the new pose endpoints
 
 ### Phase D: Frontend — 3D Playback
 
-1. Update `VrmAvatar.jsx`: load `.vrma` clips via `VRMAnimationLoaderPlugin`, play via `AnimationMixer` inside the existing `useFrame` loop, pause/resume idle head-sway around playback, merge `poseBlendshapes` into the existing blendshape lerp target map
-2. Update `Portrait.jsx`: pass `poseBlendshapes`/`poseAnimationUrl` through to `VrmAvatar`
+1. Create `mixamoRetargeting.js`: bone-name mapping table (Mixamo skeleton → VRM humanoid bones), ported from `@pixiv/three-vrm`'s official Mixamo-animation example (see [research.md Decision 9](research.md#decision-9-fbx-animation-support-via-mixamo-retargeting))
+2. Update `VrmAvatar.jsx`: branch pose animation loading by file extension — `.vrma` via `VRMAnimationLoaderPlugin`, `.fbx` via `THREE.FBXLoader` + `mixamoRetargeting.js`; play either through `AnimationMixer` inside the existing `useFrame` loop, pause/resume idle head-sway around playback, merge `poseBlendshapes` into the existing blendshape lerp target map
+3. Update `Portrait.jsx`: pass `poseBlendshapes`/`poseAnimationUrl` through to `VrmAvatar`
 
 ### Phase E: Lint & Verification
 
@@ -153,4 +155,4 @@ resources/js/
 
 ## Complexity Tracking
 
-No constitution violations requiring justification. `@pixiv/three-vrm-animation` is an additive frontend dependency in the same ecosystem as the already-installed `@pixiv/three-vrm`, with no impact on backend principles — flagged in Phase B for explicit user approval per CLAUDE.md's dependency-change policy.
+No constitution violations requiring justification. `@pixiv/three-vrm-animation` is an additive frontend dependency in the same ecosystem as the already-installed `@pixiv/three-vrm`, with no impact on backend principles — flagged in Phase B for explicit user approval per CLAUDE.md's dependency-change policy. `.fbx` support adds no new dependency: `THREE.FBXLoader` ships with the already-installed `three` package, and the Mixamo bone-mapping is in-house code, not a package.
