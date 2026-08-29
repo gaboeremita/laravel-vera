@@ -50,4 +50,25 @@ class Assistant extends Model
     {
         return $this->morphOne(VrmFile::class, 'vrmable');
     }
+
+    /**
+     * @return array{regular: array<string>, intimate: array<string>}
+     */
+    public function promptEmotionNames(): array
+    {
+        if ($this->portrait_type === AssistantPortraitType::Avatar3d) {
+            // 3D avatar assistants don't have uploaded Emotion records to draw
+            // from — this list must stay in sync with the blendshape mapping
+            // in resources/js/utils/vrmExpressions.js.
+            return [
+                'regular' => ['happy', 'sad', 'annoyed', 'flustered', 'surprised', 'angry', 'relaxed'],
+                'intimate' => ['seduced'],
+            ];
+        }
+
+        return [
+            'regular' => $this->emotions()->where('restricted', false)->pluck('name')->toArray(),
+            'intimate' => $this->emotions()->where('restricted', true)->pluck('name')->toArray(),
+        ];
+    }
 }

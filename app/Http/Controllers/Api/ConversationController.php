@@ -184,10 +184,7 @@ class ConversationController extends Controller
 
         $assistantModel = $assistantUser->assistant;
 
-        $emotions = [
-            'regular' => $assistantModel->emotions()->where('restricted', false)->pluck('name')->toArray(),
-            'intimate' => $assistantModel->emotions()->where('restricted', true)->pluck('name')->toArray(),
-        ];
+        $emotions = $assistantModel->promptEmotionNames();
 
         $archive = $assistantModel->archive;
 
@@ -388,10 +385,7 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $emotions = [
-            'regular' => $assistantModel->emotions()->where('restricted', false)->pluck('name')->toArray(),
-            'intimate' => $assistantModel->emotions()->where('restricted', true)->pluck('name')->toArray(),
-        ];
+        $emotions = $assistantModel->promptEmotionNames();
 
         $excludedSections = ['opening_message', 'voice mode'];
 
