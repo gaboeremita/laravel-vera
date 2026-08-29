@@ -54,7 +54,7 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function setUpAgentAssistant(string $mode = 'agent'): array
+function setUpAgentAssistant(string $mode = 'agent', array $assistantAttributes = []): array
 {
     $user = User::factory()->create();
 
@@ -77,6 +77,7 @@ function setUpAgentAssistant(string $mode = 'agent'): array
 
     $assistant = Assistant::factory()->create([
         'mode' => $mode,
+        ...$assistantAttributes,
     ]);
 
     $assistantUser = AssistantUser::factory()->create([

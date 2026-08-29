@@ -23,6 +23,7 @@ export default function ChatPage() {
 		unlocked,
 		setConversations,
 		conversations,
+		setActiveConversationId,
 	} = useOutletContext();
 
 	const draftKey = `chatDraft:${assistantId}:${id}`;
@@ -108,6 +109,8 @@ export default function ChatPage() {
 
 	// Load conversation messages
 	useEffect(() => {
+		setActiveConversationId(Number(id));
+
 		const loadMessages = async () => {
 			try {
 				const res = await api.get(route('conversations.show', { assistant: assistantId, id }));
@@ -136,6 +139,8 @@ export default function ChatPage() {
 			}
 		};
 		loadMessages();
+
+		return () => setActiveConversationId(null);
 	}, [id]);
 
 	useEffect(() => {

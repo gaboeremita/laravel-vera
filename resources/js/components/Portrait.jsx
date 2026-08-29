@@ -2,7 +2,7 @@ import {useState} from "react";
 import veraAvatar from "../../images/vera-avatar.png";
 import VrmAvatar from "./VrmAvatar.jsx";
 
-export default function Portrait({ emotion, authenticated, hasAssistant = true, getImageUrl, getVideoUrl, getVrmBlendshapes, portraitType = 'image', vrmUrl = null }) {
+export default function Portrait({ emotion, authenticated, hasAssistant = true, getImageUrl, getVideoUrl, getVrmBlendshapes, portraitType = 'image', vrmUrl = null, assistantId = null, conversationId = null }) {
 	const [playingVideo, setPlayingVideo] = useState(false);
 
 	const src = getImageUrl(emotion) || getImageUrl('default');
@@ -59,7 +59,7 @@ export default function Portrait({ emotion, authenticated, hasAssistant = true, 
 		if (vrmUrl) {
 			return (
 				<div className="relative w-full h-full overflow-hidden portrait-bg">
-					<VrmAvatar vrmUrl={vrmUrl} emotion={emotion} blendshapes={getVrmBlendshapes ? getVrmBlendshapes(emotion) : []} />
+					<VrmAvatar vrmUrl={vrmUrl} emotion={emotion} blendshapes={getVrmBlendshapes ? getVrmBlendshapes(emotion) : []} assistantId={assistantId} conversationId={conversationId} />
 					<div className="absolute inset-0 pointer-events-none portrait-overlay" />
 					<div className="absolute bottom-3 left-3 bg-black/60 px-2.5 py-1 text-[0.6rem] tracking-[0.15em] text-accent uppercase">
 						mood: {emotion}
