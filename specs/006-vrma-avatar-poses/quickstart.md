@@ -1,0 +1,112 @@
+# Quickstart Validation Guide: VRMA Avatar Pose Animations
+
+**Feature**: `006-vrma-avatar-poses` | **Date**: 2026-08-29
+
+This guide covers the runnable scenarios that prove the feature works end-to-end. Complete them in order — each depends on the previous. Requires `004-vrm-3d-avatar` to already be functional (an assistant in 3D avatar mode with a `.vrm` file).
+
+---
+
+## Prerequisites
+
+- App running locally (Herd)
+- At least one user account and one assistant configured with portrait type "3D Avatar" and a valid `.vrm` file uploaded (per `004-vrm-3d-avatar/quickstart.md` Scenario 1)
+- A valid `.vrma` animation file (any publicly available sample VRMA clip compatible with the uploaded VRM's skeleton works)
+- A `.vrma` file >10 MB handy (for rejection test)
+
+---
+
+## Scenario 1: Configure a Pose With Blendshape Weights Only
+
+1. Open assistant settings (Edit page) for the 3D avatar assistant.
+2. Scroll to the new Poses section (below the emotion editor).
+3. Add a pose named "happy-hands" and set a blendshape weight (e.g., `happy` at 80%) without uploading a file.
+4. Save.
+5. **Expected**: The pose is listed with the blendshape configuration and no animation file.
+
+**Verifies**: FR-001, FR-002, FR-003 (weights-only path), US1 Scenario 1
+
+---
+
+## Scenario 2: Configure a Pose With an Uploaded Animation Only
+
+1. Add a pose named "spin", upload a valid `.vrma` file, and do not set any blendshape weights.
+2. Save.
+3. **Expected**: The pose is listed with an animation file and no blendshape configuration.
+
+**Verifies**: FR-003 (upload-only path), FR-005, FR-006, US1 Scenario 2
+
+---
+
+## Scenario 3: Configure a Pose With Both
+
+1. Add a pose named "wave", set a blendshape weight, and upload a `.vrma` file for the same pose.
+2. Save.
+3. **Expected**: The pose is listed with both the blendshape configuration and the animation file.
+4. Reload the edit page.
+5. **Expected**: Both pieces of data are still present — configuring one did not clear the other.
+
+**Verifies**: FR-003 (combined path), FR-004, US1 Scenarios 3–4, SC-005
+
+---
+
+## Scenario 4: LLM Prompt Includes Poses
+
+1. With poses configured on the assistant (from Scenarios 1–3), open the chat view and send any message.
+2. Inspect the assistant's response for character/behavior consistent with awareness of "spin," "wave," and "happy-hands" as physical actions (not emotions) it can perform — or inspect server logs / a debug endpoint if available for the constructed system prompt.
+3. **Expected**: The prompt sent to the LLM includes a `pose tags` section separate from the `emotion tags` section, listing all three pose names.
+
+**Verifies**: FR-008, FR-009, US3 Scenarios 1 and 3
+
+---
+
+## Scenario 5: Triggering a Pose in Chat
+
+1. In the chat view for the configured assistant, ask the character to "do a spin."
+2. **Expected**: Within 2 seconds, the avatar plays the "spin" animation once, then returns to its normal idle behavior (blink/head-sway resume).
+
+**Verifies**: FR-010, FR-015, SC-002
+
+**Note**: Visual verification only — no automated test covers 3D rendering behavior.
+
+---
+
+## Scenario 6: Combined Pose + Emotion
+
+1. Ask the character to do something that would plausibly trigger both an emotion and the "wave" pose (e.g., "wave happily at me").
+2. **Expected**: The avatar's face shows the emotional expression while simultaneously playing the wave animation and/or applying the pose's own blendshape weights — neither signal is dropped or overridden by the other.
+
+**Verifies**: FR-012, FR-016, US2 Scenario 3, SC-006, SC-007
+
+**Note**: Visual verification only.
+
+---
+
+## Scenario 7: Image Mode / No Poses Is Unchanged
+
+1. Confirm that an assistant with no poses configured shows no pose-related prompt guidance (repeat Scenario 4's inspection with a pose-free assistant).
+2. Confirm that an assistant in image portrait mode shows no pose configuration controls in its settings, and behaves exactly as before this feature.
+
+**Verifies**: FR-002, FR-009, FR-013, SC-003
+
+---
+
+## Scenario 8: File Size and Format Rejection
+
+1. In assistant settings, attempt to upload a `.vrma` file larger than 10 MB to a pose.
+2. **Expected**: The upload is rejected with a clear error message.
+3. Attempt to upload a non-`.vrma` file (e.g., a `.png`) to a pose's animation field.
+4. **Expected**: The upload is rejected with a clear error message.
+
+**Verifies**: FR-005, FR-014, SC-004
+
+---
+
+## API-Level Tests (automated)
+
+Run:
+
+```bash
+php artisan test --compact --filter=AssistantPose
+```
+
+Covers: pose CRUD (create, rename, delete, name-collision rejection), animation upload/delete, size/format rejection, ownership scoping, and the extended `emotions` endpoint response shape including `poses`. See `tests/Feature/Api/AssistantPoseTest.php` and `tests/Feature/Api/AssistantPoseAnimationTest.php`.
