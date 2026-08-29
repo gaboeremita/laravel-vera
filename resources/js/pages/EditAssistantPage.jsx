@@ -6,6 +6,7 @@ import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
 import VrmEmotionEditor from '../components/VrmEmotionEditor.jsx';
+import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
 export default function EditAssistantPage() {
@@ -30,6 +31,7 @@ export default function EditAssistantPage() {
 	const [vrmFilename, setVrmFilename] = useState(null);
 	const [isUploadingVrm, setIsUploadingVrm] = useState(false);
 	const [isDeletingVrm, setIsDeletingVrm] = useState(false);
+	const [confirmingVrmDelete, setConfirmingVrmDelete] = useState(false);
 	const vrmInputRef = useRef(null);
 	const [cardImagePreview, setCardImagePreview] = useState(null);
 	const [isUploadingCardImage, setIsUploadingCardImage] = useState(false);
@@ -64,7 +66,7 @@ export default function EditAssistantPage() {
 				setSelectedArchiveId(data.archive_id ? String(data.archive_id) : '');
 				setMode(data.mode || 'assistant');
 				setPortraitType(data.portrait_type || 'image');
-				setVrmFilename(data.vrm_url ? data.vrm_original_name : null);
+				setVrmFilename(data.vrm_url ? (data.vrm_original_name || 'avatar.vrm') : null);
 				setCardImagePreview(data.image_url || null);
 				const loadedEmotions = data.emotions || [];
 				setEmotions(loadedEmotions);
@@ -135,6 +137,7 @@ export default function EditAssistantPage() {
 	};
 
 	const handleVrmDelete = async () => {
+		setConfirmingVrmDelete(false);
 		setIsDeletingVrm(true);
 		try {
 			const res = await api.delete(route('assistants.vrm.destroy', { id }));
@@ -438,7 +441,7 @@ export default function EditAssistantPage() {
 									<div className="flex items-center gap-2">
 										<span className="text-accent text-sm truncate flex-1">{vrmFilename}</span>
 										<button
-											onClick={handleVrmDelete}
+											onClick={() => setConfirmingVrmDelete(true)}
 											disabled={isDeletingVrm}
 											className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-danger text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
 										>
@@ -648,6 +651,14 @@ export default function EditAssistantPage() {
 					)}
 				</div>
 			</div>
+
+			{confirmingVrmDelete && (
+				<ConfirmationModal
+					message="Delete the VRM avatar file?"
+					onConfirm={handleVrmDelete}
+					onCancel={() => setConfirmingVrmDelete(false)}
+				/>
+			)}
 		</>
 	);
 }

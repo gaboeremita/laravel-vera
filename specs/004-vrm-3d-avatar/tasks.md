@@ -94,7 +94,7 @@
 
 - [x] T022 [P] Run `vendor/bin/pint --dirty --format agent` and fix any violations across all PHP files changed in this feature
 - [x] T023 [P] Run `php artisan test --compact --filter=AssistantVrm` and confirm all tests pass
-- [x] T024 [P] Run `npm run lint` and fix any ESLint violations across all JS/JSX files changed in this feature
+- [x] T024 [P] Run `npm run lint` and fix any violations across all JS/JSX files changed in this feature
 - [x] T025 Complete manual verification per [quickstart.md](quickstart.md) scenarios 1–7
 
 ---
@@ -131,7 +131,7 @@
 
 ### User Story 1 — Backend can run alongside Frontend
 
-```
+```text
 Parallel group A (different files, no deps on each other):
   T008 — AssistantVrmController
   T009 — routes/api.php

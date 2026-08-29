@@ -130,7 +130,7 @@ it('persists portrait_type via PATCH', function () {
         ])
         ->assertStatus(200);
 
-    expect($assistant->fresh()->portrait_type)->toBe(AssistantPortraitType::Avatar3d);
+    expect($assistant->fresh()->portrait_type)->toBe(AssistantPortraitType::Avatar3D);
 });
 
 it('creates an avatar3d assistant without emotion images', function () {
@@ -146,7 +146,7 @@ it('creates an avatar3d assistant without emotion images', function () {
 
     $response->assertStatus(201);
     $assistant = Assistant::find($response->json('id'));
-    expect($assistant->portrait_type)->toBe(AssistantPortraitType::Avatar3d);
+    expect($assistant->portrait_type)->toBe(AssistantPortraitType::Avatar3D);
     expect($assistant->emotions()->count())->toBe(0);
 });
 

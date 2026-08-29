@@ -18,21 +18,27 @@ class AssistantVrmController extends Controller
         ]);
 
         $file = $request->file('vrm');
-
-        if ($assistant->vrm) {
-            Storage::disk($assistant->vrm->disk)->delete($assistant->vrm->path);
-            $assistant->vrm->delete();
-        }
+        $previousPath = $assistant->vrm?->path;
+        $previousDisk = $assistant->vrm?->disk;
 
         $path = $file->store("vrm/{$assistant->id}", 'public');
 
-        $vrmFile = $assistant->vrm()->create([
-            'path' => $path,
-            'disk' => 'public',
-            'mime_type' => 'application/octet-stream',
-            'size' => $file->getSize(),
-            'original_name' => $file->getClientOriginalName(),
-        ]);
+        try {
+            $vrmFile = $assistant->vrm()->updateOrCreate([], [
+                'path' => $path,
+                'disk' => 'public',
+                'mime_type' => 'application/octet-stream',
+                'size' => $file->getSize(),
+                'original_name' => $file->getClientOriginalName(),
+            ]);
+        } catch (\Throwable $e) {
+            Storage::disk('public')->delete($path);
+            throw $e;
+        }
+
+        if ($previousPath) {
+            Storage::disk($previousDisk)->delete($previousPath);
+        }
 
         return response()->json(['vrm_url' => $vrmFile->url], 201);
     }
@@ -50,6 +56,6 @@ class AssistantVrmController extends Controller
         Storage::disk($vrm->disk)->delete($vrm->path);
         $vrm->delete();
 
-        return response()->json(['message' => 'VRM file deleted.']);
+        return response()->json(['message' => 'VRM file deleted']);
     }
 }

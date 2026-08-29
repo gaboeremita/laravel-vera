@@ -108,7 +108,7 @@ export default function CreateAssistantPage() {
 	};
 
 	const handleAddVrmEmotion = (emotionName, blendshapes) => {
-		setStagedVrmEmotions((prev) => [...prev, { name: emotionName, vrm_blendshapes: blendshapes }]);
+		setStagedVrmEmotions((prev) => [...prev, { id: crypto.randomUUID(), name: emotionName, vrm_blendshapes: blendshapes }]);
 	};
 
 	const handleDeleteVrmEmotion = (emotion) => {
@@ -120,7 +120,7 @@ export default function CreateAssistantPage() {
 	};
 
 	const handleAddVrmRestrictedEmotion = (emotionName, blendshapes) => {
-		setStagedVrmRestrictedEmotions((prev) => [...prev, { name: emotionName, vrm_blendshapes: blendshapes }]);
+		setStagedVrmRestrictedEmotions((prev) => [...prev, { id: crypto.randomUUID(), name: emotionName, vrm_blendshapes: blendshapes }]);
 	};
 
 	const handleDeleteVrmRestrictedEmotion = (emotion) => {
@@ -210,10 +210,16 @@ export default function CreateAssistantPage() {
 
 			const created = await res.json();
 
-			if (pendingVrmFile && created.id) {
+			if (portraitType === 'avatar3d' && pendingVrmFile && created.id) {
 				const vrmForm = new FormData();
 				vrmForm.append('vrm', pendingVrmFile);
-				await api.postForm(route('assistants.vrm.store', { id: created.id }), vrmForm);
+				const vrmRes = await api.postForm(route('assistants.vrm.store', { id: created.id }), vrmForm);
+				if (!vrmRes.ok) {
+					const vrmError = await vrmRes.json().catch(() => ({}));
+					addToast(vrmError.message || 'Assistant created, but the VRM upload failed', 'error');
+					navigate('/assistants');
+					return;
+				}
 			}
 
 			addToast('Assistant created', 'success');
