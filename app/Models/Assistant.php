@@ -51,6 +51,11 @@ class Assistant extends Model
         return $this->morphOne(VrmFile::class, 'vrmable');
     }
 
+    public function cardImage(): MorphOne
+    {
+        return $this->morphOne(Image::class, 'imageable');
+    }
+
     /**
      * @return array{regular: array<string>, intimate: array<string>}
      */

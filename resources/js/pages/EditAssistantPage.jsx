@@ -30,6 +30,9 @@ export default function EditAssistantPage() {
 	const [isUploadingVrm, setIsUploadingVrm] = useState(false);
 	const [isDeletingVrm, setIsDeletingVrm] = useState(false);
 	const vrmInputRef = useRef(null);
+	const [cardImagePreview, setCardImagePreview] = useState(null);
+	const [isUploadingCardImage, setIsUploadingCardImage] = useState(false);
+	const cardImageRef = useRef(null);
 	const [promptMode, setPromptMode] = useState('manual');
 	const [promptJson, setPromptJson] = useState('');
 	const [promptJsonError, setPromptJsonError] = useState(null);
@@ -60,7 +63,8 @@ export default function EditAssistantPage() {
 				setSelectedArchiveId(data.archive_id ? String(data.archive_id) : '');
 				setMode(data.mode || 'assistant');
 				setPortraitType(data.portrait_type || 'image');
-				setVrmFilename(data.vrm_url ? data.vrm_url.split('/').pop() : null);
+				setVrmFilename(data.vrm_url ? data.vrm_original_name : null);
+				setCardImagePreview(data.image_url || null);
 				const loadedEmotions = data.emotions || [];
 				setEmotions(loadedEmotions);
 				setRestrictedEmotions(data.restricted_emotions || []);
@@ -140,6 +144,28 @@ export default function EditAssistantPage() {
 			addToast('Failed to delete VRM file', 'error');
 		} finally {
 			setIsDeletingVrm(false);
+		}
+	};
+
+	const handleCardImageUpload = async (e) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+		setIsUploadingCardImage(true);
+		try {
+			const formData = new FormData();
+			formData.append('image', file);
+			const res = await api.postForm(route('assistants.image.store', { id }), formData);
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Upload failed');
+			}
+			setCardImagePreview(URL.createObjectURL(file));
+			addToast('Card image updated', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to upload card image', 'error');
+		} finally {
+			setIsUploadingCardImage(false);
+			if (cardImageRef.current) cardImageRef.current.value = '';
 		}
 	};
 
@@ -362,38 +388,65 @@ export default function EditAssistantPage() {
 					</div>
 
 					{portraitType === 'avatar3d' && (
-						<div className="space-y-2">
-							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
-								VRM File
-							</label>
-							{vrmFilename ? (
-								<div className="flex items-center gap-2">
-									<span className="text-accent text-sm truncate flex-1">{vrmFilename}</span>
+						<>
+							<div className="space-y-2">
+								<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+									VRM File
+								</label>
+								{vrmFilename ? (
+									<div className="flex items-center gap-2">
+										<span className="text-accent text-sm truncate flex-1">{vrmFilename}</span>
+										<button
+											onClick={handleVrmDelete}
+											disabled={isDeletingVrm}
+											className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-danger text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
+										>
+											{isDeletingVrm ? 'DELETING...' : 'DELETE'}
+										</button>
+									</div>
+								) : (
 									<button
-										onClick={handleVrmDelete}
-										disabled={isDeletingVrm}
-										className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-danger text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
+										onClick={() => vrmInputRef.current?.click()}
+										disabled={isUploadingVrm}
+										className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-line-1 text-fg-3 hover:border-fg-3 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
 									>
-										{isDeletingVrm ? 'DELETING...' : 'DELETE'}
+										{isUploadingVrm ? 'UPLOADING...' : 'UPLOAD .VRM'}
 									</button>
-								</div>
-							) : (
-								<button
-									onClick={() => vrmInputRef.current?.click()}
-									disabled={isUploadingVrm}
-									className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-line-1 text-fg-3 hover:border-fg-3 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
+								)}
+								<input
+									ref={vrmInputRef}
+									type="file"
+									accept=".vrm"
+									onChange={handleVrmUpload}
+									className="hidden"
+								/>
+							</div>
+
+							<div className="space-y-2">
+								<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+									Card Image <span className="text-fg-3 normal-case">(shown in the assistants menu)</span>
+								</label>
+								<div
+									onClick={() => cardImageRef.current?.click()}
+									className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
 								>
-									{isUploadingVrm ? 'UPLOADING...' : 'UPLOAD .VRM'}
-								</button>
-							)}
-							<input
-								ref={vrmInputRef}
-								type="file"
-								accept=".vrm"
-								onChange={handleVrmUpload}
-								className="hidden"
-							/>
-						</div>
+									{cardImagePreview ? (
+										<img src={cardImagePreview} alt="Card" className="w-full h-full object-cover object-top" />
+									) : (
+										<span className="text-fg-3 text-[0.65rem] tracking-[0.1em] text-center px-2">
+											{isUploadingCardImage ? 'UPLOADING...' : 'CLICK TO SELECT'}
+										</span>
+									)}
+								</div>
+								<input
+									ref={cardImageRef}
+									type="file"
+									accept="image/*"
+									onChange={handleCardImageUpload}
+									className="hidden"
+								/>
+							</div>
+						</>
 					)}
 
 					{/* Save basic fields */}
@@ -412,50 +465,54 @@ export default function EditAssistantPage() {
 					</div>
 				</div>
 
-				<div className="border-t border-line-1" />
+				{portraitType === 'image' && (
+					<>
+						<div className="border-t border-line-1" />
 
-				{/* Default image */}
-				<div className="space-y-2">
-					<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
-						Default Image
-					</label>
-					<div
-						onClick={() => defaultImageRef.current?.click()}
-						className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
-					>
-						{defaultPreview ? (
-							<img src={defaultPreview} alt="Default" className="w-full h-full object-cover object-top" />
-						) : (
-							<span className="text-fg-3 text-[0.65rem] tracking-[0.1em] text-center px-2">
-								CLICK TO REPLACE
-							</span>
-						)}
-					</div>
-					<input
-						ref={defaultImageRef}
-						type="file"
-						accept="image/*"
-						onChange={handleReplaceDefaultImage}
-						className="hidden"
-					/>
-				</div>
+						{/* Default image */}
+						<div className="space-y-2">
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+								Default Image
+							</label>
+							<div
+								onClick={() => defaultImageRef.current?.click()}
+								className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
+							>
+								{defaultPreview ? (
+									<img src={defaultPreview} alt="Default" className="w-full h-full object-cover object-top" />
+								) : (
+									<span className="text-fg-3 text-[0.65rem] tracking-[0.1em] text-center px-2">
+										CLICK TO REPLACE
+									</span>
+								)}
+							</div>
+							<input
+								ref={defaultImageRef}
+								type="file"
+								accept="image/*"
+								onChange={handleReplaceDefaultImage}
+								className="hidden"
+							/>
+						</div>
 
-				{/* Emotions */}
-				<EmotionGrid
-					emotions={emotions.filter((e) => e.name !== 'default')}
-					onAdd={handleAddEmotion}
-					onDelete={handleDeleteEmotion}
-					onUpdateImage={handleReplaceImage}
-				/>
+						{/* Emotions */}
+						<EmotionGrid
+							emotions={emotions.filter((e) => e.name !== 'default')}
+							onAdd={handleAddEmotion}
+							onDelete={handleDeleteEmotion}
+							onUpdateImage={handleReplaceImage}
+						/>
 
-				{/* Restricted Emotions */}
-				<EmotionGrid
-					label="Restricted Emotions"
-					emotions={restrictedEmotions}
-					onAdd={handleAddRestrictedEmotion}
-					onDelete={handleDeleteEmotion}
-					onUpdateImage={handleReplaceImage}
-				/>
+						{/* Restricted Emotions */}
+						<EmotionGrid
+							label="Restricted Emotions"
+							emotions={restrictedEmotions}
+							onAdd={handleAddRestrictedEmotion}
+							onDelete={handleDeleteEmotion}
+							onUpdateImage={handleReplaceImage}
+						/>
+					</>
+				)}
 
 				<div className="border-t border-line-1" />
 

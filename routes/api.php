@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AiProviderController;
 use App\Http\Controllers\Api\ArchiveController;
 use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AssistantEmotionController;
+use App\Http\Controllers\Api\AssistantImageController;
 use App\Http\Controllers\Api\AssistantMemoryPromptController;
 use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\AssistantVrmController;
@@ -32,6 +33,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/assistants/{id}', [AssistantController::class, 'destroy'])->name('assistants.destroy');
     Route::post('/assistants/{id}/vrm', [AssistantVrmController::class, 'store'])->name('assistants.vrm.store');
     Route::delete('/assistants/{id}/vrm', [AssistantVrmController::class, 'destroy'])->name('assistants.vrm.destroy');
+    Route::post('/assistants/{id}/image', [AssistantImageController::class, 'store'])->name('assistants.image.store');
+    Route::delete('/assistants/{id}/image', [AssistantImageController::class, 'destroy'])->name('assistants.image.destroy');
 
     Route::prefix('assistants/{assistant}')->group(function () {
         Route::get('/settings', [SettingsController::class, 'show'])->name('settings.show');

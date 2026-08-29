@@ -19,15 +19,23 @@ class AssistantController extends Controller
         $assistants = $request->user()
             ->assistants()
             ->withCount(['emotions'])
+            ->with('cardImage')
             ->get()
             ->map(function (Assistant $assistant) {
                 $pivotId = $assistant->pivot->id;
 
-                // Default emotion image for card avatar
-                $defaultEmotion = $assistant->emotions()
-                    ->where('name', 'default')
-                    ->with('image')
-                    ->first();
+                // Card image takes priority; the 'default' emotion image is
+                // the fallback for image-mode assistants without one set.
+                $cardImageUrl = $assistant->cardImage?->url;
+
+                if (! $cardImageUrl) {
+                    $defaultEmotion = $assistant->emotions()
+                        ->where('name', 'default')
+                        ->with('image')
+                        ->first();
+
+                    $cardImageUrl = $defaultEmotion?->image?->url;
+                }
 
                 // Conversation stats via the pivot
                 $stats = DB::table('conversations')
@@ -40,7 +48,7 @@ class AssistantController extends Controller
                     'name' => $assistant->name,
                     'slug' => $assistant->slug,
                     'description' => $assistant->description,
-                    'image_url' => $defaultEmotion?->image?->url,
+                    'image_url' => $cardImageUrl,
                     'conversations_count' => (int) ($stats->conversations_count ?? 0),
                     'last_activity' => $stats->last_activity,
                 ];
@@ -53,7 +61,7 @@ class AssistantController extends Controller
     {
         $assistant = $request->user()
             ->assistants()
-            ->with('vrm')
+            ->with(['vrm', 'cardImage'])
             ->findOrFail($id);
 
         $mapEmotion = fn ($emotion) => [
@@ -85,6 +93,8 @@ class AssistantController extends Controller
             'mode' => $assistant->mode,
             'portrait_type' => $assistant->portrait_type->value,
             'vrm_url' => $assistant->vrm?->url,
+            'vrm_original_name' => $assistant->vrm?->original_name,
+            'image_url' => $assistant->cardImage?->url,
             'emotions' => $emotions,
             'restricted_emotions' => $restrictedEmotions,
         ]);
