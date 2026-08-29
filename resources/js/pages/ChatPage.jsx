@@ -3,7 +3,7 @@ import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Pencil, Mic, MicOff, Volume2, VolumeX, Brain } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
-import { parseEmotionFromResponse, stripForSpeech } from '../utils/parsers.js';
+import { parseEmotionFromResponse, parsePoseFromResponse, stripForSpeech } from '../utils/parsers.js';
 import { useVoiceMode } from '../hooks/useVoiceMode.js';
 import ChatMessage from '../components/ChatMessage.jsx';
 import Header from '../components/Header.jsx';
@@ -17,7 +17,9 @@ export default function ChatPage() {
 		assistantId,
 		assistantName,
 		setCurrentEmotion,
+		setCurrentPose,
 		emotionNames,
+		poseNames,
 		addToast,
 		fetchEmotions,
 		unlocked,
@@ -315,7 +317,8 @@ export default function ChatPage() {
 				const rawReply = data.content || '[default]\n...signal lost. Try again.';
 				const thinking = data.thinking || null;
 
-				const { emotion, intimate, text: cleanText } = parseEmotionFromResponse(rawReply, emotionNames);
+				const { emotion, intimate, text: emotionCleanText } = parseEmotionFromResponse(rawReply, emotionNames);
+				const { pose, text: cleanText } = parsePoseFromResponse(emotionCleanText, poseNames);
 				const ttsInstructions = data.tts_instructions ?? null;
 
 				if (intimate !== unlocked) {
@@ -332,6 +335,7 @@ export default function ChatPage() {
 					}));
 
 				setCurrentEmotion(emotion);
+				setCurrentPose(pose);
 				setHasError(false);
 				setMessages([
 					...updatedMessages,

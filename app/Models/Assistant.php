@@ -46,6 +46,11 @@ class Assistant extends Model
         return $this->hasMany(Emotion::class);
     }
 
+    public function poses(): HasMany
+    {
+        return $this->hasMany(Pose::class);
+    }
+
     public function vrm(): MorphOne
     {
         return $this->morphOne(VrmFile::class, 'vrmable');
@@ -65,5 +70,13 @@ class Assistant extends Model
             'regular' => $this->emotions()->where('restricted', false)->pluck('name')->toArray(),
             'intimate' => $this->emotions()->where('restricted', true)->pluck('name')->toArray(),
         ];
+    }
+
+    /**
+     * @return array<string>
+     */
+    public function promptPoseNames(): array
+    {
+        return $this->poses()->pluck('name')->toArray();
     }
 }

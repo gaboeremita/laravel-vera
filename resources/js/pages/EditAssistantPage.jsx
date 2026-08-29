@@ -6,6 +6,7 @@ import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
 import VrmEmotionEditor from '../components/VrmEmotionEditor.jsx';
+import PoseEditor from '../components/PoseEditor.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
@@ -22,6 +23,7 @@ export default function EditAssistantPage() {
 	const [openingMessage, setOpeningMessage] = useState('');
 	const [emotions, setEmotions] = useState([]);
 	const [restrictedEmotions, setRestrictedEmotions] = useState([]);
+	const [poses, setPoses] = useState([]);
 	const [defaultPreview, setDefaultPreview] = useState(null);
 	const defaultImageRef = useRef(null);
 	const [archives, setArchives] = useState([]);
@@ -71,6 +73,7 @@ export default function EditAssistantPage() {
 				const loadedEmotions = data.emotions || [];
 				setEmotions(loadedEmotions);
 				setRestrictedEmotions(data.restricted_emotions || []);
+				setPoses(data.poses || []);
 				const defaultEmo = loadedEmotions.find((e) => e.name === 'default');
 				if (defaultEmo?.image_url) setDefaultPreview(defaultEmo.image_url);
 			} catch {
@@ -301,6 +304,80 @@ export default function EditAssistantPage() {
 			addToast('Image updated', 'success');
 		} catch {
 			addToast('Failed to update emotion', 'error');
+		}
+	};
+
+	/* ── Pose handlers ── */
+
+	const handleAddPose = async (poseName, blendshapes) => {
+		try {
+			const res = await api.post(route('assistants.poses.store', { assistant: id }), {
+				name: poseName,
+				vrm_blendshapes: blendshapes,
+			});
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Failed to add pose');
+			}
+			const data = await res.json();
+			setPoses((prev) => [...prev, data]);
+			addToast('Pose added', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to add pose', 'error');
+		}
+	};
+
+	const handleUpdatePoseBlendshapes = async (pose, blendshapes) => {
+		try {
+			const res = await api.post(route('assistants.poses.update', { assistant: id, pose: pose.id }), {
+				vrm_blendshapes: blendshapes,
+			});
+			if (!res.ok) throw new Error('Update failed');
+			const data = await res.json();
+			setPoses((prev) => prev.map((p) => (p.id === pose.id ? data : p)));
+			addToast('Pose expression saved', 'success');
+		} catch {
+			addToast('Failed to save pose expression', 'error');
+		}
+	};
+
+	const handleDeletePose = async (pose) => {
+		try {
+			const res = await api.delete(route('assistants.poses.destroy', { assistant: id, pose: pose.id }));
+			if (!res.ok) throw new Error('Delete failed');
+			setPoses((prev) => prev.filter((p) => p.id !== pose.id));
+			addToast('Pose deleted', 'success');
+		} catch {
+			addToast('Failed to delete pose', 'error');
+		}
+	};
+
+	const handleUploadPoseAnimation = async (pose, file) => {
+		const formData = new FormData();
+		formData.append('animation', file);
+
+		try {
+			const res = await api.postForm(route('assistants.poses.animation.store', { assistant: id, pose: pose.id }), formData);
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Upload failed');
+			}
+			const data = await res.json();
+			setPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, animation_url: data.animation_url } : p)));
+			addToast('Pose animation uploaded', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to upload pose animation', 'error');
+		}
+	};
+
+	const handleDeletePoseAnimation = async (pose) => {
+		try {
+			const res = await api.delete(route('assistants.poses.animation.destroy', { assistant: id, pose: pose.id }));
+			if (!res.ok) throw new Error('Delete failed');
+			setPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, animation_url: null } : p)));
+			addToast('Pose animation deleted', 'success');
+		} catch {
+			addToast('Failed to delete pose animation', 'error');
 		}
 	};
 
@@ -575,6 +652,17 @@ export default function EditAssistantPage() {
 							onAdd={(name, blendshapes) => handleAddVrmEmotion(name, blendshapes, true)}
 							onDelete={handleDeleteEmotion}
 							onUpdateBlendshapes={handleUpdateVrmBlendshapes}
+						/>
+
+						<div className="border-t border-line-1" />
+
+						<PoseEditor
+							poses={poses}
+							onAdd={handleAddPose}
+							onDelete={handleDeletePose}
+							onUpdateBlendshapes={handleUpdatePoseBlendshapes}
+							onUploadAnimation={handleUploadPoseAnimation}
+							onDeleteAnimation={handleDeletePoseAnimation}
 						/>
 					</>
 				)}

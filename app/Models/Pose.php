@@ -3,20 +3,19 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasNormalizedBlendshapes;
-use Database\Factories\EmotionFactory;
+use Database\Factories\PoseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class Emotion extends Model
+class Pose extends Model
 {
-    /** @use HasFactory<EmotionFactory> */
+    /** @use HasFactory<PoseFactory> */
     use HasFactory, HasNormalizedBlendshapes;
 
     protected $fillable = [
         'name',
-        'restricted',
         'vrm_blendshapes',
     ];
 
@@ -27,18 +26,13 @@ class Emotion extends Model
         ];
     }
 
-    public function image(): MorphOne
-    {
-        return $this->morphOne(Image::class, 'imageable');
-    }
-
-    public function video(): MorphOne
-    {
-        return $this->morphOne(Video::class, 'videoable');
-    }
-
     public function assistant(): BelongsTo
     {
         return $this->belongsTo(Assistant::class);
+    }
+
+    public function animationFile(): HasOne
+    {
+        return $this->hasOne(PoseAnimationFile::class);
     }
 }

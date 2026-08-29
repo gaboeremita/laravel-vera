@@ -25,7 +25,7 @@ description: "Task list for VRMA avatar pose animations"
 
 **Purpose**: Dependency the frontend playback work (US2) needs before it can start.
 
-- [ ] T001 Add `@pixiv/three-vrm-animation` to `package.json` and run `npm install` — requires explicit user approval first per CLAUDE.md's dependency-change policy (research.md Decision 6)
+- [X] T001 Add `@pixiv/three-vrm-animation` to `package.json` and run `npm install` — requires explicit user approval first per CLAUDE.md's dependency-change policy (research.md Decision 6)
 
 ---
 
@@ -35,13 +35,13 @@ description: "Task list for VRMA avatar pose animations"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 [P] Migration: create `poses` table (`assistant_id` FK, `name`, `vrm_blendshapes` json nullable, unique `(assistant_id, name)`) in `database/migrations/xxxx_xx_xx_xxxxxx_create_poses_table.php` (data-model.md)
-- [ ] T003 [P] Migration: create `pose_animation_files` table (`pose_id` FK unique, `path`, `disk`, `mime_type`, `size`, `original_name`) in `database/migrations/xxxx_xx_xx_xxxxxx_create_pose_animation_files_table.php` (data-model.md)
-- [ ] T004 [P] Extract `HasNormalizedBlendshapes` trait from `Emotion::normalizeBlendshapes()` (`app/Models/Emotion.php:50-60`) into `app/Models/Concerns/HasNormalizedBlendshapes.php`; update `Emotion` to `use` it (research.md Decision 7)
-- [ ] T005 [P] Create `Pose` model in `app/Models/Pose.php` (fillable `name`, `vrm_blendshapes`; cast `vrm_blendshapes` → array; `assistant(): BelongsTo`; `animationFile(): HasOne`; uses `HasNormalizedBlendshapes`) + `PoseFactory` in `database/factories/PoseFactory.php` (depends on T002, T004)
-- [ ] T006 [P] Create `PoseAnimationFile` model in `app/Models/PoseAnimationFile.php` (fillable `path`, `disk`, `mime_type`, `size`, `original_name`; `pose(): BelongsTo`; `url` accessor) + `PoseAnimationFileFactory` in `database/factories/PoseAnimationFileFactory.php` (depends on T003)
-- [ ] T007 Update `Assistant` model in `app/Models/Assistant.php`: add `poses(): HasMany` relation and `promptPoseNames(): array` method (depends on T005)
-- [ ] T008 Update `EmotionController::index` in `app/Http/Controllers/Api/EmotionController.php`: add a `poses` array (`{id, name, vrm_blendshapes, animation_url}`) to the response envelope alongside the existing `portrait_type`, `vrm_url`, `emotions` (contracts/api.md) (depends on T005, T006)
+- [X] T002 [P] Migration: create `poses` table (`assistant_id` FK, `name`, `vrm_blendshapes` json nullable, unique `(assistant_id, name)`) in `database/migrations/xxxx_xx_xx_xxxxxx_create_poses_table.php` (data-model.md)
+- [X] T003 [P] Migration: create `pose_animation_files` table (`pose_id` FK unique, `path`, `disk`, `mime_type`, `size`, `original_name`) in `database/migrations/xxxx_xx_xx_xxxxxx_create_pose_animation_files_table.php` (data-model.md)
+- [X] T004 [P] Extract `HasNormalizedBlendshapes` trait from `Emotion::normalizeBlendshapes()` (`app/Models/Emotion.php:50-60`) into `app/Models/Concerns/HasNormalizedBlendshapes.php`; update `Emotion` to `use` it (research.md Decision 7)
+- [X] T005 [P] Create `Pose` model in `app/Models/Pose.php` (fillable `name`, `vrm_blendshapes`; cast `vrm_blendshapes` → array; `assistant(): BelongsTo`; `animationFile(): HasOne`; uses `HasNormalizedBlendshapes`) + `PoseFactory` in `database/factories/PoseFactory.php` (depends on T002, T004)
+- [X] T006 [P] Create `PoseAnimationFile` model in `app/Models/PoseAnimationFile.php` (fillable `path`, `disk`, `mime_type`, `size`, `original_name`; `pose(): BelongsTo`; `url` accessor) + `PoseAnimationFileFactory` in `database/factories/PoseAnimationFileFactory.php` (depends on T003)
+- [X] T007 Update `Assistant` model in `app/Models/Assistant.php`: add `poses(): HasMany` relation and `promptPoseNames(): array` method (depends on T005)
+- [X] T008 Update `EmotionController::index` in `app/Http/Controllers/Api/EmotionController.php`: add a `poses` array (`{id, name, vrm_blendshapes, animation_url}`) to the response envelope alongside the existing `portrait_type`, `vrm_url`, `emotions` (contracts/api.md) (depends on T005, T006)
 
 **Checkpoint**: Foundation ready — user story implementation can now begin.
 
@@ -57,18 +57,18 @@ description: "Task list for VRMA avatar pose animations"
 
 > Write these first — they should FAIL until the corresponding implementation tasks land.
 
-- [ ] T009 [P] [US1] `AssistantPoseTest` — create/rename/delete a pose, reject duplicate names on the same assistant, ownership scoping (404 for another user's assistant) in `tests/Feature/Api/AssistantPoseTest.php` (exercises T011, T013)
-- [ ] T010 [P] [US1] `AssistantPoseAnimationTest` — upload/delete a pose's animation file, accept `.vrma` and `.fbx`, reject non-matching extensions and files over 10 MB, ownership scoping in `tests/Feature/Api/AssistantPoseAnimationTest.php` (exercises T012, T013)
+- [X] T009 [P] [US1] `AssistantPoseTest` — create/rename/delete a pose, reject duplicate names on the same assistant, ownership scoping (404 for another user's assistant) in `tests/Feature/Api/AssistantPoseTest.php` (exercises T011, T013)
+- [X] T010 [P] [US1] `AssistantPoseAnimationTest` — upload/delete a pose's animation file, accept `.vrma` and `.fbx`, reject non-matching extensions and files over 10 MB, ownership scoping in `tests/Feature/Api/AssistantPoseAnimationTest.php` (exercises T012, T013)
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Create `AssistantPoseController` (`store`, `update`, `destroy`) in `app/Http/Controllers/Api/AssistantPoseController.php`, scoped via `$request->user()->assistants()->findOrFail($assistantId)->poses()`, mirroring `AssistantEmotionController` (contracts/api.md) (depends on T005)
-- [ ] T012 [US1] Create `AssistantPoseAnimationController` (`store`, `destroy`) in `app/Http/Controllers/Api/AssistantPoseAnimationController.php` with `['required','file','extensions:vrma,fbx','max:10240']` validation, mirroring `AssistantVrmController` (contracts/api.md) (depends on T006)
-- [ ] T013 [US1] Register 5 pose routes in `routes/api.php`: `assistants.poses.store`, `assistants.poses.update`, `assistants.poses.destroy`, `assistants.poses.animation.store`, `assistants.poses.animation.destroy` (contracts/api.md) (depends on T011, T012) — T009/T010 should pass after this lands
-- [ ] T014 [US1] Add `poses`, `getPoseBlendshapes(name)`, `getPoseAnimationUrl(name)` to the `useEmotions` hook in `resources/js/hooks/useEmotions.js`, populated from the extended `GET /api/assistants/{assistant}/emotions` envelope (contracts/frontend-components.md) (depends on T008)
-- [ ] T015 [US1] Create `PoseEditor.jsx` in `resources/js/components/PoseEditor.jsx` — pose rows with optional `BlendshapeRows` (reused from `VrmEmotionEditor.jsx`) and an optional animation file (`.vrma`/`.fbx`) upload/delete control (contracts/frontend-components.md) (depends on T014)
-- [ ] T016 [P] [US1] Render `<PoseEditor>` in `resources/js/pages/EditAssistantPage.jsx` when `portraitType === 'avatar3d'`, below the existing `VrmEmotionEditor` sections, wired to the pose CRUD/animation endpoints (depends on T015, T013)
-- [ ] T017 [P] [US1] Render `<PoseEditor>` in `resources/js/pages/CreateAssistantPage.jsx` when `portraitType === 'avatar3d'`, wired the same way (depends on T015, T013)
+- [X] T011 [US1] Create `AssistantPoseController` (`store`, `update`, `destroy`) in `app/Http/Controllers/Api/AssistantPoseController.php`, scoped via `$request->user()->assistants()->findOrFail($assistantId)->poses()`, mirroring `AssistantEmotionController` (contracts/api.md) (depends on T005)
+- [X] T012 [US1] Create `AssistantPoseAnimationController` (`store`, `destroy`) in `app/Http/Controllers/Api/AssistantPoseAnimationController.php` with `['required','file','extensions:vrma,fbx','max:10240']` validation, mirroring `AssistantVrmController` (contracts/api.md) (depends on T006)
+- [X] T013 [US1] Register 5 pose routes in `routes/api.php`: `assistants.poses.store`, `assistants.poses.update`, `assistants.poses.destroy`, `assistants.poses.animation.store`, `assistants.poses.animation.destroy` (contracts/api.md) (depends on T011, T012) — T009/T010 should pass after this lands
+- [X] T014 [US1] Add `poses`, `getPoseBlendshapes(name)`, `getPoseAnimationUrl(name)` to the `useEmotions` hook in `resources/js/hooks/useEmotions.js`, populated from the extended `GET /api/assistants/{assistant}/emotions` envelope (contracts/frontend-components.md) (depends on T008)
+- [X] T015 [US1] Create `PoseEditor.jsx` in `resources/js/components/PoseEditor.jsx` — pose rows with optional `BlendshapeRows` (reused from `VrmEmotionEditor.jsx`) and an optional animation file (`.vrma`/`.fbx`) upload/delete control (contracts/frontend-components.md) (depends on T014)
+- [X] T016 [P] [US1] Render `<PoseEditor>` in `resources/js/pages/EditAssistantPage.jsx` when `portraitType === 'avatar3d'`, below the existing `VrmEmotionEditor` sections, wired to the pose CRUD/animation endpoints (depends on T015, T013)
+- [X] T017 [P] [US1] Render `<PoseEditor>` in `resources/js/pages/CreateAssistantPage.jsx` when `portraitType === 'avatar3d'`, wired the same way (depends on T015, T013)
 
 **Checkpoint**: User Story 1 is fully functional and testable independently — poses can be configured and persisted, even though nothing triggers them in chat yet.
 
@@ -84,12 +84,12 @@ description: "Task list for VRMA avatar pose animations"
 
 ### Implementation for User Story 2
 
-- [ ] T018 [P] [US2] Add `parsePoseFromResponse(text, validPoseNames)` to `resources/js/utils/parsers.js`, mirroring `parseEmotionFromResponse` — strips a leading `[pose: name]` tag after any `[emotion]`/`[intimate]` tags (research.md Decision 5)
-- [ ] T019 [P] [US2] Create `mixamoRetargeting.js` in `resources/js/utils/mixamoRetargeting.js` — Mixamo skeleton → VRM humanoid bone-name mapping, ported from `@pixiv/three-vrm`'s official Mixamo-animation example (research.md Decision 9) (depends on T001)
-- [ ] T020 [US2] Update `VrmAvatar.jsx` (`resources/js/components/VrmAvatar.jsx`): accept `poseBlendshapes`/`poseAnimationUrl` props; branch by file extension — `.vrma` via `VRMAnimationLoaderPlugin`, `.fbx` via `THREE.FBXLoader` + `mixamoRetargeting.js`; play once via `AnimationMixer` inside the existing `useFrame` loop; pause/resume idle head-sway around playback; merge `poseBlendshapes` into the existing blendshape lerp target map (contracts/frontend-components.md, research.md Decision 6) (depends on T001, T019)
-- [ ] T021 [US2] Update `Portrait.jsx` (`resources/js/components/Portrait.jsx`): pass `poseBlendshapes`/`poseAnimationUrl` props through to `VrmAvatar` (depends on T020)
-- [ ] T022 [US2] Update `AuthenticatedLayout.jsx` (`resources/js/layouts/AuthenticatedLayout.jsx`): add `currentPose` state, resolve `poseBlendshapes`/`poseAnimationUrl` via `useEmotions`, pass to `Portrait`, expose `setCurrentPose` via `Outlet` context alongside the existing `setCurrentEmotion` (depends on T021, T014)
-- [ ] T023 [US2] Update `ChatPage.jsx` (`resources/js/pages/ChatPage.jsx`): call `parsePoseFromResponse` alongside `parseEmotionFromResponse` when handling a chat response, then `setCurrentPose(pose)` (depends on T018, T022)
+- [X] T018 [P] [US2] Add `parsePoseFromResponse(text, validPoseNames)` to `resources/js/utils/parsers.js`, mirroring `parseEmotionFromResponse` — strips a leading `[pose: name]` tag after any `[emotion]`/`[intimate]` tags (research.md Decision 5)
+- [X] T019 [P] [US2] Create `mixamoRetargeting.js` in `resources/js/utils/mixamoRetargeting.js` — Mixamo skeleton → VRM humanoid bone-name mapping, ported from `@pixiv/three-vrm`'s official Mixamo-animation example (research.md Decision 9) (depends on T001)
+- [X] T020 [US2] Update `VrmAvatar.jsx` (`resources/js/components/VrmAvatar.jsx`): accept `poseBlendshapes`/`poseAnimationUrl` props; branch by file extension — `.vrma` via `VRMAnimationLoaderPlugin`, `.fbx` via `THREE.FBXLoader` + `mixamoRetargeting.js`; play once via `AnimationMixer` inside the existing `useFrame` loop; pause/resume idle head-sway around playback; merge `poseBlendshapes` into the existing blendshape lerp target map (contracts/frontend-components.md, research.md Decision 6) (depends on T001, T019)
+- [X] T021 [US2] Update `Portrait.jsx` (`resources/js/components/Portrait.jsx`): pass `poseBlendshapes`/`poseAnimationUrl` props through to `VrmAvatar` (depends on T020)
+- [X] T022 [US2] Update `AuthenticatedLayout.jsx` (`resources/js/layouts/AuthenticatedLayout.jsx`): add `currentPose` state, resolve `poseBlendshapes`/`poseAnimationUrl` via `useEmotions`, pass to `Portrait`, expose `setCurrentPose` via `Outlet` context alongside the existing `setCurrentEmotion` (depends on T021, T014)
+- [X] T023 [US2] Update `ChatPage.jsx` (`resources/js/pages/ChatPage.jsx`): call `parsePoseFromResponse` alongside `parseEmotionFromResponse` when handling a chat response, then `setCurrentPose(pose)` (depends on T018, T022)
 
 **Checkpoint**: User Stories 1 AND 2 both work independently — poses configured in Story 1 now visibly animate/express when signaled in chat.
 
@@ -105,11 +105,11 @@ description: "Task list for VRMA avatar pose animations"
 
 > Write first — should FAIL until T025 lands.
 
-- [ ] T024 [P] [US3] Test verifying the `pose tags` prompt section is present (with correct pose names) when poses are configured and absent when they are not, in `tests/Feature/Api/ConversationPosePromptTest.php` (exercises T025)
+- [X] T024 [P] [US3] Test verifying the `pose tags` prompt section is present (with correct pose names) when poses are configured and absent when they are not, in `tests/Feature/Api/ConversationPosePromptTest.php` (exercises T025)
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] Add a `POSE_TAG_INSTRUCTION` constant and a conditional `pose tags` prompt section (`$director->append('pose tags', [...])`, guarded on `promptPoseNames()` being non-empty) in `app/Http/Controllers/Api/ConversationController.php`, mirroring the existing `background tags` section (research.md Decision 4) (depends on T007) — T024 should pass after this lands
+- [X] T025 [US3] Add a `POSE_TAG_INSTRUCTION` constant and a conditional `pose tags` prompt section (`$director->append('pose tags', [...])`, guarded on `promptPoseNames()` being non-empty) in `app/Http/Controllers/Api/ConversationController.php`, mirroring the existing `background tags` section (research.md Decision 4) (depends on T007) — T024 should pass after this lands
 
 **Checkpoint**: All three user stories are independently functional.
 
@@ -119,9 +119,9 @@ description: "Task list for VRMA avatar pose animations"
 
 **Purpose**: Quality gates that span all stories.
 
-- [ ] T026 [P] Run `vendor/bin/pint --dirty --format agent` and fix any violations across all new/modified PHP files
-- [ ] T027 [P] Run `npm run lint` and fix any violations across all new/modified JS files
-- [ ] T028 Run `php artisan test --compact --filter=AssistantPose` and `php artisan test --compact --filter=ConversationPosePrompt`; confirm all pass
+- [X] T026 [P] Run `vendor/bin/pint --dirty --format agent` and fix any violations across all new/modified PHP files
+- [X] T027 [P] Run `npm run lint` and fix any violations across all new/modified JS files
+- [X] T028 Run `php artisan test --compact --filter=AssistantPose` and `php artisan test --compact --filter=ConversationPosePrompt`; confirm all pass
 - [ ] T029 Manually validate [quickstart.md](quickstart.md) Scenarios 1–8 in the browser (3D rendering/playback verification cannot be automated)
 
 ---

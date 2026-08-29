@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Assistant;
 use App\Models\Emotion;
 use App\Models\Image;
+use App\Models\Pose;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -84,6 +85,16 @@ class AssistantController extends Controller
             ->get()
             ->map($mapEmotion);
 
+        $poses = $assistant->poses()
+            ->with('animationFile')
+            ->get()
+            ->map(fn (Pose $pose) => [
+                'id' => $pose->id,
+                'name' => $pose->name,
+                'vrm_blendshapes' => $pose->vrm_blendshapes,
+                'animation_url' => $pose->animationFile?->url,
+            ]);
+
         return response()->json([
             'id' => $assistant->id,
             'name' => $assistant->name,
@@ -99,6 +110,7 @@ class AssistantController extends Controller
             'image_url' => $assistant->cardImage?->url,
             'emotions' => $emotions,
             'restricted_emotions' => $restrictedEmotions,
+            'poses' => $poses,
         ]);
     }
 
@@ -131,6 +143,12 @@ class AssistantController extends Controller
             'restricted_emotions.*.vrm_blendshapes' => ['sometimes', 'array'],
             'restricted_emotions.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'restricted_emotions.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
+            'poses' => ['sometimes', 'array'],
+            'poses.*.name' => ['required', 'string', 'max:255', 'distinct'],
+            'poses.*.vrm_blendshapes' => ['sometimes', 'array'],
+            'poses.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
+            'poses.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
+            'poses.*.animation' => ['sometimes', 'file', 'extensions:vrma,fbx', 'max:10240'],
         ]);
 
         $duplicateAcrossArrays = collect($validated['emotions'] ?? [])
@@ -196,6 +214,25 @@ class AssistantController extends Controller
 
             foreach ($validated['restricted_emotions'] ?? [] as $emotionData) {
                 $storeEmotion($emotionData, true);
+            }
+
+            foreach ($validated['poses'] ?? [] as $poseData) {
+                $pose = $assistant->poses()->create([
+                    'name' => $poseData['name'],
+                    'vrm_blendshapes' => Pose::normalizeBlendshapes($poseData['vrm_blendshapes'] ?? null),
+                ]);
+
+                if (isset($poseData['animation'])) {
+                    $path = $poseData['animation']->store("poses/{$assistant->id}/{$pose->id}", 'public');
+
+                    $pose->animationFile()->create([
+                        'path' => $path,
+                        'disk' => 'public',
+                        'mime_type' => 'application/octet-stream',
+                        'size' => $poseData['animation']->getSize(),
+                        'original_name' => $poseData['animation']->getClientOriginalName(),
+                    ]);
+                }
             }
 
             return $assistant;

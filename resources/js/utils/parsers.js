@@ -36,6 +36,32 @@ export function parseEmotionFromResponse(text, validEmotions = []) {
 }
 
 /**
+ * Parses a pose tag (e.g. "[pose: spin] ...") from the start of text,
+ * distinct from the emotion tag syntax so a pose name can never be mistaken
+ * for an emotion tag. Intended to run on the text already returned by
+ * parseEmotionFromResponse, after any [emotion]/[intimate] tags are
+ * stripped, so both tags can appear on the same message.
+ */
+export function parsePoseFromResponse(text, validPoseNames = []) {
+    let remaining = text;
+    let pose = null;
+
+    const poseMatch = remaining.match(/^\[pose:\s*([^\]]+)\]/i);
+    if (poseMatch) {
+        remaining = remaining.slice(poseMatch[0].length);
+        const matchedPose = poseMatch[1].trim();
+        if (validPoseNames.some((p) => p.toLowerCase() === matchedPose.toLowerCase())) {
+            pose = matchedPose;
+        }
+    }
+
+    return {
+        pose,
+        text: remaining.trim(),
+    };
+}
+
+/**
  * Strips asterisk-wrapped stage directions / action narration from text
  * before it's sent to TTS. Defense-in-depth alongside the voice-mode prompt
  * instructions — models don't always follow formatting instructions.

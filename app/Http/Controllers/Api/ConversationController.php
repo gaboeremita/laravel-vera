@@ -38,6 +38,8 @@ class ConversationController extends Controller
 
     private const BACKGROUND_TAG_INSTRUCTION = 'When the scene/setting you and the user are in has just clearly changed to a new location, prefix your reply with a tag describing the new setting: [scene: <short description of the new location>]. Only include this tag when the setting has actually changed, never when it is unchanged. Never mention the tag itself.';
 
+    private const POSE_TAG_INSTRUCTION = 'You can also perform physical actions or gestures with your body — separate from and in addition to your emotional expression. These are not emotions; they represent things you can do, like a spin, a dance, or a wave. When the user asks you to do one of your available poses, or it clearly fits what you are doing, include a tag naming it: [pose: <pose name>]. Only use a pose name from the list below, and only when it is actually being performed right now. Never mention the tag itself.';
+
     public function index(Request $request, int $assistant): JsonResponse
     {
 
@@ -268,6 +270,15 @@ class ConversationController extends Controller
 
         if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
             $director->append('background tags', self::BACKGROUND_TAG_INSTRUCTION);
+
+            $poses = $assistantModel->promptPoseNames();
+
+            if (! empty($poses)) {
+                $director->append('pose tags', [
+                    'instruction' => self::POSE_TAG_INSTRUCTION,
+                    'available poses' => $poses,
+                ]);
+            }
         }
 
         $director->except($excludedSections);

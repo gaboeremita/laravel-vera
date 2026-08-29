@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Emotion;
+use App\Models\Pose;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,10 +27,21 @@ class EmotionController extends Controller
                 'vrm_blendshapes' => $emotion->vrm_blendshapes,
             ]);
 
+        $poses = Pose::with('animationFile')
+            ->where('assistant_id', $assistant)
+            ->get()
+            ->map(fn (Pose $pose) => [
+                'id' => $pose->id,
+                'name' => $pose->name,
+                'vrm_blendshapes' => $pose->vrm_blendshapes,
+                'animation_url' => $pose->animationFile?->url,
+            ]);
+
         return response()->json([
             'portrait_type' => $assistantModel->portrait_type->value,
             'vrm_url' => $assistantModel->vrm?->url,
             'emotions' => $emotions,
+            'poses' => $poses,
         ]);
     }
 }

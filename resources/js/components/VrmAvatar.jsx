@@ -1,12 +1,15 @@
 import { useRef, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Box3, BackSide, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3 } from 'three';
+import { AnimationMixer, Box3, BackSide, LoopOnce, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 import veraAvatar from '../../images/vera-avatar.png';
 import defaultFloor from '../../images/avatar-background-default-floor.png';
 import defaultSurroundings from '../../images/avatar-background-default-surroundings.png';
 import useAvatarBackground from '../hooks/useAvatarBackground.js';
+import { retargetMixamoAnimation } from '../utils/mixamoRetargeting.js';
 
 const EXPRESSION_HOLD_SECONDS = 3.5;
 const BACKGROUND_FADE_SECONDS = 0.4;
@@ -41,7 +44,7 @@ const BACKDROP_THETA_START = Math.PI - BACKDROP_THETA_LENGTH / 2;
 // straddling the floor and having its lower half hidden beneath it.
 const BACKDROP_Y = BACKDROP_HEIGHT / 2;
 
-function VrmScene({ vrmUrl, emotion, blendshapes, onLoaded, onError }) {
+function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimationUrl, onLoaded, onError }) {
 	const { scene, camera } = useThree();
 	const vrmRef = useRef(null);
 	const currentWeightsRef = useRef({});
@@ -49,6 +52,10 @@ function VrmScene({ vrmUrl, emotion, blendshapes, onLoaded, onError }) {
 	const elapsedRef = useRef(0);
 	const lastEmotionRef = useRef(emotion);
 	const expressionHoldRef = useRef(0);
+	const mixerRef = useRef(null);
+	const poseActionRef = useRef(null);
+	const posePlayingRef = useRef(false);
+	const loadedPoseUrlRef = useRef(null);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -113,6 +120,65 @@ function VrmScene({ vrmUrl, emotion, blendshapes, onLoaded, onError }) {
 		};
 	}, [vrmUrl]);
 
+	// Plays a triggered pose's uploaded body animation once, then returns to
+	// idle. Loading is async (file fetch + parse) so it stays in an effect
+	// with a locally-scoped closure rather than the render-time-derivation
+	// pattern used elsewhere in this file.
+	useEffect(() => {
+		if (!poseAnimationUrl || !vrmRef.current) return;
+		if (loadedPoseUrlRef.current === poseAnimationUrl) return;
+		loadedPoseUrlRef.current = poseAnimationUrl;
+
+		let cancelled = false;
+
+		const loadAndPlay = async () => {
+			const vrm = vrmRef.current;
+			if (!vrm) return;
+
+			let clip = null;
+			try {
+				if (poseAnimationUrl.toLowerCase().endsWith('.fbx')) {
+					const fbxAsset = await new FBXLoader().loadAsync(poseAnimationUrl);
+					clip = retargetMixamoAnimation(fbxAsset, vrm);
+				} else {
+					const loader = new GLTFLoader();
+					loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+					const gltf = await loader.loadAsync(poseAnimationUrl);
+					const vrmAnimation = gltf.userData.vrmAnimations?.[0];
+					if (vrmAnimation) {
+						clip = createVRMAnimationClip(vrmAnimation, vrm);
+					}
+				}
+			} catch (error) {
+				console.error('[VrmAvatar] pose animation load error:', error);
+			}
+
+			if (cancelled || !clip) return;
+
+			if (!mixerRef.current) {
+				mixerRef.current = new AnimationMixer(vrm.scene);
+				mixerRef.current.addEventListener('finished', () => {
+					posePlayingRef.current = false;
+				});
+			}
+
+			poseActionRef.current?.stop();
+
+			const action = mixerRef.current.clipAction(clip);
+			action.setLoop(LoopOnce);
+			action.clampWhenFinished = true;
+			action.reset().play();
+			poseActionRef.current = action;
+			posePlayingRef.current = true;
+		};
+
+		void loadAndPlay();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [poseAnimationUrl]);
+
 	useFrame((_, delta) => {
 		if (!vrmRef.current) return;
 		const vrm = vrmRef.current;
@@ -132,7 +198,11 @@ function VrmScene({ vrmUrl, emotion, blendshapes, onLoaded, onError }) {
 		// Expression names come entirely from the assistant's own mapping —
 		// also lerp any previously-active expression down to 0 even if it's
 		// no longer targeted, so switching emotions doesn't leave it stuck.
-		const targets = expressionActive ? blendshapes : [];
+		// A pose's own blendshapes (if any) merge in on top of the emotion's,
+		// independent of the emotion hold/decay timer — they clear as soon as
+		// a later message no longer signals that pose.
+		const emotionTargets = expressionActive ? blendshapes : [];
+		const targets = [...emotionTargets, ...poseBlendshapes];
 		const targetMap = Object.fromEntries(targets.filter((t) => t.expression !== 'blink').map((t) => [t.expression, t.weight]));
 		const activeExpressions = new Set([...Object.keys(currentWeightsRef.current), ...Object.keys(targetMap)]);
 		activeExpressions.delete('blink');
@@ -167,13 +237,16 @@ function VrmScene({ vrmUrl, emotion, blendshapes, onLoaded, onError }) {
 			}
 		}
 
-		// Sinusoidal head sway applied to the humanoid head bone
+		// Sinusoidal head sway applied to the humanoid head bone — paused
+		// while a pose's body animation is playing so the two don't fight
+		// over the same bone.
 		const headBone = vrm.humanoid.getNormalizedBoneNode('head');
-		if (headBone) {
+		if (headBone && !posePlayingRef.current) {
 			headBone.rotation.y = Math.sin(elapsedRef.current * 0.6) * 0.03;
 			headBone.rotation.z = Math.sin(elapsedRef.current * 0.4) * 0.015;
 		}
 
+		mixerRef.current?.update(delta);
 		vrm.update(delta);
 	});
 
@@ -300,7 +373,7 @@ function AvatarBackgroundScene({ floorUrl, surroundingsUrl }) {
 	);
 }
 
-export default function VrmAvatar({ vrmUrl, emotion, blendshapes = [], assistantId = null, conversationId = null }) {
+export default function VrmAvatar({ vrmUrl, emotion, blendshapes = [], poseBlendshapes = [], poseAnimationUrl = null, assistantId = null, conversationId = null }) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [loadError, setLoadError] = useState(false);
 	const [syncedUrl, setSyncedUrl] = useState(vrmUrl);
@@ -344,6 +417,8 @@ export default function VrmAvatar({ vrmUrl, emotion, blendshapes = [], assistant
 					vrmUrl={vrmUrl}
 					emotion={emotion}
 					blendshapes={blendshapes}
+					poseBlendshapes={poseBlendshapes}
+					poseAnimationUrl={poseAnimationUrl}
 					onLoaded={() => setIsLoading(false)}
 					onError={() => {
 						setIsLoading(false);
