@@ -33,6 +33,7 @@ Confirmed mapping:
 | `default` | all 0.0 |
 | `neutral` | all 0.0 |
 | `happy` | happy: 1.0 |
+| `content` | happy: 0.4 (milder than `happy`, same blendshape) |
 | `sad` | sad: 1.0 |
 | `annoyed` | angry: 0.4 (milder than `angry`, same blendshape) |
 | `flustered` | surprised: 0.3, happy: 0.2 |

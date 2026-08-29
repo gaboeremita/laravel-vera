@@ -2,6 +2,8 @@ const EXPRESSION_MAP = {
 	default: [],
 	neutral: [],
 	happy: [{ expression: 'happy', weight: 1.0 }],
+	// Kept below 1.0 — a milder version of `happy`, not a distinct blendshape.
+	content: [{ expression: 'happy', weight: 0.4 }],
 	sad: [{ expression: 'sad', weight: 1.0 }],
 	// Kept below 1.0 — a milder version of `angry`, not a distinct blendshape.
 	annoyed: [{ expression: 'angry', weight: 0.4 }],

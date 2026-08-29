@@ -61,7 +61,7 @@ class Assistant extends Model
             // from — this list must stay in sync with the blendshape mapping
             // in resources/js/utils/vrmExpressions.js.
             return [
-                'regular' => ['happy', 'sad', 'annoyed', 'flustered', 'surprised', 'angry', 'relaxed'],
+                'regular' => ['happy', 'content', 'sad', 'annoyed', 'flustered', 'surprised', 'angry', 'relaxed'],
                 'intimate' => ['seduced'],
             ];
         }
