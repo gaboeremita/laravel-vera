@@ -48,6 +48,11 @@ return [
         'timeout' => (int) env('IMAGE_GEN_TIMEOUT', 120),
     ],
 
+    'avatar_background' => [
+        'cache_ttl' => (int) env('AVATAR_BACKGROUND_CACHE_TTL', 21600),
+        'storage_path' => env('AVATAR_BACKGROUND_STORAGE_PATH', 'avatar-backgrounds'),
+    ],
+
     'telegram' => [
         'url' => env('TELEGRAM_URL'),
         'token' => env('TELEGRAM_BOT_TOKEN'),

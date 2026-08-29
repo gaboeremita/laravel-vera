@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AssistantImageController;
 use App\Http\Controllers\Api\AssistantMemoryPromptController;
 use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\AssistantVrmController;
+use App\Http\Controllers\Api\AvatarBackgroundController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\ConversationMemoryController;
 use App\Http\Controllers\Api\DiscordController;
@@ -55,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/conversations/{id}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
         Route::patch('/conversations/{id}', [ConversationController::class, 'update'])->name('conversations.update');
         Route::get('/conversations/{id}/agent-progress', [AgentProgressController::class, 'show'])->name('conversations.agent-progress');
+        Route::get('/conversations/{id}/avatar-background', [AvatarBackgroundController::class, 'show'])->name('conversations.avatar-background');
         Route::get('/conversations/{id}/memory', [ConversationMemoryController::class, 'show'])->name('memory.show');
         Route::put('/conversations/{id}/memory', [ConversationMemoryController::class, 'update'])->name('memory.update');
         Route::post('/conversations/{id}/memory/summarize', [ConversationMemoryController::class, 'summarize'])->name('memory.summarize');

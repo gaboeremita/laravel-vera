@@ -89,7 +89,7 @@ As an ongoing conversation's narrative setting shifts (for example, the characte
 - **FR-011**: The generated background MUST read as coherent under the avatar scene's fixed/limited camera view, without depending on a full 360° or free-roaming camera.
 - **FR-012**: System MUST cache the most recently generated background for a conversation, scoped to that conversation only, so returning to it while the cache is still available shows the same scene without regenerating it. This cache is temporary, not a permanent archival record — the system is not required to keep a cached background indefinitely.
 - **FR-012a**: If a conversation's cached background is no longer available when the user returns to it, System MUST automatically regenerate a background from that conversation's current context, without requiring a manual request.
-- **FR-013**: System MUST show a loading indication while a background is being generated, and MUST leave the previously displayed background (or default) in place until generation completes.
+- **FR-013**: System MUST leave the previously displayed background (or default) in place until generation completes, rather than showing a blank or broken scene while a new background generates.
 - **FR-014**: System MUST apply generated backgrounds only to assistants presented via the 3D avatar; assistants without a 3D avatar are unaffected by this feature.
 - **FR-015**: Cached backgrounds MUST NOT be reused across different conversations, even for the same assistant and the same setting.
 - **FR-016**: Automatically triggered background changes (initial scene and mid-conversation updates) MUST apply immediately without requiring user confirmation.

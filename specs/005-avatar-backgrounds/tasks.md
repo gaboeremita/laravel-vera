@@ -25,7 +25,7 @@ description: "Task list for 3D Avatar Scene Backgrounds"
 
 ## Phase 1: Setup
 
-- [ ] T001 Add an `avatar_background` config block to `config/ai.php` (cache TTL seconds, storage path prefix `avatar-backgrounds`), following the existing `image_gen` block's `env()`-backed shape
+- [x] T001 Add an `avatar_background` config block to `config/ai.php` (cache TTL seconds, storage path prefix `avatar-backgrounds`), following the existing `image_gen` block's `env()`-backed shape
 
 ---
 
@@ -33,15 +33,15 @@ description: "Task list for 3D Avatar Scene Backgrounds"
 
 **Purpose**: The generation pipeline and rendering that every user story triggers into. No user story can be implemented until this phase is complete.
 
-- [ ] T002 [P] Add `generateMany(array $prompts): array` to `App\Contracts\ImageGenProvider` (`app/Contracts/ImageGenProvider.php`), returning one `ImageGenResult` per prompt in the same order; implement in `app/Services/ImageGenProviders/OpenRouterImageGenProvider.php` and `app/Services/ImageGenProviders/OpenAiCompatibleImageGenProvider.php` using `Http::pool()` so both prompts are sent concurrently rather than sequentially (research.md §5 — resolves the `/speckit-analyze` C2 finding: sequential calls risked missing SC-001's 60s target)
-- [ ] T003 [P] Create `AvatarBackgroundPromptEnhancer` in `app/Services/AvatarBackground/AvatarBackgroundPromptEnhancer.php` — mirrors `app/Services/ImageGenProviders/ImageGenPromptEnhancer.php`'s `PromptDirector` + `withRetrieval()` setup (FR-006, FR-007); its `enhance()` returns a `{floor: string, surroundings: string}` prompt pair from one raw description
-- [ ] T004 Create `AvatarBackgroundService` in `app/Services/AvatarBackground/AvatarBackgroundService.php` — orchestrates: call `AvatarBackgroundPromptEnhancer` (T003), call the assistant's `ImageGenManager`-resolved provider's `generateMany()` (T002) with the `[floor, surroundings]` prompts, delete the conversation's previous `avatar-backgrounds/{conversation_id}/*` files from the `public` disk, write the new pair, and return the cache payload shape from data-model.md. Depends on T002, T003.
-- [ ] T005 Create `GenerateAvatarBackground` queued job in `app/Jobs/GenerateAvatarBackground.php` — constructor takes `AssistantUser`, `Conversation`, raw description; on `handle()`, writes `avatar-background-progress:{conversation_id}` while running (mirrors `AgentProgressController`'s key), calls `AvatarBackgroundService`, writes `avatar-background:{conversation_id}` (with the configured TTL from T001) on success, and on failure logs via `Log::error` and leaves the existing `avatar-background:{conversation_id}` entry untouched (Constitution Principle V — FR-013 fallback). Always clears the progress key in a `finally`. Depends on T004.
-- [ ] T006 [P] Create `AvatarBackgroundController@show` in `app/Http/Controllers/Api/AvatarBackgroundController.php` — ownership-checks `{assistant}`/`{id}` exactly like `AgentProgressController@show`, returns the shape in `contracts/avatar-background-api.md` (`in_progress`, `status`, `background`). Purely a read — never dispatches generation itself (contracts/avatar-background-api.md).
-- [ ] T007 Add `GET /assistants/{assistant}/conversations/{id}/avatar-background` route in `routes/api.php`, next to the existing `conversations.agent-progress` route. Depends on T006.
+- [x] T002 [P] Add `generateMany(array $prompts): array` to `App\Contracts\ImageGenProvider` (`app/Contracts/ImageGenProvider.php`), returning one `ImageGenResult` per prompt in the same order; implement in `app/Services/ImageGenProviders/OpenRouterImageGenProvider.php` and `app/Services/ImageGenProviders/OpenAiCompatibleImageGenProvider.php` using `Http::pool()` so both prompts are sent concurrently rather than sequentially (research.md §5 — resolves the `/speckit-analyze` C2 finding: sequential calls risked missing SC-001's 60s target)
+- [x] T003 [P] Create `AvatarBackgroundPromptEnhancer` in `app/Services/AvatarBackground/AvatarBackgroundPromptEnhancer.php` — mirrors `app/Services/ImageGenProviders/ImageGenPromptEnhancer.php`'s `PromptDirector` + `withRetrieval()` setup (FR-006, FR-007); its `enhance()` returns a `{floor: string, surroundings: string}` prompt pair from one raw description
+- [x] T004 Create `AvatarBackgroundService` in `app/Services/AvatarBackground/AvatarBackgroundService.php` — orchestrates: call `AvatarBackgroundPromptEnhancer` (T003), call the assistant's `ImageGenManager`-resolved provider's `generateMany()` (T002) with the `[floor, surroundings]` prompts, delete the conversation's previous `avatar-backgrounds/{conversation_id}/*` files from the `public` disk, write the new pair, and return the cache payload shape from data-model.md. Depends on T002, T003.
+- [x] T005 Create `GenerateAvatarBackground` queued job in `app/Jobs/GenerateAvatarBackground.php` — constructor takes `AssistantUser`, `Conversation`, raw description; on `handle()`, writes `avatar-background-progress:{conversation_id}` while running (mirrors `AgentProgressController`'s key), calls `AvatarBackgroundService`, writes `avatar-background:{conversation_id}` (with the configured TTL from T001) on success, and on failure logs via `Log::error` and leaves the existing `avatar-background:{conversation_id}` entry untouched (Constitution Principle V — FR-013 fallback). Always clears the progress key in a `finally`. Depends on T004.
+- [x] T006 [P] Create `AvatarBackgroundController@show` in `app/Http/Controllers/Api/AvatarBackgroundController.php` — ownership-checks `{assistant}`/`{id}` exactly like `AgentProgressController@show`, returns the shape in `contracts/avatar-background-api.md` (`in_progress`, `status`, `background`). Purely a read — never dispatches generation itself (contracts/avatar-background-api.md).
+- [x] T007 Add `GET /assistants/{assistant}/conversations/{id}/avatar-background` route in `routes/api.php`, next to the existing `conversations.agent-progress` route. Depends on T006.
 - [x] T008 [P] Add the bundled default background assets to `resources/images/avatar-background-default-floor.png` and `resources/images/avatar-background-default-surroundings.png` (research.md §9 — resolves the `/speckit-analyze` B1 finding: "the default scene" was previously undefined). Done — both files saved from the user-supplied image (the same image used for both, per their direction).
-- [ ] T009 [P] Create `useAvatarBackground.js` hook in `resources/js/hooks/useAvatarBackground.js` — polls the T007 endpoint every 2s while `active` (mirrors `resources/js/components/AgentProgressIndicator.jsx`'s poll loop exactly, including computing the active/inactive transition in the render body per Constitution Principle VIII), returns `{ background, inProgress }`
-- [ ] T010 Add floor + curved-backdrop rendering to `resources/js/components/VrmAvatar.jsx` — a flat ground-plane mesh (floor texture) beneath the avatar and an open partial-cylinder mesh (no front/top/bottom caps, surroundings texture) behind it (FR-008–FR-011), consuming `useAvatarBackground` (T009); when `background` is null, use the bundled default pair (T008) instead of rendering nothing. When the background prop changes (including from default to generated, or between two generated pairs), cross-fade the new pair's material opacity 0→1 while fading the previous pair 1→0 before disposing it (FR-018, research.md §7). Depends on T008, T009.
+- [x] T009 [P] Create `useAvatarBackground.js` hook in `resources/js/hooks/useAvatarBackground.js` — polls the T007 endpoint every 2s while `active` (mirrors `resources/js/components/AgentProgressIndicator.jsx`'s poll loop exactly, including computing the active/inactive transition in the render body per Constitution Principle VIII), returns `{ background, inProgress }`
+- [x] T010 Add floor + curved-backdrop rendering to `resources/js/components/VrmAvatar.jsx` — a flat ground-plane mesh (floor texture) beneath the avatar and an open partial-cylinder mesh (no front/top/bottom caps, surroundings texture) behind it (FR-008–FR-011), consuming `useAvatarBackground` (T009); when `background` is null, use the bundled default pair (T008) instead of rendering nothing. When the background prop changes (including from default to generated, or between two generated pairs), cross-fade the new pair's material opacity 0→1 while fading the previous pair 1→0 before disposing it (FR-018, research.md §7). Depends on T008, T009.
 
 **Checkpoint**: Generation pipeline and rendering are complete and manually triggerable (e.g. via Tinker dispatching the job) — user story work can now begin.
 
@@ -55,16 +55,16 @@ description: "Task list for 3D Avatar Scene Backgrounds"
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Feature test: sending `/change-background a futuristic park` dispatches `GenerateAvatarBackground` with that description, in `tests/Feature/AvatarBackgroundCommandTest.php` (follow `tests/Feature/ImageGenerationToolSingleCallTest.php`'s `Http::fake()`/`Queue::fake()` conventions)
-- [ ] T012 [P] [US1] Feature test: an agent-mode assistant asked in natural language to change the background invokes the `change_avatar_background` tool (assert via `tool_calls` in the response, mirroring `ImageGenerationToolSingleCallTest.php`), in `tests/Feature/AvatarBackgroundToolTest.php`
-- [ ] T013 [P] [US1] Feature test: requesting a location matching an `ArchiveEntry` (via `setUpAssistantWithArchive()`) results in the enhanced floor/surroundings prompts including that entry's documented content, in `tests/Feature/AvatarBackgroundArchiveGroundingTest.php`
-- [ ] T014 [P] [US1] Feature test: `/change-background ...` and the agent tool both have no effect for an assistant whose `portrait_type` is not `Avatar3D` (no job dispatched), in `tests/Feature/AvatarBackgroundNonAvatarNoOpTest.php`
+- [x] T011 [P] [US1] Feature test: sending `/change-background a futuristic park` dispatches `GenerateAvatarBackground` with that description, in `tests/Feature/AvatarBackgroundCommandTest.php` (follow `tests/Feature/ImageGenerationToolSingleCallTest.php`'s `Http::fake()`/`Queue::fake()` conventions)
+- [x] T012 [P] [US1] Feature test: an agent-mode assistant asked in natural language to change the background invokes the `change_avatar_background` tool (assert via `tool_calls` in the response, mirroring `ImageGenerationToolSingleCallTest.php`), in `tests/Feature/AvatarBackgroundToolTest.php`
+- [x] T013 [P] [US1] Feature test: requesting a location matching an `ArchiveEntry` (via `setUpAssistantWithArchive()`) results in the enhanced floor/surroundings prompts including that entry's documented content, in `tests/Feature/AvatarBackgroundArchiveGroundingTest.php`
+- [x] T014 [P] [US1] Feature test: `/change-background ...` and the agent tool both have no effect for an assistant whose `portrait_type` is not `Avatar3D` (no job dispatched), in `tests/Feature/AvatarBackgroundNonAvatarNoOpTest.php`
 
 ### Implementation for User Story 1
 
-- [ ] T015 [US1] Add `/change-background <description>` slash-command parsing in `ConversationController::sendMessage()` (`app/Http/Controllers/Api/ConversationController.php`), mirroring `extractImageGenPrompt()`/the `/create-image` branch, dispatching `GenerateAvatarBackground` (T005) only when the assistant's `portrait_type === AssistantPortraitType::Avatar3D`
-- [ ] T016 [US1] Create `AvatarBackgroundTool` implementing `App\Contracts\AgentTool` in `app/Services/AgentLoop/Tools/AvatarBackgroundTool.php`, per `contracts/avatar-background-tool.md` — `handle()` dispatches `GenerateAvatarBackground` (T005) and returns immediately (no carrier message, unlike `ImageGenerationTool`)
-- [ ] T017 [US1] Register `AvatarBackgroundTool` in `ConversationController::sendMessage()`'s agent-mode tool list, gated on `portrait_type === AssistantPortraitType::Avatar3D` (same `if` shape as the existing `ImageGenerationTool` registration). Depends on T016.
+- [x] T015 [US1] Add `/change-background <description>` slash-command parsing in `ConversationController::sendMessage()` (`app/Http/Controllers/Api/ConversationController.php`), mirroring `extractImageGenPrompt()`/the `/create-image` branch, dispatching `GenerateAvatarBackground` (T005) only when the assistant's `portrait_type === AssistantPortraitType::Avatar3D`
+- [x] T016 [US1] Create `AvatarBackgroundTool` implementing `App\Contracts\AgentTool` in `app/Services/AgentLoop/Tools/AvatarBackgroundTool.php`, per `contracts/avatar-background-tool.md` — `handle()` dispatches `GenerateAvatarBackground` (T005) and returns immediately (no carrier message, unlike `ImageGenerationTool`)
+- [x] T017 [US1] Register `AvatarBackgroundTool` in `ConversationController::sendMessage()`'s agent-mode tool list, gated on `portrait_type === AssistantPortraitType::Avatar3D` (same `if` shape as the existing `ImageGenerationTool` registration). Depends on T016.
 
 **Checkpoint**: User Story 1 is fully functional and independently testable — this is the MVP.
 
@@ -78,14 +78,14 @@ description: "Task list for 3D Avatar Scene Backgrounds"
 
 ### Tests for User Story 2
 
-- [ ] T018 [P] [US2] Feature test: creating a conversation for an Avatar3D assistant with a non-empty `opening_message` dispatches `GenerateAvatarBackground` seeded from it, in `tests/Feature/AvatarBackgroundInitialTest.php`
-- [ ] T019 [P] [US2] Feature test: creating a conversation for an Avatar3D assistant with an empty `opening_message`, then sending the first user message, dispatches `GenerateAvatarBackground` seeded from that first message (and does not double-dispatch on later messages); also covers sending the first message *before* an opening-message-seeded job has finished (no cache entry yet) does **not** double-dispatch when `opening_message` was non-empty, in `tests/Feature/AvatarBackgroundInitialFallbackTest.php`
-- [ ] T020 [P] [US2] Feature test: creating a conversation for a non-Avatar3D assistant never dispatches a background job, in `tests/Feature/AvatarBackgroundInitialNonAvatarTest.php`
+- [x] T018 [P] [US2] Feature test: creating a conversation for an Avatar3D assistant with a non-empty `opening_message` dispatches `GenerateAvatarBackground` seeded from it, in `tests/Feature/AvatarBackgroundInitialTest.php`
+- [x] T019 [P] [US2] Feature test: creating a conversation for an Avatar3D assistant with an empty `opening_message`, then sending the first user message, dispatches `GenerateAvatarBackground` seeded from that first message (and does not double-dispatch on later messages); also covers sending the first message *before* an opening-message-seeded job has finished (no cache entry yet) does **not** double-dispatch when `opening_message` was non-empty, in `tests/Feature/AvatarBackgroundInitialFallbackTest.php`
+- [x] T020 [P] [US2] Feature test: creating a conversation for a non-Avatar3D assistant never dispatches a background job, in `tests/Feature/AvatarBackgroundInitialNonAvatarTest.php`
 
 ### Implementation for User Story 2
 
-- [ ] T021 [US2] In `ConversationController::store()` (`app/Http/Controllers/Api/ConversationController.php`), dispatch `GenerateAvatarBackground` (T005) using `opening_message` when it's non-empty and `portrait_type === AssistantPortraitType::Avatar3D`
-- [ ] T022 [US2] In `ConversationController::sendMessage()`, dispatch `GenerateAvatarBackground` seeded from the first user message's content when **`assistantModel->opening_message` is empty** and this is the conversation's first user message. Gate on the assistant's `opening_message` value directly, not on cache-entry absence — checking cache absence alone would double-dispatch when `opening_message` was non-empty but T021's job hadn't finished (and hadn't written the cache) yet by the time this message arrives (`/speckit-analyze` finding C1). Depends on T021.
+- [x] T021 [US2] In `ConversationController::store()` (`app/Http/Controllers/Api/ConversationController.php`), dispatch `GenerateAvatarBackground` (T005) using `opening_message` when it's non-empty and `portrait_type === AssistantPortraitType::Avatar3D`
+- [x] T022 [US2] In `ConversationController::sendMessage()`, dispatch `GenerateAvatarBackground` seeded from the first user message's content when **`assistantModel->opening_message` is empty** and this is the conversation's first user message. Gate on the assistant's `opening_message` value directly, not on cache-entry absence — checking cache absence alone would double-dispatch when `opening_message` was non-empty but T021's job hadn't finished (and hadn't written the cache) yet by the time this message arrives (`/speckit-analyze` finding C1). Depends on T021.
 
 **Checkpoint**: User Stories 1 and 2 both work independently.
 
@@ -99,13 +99,13 @@ description: "Task list for 3D Avatar Scene Backgrounds"
 
 ### Tests for User Story 3
 
-- [ ] T023 [P] [US3] Feature test: an assistant reply starting with `[scene: a rain-soaked rooftop]` is stripped of that tag before being shown to the user, and dispatches `GenerateAvatarBackground` with `"a rain-soaked rooftop"`, in `tests/Feature/AvatarBackgroundSceneTagTest.php`
-- [ ] T024 [P] [US3] Feature test: a normal assistant reply with no `[scene: ...]` tag never dispatches a background job, in `tests/Feature/AvatarBackgroundNoSceneTagTest.php`
+- [x] T023 [P] [US3] Feature test: an assistant reply starting with `[scene: a rain-soaked rooftop]` is stripped of that tag before being shown to the user, and dispatches `GenerateAvatarBackground` with `"a rain-soaked rooftop"`, in `tests/Feature/AvatarBackgroundSceneTagTest.php`
+- [x] T024 [P] [US3] Feature test: a normal assistant reply with no `[scene: ...]` tag never dispatches a background job, in `tests/Feature/AvatarBackgroundNoSceneTagTest.php`
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] In `ConversationController::sendMessage()`, for `Avatar3D` assistants, append a "background tags" system-prompt section instructing the model to optionally prefix its reply with `[scene: <description>]` when the setting has just changed (mirrors the existing `->append('emotion tags', ...)` call, but sets static instructional text unconditionally rather than relying on assistant-authored content — research.md §2)
-- [ ] T026 [US3] Add `extractSceneTag()` parsing in `ConversationController` (mirrors `extractEmotionTag()`), called after the assistant's reply is received: strips the tag from the visible/persisted content and, when present, dispatches `GenerateAvatarBackground` with the extracted description. Depends on T025.
+- [x] T025 [US3] In `ConversationController::sendMessage()`, for `Avatar3D` assistants, append a "background tags" system-prompt section instructing the model to optionally prefix its reply with `[scene: <description>]` when the setting has just changed (mirrors the existing `->append('emotion tags', ...)` call, but sets static instructional text unconditionally rather than relying on assistant-authored content — research.md §2)
+- [x] T026 [US3] Add `extractSceneTag()` parsing in `ConversationController` (mirrors `extractEmotionTag()`), called after the assistant's reply is received: strips the tag from the visible/persisted content and, when present, dispatches `GenerateAvatarBackground` with the extracted description. Depends on T025.
 
 **Checkpoint**: All three user stories are independently functional.
 
@@ -115,16 +115,16 @@ description: "Task list for 3D Avatar Scene Backgrounds"
 
 ### Tests
 
-- [ ] T027 [P] Feature test: reopening a conversation whose `avatar-background:{conversation_id}` cache entry has expired automatically regenerates a background from current context (FR-012a), in `tests/Feature/AvatarBackgroundCacheMissTest.php`
-- [ ] T028 [P] Feature test: an image-gen provider failure during `GenerateAvatarBackground` leaves the previous `avatar-background:{conversation_id}` cache entry (or absence of one) untouched — no exception surfaces to the user (FR-013), in `tests/Feature/AvatarBackgroundFailureTest.php`
-- [ ] T029 [P] Feature test: `sendMessage`'s HTTP response returns without waiting on `GenerateAvatarBackground` to finish (`Queue::fake()` + assert response completes), in `tests/Feature/AvatarBackgroundNonBlockingTest.php`
+- [x] T027 [P] Feature test: reopening a conversation whose `avatar-background:{conversation_id}` cache entry has expired automatically regenerates a background from current context (FR-012a), in `tests/Feature/AvatarBackgroundCacheMissTest.php`
+- [x] T028 [P] Feature test: an image-gen provider failure during `GenerateAvatarBackground` leaves the previous `avatar-background:{conversation_id}` cache entry (or absence of one) untouched — no exception surfaces to the user (FR-013), in `tests/Feature/AvatarBackgroundFailureTest.php`
+- [x] T029 [P] Feature test: `sendMessage`'s HTTP response returns without waiting on `GenerateAvatarBackground` to finish (`Queue::fake()` + assert response completes), in `tests/Feature/AvatarBackgroundNonBlockingTest.php`
 
 ### Implementation
 
-- [ ] T030 In `ConversationController::show()` (`app/Http/Controllers/Api/ConversationController.php`), dispatch `GenerateAvatarBackground` — seeded with a generic "infer the current setting from the conversation so far" description, relying on the enhancer's own recent-message-history context (T003) to do the actual inference — when: `portrait_type === Avatar3D`, this is the first page of messages (no `before` query param), no `avatar-background:{conversation_id}` cache entry exists, and no `avatar-background-progress:{conversation_id}` job is already running. Makes T027 pass. Depends on T005. (research.md §8 — resolves the `/speckit-analyze` E1/F1 findings: FR-012a previously had no implementation task, and the polling endpoint's read-only contract is preserved by triggering here instead.)
-- [ ] T031 [P] Run `vendor/bin/pint --dirty --format agent` and fix any violations across all new/changed PHP files
-- [ ] T032 [P] Run `npm run lint` and fix any violations in `resources/js/hooks/useAvatarBackground.js` and `resources/js/components/VrmAvatar.jsx`
-- [ ] T033 Walk through every scenario in [quickstart.md](quickstart.md) against a running dev server (`composer run dev`) with a real or fake image-gen provider, confirming the cross-fade transition (T010) looks smooth per SC-006
+- [x] T030 In `ConversationController::show()` (`app/Http/Controllers/Api/ConversationController.php`), dispatch `GenerateAvatarBackground` — seeded with a generic "infer the current setting from the conversation so far" description, relying on the enhancer's own recent-message-history context (T003) to do the actual inference — when: `portrait_type === Avatar3D`, this is the first page of messages (no `before` query param), no `avatar-background:{conversation_id}` cache entry exists, and no `avatar-background-progress:{conversation_id}` job is already running. Makes T027 pass. Depends on T005. (research.md §8 — resolves the `/speckit-analyze` E1/F1 findings: FR-012a previously had no implementation task, and the polling endpoint's read-only contract is preserved by triggering here instead.)
+- [x] T031 [P] Run `vendor/bin/pint --dirty --format agent` and fix any violations across all new/changed PHP files
+- [x] T032 [P] Run `npm run lint` and fix any violations in `resources/js/hooks/useAvatarBackground.js` and `resources/js/components/VrmAvatar.jsx`
+- [x] T033 Walk through every scenario in [quickstart.md](quickstart.md) against a running dev server (`composer run dev`) with a real or fake image-gen provider, confirming the cross-fade transition (T010) looks smooth per SC-006
 
 ---
 

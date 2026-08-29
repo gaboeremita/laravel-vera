@@ -16,6 +16,7 @@ export default function AuthenticatedLayout() {
 	});
 	const [currentEmotion, setCurrentEmotion] = useState('default');
 	const [activeAssistantId, setActiveAssistantId] = useState(null);
+	const [activeConversationId, setActiveConversationId] = useState(null);
 
 	const { emotionNames, fetchEmotions, getImageUrl, getVideoUrl, getVrmBlendshapes, unlocked, portraitType, vrmUrl } = useEmotions();
 	const { toasts, addToast, removeToast } = useToast();
@@ -55,6 +56,8 @@ export default function AuthenticatedLayout() {
 					getVrmBlendshapes={getVrmBlendshapes}
 					portraitType={portraitType}
 					vrmUrl={vrmUrl}
+					assistantId={activeAssistantId}
+					conversationId={activeConversationId}
 				/>
 			</div>
 
@@ -71,6 +74,7 @@ export default function AuthenticatedLayout() {
 						addToast,
 						activeAssistantId,
 						setActiveAssistantId,
+						setActiveConversationId,
 					}} />
 				)}
 			</div>

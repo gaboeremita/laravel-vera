@@ -53,11 +53,11 @@ No `NEEDS CLARIFICATION` markers remain in the Technical Context — the spec's 
 
 ## 6. Placing the two images in the 3D scene
 
-**Decision**: Add two meshes into the existing `VrmScene` (inside `VrmAvatar.jsx`'s `<Canvas>`): a flat ground-plane mesh beneath the avatar textured with the floor image, and an open (no front cap, no top/bottom cap) partial cylinder behind the avatar textured with the surroundings image, to read as a curved backdrop under the existing fixed camera.
+**Decision**: Add two meshes into the existing `VrmScene` (inside `VrmAvatar.jsx`'s `<Canvas>`): a flat ground-plane mesh beneath the avatar textured with the floor image, and an open (no front/top/bottom caps) **partial-arc** cylinder behind the avatar textured with the surroundings image, to read as a curved backdrop under the existing fixed camera. The arc spans 90° (`thetaLength = π/2`), radius 6, height 6, centered on the side of the cylinder actually facing the camera (`thetaStart = π - thetaLength/2`, derived from `CylinderGeometry`'s `x = r·sin(θ), z = r·cos(θ)` convention) — sized so the visible arc's width (`radius × thetaLength ≈ 9.4`) against its height (6) lands close to a normal image's aspect ratio.
 
-**Rationale**: This is a direct implementation of FR-008–FR-011, placed into the scene graph that already exists for the VRM model itself — no new rendering framework or canvas is needed.
+**Rationale**: This is a direct implementation of FR-008–FR-011 (a *curved plane*, not a full wraparound), placed into the scene graph that already exists for the VRM model itself. The specific arc size matters, not just "partial vs. full": `CylinderGeometry` maps a texture's full width across whatever `thetaLength` it's given regardless of the image's real aspect ratio, so the arc's width-to-height ratio has to be chosen to roughly match the image or the texture visibly stretches.
 
-**Alternatives considered**: None meaningfully different — the spec is explicit about the two-plane, no-ceiling/no-front shape (see spec Input), so this is a direct translation rather than an open design choice.
+**Alternatives considered**: A full 360° cylinder — tried first for simplicity (no arc-facing math to get right), but wrapping a single non-tileable image around a full ~56-unit circumference against a 6–10-unit height stretched it roughly 3x past its native proportions, which read as visible distortion rather than a scene once actually rendered. Rejected in favor of the sized partial arc above.
 
 ## 7. Transition effect
 
