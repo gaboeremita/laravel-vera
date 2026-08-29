@@ -17,7 +17,7 @@ export default function AuthenticatedLayout() {
 	const [currentEmotion, setCurrentEmotion] = useState('default');
 	const [activeAssistantId, setActiveAssistantId] = useState(null);
 
-	const { emotionNames, fetchEmotions, getImageUrl, getVideoUrl, unlocked } = useEmotions();
+	const { emotionNames, fetchEmotions, getImageUrl, getVideoUrl, getVrmBlendshapes, unlocked, portraitType, vrmUrl } = useEmotions();
 	const { toasts, addToast, removeToast } = useToast();
 
 	useEffect(() => {
@@ -52,6 +52,9 @@ export default function AuthenticatedLayout() {
 					hasAssistant={!!activeAssistantId}
 					getImageUrl={getImageUrl}
 					getVideoUrl={getVideoUrl}
+					getVrmBlendshapes={getVrmBlendshapes}
+					portraitType={portraitType}
+					vrmUrl={vrmUrl}
 				/>
 			</div>
 

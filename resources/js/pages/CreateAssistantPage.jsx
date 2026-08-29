@@ -5,6 +5,7 @@ import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
+import VrmEmotionEditor from '../components/VrmEmotionEditor.jsx';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
 export default function CreateAssistantPage() {
@@ -26,12 +27,20 @@ export default function CreateAssistantPage() {
 	const [stagedEmotions, setStagedEmotions] = useState([]);
 	const [stagedRestrictedEmotions, setStagedRestrictedEmotions] = useState([]);
 
+	// Staged VRM emotion → blendshape mappings (avatar3d mode, no files involved)
+	const [stagedVrmEmotions, setStagedVrmEmotions] = useState([]);
+	const [stagedVrmRestrictedEmotions, setStagedVrmRestrictedEmotions] = useState([]);
+
 	// Archive
 	const [archives, setArchives] = useState([]);
 	const [selectedArchiveId, setSelectedArchiveId] = useState('');
 
 	// Agent mode
 	const [assistantMode, setAssistantMode] = useState('assistant');
+
+	// Portrait type
+	const [portraitType, setPortraitType] = useState('image');
+	const [pendingVrmFile, setPendingVrmFile] = useState(null);
 
 	useEffect(() => {
 		api.get(route('archives.index'))
@@ -98,13 +107,37 @@ export default function CreateAssistantPage() {
 		);
 	};
 
+	const handleAddVrmEmotion = (emotionName, blendshapes) => {
+		setStagedVrmEmotions((prev) => [...prev, { name: emotionName, vrm_blendshapes: blendshapes }]);
+	};
+
+	const handleDeleteVrmEmotion = (emotion) => {
+		setStagedVrmEmotions((prev) => prev.filter((e) => e !== emotion));
+	};
+
+	const handleUpdateVrmEmotion = (emotion, blendshapes) => {
+		setStagedVrmEmotions((prev) => prev.map((e) => (e === emotion ? { ...e, vrm_blendshapes: blendshapes } : e)));
+	};
+
+	const handleAddVrmRestrictedEmotion = (emotionName, blendshapes) => {
+		setStagedVrmRestrictedEmotions((prev) => [...prev, { name: emotionName, vrm_blendshapes: blendshapes }]);
+	};
+
+	const handleDeleteVrmRestrictedEmotion = (emotion) => {
+		setStagedVrmRestrictedEmotions((prev) => prev.filter((e) => e !== emotion));
+	};
+
+	const handleUpdateVrmRestrictedEmotion = (emotion, blendshapes) => {
+		setStagedVrmRestrictedEmotions((prev) => prev.map((e) => (e === emotion ? { ...e, vrm_blendshapes: blendshapes } : e)));
+	};
+
 	const handleSubmit = async () => {
 		if (!name.trim() || !slug.trim()) {
 			addToast('Name and slug are required', 'error');
 			return;
 		}
 
-		if (!defaultImage) {
+		if (portraitType === 'image' && !defaultImage) {
 			addToast('A default image is required', 'error');
 			return;
 		}
@@ -118,6 +151,7 @@ export default function CreateAssistantPage() {
 			formData.append('description', description.trim());
 			formData.append('opening_message', openingMessage.trim());
 			formData.append('mode', assistantMode);
+			formData.append('portrait_type', portraitType);
 
 			if (promptMode === 'json') {
 				try {
@@ -133,27 +167,53 @@ export default function CreateAssistantPage() {
 			}
 
 			if (selectedArchiveId) {
-			formData.append('archive_id', selectedArchiveId);
-		}
+				formData.append('archive_id', selectedArchiveId);
+			}
 
-		formData.append('emotions[0][name]', 'default');
-			formData.append('emotions[0][image]', defaultImage);
+			if (portraitType === 'image') {
+				formData.append('emotions[0][name]', 'default');
+				formData.append('emotions[0][image]', defaultImage);
 
-			stagedEmotions.forEach((emotion, i) => {
-				formData.append(`emotions[${i + 1}][name]`, emotion.name);
-				formData.append(`emotions[${i + 1}][image]`, emotion.file);
-			});
+				stagedEmotions.forEach((emotion, i) => {
+					formData.append(`emotions[${i + 1}][name]`, emotion.name);
+					formData.append(`emotions[${i + 1}][image]`, emotion.file);
+				});
 
-			stagedRestrictedEmotions.forEach((emotion, i) => {
-				formData.append(`restricted_emotions[${i}][name]`, emotion.name);
-				formData.append(`restricted_emotions[${i}][image]`, emotion.file);
-			});
+				stagedRestrictedEmotions.forEach((emotion, i) => {
+					formData.append(`restricted_emotions[${i}][name]`, emotion.name);
+					formData.append(`restricted_emotions[${i}][image]`, emotion.file);
+				});
+			} else {
+				stagedVrmEmotions.forEach((emotion, i) => {
+					formData.append(`emotions[${i}][name]`, emotion.name);
+					(emotion.vrm_blendshapes || []).forEach((b, j) => {
+						formData.append(`emotions[${i}][vrm_blendshapes][${j}][expression]`, b.expression);
+						formData.append(`emotions[${i}][vrm_blendshapes][${j}][weight]`, b.weight);
+					});
+				});
+
+				stagedVrmRestrictedEmotions.forEach((emotion, i) => {
+					formData.append(`restricted_emotions[${i}][name]`, emotion.name);
+					(emotion.vrm_blendshapes || []).forEach((b, j) => {
+						formData.append(`restricted_emotions[${i}][vrm_blendshapes][${j}][expression]`, b.expression);
+						formData.append(`restricted_emotions[${i}][vrm_blendshapes][${j}][weight]`, b.weight);
+					});
+				});
+			}
 
 			const res = await api.postForm(route('assistants.store'), formData);
 
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
 				throw new Error(error.message || 'Failed to create assistant');
+			}
+
+			const created = await res.json();
+
+			if (pendingVrmFile && created.id) {
+				const vrmForm = new FormData();
+				vrmForm.append('vrm', pendingVrmFile);
+				await api.postForm(route('assistants.vrm.store', { id: created.id }), vrmForm);
 			}
 
 			addToast('Assistant created', 'success');
@@ -263,53 +323,110 @@ export default function CreateAssistantPage() {
 							<option value="agent">Agent</option>
 						</select>
 					</div>
-				</div>
 
-				{/* Divider */}
-				<div className="border-t border-line-1" />
-
-				{/* Default image */}
-				<div className="space-y-2">
-					<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
-						Default Image <span className="text-danger">*</span>
-					</label>
-					<div
-						onClick={() => defaultImageRef.current?.click()}
-						className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
-					>
-						{defaultPreview ? (
-							<img src={defaultPreview} alt="Default" className="w-full h-full object-cover object-top" />
-						) : (
-							<span className="text-fg-3 text-[0.65rem] tracking-[0.1em] text-center px-2">
-								CLICK TO SELECT
-							</span>
-						)}
+					<div>
+						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+							Portrait Type
+						</label>
+						<select
+							value={portraitType}
+							onChange={(e) => setPortraitType(e.target.value)}
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+						>
+							<option value="image">Image</option>
+							<option value="avatar3d">3D Avatar</option>
+						</select>
 					</div>
-					<input
-						ref={defaultImageRef}
-						type="file"
-						accept="image/*"
-						onChange={handleDefaultImage}
-						className="hidden"
-					/>
+
+					{portraitType === 'avatar3d' && (
+						<div className="space-y-1">
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+								VRM File <span className="text-fg-3 normal-case">(optional, can upload later)</span>
+							</label>
+							<input
+								type="file"
+								accept=".vrm"
+								onChange={(e) => setPendingVrmFile(e.target.files?.[0] ?? null)}
+								className="w-full text-sm text-accent file:mr-3 file:border file:border-line-1 file:bg-bg-1 file:text-fg-3 file:text-[0.65rem] file:tracking-[0.1em] file:px-3 file:py-1 file:cursor-pointer"
+							/>
+							{pendingVrmFile && (
+								<span className="text-fg-3 text-[0.65rem]">{pendingVrmFile.name}</span>
+							)}
+						</div>
+					)}
 				</div>
 
-				{/* Emotions */}
-				<EmotionGrid
-					emotions={stagedEmotions}
-					onAdd={handleAddEmotion}
-					onDelete={handleDeleteEmotion}
-					onUpdateImage={handleReplaceImage}
-				/>
+				{portraitType === 'image' && (
+					<>
+						{/* Divider */}
+						<div className="border-t border-line-1" />
 
-				{/* Restricted Emotions */}
-				<EmotionGrid
-					label="Restricted Emotions"
-					emotions={stagedRestrictedEmotions}
-					onAdd={handleAddRestrictedEmotion}
-					onDelete={handleDeleteRestrictedEmotion}
-					onUpdateImage={handleReplaceRestrictedImage}
-				/>
+						{/* Default image */}
+						<div className="space-y-2">
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+								Default Image <span className="text-danger">*</span>
+							</label>
+							<div
+								onClick={() => defaultImageRef.current?.click()}
+								className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
+							>
+								{defaultPreview ? (
+									<img src={defaultPreview} alt="Default" className="w-full h-full object-cover object-top" />
+								) : (
+									<span className="text-fg-3 text-[0.65rem] tracking-[0.1em] text-center px-2">
+										CLICK TO SELECT
+									</span>
+								)}
+							</div>
+							<input
+								ref={defaultImageRef}
+								type="file"
+								accept="image/*"
+								onChange={handleDefaultImage}
+								className="hidden"
+							/>
+						</div>
+
+						{/* Emotions */}
+						<EmotionGrid
+							emotions={stagedEmotions}
+							onAdd={handleAddEmotion}
+							onDelete={handleDeleteEmotion}
+							onUpdateImage={handleReplaceImage}
+						/>
+
+						{/* Restricted Emotions */}
+						<EmotionGrid
+							label="Restricted Emotions"
+							emotions={stagedRestrictedEmotions}
+							onAdd={handleAddRestrictedEmotion}
+							onDelete={handleDeleteRestrictedEmotion}
+							onUpdateImage={handleReplaceRestrictedImage}
+						/>
+					</>
+				)}
+
+				{portraitType === 'avatar3d' && (
+					<>
+						{/* Divider */}
+						<div className="border-t border-line-1" />
+
+						<VrmEmotionEditor
+							emotions={stagedVrmEmotions}
+							onAdd={handleAddVrmEmotion}
+							onDelete={handleDeleteVrmEmotion}
+							onUpdateBlendshapes={handleUpdateVrmEmotion}
+						/>
+
+						<VrmEmotionEditor
+							label="Restricted Emotions"
+							emotions={stagedVrmRestrictedEmotions}
+							onAdd={handleAddVrmRestrictedEmotion}
+							onDelete={handleDeleteVrmRestrictedEmotion}
+							onUpdateBlendshapes={handleUpdateVrmRestrictedEmotion}
+						/>
+					</>
+				)}
 
 				{/* Divider */}
 				<div className="border-t border-line-1" />

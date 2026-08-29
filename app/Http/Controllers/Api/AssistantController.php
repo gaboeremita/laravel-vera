@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\AssistantMode;
+use App\Enums\AssistantPortraitType;
 use App\Http\Controllers\Controller;
 use App\Models\Assistant;
+use App\Models\Emotion;
 use App\Models\Image;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,15 +20,23 @@ class AssistantController extends Controller
         $assistants = $request->user()
             ->assistants()
             ->withCount(['emotions'])
+            ->with('cardImage')
             ->get()
             ->map(function (Assistant $assistant) {
                 $pivotId = $assistant->pivot->id;
 
-                // Default emotion image for card avatar
-                $defaultEmotion = $assistant->emotions()
-                    ->where('name', 'default')
-                    ->with('image')
-                    ->first();
+                // Card image takes priority; the 'default' emotion image is
+                // the fallback for image-mode assistants without one set.
+                $cardImageUrl = $assistant->cardImage?->url;
+
+                if (! $cardImageUrl) {
+                    $defaultEmotion = $assistant->emotions()
+                        ->where('name', 'default')
+                        ->with('image')
+                        ->first();
+
+                    $cardImageUrl = $defaultEmotion?->image?->url;
+                }
 
                 // Conversation stats via the pivot
                 $stats = DB::table('conversations')
@@ -39,7 +49,7 @@ class AssistantController extends Controller
                     'name' => $assistant->name,
                     'slug' => $assistant->slug,
                     'description' => $assistant->description,
-                    'image_url' => $defaultEmotion?->image?->url,
+                    'image_url' => $cardImageUrl,
                     'conversations_count' => (int) ($stats->conversations_count ?? 0),
                     'last_activity' => $stats->last_activity,
                 ];
@@ -52,12 +62,14 @@ class AssistantController extends Controller
     {
         $assistant = $request->user()
             ->assistants()
+            ->with(['vrm', 'cardImage'])
             ->findOrFail($id);
 
         $mapEmotion = fn ($emotion) => [
             'id' => $emotion->id,
             'name' => $emotion->name,
             'image_url' => $emotion->image?->url,
+            'vrm_blendshapes' => $emotion->vrm_blendshapes,
         ];
 
         $emotions = $assistant->emotions()
@@ -81,6 +93,10 @@ class AssistantController extends Controller
             'prompt' => $assistant->prompt,
             'archive_id' => $assistant->archive_id,
             'mode' => $assistant->mode,
+            'portrait_type' => $assistant->portrait_type->value,
+            'vrm_url' => $assistant->vrm?->url,
+            'vrm_original_name' => $assistant->vrm?->original_name,
+            'image_url' => $assistant->cardImage?->url,
             'emotions' => $emotions,
             'restricted_emotions' => $restrictedEmotions,
         ]);
@@ -92,6 +108,8 @@ class AssistantController extends Controller
             $request->merge(['prompt' => json_decode($request->input('prompt'), true)]);
         }
 
+        $isAvatarMode = $request->input('portrait_type') === AssistantPortraitType::Avatar3d->value;
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['required', 'string', 'max:255', 'unique:assistants,slug'],
@@ -100,23 +118,32 @@ class AssistantController extends Controller
             'prompt' => ['nullable', 'array'],
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
-            'emotions' => ['required', 'array', 'min:1'],
+            'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
+            'emotions' => [$isAvatarMode ? 'nullable' : 'required', 'array', $isAvatarMode ? 'min:0' : 'min:1'],
             'emotions.*.name' => ['required', 'string', 'max:255'],
-            'emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
+            'emotions.*.image' => [$isAvatarMode ? 'sometimes' : 'required', 'file', 'image', 'max:10480'],
+            'emotions.*.vrm_blendshapes' => ['sometimes', 'array'],
+            'emotions.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
+            'emotions.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
             'restricted_emotions' => ['sometimes', 'array'],
             'restricted_emotions.*.name' => ['required', 'string', 'max:255'],
-            'restricted_emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
+            'restricted_emotions.*.image' => [$isAvatarMode ? 'sometimes' : 'required', 'file', 'image', 'max:10480'],
+            'restricted_emotions.*.vrm_blendshapes' => ['sometimes', 'array'],
+            'restricted_emotions.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
+            'restricted_emotions.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
 
-        // At least one emotion must be named "default"
-        $hasDefault = collect($validated['emotions'])
-            ->contains(fn ($e) => $e['name'] === 'default');
+        // In image mode a "default" emotion is required
+        if (! $isAvatarMode) {
+            $hasDefault = collect($validated['emotions'] ?? [])
+                ->contains(fn ($e) => $e['name'] === 'default');
 
-        if (! $hasDefault) {
-            return response()->json([
-                'message' => 'A "default" emotion is required.',
-                'errors' => ['emotions' => ['A "default" emotion is required.']],
-            ], 422);
+            if (! $hasDefault) {
+                return response()->json([
+                    'message' => 'A "default" emotion is required.',
+                    'errors' => ['emotions' => ['A "default" emotion is required.']],
+                ], 422);
+            }
         }
 
         $assistant = DB::transaction(function () use ($request, $validated) {
@@ -128,29 +155,33 @@ class AssistantController extends Controller
                 'prompt' => $validated['prompt'] ?? [],
                 'archive_id' => $validated['archive_id'] ?? null,
                 'mode' => $validated['mode'] ?? AssistantMode::Assistant->value,
+                'portrait_type' => $validated['portrait_type'] ?? AssistantPortraitType::Image->value,
             ]);
 
             // Create the pivot
             $request->user()->assistants()->attach($assistant->id);
 
-            // Store emotions with images
+            // Store emotions with images and/or VRM blendshape mappings
             $storeEmotion = function (array $emotionData, bool $restricted) use ($assistant): void {
                 $emotion = $assistant->emotions()->create([
                     'name' => $emotionData['name'],
                     'restricted' => $restricted,
+                    'vrm_blendshapes' => Emotion::normalizeBlendshapes($emotionData['vrm_blendshapes'] ?? null),
                 ]);
 
-                $path = $emotionData['image']->store("emotions/{$assistant->id}", 'public');
+                if (isset($emotionData['image'])) {
+                    $path = $emotionData['image']->store("emotions/{$assistant->id}", 'public');
 
-                $emotion->image()->create([
-                    'path' => $path,
-                    'disk' => 'public',
-                    'mime_type' => $emotionData['image']->getMimeType(),
-                    'size' => $emotionData['image']->getSize(),
-                ]);
+                    $emotion->image()->create([
+                        'path' => $path,
+                        'disk' => 'public',
+                        'mime_type' => $emotionData['image']->getMimeType(),
+                        'size' => $emotionData['image']->getSize(),
+                    ]);
+                }
             };
 
-            foreach ($validated['emotions'] as $emotionData) {
+            foreach ($validated['emotions'] ?? [] as $emotionData) {
                 $storeEmotion($emotionData, false);
             }
 
@@ -178,6 +209,7 @@ class AssistantController extends Controller
             'prompt' => ['nullable', 'array'],
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
+            'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
         ]);
 
         $assistant->update($validated);

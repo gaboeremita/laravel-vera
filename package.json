@@ -34,6 +34,8 @@
         "@fontsource/ibm-plex-serif": "^5.2.7",
         "@fontsource/share-tech-mono": "^5.2.7",
         "@fontsource/spectral": "^5.2.8",
+        "@pixiv/three-vrm": "^3.5.5",
+        "@react-three/fiber": "^9.7.0",
         "@ricky0123/vad-web": "^0.0.30",
         "framer-motion": "^12.42.0",
         "lucide-react": "^1.18.0",
@@ -42,6 +44,7 @@
         "react-markdown": "^10.1.0",
         "react-router-dom": "^7.18.0",
         "remark-gfm": "^4.0.1",
+        "three": "^0.185.1",
         "ziggy-js": "^2.6.3"
     }
 }

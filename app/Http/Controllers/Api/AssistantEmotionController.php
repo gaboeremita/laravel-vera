@@ -19,8 +19,11 @@ class AssistantEmotionController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'image' => ['required', 'file', 'image', 'max:10480'],
+            'image' => ['sometimes', 'file', 'image', 'max:10480'],
             'restricted' => ['sometimes', 'boolean'],
+            'vrm_blendshapes' => ['sometimes', 'array'],
+            'vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
+            'vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
 
         if ($assistant->emotions()->where('name', $validated['name'])->exists()) {
@@ -33,14 +36,18 @@ class AssistantEmotionController extends Controller
         $emotion = $assistant->emotions()->create([
             'name' => $validated['name'],
             'restricted' => $validated['restricted'] ?? false,
+            'vrm_blendshapes' => Emotion::normalizeBlendshapes($validated['vrm_blendshapes'] ?? null),
         ]);
 
-        $this->storeImageForEmotion($emotion, $validated['image'], $assistant->id);
+        if (isset($validated['image'])) {
+            $this->storeImageForEmotion($emotion, $validated['image'], $assistant->id);
+        }
 
         return response()->json([
             'id' => $emotion->id,
             'name' => $emotion->name,
-            'image_url' => $emotion->image->url,
+            'image_url' => $emotion->image?->url,
+            'vrm_blendshapes' => $emotion->vrm_blendshapes,
         ], 201);
     }
 
@@ -55,6 +62,9 @@ class AssistantEmotionController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'image' => ['sometimes', 'file', 'image', 'max:10480'],
+            'vrm_blendshapes' => ['sometimes', 'array'],
+            'vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
+            'vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
 
         if (isset($validated['name']) && $validated['name'] !== $emotion->name) {
@@ -77,12 +87,17 @@ class AssistantEmotionController extends Controller
             $this->storeImageForEmotion($emotion, $validated['image'], $assistant->id);
         }
 
+        if (array_key_exists('vrm_blendshapes', $validated)) {
+            $emotion->update(['vrm_blendshapes' => Emotion::normalizeBlendshapes($validated['vrm_blendshapes'])]);
+        }
+
         $emotion->load('image');
 
         return response()->json([
             'id' => $emotion->id,
             'name' => $emotion->name,
             'image_url' => $emotion->image?->url,
+            'vrm_blendshapes' => $emotion->vrm_blendshapes,
         ]);
     }
 

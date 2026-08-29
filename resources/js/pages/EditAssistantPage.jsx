@@ -5,6 +5,7 @@ import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
+import VrmEmotionEditor from '../components/VrmEmotionEditor.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
 export default function EditAssistantPage() {
@@ -25,6 +26,14 @@ export default function EditAssistantPage() {
 	const [archives, setArchives] = useState([]);
 	const [selectedArchiveId, setSelectedArchiveId] = useState('');
 	const [mode, setMode] = useState('assistant');
+	const [portraitType, setPortraitType] = useState('image');
+	const [vrmFilename, setVrmFilename] = useState(null);
+	const [isUploadingVrm, setIsUploadingVrm] = useState(false);
+	const [isDeletingVrm, setIsDeletingVrm] = useState(false);
+	const vrmInputRef = useRef(null);
+	const [cardImagePreview, setCardImagePreview] = useState(null);
+	const [isUploadingCardImage, setIsUploadingCardImage] = useState(false);
+	const cardImageRef = useRef(null);
 	const [promptMode, setPromptMode] = useState('manual');
 	const [promptJson, setPromptJson] = useState('');
 	const [promptJsonError, setPromptJsonError] = useState(null);
@@ -54,6 +63,9 @@ export default function EditAssistantPage() {
 				setOpeningMessage(data.opening_message || '');
 				setSelectedArchiveId(data.archive_id ? String(data.archive_id) : '');
 				setMode(data.mode || 'assistant');
+				setPortraitType(data.portrait_type || 'image');
+				setVrmFilename(data.vrm_url ? data.vrm_original_name : null);
+				setCardImagePreview(data.image_url || null);
 				const loadedEmotions = data.emotions || [];
 				setEmotions(loadedEmotions);
 				setRestrictedEmotions(data.restricted_emotions || []);
@@ -84,6 +96,7 @@ export default function EditAssistantPage() {
 				opening_message: openingMessage.trim() || null,
 				archive_id: selectedArchiveId ? Number(selectedArchiveId) : null,
 				mode,
+				portrait_type: portraitType,
 			});
 
 			if (!res.ok) {
@@ -96,6 +109,104 @@ export default function EditAssistantPage() {
 			addToast(e.message || 'Failed to save assistant', 'error');
 		} finally {
 			setIsSaving(false);
+		}
+	};
+
+	const handleVrmUpload = async (e) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+		setIsUploadingVrm(true);
+		try {
+			const formData = new FormData();
+			formData.append('vrm', file);
+			const res = await api.postForm(route('assistants.vrm.store', { id }), formData);
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Upload failed');
+			}
+			setVrmFilename(file.name);
+			addToast('VRM file uploaded', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to upload VRM file', 'error');
+		} finally {
+			setIsUploadingVrm(false);
+			if (vrmInputRef.current) vrmInputRef.current.value = '';
+		}
+	};
+
+	const handleVrmDelete = async () => {
+		setIsDeletingVrm(true);
+		try {
+			const res = await api.delete(route('assistants.vrm.destroy', { id }));
+			if (!res.ok) throw new Error('Delete failed');
+			setVrmFilename(null);
+			addToast('VRM file deleted', 'success');
+		} catch {
+			addToast('Failed to delete VRM file', 'error');
+		} finally {
+			setIsDeletingVrm(false);
+		}
+	};
+
+	const handleCardImageUpload = async (e) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+		setIsUploadingCardImage(true);
+		try {
+			const formData = new FormData();
+			formData.append('image', file);
+			const res = await api.postForm(route('assistants.image.store', { id }), formData);
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Upload failed');
+			}
+			setCardImagePreview(URL.createObjectURL(file));
+			addToast('Card image updated', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to upload card image', 'error');
+		} finally {
+			setIsUploadingCardImage(false);
+			if (cardImageRef.current) cardImageRef.current.value = '';
+		}
+	};
+
+	/* ── VRM emotion→blendshape handlers ── */
+
+	const handleAddVrmEmotion = async (name, blendshapes, restricted) => {
+		try {
+			const res = await api.post(route('assistants.emotions.store', { assistant: id }), {
+				name,
+				vrm_blendshapes: blendshapes,
+				restricted,
+			});
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Failed to add emotion');
+			}
+			const data = await res.json();
+			if (restricted) {
+				setRestrictedEmotions((prev) => [...prev, data]);
+			} else {
+				setEmotions((prev) => [...prev, data]);
+			}
+			addToast('Emotion added', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to add emotion', 'error');
+		}
+	};
+
+	const handleUpdateVrmBlendshapes = async (emotion, blendshapes) => {
+		try {
+			const res = await api.post(route('assistants.emotions.update', { assistant: id, emotion: emotion.id }), {
+				vrm_blendshapes: blendshapes,
+			});
+			if (!res.ok) throw new Error('Update failed');
+			const data = await res.json();
+			setEmotions((prev) => prev.map((e) => (e.id === emotion.id ? data : e)));
+			setRestrictedEmotions((prev) => prev.map((e) => (e.id === emotion.id ? data : e)));
+			addToast('Expression mapping saved', 'success');
+		} catch {
+			addToast('Failed to save expression mapping', 'error');
 		}
 	};
 
@@ -303,6 +414,82 @@ export default function EditAssistantPage() {
 						</select>
 					</div>
 
+					<div>
+						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+							Portrait Type
+						</label>
+						<select
+							value={portraitType}
+							onChange={(e) => setPortraitType(e.target.value)}
+							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+						>
+							<option value="image">Image</option>
+							<option value="avatar3d">3D Avatar</option>
+						</select>
+					</div>
+
+					{portraitType === 'avatar3d' && (
+						<>
+							<div className="space-y-2">
+								<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+									VRM File
+								</label>
+								{vrmFilename ? (
+									<div className="flex items-center gap-2">
+										<span className="text-accent text-sm truncate flex-1">{vrmFilename}</span>
+										<button
+											onClick={handleVrmDelete}
+											disabled={isDeletingVrm}
+											className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-danger text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
+										>
+											{isDeletingVrm ? 'DELETING...' : 'DELETE'}
+										</button>
+									</div>
+								) : (
+									<button
+										onClick={() => vrmInputRef.current?.click()}
+										disabled={isUploadingVrm}
+										className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-line-1 text-fg-3 hover:border-fg-3 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
+									>
+										{isUploadingVrm ? 'UPLOADING...' : 'UPLOAD .VRM'}
+									</button>
+								)}
+								<input
+									ref={vrmInputRef}
+									type="file"
+									accept=".vrm"
+									onChange={handleVrmUpload}
+									className="hidden"
+								/>
+							</div>
+
+							<div className="space-y-2">
+								<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+									Card Image <span className="text-fg-3 normal-case">(shown in the assistants menu)</span>
+								</label>
+								<div
+									onClick={() => cardImageRef.current?.click()}
+									className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
+								>
+									{cardImagePreview ? (
+										<img src={cardImagePreview} alt="Card" className="w-full h-full object-cover object-top" />
+									) : (
+										<span className="text-fg-3 text-[0.65rem] tracking-[0.1em] text-center px-2">
+											{isUploadingCardImage ? 'UPLOADING...' : 'CLICK TO SELECT'}
+										</span>
+									)}
+								</div>
+								<input
+									ref={cardImageRef}
+									type="file"
+									accept="image/*"
+									onChange={handleCardImageUpload}
+									className="hidden"
+								/>
+							</div>
+						</>
+					)}
+
 					{/* Save basic fields */}
 					<div className="flex justify-end">
 						<button
@@ -319,50 +506,75 @@ export default function EditAssistantPage() {
 					</div>
 				</div>
 
-				<div className="border-t border-line-1" />
+				{portraitType === 'image' && (
+					<>
+						<div className="border-t border-line-1" />
 
-				{/* Default image */}
-				<div className="space-y-2">
-					<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
-						Default Image
-					</label>
-					<div
-						onClick={() => defaultImageRef.current?.click()}
-						className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
-					>
-						{defaultPreview ? (
-							<img src={defaultPreview} alt="Default" className="w-full h-full object-cover object-top" />
-						) : (
-							<span className="text-fg-3 text-[0.65rem] tracking-[0.1em] text-center px-2">
-								CLICK TO REPLACE
-							</span>
-						)}
-					</div>
-					<input
-						ref={defaultImageRef}
-						type="file"
-						accept="image/*"
-						onChange={handleReplaceDefaultImage}
-						className="hidden"
-					/>
-				</div>
+						{/* Default image */}
+						<div className="space-y-2">
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+								Default Image
+							</label>
+							<div
+								onClick={() => defaultImageRef.current?.click()}
+								className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
+							>
+								{defaultPreview ? (
+									<img src={defaultPreview} alt="Default" className="w-full h-full object-cover object-top" />
+								) : (
+									<span className="text-fg-3 text-[0.65rem] tracking-[0.1em] text-center px-2">
+										CLICK TO REPLACE
+									</span>
+								)}
+							</div>
+							<input
+								ref={defaultImageRef}
+								type="file"
+								accept="image/*"
+								onChange={handleReplaceDefaultImage}
+								className="hidden"
+							/>
+						</div>
 
-				{/* Emotions */}
-				<EmotionGrid
-					emotions={emotions.filter((e) => e.name !== 'default')}
-					onAdd={handleAddEmotion}
-					onDelete={handleDeleteEmotion}
-					onUpdateImage={handleReplaceImage}
-				/>
+						{/* Emotions */}
+						<EmotionGrid
+							emotions={emotions.filter((e) => e.name !== 'default')}
+							onAdd={handleAddEmotion}
+							onDelete={handleDeleteEmotion}
+							onUpdateImage={handleReplaceImage}
+						/>
 
-				{/* Restricted Emotions */}
-				<EmotionGrid
-					label="Restricted Emotions"
-					emotions={restrictedEmotions}
-					onAdd={handleAddRestrictedEmotion}
-					onDelete={handleDeleteEmotion}
-					onUpdateImage={handleReplaceImage}
-				/>
+						{/* Restricted Emotions */}
+						<EmotionGrid
+							label="Restricted Emotions"
+							emotions={restrictedEmotions}
+							onAdd={handleAddRestrictedEmotion}
+							onDelete={handleDeleteEmotion}
+							onUpdateImage={handleReplaceImage}
+						/>
+					</>
+				)}
+
+				{portraitType === 'avatar3d' && (
+					<>
+						<div className="border-t border-line-1" />
+
+						<VrmEmotionEditor
+							emotions={emotions}
+							onAdd={(name, blendshapes) => handleAddVrmEmotion(name, blendshapes, false)}
+							onDelete={handleDeleteEmotion}
+							onUpdateBlendshapes={handleUpdateVrmBlendshapes}
+						/>
+
+						<VrmEmotionEditor
+							label="Restricted Emotions"
+							emotions={restrictedEmotions}
+							onAdd={(name, blendshapes) => handleAddVrmEmotion(name, blendshapes, true)}
+							onDelete={handleDeleteEmotion}
+							onUpdateBlendshapes={handleUpdateVrmBlendshapes}
+						/>
+					</>
+				)}
 
 				<div className="border-t border-line-1" />
 
