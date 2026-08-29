@@ -1,17 +1,18 @@
 const EXPRESSION_MAP = {
 	default: [],
 	neutral: [],
-	happy: [{ expression: 'happy', weight: 0.8 }],
-	sad: [{ expression: 'sad', weight: 0.7 }],
+	happy: [{ expression: 'happy', weight: 1.0 }],
+	sad: [{ expression: 'sad', weight: 1.0 }],
+	// Kept below 1.0 — a milder version of `angry`, not a distinct blendshape.
 	annoyed: [{ expression: 'angry', weight: 0.4 }],
 	flustered: [
 		{ expression: 'surprised', weight: 0.3 },
 		{ expression: 'happy', weight: 0.2 },
 	],
-	seduced: [{ expression: 'relaxed', weight: 0.5 }],
-	surprised: [{ expression: 'surprised', weight: 0.8 }],
-	angry: [{ expression: 'angry', weight: 0.9 }],
-	relaxed: [{ expression: 'relaxed', weight: 0.7 }],
+	seduced: [{ expression: 'relaxed', weight: 1.0 }],
+	surprised: [{ expression: 'surprised', weight: 1.0 }],
+	angry: [{ expression: 'angry', weight: 1.0 }],
+	relaxed: [{ expression: 'relaxed', weight: 1.0 }],
 };
 
 export function getBlendshapeTargets(emotionTag) {

@@ -32,14 +32,14 @@ Confirmed mapping:
 |---|---|
 | `default` | all 0.0 |
 | `neutral` | all 0.0 |
-| `happy` | happy: 0.8 |
-| `sad` | sad: 0.7 |
-| `annoyed` | angry: 0.4 |
+| `happy` | happy: 1.0 |
+| `sad` | sad: 1.0 |
+| `annoyed` | angry: 0.4 (milder than `angry`, same blendshape) |
 | `flustered` | surprised: 0.3, happy: 0.2 |
-| `seduced` | relaxed: 0.5 |
-| `surprised` | surprised: 0.8 |
-| `angry` | angry: 0.9 |
-| `relaxed` | relaxed: 0.7 |
+| `seduced` | relaxed: 1.0 |
+| `surprised` | surprised: 1.0 |
+| `angry` | angry: 1.0 |
+| `relaxed` | relaxed: 1.0 |
 
 Unknown tags fall back to neutral (all 0.0).
 
