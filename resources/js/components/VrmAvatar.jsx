@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Box3, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import veraAvatar from '../../images/vera-avatar.png';
@@ -8,7 +9,7 @@ import { getBlendshapeTargets } from '../utils/vrmExpressions.js';
 const ALL_EXPRESSIONS = ['happy', 'sad', 'angry', 'relaxed', 'surprised'];
 
 function VrmScene({ vrmUrl, emotion, onLoaded, onError }) {
-	const { scene } = useThree();
+	const { scene, camera } = useThree();
 	const vrmRef = useRef(null);
 	const currentWeightsRef = useRef({});
 	const blinkRef = useRef({ phase: 'waiting', phaseElapsed: 0, threshold: 3 });
@@ -27,6 +28,25 @@ function VrmScene({ vrmUrl, emotion, onLoaded, onError }) {
 				VRMUtils.rotateVRM0(vrm);
 				vrmRef.current = vrm;
 				scene.add(vrm.scene);
+
+				// VRM models load in T-pose; lower the arms to a relaxed stance.
+				const leftUpperArm = vrm.humanoid.getNormalizedBoneNode('leftUpperArm');
+				const rightUpperArm = vrm.humanoid.getNormalizedBoneNode('rightUpperArm');
+				if (leftUpperArm) leftUpperArm.rotation.z = 1.2;
+				if (rightUpperArm) rightUpperArm.rotation.z = -1.2;
+
+				// Frame the full body: fit the model's bounding box height to
+				// the vertical fov so the whole figure is visible regardless
+				// of model size.
+				vrm.scene.updateWorldMatrix(true, true);
+				const box = new Box3().setFromObject(vrm.scene);
+				const size = box.getSize(new Vector3());
+				const center = box.getCenter(new Vector3());
+				const fovRad = (camera.fov * Math.PI) / 180;
+				const distance = (size.y / 2) / Math.tan(fovRad / 2) * 1.1;
+				camera.position.set(center.x, center.y, center.z + distance);
+				camera.lookAt(center.x, center.y, center.z);
+
 				onLoaded();
 			},
 			undefined,

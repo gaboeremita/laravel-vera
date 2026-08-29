@@ -108,7 +108,7 @@ export default function CreateAssistantPage() {
 			return;
 		}
 
-		if (!defaultImage) {
+		if (portraitType === 'image' && !defaultImage) {
 			addToast('A default image is required', 'error');
 			return;
 		}
@@ -138,21 +138,23 @@ export default function CreateAssistantPage() {
 			}
 
 			if (selectedArchiveId) {
-			formData.append('archive_id', selectedArchiveId);
-		}
+				formData.append('archive_id', selectedArchiveId);
+			}
 
-		formData.append('emotions[0][name]', 'default');
-			formData.append('emotions[0][image]', defaultImage);
+			if (portraitType === 'image') {
+				formData.append('emotions[0][name]', 'default');
+				formData.append('emotions[0][image]', defaultImage);
 
-			stagedEmotions.forEach((emotion, i) => {
-				formData.append(`emotions[${i + 1}][name]`, emotion.name);
-				formData.append(`emotions[${i + 1}][image]`, emotion.file);
-			});
+				stagedEmotions.forEach((emotion, i) => {
+					formData.append(`emotions[${i + 1}][name]`, emotion.name);
+					formData.append(`emotions[${i + 1}][image]`, emotion.file);
+				});
 
-			stagedRestrictedEmotions.forEach((emotion, i) => {
-				formData.append(`restricted_emotions[${i}][name]`, emotion.name);
-				formData.append(`restricted_emotions[${i}][image]`, emotion.file);
-			});
+				stagedRestrictedEmotions.forEach((emotion, i) => {
+					formData.append(`restricted_emotions[${i}][name]`, emotion.name);
+					formData.append(`restricted_emotions[${i}][image]`, emotion.file);
+				});
+			}
 
 			const res = await api.postForm(route('assistants.store'), formData);
 
@@ -309,51 +311,55 @@ export default function CreateAssistantPage() {
 					)}
 				</div>
 
-				{/* Divider */}
-				<div className="border-t border-line-1" />
+				{portraitType === 'image' && (
+					<>
+						{/* Divider */}
+						<div className="border-t border-line-1" />
 
-				{/* Default image */}
-				<div className="space-y-2">
-					<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
-						Default Image <span className="text-danger">*</span>
-					</label>
-					<div
-						onClick={() => defaultImageRef.current?.click()}
-						className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
-					>
-						{defaultPreview ? (
-							<img src={defaultPreview} alt="Default" className="w-full h-full object-cover object-top" />
-						) : (
-							<span className="text-fg-3 text-[0.65rem] tracking-[0.1em] text-center px-2">
-								CLICK TO SELECT
-							</span>
-						)}
-					</div>
-					<input
-						ref={defaultImageRef}
-						type="file"
-						accept="image/*"
-						onChange={handleDefaultImage}
-						className="hidden"
-					/>
-				</div>
+						{/* Default image */}
+						<div className="space-y-2">
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+								Default Image <span className="text-danger">*</span>
+							</label>
+							<div
+								onClick={() => defaultImageRef.current?.click()}
+								className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
+							>
+								{defaultPreview ? (
+									<img src={defaultPreview} alt="Default" className="w-full h-full object-cover object-top" />
+								) : (
+									<span className="text-fg-3 text-[0.65rem] tracking-[0.1em] text-center px-2">
+										CLICK TO SELECT
+									</span>
+								)}
+							</div>
+							<input
+								ref={defaultImageRef}
+								type="file"
+								accept="image/*"
+								onChange={handleDefaultImage}
+								className="hidden"
+							/>
+						</div>
 
-				{/* Emotions */}
-				<EmotionGrid
-					emotions={stagedEmotions}
-					onAdd={handleAddEmotion}
-					onDelete={handleDeleteEmotion}
-					onUpdateImage={handleReplaceImage}
-				/>
+						{/* Emotions */}
+						<EmotionGrid
+							emotions={stagedEmotions}
+							onAdd={handleAddEmotion}
+							onDelete={handleDeleteEmotion}
+							onUpdateImage={handleReplaceImage}
+						/>
 
-				{/* Restricted Emotions */}
-				<EmotionGrid
-					label="Restricted Emotions"
-					emotions={stagedRestrictedEmotions}
-					onAdd={handleAddRestrictedEmotion}
-					onDelete={handleDeleteRestrictedEmotion}
-					onUpdateImage={handleReplaceRestrictedImage}
-				/>
+						{/* Restricted Emotions */}
+						<EmotionGrid
+							label="Restricted Emotions"
+							emotions={stagedRestrictedEmotions}
+							onAdd={handleAddRestrictedEmotion}
+							onDelete={handleDeleteRestrictedEmotion}
+							onUpdateImage={handleReplaceRestrictedImage}
+						/>
+					</>
+				)}
 
 				{/* Divider */}
 				<div className="border-t border-line-1" />

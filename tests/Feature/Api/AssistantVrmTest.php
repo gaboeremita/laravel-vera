@@ -133,6 +133,36 @@ it('persists portrait_type via PATCH', function () {
     expect($assistant->fresh()->portrait_type)->toBe(AssistantPortraitType::Avatar3d);
 });
 
+it('creates an avatar3d assistant without emotion images', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->postJson(route('assistants.store'), [
+            'name' => 'Avatar Assistant',
+            'slug' => 'avatar-assistant',
+            'portrait_type' => 'avatar3d',
+        ]);
+
+    $response->assertStatus(201);
+    $assistant = Assistant::find($response->json('id'));
+    expect($assistant->portrait_type)->toBe(AssistantPortraitType::Avatar3d);
+    expect($assistant->emotions()->count())->toBe(0);
+});
+
+it('still requires emotions when creating an image assistant', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->postJson(route('assistants.store'), [
+            'name' => 'Image Assistant',
+            'slug' => 'image-assistant',
+        ]);
+
+    $response->assertStatus(422)->assertJsonValidationErrors(['emotions']);
+});
+
 it('emotions index returns envelope with portrait_type and vrm_url', function () {
     [$user, $assistant] = setUpAssistantForVrm();
 

@@ -96,6 +96,8 @@ class AssistantController extends Controller
             $request->merge(['prompt' => json_decode($request->input('prompt'), true)]);
         }
 
+        $isAvatarMode = $request->input('portrait_type') === AssistantPortraitType::Avatar3d->value;
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['required', 'string', 'max:255', 'unique:assistants,slug'],
@@ -104,7 +106,8 @@ class AssistantController extends Controller
             'prompt' => ['nullable', 'array'],
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
-            'emotions' => ['required', 'array', 'min:1'],
+            'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
+            'emotions' => [$isAvatarMode ? 'nullable' : 'required', 'array', $isAvatarMode ? 'min:0' : 'min:1'],
             'emotions.*.name' => ['required', 'string', 'max:255'],
             'emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
             'restricted_emotions' => ['sometimes', 'array'],
@@ -112,15 +115,17 @@ class AssistantController extends Controller
             'restricted_emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
         ]);
 
-        // At least one emotion must be named "default"
-        $hasDefault = collect($validated['emotions'])
-            ->contains(fn ($e) => $e['name'] === 'default');
+        // In image mode a "default" emotion is required
+        if (! $isAvatarMode) {
+            $hasDefault = collect($validated['emotions'] ?? [])
+                ->contains(fn ($e) => $e['name'] === 'default');
 
-        if (! $hasDefault) {
-            return response()->json([
-                'message' => 'A "default" emotion is required.',
-                'errors' => ['emotions' => ['A "default" emotion is required.']],
-            ], 422);
+            if (! $hasDefault) {
+                return response()->json([
+                    'message' => 'A "default" emotion is required.',
+                    'errors' => ['emotions' => ['A "default" emotion is required.']],
+                ], 422);
+            }
         }
 
         $assistant = DB::transaction(function () use ($request, $validated) {
@@ -132,6 +137,7 @@ class AssistantController extends Controller
                 'prompt' => $validated['prompt'] ?? [],
                 'archive_id' => $validated['archive_id'] ?? null,
                 'mode' => $validated['mode'] ?? AssistantMode::Assistant->value,
+                'portrait_type' => $validated['portrait_type'] ?? AssistantPortraitType::Image->value,
             ]);
 
             // Create the pivot
@@ -154,7 +160,7 @@ class AssistantController extends Controller
                 ]);
             };
 
-            foreach ($validated['emotions'] as $emotionData) {
+            foreach ($validated['emotions'] ?? [] as $emotionData) {
                 $storeEmotion($emotionData, false);
             }
 
