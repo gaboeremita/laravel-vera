@@ -6,6 +6,7 @@ use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
 use App\Http\Controllers\Controller;
 use App\Models\Assistant;
+use App\Models\Emotion;
 use App\Models\Image;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,6 +69,7 @@ class AssistantController extends Controller
             'id' => $emotion->id,
             'name' => $emotion->name,
             'image_url' => $emotion->image?->url,
+            'vrm_blendshapes' => $emotion->vrm_blendshapes,
         ];
 
         $emotions = $assistant->emotions()
@@ -119,10 +121,16 @@ class AssistantController extends Controller
             'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
             'emotions' => [$isAvatarMode ? 'nullable' : 'required', 'array', $isAvatarMode ? 'min:0' : 'min:1'],
             'emotions.*.name' => ['required', 'string', 'max:255'],
-            'emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
+            'emotions.*.image' => [$isAvatarMode ? 'sometimes' : 'required', 'file', 'image', 'max:10480'],
+            'emotions.*.vrm_blendshapes' => ['sometimes', 'array'],
+            'emotions.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
+            'emotions.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
             'restricted_emotions' => ['sometimes', 'array'],
             'restricted_emotions.*.name' => ['required', 'string', 'max:255'],
-            'restricted_emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
+            'restricted_emotions.*.image' => [$isAvatarMode ? 'sometimes' : 'required', 'file', 'image', 'max:10480'],
+            'restricted_emotions.*.vrm_blendshapes' => ['sometimes', 'array'],
+            'restricted_emotions.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
+            'restricted_emotions.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
 
         // In image mode a "default" emotion is required
@@ -153,21 +161,24 @@ class AssistantController extends Controller
             // Create the pivot
             $request->user()->assistants()->attach($assistant->id);
 
-            // Store emotions with images
+            // Store emotions with images and/or VRM blendshape mappings
             $storeEmotion = function (array $emotionData, bool $restricted) use ($assistant): void {
                 $emotion = $assistant->emotions()->create([
                     'name' => $emotionData['name'],
                     'restricted' => $restricted,
+                    'vrm_blendshapes' => Emotion::normalizeBlendshapes($emotionData['vrm_blendshapes'] ?? null),
                 ]);
 
-                $path = $emotionData['image']->store("emotions/{$assistant->id}", 'public');
+                if (isset($emotionData['image'])) {
+                    $path = $emotionData['image']->store("emotions/{$assistant->id}", 'public');
 
-                $emotion->image()->create([
-                    'path' => $path,
-                    'disk' => 'public',
-                    'mime_type' => $emotionData['image']->getMimeType(),
-                    'size' => $emotionData['image']->getSize(),
-                ]);
+                    $emotion->image()->create([
+                        'path' => $path,
+                        'disk' => 'public',
+                        'mime_type' => $emotionData['image']->getMimeType(),
+                        'size' => $emotionData['image']->getSize(),
+                    ]);
+                }
             };
 
             foreach ($validated['emotions'] ?? [] as $emotionData) {

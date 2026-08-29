@@ -4,13 +4,10 @@ import { Box3, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import veraAvatar from '../../images/vera-avatar.png';
-import { getBlendshapeTargets } from '../utils/vrmExpressions.js';
-
-const ALL_EXPRESSIONS = ['happy', 'sad', 'angry', 'relaxed', 'surprised'];
 
 const EXPRESSION_HOLD_SECONDS = 3.5;
 
-function VrmScene({ vrmUrl, emotion, onLoaded, onError }) {
+function VrmScene({ vrmUrl, emotion, blendshapes, onLoaded, onError }) {
 	const { scene, camera } = useThree();
 	const vrmRef = useRef(null);
 	const currentWeightsRef = useRef({});
@@ -87,10 +84,14 @@ function VrmScene({ vrmUrl, emotion, onLoaded, onError }) {
 		}
 		const expressionActive = expressionHoldRef.current < EXPRESSION_HOLD_SECONDS;
 
-		// Lerp expression blendshapes toward targets (~300ms to converge)
-		const targets = expressionActive ? getBlendshapeTargets(emotion) : [];
+		// Lerp expression blendshapes toward targets (~300ms to converge).
+		// Expression names come entirely from the assistant's own mapping —
+		// also lerp any previously-active expression down to 0 even if it's
+		// no longer targeted, so switching emotions doesn't leave it stuck.
+		const targets = expressionActive ? blendshapes : [];
 		const targetMap = Object.fromEntries(targets.map((t) => [t.expression, t.weight]));
-		for (const expr of ALL_EXPRESSIONS) {
+		const activeExpressions = new Set([...Object.keys(currentWeightsRef.current), ...Object.keys(targetMap)]);
+		for (const expr of activeExpressions) {
 			const target = targetMap[expr] ?? 0;
 			const current = currentWeightsRef.current[expr] ?? 0;
 			const lerped = current + (target - current) * Math.min(delta / 0.3, 1);
@@ -134,7 +135,7 @@ function VrmScene({ vrmUrl, emotion, onLoaded, onError }) {
 	return null;
 }
 
-export default function VrmAvatar({ vrmUrl, emotion }) {
+export default function VrmAvatar({ vrmUrl, emotion, blendshapes = [] }) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [loadError, setLoadError] = useState(false);
 
@@ -165,6 +166,7 @@ export default function VrmAvatar({ vrmUrl, emotion }) {
 				<VrmScene
 					vrmUrl={vrmUrl}
 					emotion={emotion}
+					blendshapes={blendshapes}
 					onLoaded={() => setIsLoading(false)}
 					onError={() => {
 						setIsLoading(false);

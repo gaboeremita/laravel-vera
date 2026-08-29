@@ -31,6 +31,10 @@ export function useEmotions() {
 		return emotions.find((e) => e.name === name)?.video_url || null;
 	};
 
+	const getVrmBlendshapes = (name) => {
+		return emotions.find((e) => e.name === name)?.vrm_blendshapes || [];
+	};
+
 	return {
 		emotions,
 		emotionNames,
@@ -38,6 +42,7 @@ export function useEmotions() {
 		fetchEmotions,
 		getImageUrl,
 		getVideoUrl,
+		getVrmBlendshapes,
 		portraitType,
 		vrmUrl,
 	};

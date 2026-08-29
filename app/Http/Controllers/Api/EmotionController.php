@@ -23,6 +23,7 @@ class EmotionController extends Controller
                 'name' => $emotion->name,
                 'image_url' => $emotion->image?->url,
                 'video_url' => $emotion->video?->url,
+                'vrm_blendshapes' => $emotion->vrm_blendshapes,
             ]);
 
         return response()->json([

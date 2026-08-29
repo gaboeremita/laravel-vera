@@ -30,30 +30,16 @@ Self-contained 3D avatar renderer. Mounts an R3F canvas, loads the VRM model, ma
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `vrmUrl` | `string` | yes | URL to the `.vrm` file to load |
-| `emotion` | `string` | yes | Current VERA emotion tag (e.g. `'happy'`, `'neutral'`) |
+| `emotion` | `string` | yes | Current VERA emotion tag (e.g. `'happy'`, `'neutral'`) — used only to detect when the expression should start its hold/decay timer |
+| `blendshapes` | `Array<{expression: string, weight: number}>` | no, default `[]` | The resolved blendshape targets for the current emotion, from `useEmotions().getVrmBlendshapes(emotion)` |
 
 **Behaviour**:
 - Loads the VRM file from `vrmUrl`. Shows a loading state while the file is fetching.
 - On load error: renders the default VERA avatar image fallback (does not throw; logs the error).
-- Maps `emotion` to blendshape values via `vrmExpressions.js`.
-- Lerps current blendshape values toward targets on every frame (~300 ms to reach target).
+- Lerps current blendshape values toward `blendshapes` on every frame (~300 ms to reach target); any expression name previously active but no longer targeted also lerps down to 0, so switching emotions never leaves a blendshape stuck. No fixed list of expression names — whatever names appear in `blendshapes` (and whatever the loaded VRM model actually exposes) is what animates.
+- Holds an expression for ~3.5s after `emotion` changes, then decays back to neutral so the face doesn't freeze in the last emotion indefinitely.
 - Runs idle blink at a randomised interval of 2–6 seconds.
 - Pauses the render loop when the component is not visible (uses R3F's `frameloop="demand"` or visibility API).
-
----
-
-## New: `vrmExpressions.js` utility
-
-**File**: `resources/js/utils/vrmExpressions.js`
-
-Exports a pure function `getBlendshapeTargets(emotionTag)` that returns an array of `{ expression: string, weight: number }` pairs. Returns all-zero weights for unknown tags.
-
-```js
-// Example outputs
-getBlendshapeTargets('happy')    // [{ expression: 'happy', weight: 0.8 }]
-getBlendshapeTargets('flustered') // [{ expression: 'surprised', weight: 0.3 }, { expression: 'happy', weight: 0.2 }]
-getBlendshapeTargets('unknown')  // []  (neutral — caller treats missing as 0.0)
-```
 
 ---
 
@@ -61,11 +47,30 @@ getBlendshapeTargets('unknown')  // []  (neutral — caller treats missing as 0.
 
 **File**: `resources/js/hooks/useEmotions.js`
 
-Two new values added to the returned object. Existing values unchanged.
+Three new values added to the returned object. Existing values unchanged.
 
 | Key | Type | Description |
 |---|---|---|
 | `portraitType` | `'image' \| 'avatar3d'` | Portrait type for the currently loaded assistant |
 | `vrmUrl` | `string \| null` | VRM URL for the currently loaded assistant |
+| `getVrmBlendshapes` | `(name: string) => Array<{expression: string, weight: number}>` | Looks up the named emotion's `vrm_blendshapes`; returns `[]` if the emotion doesn't exist or has none |
 
-`fetchEmotions(assistantId)` is updated to consume the new response envelope from `GET /api/assistants/{assistant}/emotions` and populate these two new values. Initial state is `'image'` and `null` respectively.
+`fetchEmotions(assistantId)` is updated to consume the new response envelope from `GET /api/assistants/{assistant}/emotions` and populate these values. Initial state is `'image'`, `null`, and an empty-array-returning function respectively.
+
+---
+
+## New: `VrmEmotionEditor` component
+
+**File**: `resources/js/components/VrmEmotionEditor.jsx`
+
+Per-assistant emotion → VRM blendshape mapping editor, shown on Create/Edit assistant pages when `portraitType === 'avatar3d'` in place of the image-mode `EmotionGrid`. Each emotion row holds N `{expression, weight%}` sub-rows, added/removed freely, with an explicit Save action (no auto-save per keystroke).
+
+| Prop | Type | Description |
+|---|---|---|
+| `emotions` | `Array<{id?, name, vrm_blendshapes}>` | Rows to render — `id` absent for locally-staged (not-yet-created) rows |
+| `onAdd` | `(name: string, blendshapes: Array) => void` | Called when a new emotion row is added |
+| `onDelete` | `(emotion) => void` | Called when an emotion row is deleted |
+| `onUpdateBlendshapes` | `(emotion, blendshapes: Array) => void` | Called when an existing row's Save button is pressed |
+| `label` | `string`, default `'Emotions'` | Section label (used for the "Restricted Emotions" variant) |
+
+Expression name inputs are free text with a `<datalist>` of common VRM preset names for discoverability — nothing constrains the value to that list, since a VRM model may expose custom blendshape names.

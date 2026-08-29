@@ -5,6 +5,7 @@ import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
+import VrmEmotionEditor from '../components/VrmEmotionEditor.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
 export default function EditAssistantPage() {
@@ -166,6 +167,46 @@ export default function EditAssistantPage() {
 		} finally {
 			setIsUploadingCardImage(false);
 			if (cardImageRef.current) cardImageRef.current.value = '';
+		}
+	};
+
+	/* ── VRM emotion→blendshape handlers ── */
+
+	const handleAddVrmEmotion = async (name, blendshapes, restricted) => {
+		try {
+			const res = await api.post(route('assistants.emotions.store', { assistant: id }), {
+				name,
+				vrm_blendshapes: blendshapes,
+				restricted,
+			});
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Failed to add emotion');
+			}
+			const data = await res.json();
+			if (restricted) {
+				setRestrictedEmotions((prev) => [...prev, data]);
+			} else {
+				setEmotions((prev) => [...prev, data]);
+			}
+			addToast('Emotion added', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to add emotion', 'error');
+		}
+	};
+
+	const handleUpdateVrmBlendshapes = async (emotion, blendshapes) => {
+		try {
+			const res = await api.post(route('assistants.emotions.update', { assistant: id, emotion: emotion.id }), {
+				vrm_blendshapes: blendshapes,
+			});
+			if (!res.ok) throw new Error('Update failed');
+			const data = await res.json();
+			setEmotions((prev) => prev.map((e) => (e.id === emotion.id ? data : e)));
+			setRestrictedEmotions((prev) => prev.map((e) => (e.id === emotion.id ? data : e)));
+			addToast('Expression mapping saved', 'success');
+		} catch {
+			addToast('Failed to save expression mapping', 'error');
 		}
 	};
 
@@ -510,6 +551,27 @@ export default function EditAssistantPage() {
 							onAdd={handleAddRestrictedEmotion}
 							onDelete={handleDeleteEmotion}
 							onUpdateImage={handleReplaceImage}
+						/>
+					</>
+				)}
+
+				{portraitType === 'avatar3d' && (
+					<>
+						<div className="border-t border-line-1" />
+
+						<VrmEmotionEditor
+							emotions={emotions}
+							onAdd={(name, blendshapes) => handleAddVrmEmotion(name, blendshapes, false)}
+							onDelete={handleDeleteEmotion}
+							onUpdateBlendshapes={handleUpdateVrmBlendshapes}
+						/>
+
+						<VrmEmotionEditor
+							label="Restricted Emotions"
+							emotions={restrictedEmotions}
+							onAdd={(name, blendshapes) => handleAddVrmEmotion(name, blendshapes, true)}
+							onDelete={handleDeleteEmotion}
+							onUpdateBlendshapes={handleUpdateVrmBlendshapes}
 						/>
 					</>
 				)}

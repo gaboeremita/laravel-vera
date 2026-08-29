@@ -5,6 +5,7 @@ import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
+import VrmEmotionEditor from '../components/VrmEmotionEditor.jsx';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
 export default function CreateAssistantPage() {
@@ -25,6 +26,10 @@ export default function CreateAssistantPage() {
 	// Staged emotions — local File objects, not yet uploaded
 	const [stagedEmotions, setStagedEmotions] = useState([]);
 	const [stagedRestrictedEmotions, setStagedRestrictedEmotions] = useState([]);
+
+	// Staged VRM emotion → blendshape mappings (avatar3d mode, no files involved)
+	const [stagedVrmEmotions, setStagedVrmEmotions] = useState([]);
+	const [stagedVrmRestrictedEmotions, setStagedVrmRestrictedEmotions] = useState([]);
 
 	// Archive
 	const [archives, setArchives] = useState([]);
@@ -102,6 +107,30 @@ export default function CreateAssistantPage() {
 		);
 	};
 
+	const handleAddVrmEmotion = (emotionName, blendshapes) => {
+		setStagedVrmEmotions((prev) => [...prev, { name: emotionName, vrm_blendshapes: blendshapes }]);
+	};
+
+	const handleDeleteVrmEmotion = (emotion) => {
+		setStagedVrmEmotions((prev) => prev.filter((e) => e !== emotion));
+	};
+
+	const handleUpdateVrmEmotion = (emotion, blendshapes) => {
+		setStagedVrmEmotions((prev) => prev.map((e) => (e === emotion ? { ...e, vrm_blendshapes: blendshapes } : e)));
+	};
+
+	const handleAddVrmRestrictedEmotion = (emotionName, blendshapes) => {
+		setStagedVrmRestrictedEmotions((prev) => [...prev, { name: emotionName, vrm_blendshapes: blendshapes }]);
+	};
+
+	const handleDeleteVrmRestrictedEmotion = (emotion) => {
+		setStagedVrmRestrictedEmotions((prev) => prev.filter((e) => e !== emotion));
+	};
+
+	const handleUpdateVrmRestrictedEmotion = (emotion, blendshapes) => {
+		setStagedVrmRestrictedEmotions((prev) => prev.map((e) => (e === emotion ? { ...e, vrm_blendshapes: blendshapes } : e)));
+	};
+
 	const handleSubmit = async () => {
 		if (!name.trim() || !slug.trim()) {
 			addToast('Name and slug are required', 'error');
@@ -153,6 +182,22 @@ export default function CreateAssistantPage() {
 				stagedRestrictedEmotions.forEach((emotion, i) => {
 					formData.append(`restricted_emotions[${i}][name]`, emotion.name);
 					formData.append(`restricted_emotions[${i}][image]`, emotion.file);
+				});
+			} else {
+				stagedVrmEmotions.forEach((emotion, i) => {
+					formData.append(`emotions[${i}][name]`, emotion.name);
+					(emotion.vrm_blendshapes || []).forEach((b, j) => {
+						formData.append(`emotions[${i}][vrm_blendshapes][${j}][expression]`, b.expression);
+						formData.append(`emotions[${i}][vrm_blendshapes][${j}][weight]`, b.weight);
+					});
+				});
+
+				stagedVrmRestrictedEmotions.forEach((emotion, i) => {
+					formData.append(`restricted_emotions[${i}][name]`, emotion.name);
+					(emotion.vrm_blendshapes || []).forEach((b, j) => {
+						formData.append(`restricted_emotions[${i}][vrm_blendshapes][${j}][expression]`, b.expression);
+						formData.append(`restricted_emotions[${i}][vrm_blendshapes][${j}][weight]`, b.weight);
+					});
 				});
 			}
 
@@ -357,6 +402,28 @@ export default function CreateAssistantPage() {
 							onAdd={handleAddRestrictedEmotion}
 							onDelete={handleDeleteRestrictedEmotion}
 							onUpdateImage={handleReplaceRestrictedImage}
+						/>
+					</>
+				)}
+
+				{portraitType === 'avatar3d' && (
+					<>
+						{/* Divider */}
+						<div className="border-t border-line-1" />
+
+						<VrmEmotionEditor
+							emotions={stagedVrmEmotions}
+							onAdd={handleAddVrmEmotion}
+							onDelete={handleDeleteVrmEmotion}
+							onUpdateBlendshapes={handleUpdateVrmEmotion}
+						/>
+
+						<VrmEmotionEditor
+							label="Restricted Emotions"
+							emotions={stagedVrmRestrictedEmotions}
+							onAdd={handleAddVrmRestrictedEmotion}
+							onDelete={handleDeleteVrmRestrictedEmotion}
+							onUpdateBlendshapes={handleUpdateVrmRestrictedEmotion}
 						/>
 					</>
 				)}

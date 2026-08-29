@@ -24,29 +24,15 @@
 
 ## Decision 3: Emotion → Blendshape Mapping
 
-**Decision**: A fixed, application-level JS config object (exported from `resources/js/utils/vrmExpressions.js`). Maps each VERA emotion tag string to an array of `{ expression, weight }` pairs matching VRM standard expression names.
+**Decision**: Per-assistant, database-backed mapping. The `emotions` table (already used for image-mode emotion records) gains a `vrm_blendshapes` JSON column: `array<{expression: string, weight: float}>`, nullable. Each assistant defines its own emotion names and blendshape targets via the assistant settings UI (`VrmEmotionEditor`) — there is no fixed application-level list of emotion names or expression names.
 
-Confirmed mapping:
+`Assistant::promptEmotionNames()` reads the assistant's actual `Emotion` records for both portrait types (previously it returned a hardcoded list for `avatar3d` assistants, since they had no `Emotion` records to draw from — that fallback is gone now that avatar3d assistants create real `Emotion` rows too).
 
-| VERA emotion | VRM expression(s) |
-|---|---|
-| `default` | all 0.0 |
-| `neutral` | all 0.0 |
-| `happy` | happy: 1.0 |
-| `content` | happy: 0.4 (milder than `happy`, same blendshape) |
-| `sad` | sad: 1.0 |
-| `annoyed` | angry: 0.4 (milder than `angry`, same blendshape) |
-| `flustered` | surprised: 0.3, happy: 0.2 |
-| `seduced` | relaxed: 1.0 |
-| `surprised` | surprised: 1.0 |
-| `angry` | angry: 1.0 |
-| `relaxed` | relaxed: 1.0 |
+On the frontend, `VrmAvatar`'s `useFrame` loop lerps whatever expression names appear in the resolved `blendshapes` prop (sourced from `useEmotions().getVrmBlendshapes(name)`), with no fixed list of expression names to iterate — any name the user's VRM model actually exposes works.
 
-Unknown tags fall back to neutral (all 0.0).
+**Rationale**: A fixed JS mapping meant every assistant showed identical expressions regardless of what blendshapes its actual VRM file exposes, and adding or tuning an emotion required a code change. Reusing the `emotions` table (rather than a new one) keeps `image_url` and `vrm_blendshapes` as independent, optional fields on the same row — an emotion can carry an image, a blendshape mapping, both, or neither, consistent with the existing "portrait type and files are independent" rule.
 
-**Rationale**: Per-assistant customisation of blendshape weights is out of scope for v1 (documented in spec assumptions). A config object in JS is the lightest possible shape — no API, no DB, no migration.
-
-**Alternatives considered**: DB-backed per-assistant mapping table — deferred to v2 per spec.
+**Alternatives considered**: A dedicated `vrm_expression_targets` table with a `FK` to `emotions` — rejected; a JSON column is sufficient for an ordered list of `{expression, weight}` pairs with no independent query needs.
 
 ---
 

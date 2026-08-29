@@ -114,11 +114,11 @@ Between responses, the avatar performs subtle idle behaviors — eyes blink at r
 ## Assumptions
 
 - VRM files are created externally (e.g., in VRoid Studio) and uploaded by the user; the application does not generate or edit them.
-- The emotion-to-blendshape mapping is a fixed application-level configuration in v1; per-assistant customization of blendshape values is out of scope.
+- The emotion-to-blendshape mapping is per-assistant and user-editable via the assistant settings UI, stored on the `emotions` table; there is no fixed application-level list of emotion or expression names.
 - Lip sync (driving mouth viseme shapes from audio) is out of scope for v1.
 - The portrait area's existing dimensions and layout remain unchanged; the 3D canvas fills the same space as the current image.
 - WebGL support is assumed for any browser where a user would configure a 3D avatar — no server-side rendering fallback for the 3D model is required.
 - VRM file storage uses the same underlying storage mechanism as existing emotion images and videos in the application.
 - Portrait type and uploaded files are fully independent in both directions: changing portrait type never deletes stored files. A user must explicitly delete a VRM file or emotion image via the respective delete controls.
 - Spring bone physics (hair/clothing movement) may or may not be active in v1 — this is a rendering-quality detail left to implementation, not a specified requirement.
-- The `[flustered]` emotion and any other custom tags not matching a standard VRM expression name will map to the closest reasonable combination of standard blendshapes, documented in the implementation plan.
+- An emotion tag with no matching per-assistant blendshape mapping renders as neutral rather than erroring.
