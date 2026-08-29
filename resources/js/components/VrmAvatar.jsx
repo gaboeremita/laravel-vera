@@ -8,12 +8,16 @@ import { getBlendshapeTargets } from '../utils/vrmExpressions.js';
 
 const ALL_EXPRESSIONS = ['happy', 'sad', 'angry', 'relaxed', 'surprised'];
 
+const EXPRESSION_HOLD_SECONDS = 3.5;
+
 function VrmScene({ vrmUrl, emotion, onLoaded, onError }) {
 	const { scene, camera } = useThree();
 	const vrmRef = useRef(null);
 	const currentWeightsRef = useRef({});
 	const blinkRef = useRef({ phase: 'waiting', phaseElapsed: 0, threshold: 3 });
 	const elapsedRef = useRef(0);
+	const lastEmotionRef = useRef(emotion);
+	const expressionHoldRef = useRef(0);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -73,8 +77,18 @@ function VrmScene({ vrmUrl, emotion, onLoaded, onError }) {
 		const vrm = vrmRef.current;
 		elapsedRef.current += delta;
 
+		// Hold the expression briefly, then decay back to neutral so she
+		// doesn't stay frozen in the last emotion forever.
+		if (emotion !== lastEmotionRef.current) {
+			lastEmotionRef.current = emotion;
+			expressionHoldRef.current = 0;
+		} else {
+			expressionHoldRef.current += delta;
+		}
+		const expressionActive = expressionHoldRef.current < EXPRESSION_HOLD_SECONDS;
+
 		// Lerp expression blendshapes toward targets (~300ms to converge)
-		const targets = getBlendshapeTargets(emotion);
+		const targets = expressionActive ? getBlendshapeTargets(emotion) : [];
 		const targetMap = Object.fromEntries(targets.map((t) => [t.expression, t.weight]));
 		for (const expr of ALL_EXPRESSIONS) {
 			const target = targetMap[expr] ?? 0;
