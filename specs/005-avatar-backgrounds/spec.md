@@ -8,6 +8,12 @@
 
 **Input**: User description: "we need to implement the ability to create backgrounds for the 3D avatars, this might be a skill or a command that can be called. If invoked as a tool a LLM call will shape the prompt for the image model generator and it can be done automatically when the setting of the conversation changes. Let's think about maybe a bar, maybe a penthouse, information can be replicated more accurately by checking RAG, for instance, if the characters are in a specific location that is described in an archive entry, When initiating a conversation, we shall get info from the initial message to create the first background, But backgrounds can also be invoked directly with a command, or if the AI is an agent mode, just asking it directly something like 'change the background to a futuristic park' The background must consist of two images actually, a floor and the actual surroundings, a floor might be place in the 3D space, obviously on the floor, and the other image in a curved plane to give the illusion of depth, since camera is not implemented yet and even when implemented it will be limited, no ceiling or front is necessary, only thing needed is placing the generated image in a curved plane and it will create a background for the character."
 
+## Clarifications
+
+### Session 2026-08-28
+
+- Q: Should a cached background ever be reused across different conversations (e.g. two separate conversations with the same assistant both set "the neon bar"), or should the cache always be scoped to one conversation only? → A: Per-conversation only — each conversation caches and regenerates its own background independently, never reused elsewhere.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Change the background on request (Priority: P1)
@@ -63,7 +69,8 @@ As an ongoing conversation's narrative setting shifts (for example, the characte
 - What happens when a requested or inferred setting is too abstract or vague to depict visually (e.g. "nowhere in particular", a purely internal/emotional scene)? The system MUST fall back to a reasonable default rather than failing the request.
 - What happens when a manual background request and an automatic detected change happen close together? The most recent request MUST be the one reflected in the final displayed background.
 - What happens when the assistant has no linked archive, or the archive has no entry matching the requested/inferred location? The background MUST still be generated from the description alone.
-- What happens when a conversation is reopened later? The background last generated for that conversation MUST still be showing (see Assumptions).
+- What happens when a conversation is reopened later? If that conversation's background is still cached, it MUST still be showing; if the cache has been cleared, the system MUST automatically regenerate a background from the conversation's current context rather than showing a blank scene or requiring a manual request.
+- What happens while a background is generating? The ongoing conversation MUST NOT be blocked or delayed — the user can keep exchanging messages while generation completes and the scene updates once it's ready.
 
 ## Requirements *(mandatory)*
 
@@ -80,15 +87,18 @@ As an ongoing conversation's narrative setting shifts (for example, the characte
 - **FR-009**: The floor image MUST be positioned as a flat surface beneath the avatar's feet in the 3D scene.
 - **FR-010**: The surrounding-environment image MUST be positioned on a curved surface behind the avatar so as to suggest depth, without requiring any ceiling or front-facing geometry.
 - **FR-011**: The generated background MUST read as coherent under the avatar scene's fixed/limited camera view, without depending on a full 360° or free-roaming camera.
-- **FR-012**: System MUST retain the most recently generated background for a conversation so it is still displayed when the user returns to that conversation later.
+- **FR-012**: System MUST cache the most recently generated background for a conversation, scoped to that conversation only, so returning to it while the cache is still available shows the same scene without regenerating it. This cache is temporary, not a permanent archival record — the system is not required to keep a cached background indefinitely.
+- **FR-012a**: If a conversation's cached background is no longer available when the user returns to it, System MUST automatically regenerate a background from that conversation's current context, without requiring a manual request.
 - **FR-013**: System MUST show a loading indication while a background is being generated, and MUST leave the previously displayed background (or default) in place until generation completes.
 - **FR-014**: System MUST apply generated backgrounds only to assistants presented via the 3D avatar; assistants without a 3D avatar are unaffected by this feature.
-- **FR-015**: When a background is requested for a setting that closely matches one already generated earlier in the same conversation, System MUST reuse the previously generated background instead of generating a new image.
+- **FR-015**: When a background is requested for a setting that closely matches one already cached earlier in the same conversation, System MUST reuse the cached background instead of generating a new image. Cached backgrounds MUST NOT be reused across different conversations, even for the same assistant and the same setting.
 - **FR-016**: Automatically triggered background changes (initial scene and mid-conversation updates) MUST apply immediately without requiring user confirmation.
+- **FR-017**: Background generation MUST run without blocking the ongoing conversation — the user MUST be able to send and receive messages normally while a background is being generated, with the scene updating in place once generation completes.
+- **FR-018**: Whenever the displayed background changes — from no background to a generated one, or from one generated background to another — the transition MUST use a smooth fade-out/fade-in effect rather than an abrupt swap.
 
 ### Key Entities
 
-- **Avatar Background**: The generated scene currently associated with a conversation — a floor image, a surrounding-environment image, the description/prompt it was generated from, and when it was generated. One active background per conversation.
+- **Avatar Background**: The generated scene currently cached for a conversation — a floor image, a surrounding-environment image, and the description/prompt it was generated from. One active background per conversation, held only for as long as it remains cached; not a permanent record.
 - **Archive Entry** *(existing)*: A documented piece of assistant knowledge (e.g. a named location) that background generation consults so scenes for documented places stay accurate to what's written about them.
 
 ## Success Criteria *(mandatory)*
@@ -100,6 +110,7 @@ As an ongoing conversation's narrative setting shifts (for example, the characte
 - **SC-003**: When the requested or inferred location matches a documented archive entry, the generated scene visibly reflects the details written in that entry, confirmed by human review of a sample of generations.
 - **SC-004**: Users can continue chatting normally while a background is being generated — no part of the conversation is blocked or delayed by scene generation.
 - **SC-005**: Reviewers observing the avatar scene perceive the avatar as standing within an environment (grounded on a floor, surrounded by scenery) rather than floating in front of a flat image.
+- **SC-006**: Reviewers observing a background change describe the transition as smooth, not jarring or abrupt.
 
 ## Assumptions
 
@@ -108,4 +119,6 @@ As an ongoing conversation's narrative setting shifts (for example, the characte
 - Detecting that the narrated setting has changed during an ongoing conversation is inferred by the system from conversation content itself, the same way the assistant's emotional expression is already inferred from its replies, rather than requiring any new user-facing setting field.
 - If background generation fails, the previously displayed background (or the default scene, if none has been generated yet) remains in place rather than leaving a blank or broken scene.
 - Manual background requests are available to the same users who can already converse with the assistant; no new permission tier is introduced.
-- "Closely matches one already generated earlier in the same conversation" (FR-015) is judged by the system, not the user, using the same setting description/detection used elsewhere in this feature.
+- "Closely matches one already cached earlier in the same conversation" (FR-015) is judged by the system, not the user, using the same setting description/detection used elsewhere in this feature.
+- Cached backgrounds are held in temporary storage rather than the assistant's permanent media storage; exact cache lifetime and eviction policy are implementation decisions left to planning, not fixed by this specification.
+- Non-blocking generation (FR-017) means the conversation is never held up waiting on a background; how that concurrency is implemented is left to planning.
