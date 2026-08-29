@@ -61,12 +61,17 @@ specs/005-avatar-backgrounds/
 
 ```text
 app/
+├── Contracts/
+│   └── ImageGenProvider.php                  # + generateMany(array $prompts): array, for concurrent floor+surroundings generation (research.md §5)
 ├── Jobs/
 │   └── GenerateAvatarBackground.php          # queued, non-blocking generation (FR-017)
 ├── Services/
-│   └── AvatarBackground/
-│       ├── AvatarBackgroundPromptEnhancer.php  # mirrors ImageGenPromptEnhancer; shapes floor + surroundings prompts, with archive retrieval (FR-006, FR-007)
-│       └── AvatarBackgroundService.php         # orchestrates enhance -> generate x2 -> store files -> cache
+│   ├── AvatarBackground/
+│   │   ├── AvatarBackgroundPromptEnhancer.php  # mirrors ImageGenPromptEnhancer; shapes floor + surroundings prompts, with archive retrieval (FR-006, FR-007)
+│   │   └── AvatarBackgroundService.php         # orchestrates enhance -> generateMany -> store files -> cache
+│   └── ImageGenProviders/
+│       ├── OpenRouterImageGenProvider.php      # + generateMany() via Http::pool()
+│       └── OpenAiCompatibleImageGenProvider.php # + generateMany() via Http::pool()
 ├── Services/AgentLoop/Tools/
 │   └── AvatarBackgroundTool.php               # agent-mode trigger (FR-003), mirrors ImageGenerationTool
 └── Http/Controllers/Api/
@@ -76,13 +81,18 @@ routes/api.php                                  # + GET .../conversations/{id}/a
 
 app/Http/Controllers/Api/ConversationController.php
   - store(): dispatch initial background generation for Avatar3D assistants (FR-004)
+  - show(): dispatch cache-miss regeneration on conversation reopen (FR-012a, research.md §8)
   - sendMessage(): parse `/change-background <description>` command (FR-002); detect `[scene: ...]` tag in the assistant's reply and dispatch regeneration (FR-005)
 
-resources/js/
-├── hooks/
-│   └── useAvatarBackground.js                 # polling hook, mirrors AgentProgressIndicator's poll loop
-└── components/
-    └── VrmAvatar.jsx                          # + floor mesh, curved backdrop mesh, cross-fade transition (FR-008–FR-011, FR-018)
+resources/
+├── images/
+│   ├── avatar-background-default-floor.png       # bundled default asset (research.md §9)
+│   └── avatar-background-default-surroundings.png # bundled default asset (research.md §9)
+└── js/
+    ├── hooks/
+    │   └── useAvatarBackground.js                 # polling hook, mirrors AgentProgressIndicator's poll loop
+    └── components/
+        └── VrmAvatar.jsx                          # + floor mesh, curved backdrop mesh, cross-fade transition, default-asset fallback (FR-008–FR-011, FR-018)
 
 tests/Feature/
 └── AvatarBackground*Test.php                  # mirrors ImageGenerationTool*Test.php naming/structure

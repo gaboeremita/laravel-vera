@@ -91,7 +91,7 @@ As an ongoing conversation's narrative setting shifts (for example, the characte
 - **FR-012a**: If a conversation's cached background is no longer available when the user returns to it, System MUST automatically regenerate a background from that conversation's current context, without requiring a manual request.
 - **FR-013**: System MUST show a loading indication while a background is being generated, and MUST leave the previously displayed background (or default) in place until generation completes.
 - **FR-014**: System MUST apply generated backgrounds only to assistants presented via the 3D avatar; assistants without a 3D avatar are unaffected by this feature.
-- **FR-015**: When a background is requested for a setting that closely matches one already cached earlier in the same conversation, System MUST reuse the cached background instead of generating a new image. Cached backgrounds MUST NOT be reused across different conversations, even for the same assistant and the same setting.
+- **FR-015**: Cached backgrounds MUST NOT be reused across different conversations, even for the same assistant and the same setting.
 - **FR-016**: Automatically triggered background changes (initial scene and mid-conversation updates) MUST apply immediately without requiring user confirmation.
 - **FR-017**: Background generation MUST run without blocking the ongoing conversation — the user MUST be able to send and receive messages normally while a background is being generated, with the scene updating in place once generation completes.
 - **FR-018**: Whenever the displayed background changes — from no background to a generated one, or from one generated background to another — the transition MUST use a smooth fade-out/fade-in effect rather than an abrupt swap.
@@ -119,6 +119,5 @@ As an ongoing conversation's narrative setting shifts (for example, the characte
 - Detecting that the narrated setting has changed during an ongoing conversation is inferred by the system from conversation content itself, the same way the assistant's emotional expression is already inferred from its replies, rather than requiring any new user-facing setting field.
 - If background generation fails, the previously displayed background (or the default scene, if none has been generated yet) remains in place rather than leaving a blank or broken scene.
 - Manual background requests are available to the same users who can already converse with the assistant; no new permission tier is introduced.
-- "Closely matches one already cached earlier in the same conversation" (FR-015) is judged by the system, not the user, using the same setting description/detection used elsewhere in this feature.
 - Cached backgrounds are held in temporary storage rather than the assistant's permanent media storage; exact cache lifetime and eviction policy are implementation decisions left to planning, not fixed by this specification.
 - Non-blocking generation (FR-017) means the conversation is never held up waiting on a background; how that concurrency is implemented is left to planning.

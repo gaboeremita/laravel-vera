@@ -43,12 +43,13 @@ No `NEEDS CLARIFICATION` markers remain in the Technical Context — the spec's 
 
 ## 5. Producing two images from one description
 
-**Decision**: One call to `AvatarBackgroundPromptEnhancer` (mirroring `ImageGenPromptEnhancer`) turns the raw setting description into two enhanced prompts in a single LLM call — one framed for a ground/floor texture, one framed for a wide environment backdrop — using the same `PromptDirector` + archive-retrieval setup `ImageGenPromptEnhancer` already uses (FR-006, FR-007). Two separate calls are then made to the assistant's configured image-gen provider via the existing `ImageGenManager`, one per prompt.
+**Decision**: One call to `AvatarBackgroundPromptEnhancer` (mirroring `ImageGenPromptEnhancer`) turns the raw setting description into two enhanced prompts in a single LLM call — one framed for a ground/floor texture, one framed for a wide environment backdrop — using the same `PromptDirector` + archive-retrieval setup `ImageGenPromptEnhancer` already uses (FR-006, FR-007). The two resulting prompts are then sent to the assistant's configured image-gen provider **concurrently**, not one after the other: `App\Contracts\ImageGenProvider` gains a second method, `generateMany(array $prompts): array` (returning one `ImageGenResult` per prompt, same order), implemented in both `OpenRouterImageGenProvider` and `OpenAiCompatibleImageGenProvider` using `Http::pool()` instead of two sequential `Http::post()` calls. `AvatarBackgroundService` calls `generateMany([$floorPrompt, $surroundingsPrompt])` rather than calling `generate()` twice.
 
-**Rationale**: Reuses the exact prompt-shaping pipeline the spec's Assumptions call for, extended (not replaced) to produce a pair instead of a single prompt. Two separate generations are necessary because a floor texture and a wide backdrop are different image *compositions* — no single generated image plausibly serves both.
+**Rationale**: Reuses the exact prompt-shaping pipeline the spec's Assumptions call for, extended (not replaced) to produce a pair instead of a single prompt. Two separate generations are necessary because a floor texture and a wide backdrop are different image *compositions* — no single generated image plausibly serves both. Running them concurrently matters for SC-001 (60s/95% target): run sequentially, two calls against a provider with the existing 120s default timeout could easily land the total near or past 60s even on the successful path, not just in failure cases; run concurrently, total latency is bounded by the slower of the two calls instead of their sum.
 
 **Alternatives considered**:
 - One generated image, cropped into a "floor" and "background" region — rejected; the spec calls for two distinct images (FR-008), and a single composition can't cleanly serve a top-down floor texture and a forward-facing wide backdrop at once.
+- Sequential calls (simpler control flow) — rejected once weighed against SC-001; halving latency by running them concurrently is worth the modest added complexity of a pooled/concurrent HTTP call.
 
 ## 6. Placing the two images in the 3D scene
 
@@ -65,3 +66,20 @@ No `NEEDS CLARIFICATION` markers remain in the Technical Context — the spec's 
 **Rationale**: Implements FR-018 using the same visual language the app already established — `Portrait.jsx` already cross-fades its own image swaps with a `transition-opacity duration-300` Tailwind class. The 3D scene needs the equivalent effect done via Three.js material opacity (since these are WebGL meshes, not DOM `<img>` elements), but the target feel (smooth 300ms-scale fade, no abrupt pop) is the same as the existing convention.
 
 **Alternatives considered**: An instant swap — explicitly rejected by FR-018/SC-006.
+
+## 8. Trigger point for cache-miss auto-regeneration (FR-012a)
+
+**Decision**: `ConversationController::show()` — the endpoint that loads a conversation's messages, called every time a conversation is opened — dispatches `GenerateAvatarBackground` when: the assistant is `Avatar3D`, this is the first page of messages (no `before` query param, i.e. not a "load older messages" scroll request), no `avatar-background:{conversation_id}` cache entry exists, and no `avatar-background-progress:{conversation_id}` job is already in flight. The description passed to the job is a generic "infer the current setting from the conversation so far" instruction — `AvatarBackgroundPromptEnhancer` already includes recent message history in its LLM call (mirroring `ImageGenPromptEnhancer::recentHistory()`), so the actual inference comes from that history, not from the instruction string itself.
+
+**Rationale**: `show()` already resolves the conversation through the ownership-checked path (Constitution Principle IV) and is the one place in the app that reliably fires exactly when "the user returns to a conversation" (the language FR-012a and the spec's Edge Cases use). It keeps the `GET .../avatar-background` polling endpoint itself free of side effects — consistent with `AgentProgressController`, which is also purely read-only — so `contracts/avatar-background-api.md`'s statement that polling never triggers generation stays true.
+
+**Alternatives considered**:
+- Making the `GET .../avatar-background` polling endpoint trigger generation itself when it finds no cached background — rejected; a polled status endpoint performing a side effect on read is surprising (repeated polls could each observe "not cached yet" while the first-triggered job is still running, inviting duplicate-dispatch bugs) and breaks the read-only contract the endpoint was designed around.
+
+## 9. Default background assets (fallback when nothing is cached or generated)
+
+**Decision**: A single bundled pair of static images — a default floor texture and a default surroundings backdrop — shipped with the app (not AI-generated at runtime, not per-conversation) and used as the fallback whenever `useAvatarBackground()` has no cached background to show (brand-new conversation before its first generation completes, or any case where generation hasn't produced a result yet). These are imported directly by the frontend, the same way `resources/js/components/VrmAvatar.jsx` already imports a static fallback (`veraAvatar` from `resources/images/vera-avatar.png`) for its own `loadError` case — no backend/cache/API involvement needed, since the images never change.
+
+**Rationale**: "The default background" is referenced by FR-013 and the spec's Edge Cases but was never concretely defined (flagged in the 2026-08-28 `/speckit-analyze` pass, finding B1). Bundling two fixed images and wiring them in the same static-import pattern the frontend already uses for its avatar-load fallback is the simplest way to make "default" a real, defined thing rather than an implicit "render nothing."
+
+**Alternatives considered**: Generating the two default images once via a throwaway script and discarding the script — considered, then set aside in favor of the user supplying the two images directly, avoiding any one-off generation code entering the codebase at all.
