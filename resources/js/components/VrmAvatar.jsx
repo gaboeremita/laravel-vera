@@ -14,6 +14,14 @@ import { retargetMixamoAnimation } from '../utils/mixamoRetargeting.js';
 const EXPRESSION_HOLD_SECONDS = 3.5;
 const BACKGROUND_FADE_SECONDS = 0.4;
 const POSE_BLEND_SECONDS = 0.25;
+// Mixamo's single-frame "pose" exports (as opposed to multi-second motion
+// clips) clock in at ~0.033s (one frame, padded to 2 identical keyframes) —
+// under LoopOnce that fires 'finished' almost instantly, so without an
+// explicit hold the body reverts before it's even visible. Real animations
+// in practice run several seconds at minimum, so this threshold has a wide
+// margin. The hold reuses EXPRESSION_HOLD_SECONDS so a static pose's body
+// and (if it has one) facial expression revert together.
+const POSE_STATIC_CLIP_SECONDS = 0.5;
 
 // vrm.humanoid.humanBones returns the *raw* bones — a different node than
 // the *normalized* ones AnimationMixer clips actually target (built via
@@ -101,6 +109,9 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 	const restPoseRef = useRef(null);
 	const poseBlendRef = useRef({ active: false, mode: null, elapsed: 0 });
 	const poseBlendFromRef = useRef(null);
+	const poseClipDurationRef = useRef(0);
+	const poseHoldRemainingRef = useRef(0);
+	const pendingPoseTransitionRef = useRef(null);
 
 	// The default pose's animation loops continuously as the idle baseline
 	// whenever no triggered pose is playing — a real pose interrupts it and
@@ -127,20 +138,42 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 
 		const mixer = new AnimationMixer(vrm.scene);
 		mixer.addEventListener('finished', (event) => {
-			poseBlendFromRef.current = captureBoneQuaternions(vrm);
-			event.action.stop();
+			const startTransition = () => {
+				poseBlendFromRef.current = captureBoneQuaternions(vrm);
+				event.action.stop();
 
-			if (defaultActionRef.current && defaultPoseAnimationUrlRef.current) {
-				defaultActionRef.current.reset().play();
-				defaultLoopActiveRef.current = true;
-				// resumingDefault: this 'in' blend is handing off from a
-				// finished trigger back to the default loop, not blending
-				// into a fresh trigger — posePlayingRef must clear once it
-				// completes, or it'd stay stuck true forever and permanently
-				// block idle sway if the default animation is later removed.
-				poseBlendRef.current = { active: true, mode: 'in', elapsed: 0, resumingDefault: true };
+				if (defaultActionRef.current && defaultPoseAnimationUrlRef.current) {
+					defaultActionRef.current.reset().play();
+					defaultLoopActiveRef.current = true;
+					// resumingDefault: this 'in' blend is handing off from a
+					// finished trigger back to the default loop, not blending
+					// into a fresh trigger — posePlayingRef must clear once it
+					// completes, or it'd stay stuck true forever and permanently
+					// block idle sway if the default animation is later removed.
+					poseBlendRef.current = { active: true, mode: 'in', elapsed: 0, resumingDefault: true };
+				} else {
+					poseBlendRef.current = { active: true, mode: 'out', elapsed: 0 };
+				}
+			};
+
+			// A single-frame "pose" clip (e.g. a Mixamo pose export) fires
+			// 'finished' almost instantly under LoopOnce — hold it for a beat
+			// before reverting instead of transitioning away the moment it's
+			// barely visible. Deliberately leave the action running (not
+			// .stop()'d) for the hold duration — with clampWhenFinished, the
+			// mixer keeps re-asserting the clip's true final frame on every
+			// update() call on its own, which is more reliable than manually
+			// freezing a one-time captured snapshot (the entry blend may not
+			// have fully converged onto the mixer's live output yet at the
+			// instant 'finished' fires for such a short clip). A real
+			// multi-second animation already had its own natural duration, so
+			// it transitions away immediately once it's actually done, same
+			// as before.
+			if (poseClipDurationRef.current < POSE_STATIC_CLIP_SECONDS) {
+				poseHoldRemainingRef.current = EXPRESSION_HOLD_SECONDS;
+				pendingPoseTransitionRef.current = startTransition;
 			} else {
-				poseBlendRef.current = { active: true, mode: 'out', elapsed: 0 };
+				startTransition();
 			}
 		});
 		mixerRef.current = mixer;
@@ -315,6 +348,15 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 		if (loadedPoseTriggerRef.current === poseTriggerId) return;
 		loadedPoseTriggerRef.current = poseTriggerId;
 
+		// Set synchronously (not after the async load below resolves) so
+		// sway/expression-hold gating reacts to the trigger immediately
+		// instead of lagging by however long the file takes to fetch — and
+		// cancel any hold left over from a still-settling previous pose,
+		// since this new trigger supersedes it.
+		posePlayingRef.current = true;
+		poseHoldRemainingRef.current = 0;
+		pendingPoseTransitionRef.current = null;
+
 		let cancelled = false;
 
 		const loadAndPlay = async () => {
@@ -328,7 +370,10 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 				console.error('[VrmAvatar] pose animation load error:', error);
 			}
 
-			if (cancelled || !clip) return;
+			if (cancelled || !clip) {
+				if (!cancelled) posePlayingRef.current = false;
+				return;
+			}
 
 			const mixer = ensureMixer(vrm);
 
@@ -347,6 +392,7 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 			poseBlendFromRef.current = captureBoneQuaternions(vrm);
 			poseBlendRef.current = { active: true, mode: 'in', elapsed: 0, resumingDefault: false };
 
+			poseClipDurationRef.current = clip.duration;
 			const action = mixer.clipAction(clip);
 			action.setLoop(LoopOnce);
 			action.clampWhenFinished = true;
@@ -387,7 +433,13 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 		} else {
 			poseExpressionHoldRef.current += delta;
 		}
-		const poseExpressionActive = poseExpressionHoldRef.current < EXPRESSION_HOLD_SECONDS;
+		// When the triggered pose has a body animation, its facial expression
+		// rides along with the body's actual playback instead of a fixed
+		// timer — otherwise a long animation outlasts the timer and the face
+		// goes blank while the body keeps moving. A pose with blendshapes but
+		// no animation file has no body state to sync to, so it keeps the
+		// fixed-hold behavior.
+		const poseExpressionActive = poseAnimationUrl ? posePlayingRef.current : poseExpressionHoldRef.current < EXPRESSION_HOLD_SECONDS;
 
 		// Lerp expression blendshapes toward targets (~300ms to converge).
 		// Expression names come entirely from the assistant's own mapping —
@@ -449,6 +501,19 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 			headBone.rotation.z = Math.sin(elapsedRef.current * 0.4) * 0.015;
 		}
 
+		// Counts down the hold applied to a single-frame "pose" clip (set by
+		// the mixer's 'finished' handler) before actually starting the
+		// blend back to rest/default — see POSE_STATIC_CLIP_SECONDS.
+		if (poseHoldRemainingRef.current > 0) {
+			poseHoldRemainingRef.current -= delta;
+			if (poseHoldRemainingRef.current <= 0) {
+				poseHoldRemainingRef.current = 0;
+				const transition = pendingPoseTransitionRef.current;
+				pendingPoseTransitionRef.current = null;
+				transition?.();
+			}
+		}
+
 		mixerRef.current?.update(delta);
 
 		// Manual blend between the captured "from" bone pose and either the
@@ -493,6 +558,12 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 				blend.mode = null;
 			}
 		}
+		// No manual freeze needed during the hold window itself: the pose's
+		// action is deliberately left running (not .stop()'d — see the
+		// 'finished' handler), so mixerRef.current?.update(delta) above keeps
+		// re-asserting the clip's true clamped final frame on its own every
+		// frame for the whole hold, the same way it does while the clip is
+		// still actually playing.
 
 		vrm.update(delta);
 	});
