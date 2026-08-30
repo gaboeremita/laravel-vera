@@ -36,6 +36,46 @@ export function parseEmotionFromResponse(text, validEmotions = []) {
 }
 
 /**
+ * Parses a pose tag (e.g. "[spin] ...") from the start of text — same bare
+ * bracket format as an emotion tag. There's no separate "pose:" syntax:
+ * poses are the only expression/action signal a 3D avatar assistant emits
+ * (it has no emotion tags to disambiguate against), so a plain [name] is
+ * unambiguous. Unlike parseEmotionFromResponse, an unmatched/unrecognized
+ * tag leaves `pose` as null rather than falling back to a default name —
+ * a pose is a one-off trigger, not an ongoing state to default into.
+ *
+ * Pose names aren't restricted to a single letters-only word the way
+ * emotion names are (e.g. "deer_dance", "happy hands") — the bracket
+ * content is matched as anything up to the closing `]`, not [a-zA-Z]+.
+ */
+export function parsePoseFromResponse(text, validPoseNames = []) {
+    let remaining = text;
+    let pose = null;
+
+    const poseMatch = remaining.match(/^\[([^\]]+)\]/);
+    if (poseMatch) {
+        const matchedText = poseMatch[1].trim().toLowerCase();
+        const canonical = validPoseNames.find((p) => p.toLowerCase() === matchedText);
+
+        // Only strip the tag (and resolve `pose`) when it actually matches a
+        // configured pose — otherwise a reply that happens to start with an
+        // unrelated bracketed aside (e.g. "[Note] ...") would have that
+        // content silently eaten. Resolved to the pose's actual stored name
+        // (not the LLM's typed casing), since callers look it up with an
+        // exact match against the stored pose list.
+        if (canonical !== undefined) {
+            pose = canonical;
+            remaining = remaining.slice(poseMatch[0].length);
+        }
+    }
+
+    return {
+        pose,
+        text: remaining.trim(),
+    };
+}
+
+/**
  * Strips asterisk-wrapped stage directions / action narration from text
  * before it's sent to TTS. Defense-in-depth alongside the voice-mode prompt
  * instructions — models don't always follow formatting instructions.

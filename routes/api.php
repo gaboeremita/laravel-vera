@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AssistantEmotionController;
 use App\Http\Controllers\Api\AssistantImageController;
 use App\Http\Controllers\Api\AssistantMemoryPromptController;
+use App\Http\Controllers\Api\AssistantPoseAnimationController;
+use App\Http\Controllers\Api\AssistantPoseController;
 use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\AssistantVrmController;
 use App\Http\Controllers\Api\AvatarBackgroundController;
@@ -76,6 +78,20 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/', [AssistantEmotionController::class, 'store'])->name('store');
             Route::post('/{emotion}', [AssistantEmotionController::class, 'update'])->name('update');
             Route::delete('/{emotion}', [AssistantEmotionController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::prefix('/poses')->name('assistants.poses.')->group(function () {
+            // Registered before the {pose} wildcard routes below so the
+            // literal "default" segment isn't swallowed by them.
+            Route::post('/default', [AssistantPoseController::class, 'updateDefault'])->name('default.update');
+            Route::post('/default/animation', [AssistantPoseAnimationController::class, 'storeDefault'])->name('default.animation.store');
+            Route::delete('/default/animation', [AssistantPoseAnimationController::class, 'destroyDefault'])->name('default.animation.destroy');
+
+            Route::post('/', [AssistantPoseController::class, 'store'])->name('store');
+            Route::post('/{pose}', [AssistantPoseController::class, 'update'])->name('update');
+            Route::delete('/{pose}', [AssistantPoseController::class, 'destroy'])->name('destroy');
+            Route::post('/{pose}/animation', [AssistantPoseAnimationController::class, 'store'])->name('animation.store');
+            Route::delete('/{pose}/animation', [AssistantPoseAnimationController::class, 'destroy'])->name('animation.destroy');
         });
     });
 

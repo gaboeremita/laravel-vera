@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AssistantPortraitType;
 use App\Http\Controllers\Controller;
 use App\Models\Emotion;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,12 @@ class AssistantEmotionController extends Controller
         $assistant = $request->user()
             ->assistants()
             ->findOrFail($assistantId);
+
+        if ($assistant->portrait_type === AssistantPortraitType::Avatar3D) {
+            return response()->json([
+                'message' => '3D avatar assistants use poses, not emotions.',
+            ], 422);
+        }
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],

@@ -15,10 +15,11 @@ export default function AuthenticatedLayout() {
 		return sessionStorage.getItem('vera-booted') === 'true';
 	});
 	const [currentEmotion, setCurrentEmotion] = useState('default');
+	const [currentPose, setCurrentPose] = useState(null);
 	const [activeAssistantId, setActiveAssistantId] = useState(null);
 	const [activeConversationId, setActiveConversationId] = useState(null);
 
-	const { emotionNames, fetchEmotions, getImageUrl, getVideoUrl, getVrmBlendshapes, unlocked, portraitType, vrmUrl } = useEmotions();
+	const { emotionNames, poses, fetchEmotions, getImageUrl, getVideoUrl, getVrmBlendshapes, getPoseBlendshapes, getPoseAnimationUrl, unlocked, portraitType, vrmUrl } = useEmotions();
 	const { toasts, addToast, removeToast } = useToast();
 
 	useEffect(() => {
@@ -41,6 +42,8 @@ export default function AuthenticatedLayout() {
 	if (authState === 'checking') return null;
 	if (authState === 'unauthenticated') return <Navigate to="/login" replace />;
 
+	const poseNames = poses.map((p) => p.name);
+
 	return (
 		<div className="w-full h-screen bg-bg-0  flex relative overflow-hidden">
 			<Scanlines />
@@ -54,6 +57,12 @@ export default function AuthenticatedLayout() {
 					getImageUrl={getImageUrl}
 					getVideoUrl={getVideoUrl}
 					getVrmBlendshapes={getVrmBlendshapes}
+					poseBlendshapes={currentPose ? getPoseBlendshapes(currentPose.name) : []}
+					poseAnimationUrl={currentPose ? getPoseAnimationUrl(currentPose.name) : null}
+					poseTriggerId={currentPose?.triggerId ?? null}
+					poseName={currentPose?.name ?? null}
+					defaultPoseBlendshapes={getPoseBlendshapes('default')}
+					defaultPoseAnimationUrl={getPoseAnimationUrl('default')}
 					portraitType={portraitType}
 					vrmUrl={vrmUrl}
 					assistantId={activeAssistantId}
@@ -68,7 +77,11 @@ export default function AuthenticatedLayout() {
 					<Outlet context={{
 						currentEmotion,
 						setCurrentEmotion,
+						currentPose,
+						setCurrentPose,
 						emotionNames,
+						poseNames,
+						portraitType,
 						fetchEmotions,
 						unlocked,
 						addToast,

@@ -163,6 +163,36 @@ it('still requires emotions when creating an image assistant', function () {
     $response->assertStatus(422)->assertJsonValidationErrors(['emotions']);
 });
 
+it('rejects emotions when creating an avatar3d assistant — poses only', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->postJson(route('assistants.store'), [
+            'name' => 'Avatar Assistant',
+            'slug' => 'avatar-assistant-no-emotions',
+            'portrait_type' => 'avatar3d',
+            'emotions' => [['name' => 'happy']],
+        ]);
+
+    $response->assertStatus(422)->assertJsonValidationErrors(['emotions']);
+});
+
+it('rejects creating an emotion on an existing avatar3d assistant', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+    $assistant = Assistant::factory()->create(['portrait_type' => 'avatar3d']);
+    AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $assistant->id]);
+
+    $response = $this->actingAs($user)
+        ->postJson(route('assistants.emotions.store', ['assistant' => $assistant->id]), [
+            'name' => 'happy',
+        ]);
+
+    $response->assertStatus(422);
+    expect($assistant->emotions()->count())->toBe(0);
+});
+
 it('emotions index returns envelope with portrait_type and vrm_url', function () {
     [$user, $assistant] = setUpAssistantForVrm();
 

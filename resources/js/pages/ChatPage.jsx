@@ -3,7 +3,7 @@ import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Pencil, Mic, MicOff, Volume2, VolumeX, Brain } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
-import { parseEmotionFromResponse, stripForSpeech } from '../utils/parsers.js';
+import { parseEmotionFromResponse, parsePoseFromResponse, stripForSpeech } from '../utils/parsers.js';
 import { useVoiceMode } from '../hooks/useVoiceMode.js';
 import ChatMessage from '../components/ChatMessage.jsx';
 import Header from '../components/Header.jsx';
@@ -17,7 +17,10 @@ export default function ChatPage() {
 		assistantId,
 		assistantName,
 		setCurrentEmotion,
+		setCurrentPose,
 		emotionNames,
+		poseNames,
+		portraitType,
 		addToast,
 		fetchEmotions,
 		unlocked,
@@ -122,13 +125,22 @@ export default function ChatPage() {
 				const data = await res.json();
 				let lastEmotion = null;
 
+				// Poses are one-off triggers, not an ongoing state, so history
+				// isn't replayed into currentPose the way the last emotion is —
+				// reopening a conversation just starts the avatar idle.
 				const mapped = data.messages.map((msg) => {
-					if (msg.role === 'assistant') {
-						const { emotion, text } = parseEmotionFromResponse(msg.content, emotionNames);
-						lastEmotion = emotion;
+					if (msg.role !== 'assistant') {
+						return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+					}
+
+					if (portraitType === 'avatar3d') {
+						const { text } = parsePoseFromResponse(msg.content, poseNames);
 						return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
 					}
-					return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+
+					const { emotion, text } = parseEmotionFromResponse(msg.content, emotionNames);
+					lastEmotion = emotion;
+					return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
 				});
 
 				setMessages(mapped);
@@ -172,11 +184,17 @@ export default function ChatPage() {
 			const data = await res.json();
 
 			const mapped = data.messages.map((msg) => {
-				if (msg.role === 'assistant') {
-					const { text } = parseEmotionFromResponse(msg.content, emotionNames);
+				if (msg.role !== 'assistant') {
+					return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+				}
+
+				if (portraitType === 'avatar3d') {
+					const { text } = parsePoseFromResponse(msg.content, poseNames);
 					return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
 				}
-				return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+
+				const { text } = parseEmotionFromResponse(msg.content, emotionNames);
+				return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
 			});
 
 			setMessages((prev) => [...mapped, ...prev]);
@@ -296,13 +314,16 @@ export default function ChatPage() {
 				const data = await response.json();
 
 				if (data.image_url) {
-					const imageEmotion = data.emotion || (data.intimate ? 'seduced' : 'default');
-
 					if (data.intimate !== unlocked) {
 						fetchEmotions(assistantId);
 					}
 
-					setCurrentEmotion(imageEmotion);
+					if (portraitType === 'avatar3d') {
+						if (data.pose) setCurrentPose({ name: data.pose, triggerId: Date.now() });
+					} else {
+						setCurrentEmotion(data.emotion || (data.intimate ? 'seduced' : 'default'));
+					}
+
 					setHasError(false);
 					setMessages([
 						...updatedMessages,
@@ -315,7 +336,26 @@ export default function ChatPage() {
 				const rawReply = data.content || '[default]\n...signal lost. Try again.';
 				const thinking = data.thinking || null;
 
-				const { emotion, intimate, text: cleanText } = parseEmotionFromResponse(rawReply, emotionNames);
+				// Poses and emotions are mutually exclusive by portrait type
+				// (a 3D avatar has no emotion tags to disambiguate against),
+				// so only the applicable parser ever runs on a given reply.
+				// A background-change reply already has its tag stripped and
+				// its pose parsed server-side (data.pose is present, unlike a
+				// normal reply) — use that directly instead of re-parsing
+				// content that no longer has a tag to find.
+				let emotion = 'default';
+				let intimate = false;
+				let pose = data.pose !== undefined ? data.pose : null;
+				let cleanText = rawReply;
+
+				if (data.pose === undefined) {
+					if (portraitType === 'avatar3d') {
+						({ pose, text: cleanText } = parsePoseFromResponse(rawReply, poseNames));
+					} else {
+						({ emotion, intimate, text: cleanText } = parseEmotionFromResponse(rawReply, emotionNames));
+					}
+				}
+
 				const ttsInstructions = data.tts_instructions ?? null;
 
 				if (intimate !== unlocked) {
@@ -331,7 +371,11 @@ export default function ChatPage() {
 						image: call.result.image_url,
 					}));
 
-				setCurrentEmotion(emotion);
+				if (portraitType === 'avatar3d') {
+					if (pose) setCurrentPose({ name: pose, triggerId: Date.now() });
+				} else {
+					setCurrentEmotion(emotion);
+				}
 				setHasError(false);
 				setMessages([
 					...updatedMessages,

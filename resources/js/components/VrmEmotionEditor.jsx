@@ -1,13 +1,13 @@
 import { useId, useState } from 'react';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
 
-const EXPRESSION_SUGGESTIONS = ['happy', 'sad', 'angry', 'relaxed', 'surprised', 'neutral', 'blink'];
+export const EXPRESSION_SUGGESTIONS = ['happy', 'sad', 'angry', 'relaxed', 'surprised', 'neutral', 'blink'];
 
 function toPercentDisplay(blendshapes) {
 	return blendshapes.map((b) => (b.weight <= 1 ? { ...b, weight: Math.round(b.weight * 100) } : b));
 }
 
-function BlendshapeRows({ blendshapes, onChange, datalistId }) {
+export function BlendshapeRows({ blendshapes, onChange, datalistId }) {
 	const updateRow = (index, field, value) => {
 		if (field === 'weight') {
 			const parsed = Number(value);
@@ -216,9 +216,16 @@ export default function VrmEmotionEditor({ emotions, onAdd, onDelete, onUpdateBl
 
 			{deleteTarget && (
 				<ConfirmationModal
+					title="Delete emotion"
 					message={`Delete emotion "${deleteTarget.name}"?`}
-					onConfirm={handleConfirmDelete}
-					onCancel={() => setDeleteTarget(null)}
+					options={[
+						{ label: 'DELETE', value: 'confirm', destructive: true },
+						{ label: 'CANCEL', value: 'cancel', cancel: true },
+					]}
+					onSelect={(value) => {
+						if (value === 'confirm') handleConfirmDelete();
+						else setDeleteTarget(null);
+					}}
 				/>
 			)}
 		</div>

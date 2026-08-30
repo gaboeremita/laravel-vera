@@ -130,9 +130,16 @@ export default function AssistantsPage() {
 
 			{deleteTarget && (
 				<ConfirmationModal
+					title="Delete assistant"
 					message={`Delete "${deleteTarget.name}"? All conversations and data will be lost.`}
-					onConfirm={handleConfirmDelete}
-					onCancel={() => setDeleteTarget(null)}
+					options={[
+						{ label: 'DELETE', value: 'confirm', destructive: true },
+						{ label: 'CANCEL', value: 'cancel', cancel: true },
+					]}
+					onSelect={(value) => {
+						if (value === 'confirm') handleConfirmDelete();
+						else setDeleteTarget(null);
+					}}
 				/>
 			)}
 		</>

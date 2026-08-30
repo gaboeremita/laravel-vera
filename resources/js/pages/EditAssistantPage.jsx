@@ -5,7 +5,8 @@ import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
-import VrmEmotionEditor from '../components/VrmEmotionEditor.jsx';
+import PoseEditor from '../components/PoseEditor.jsx';
+import DefaultPoseEditor from '../components/DefaultPoseEditor.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
@@ -22,6 +23,7 @@ export default function EditAssistantPage() {
 	const [openingMessage, setOpeningMessage] = useState('');
 	const [emotions, setEmotions] = useState([]);
 	const [restrictedEmotions, setRestrictedEmotions] = useState([]);
+	const [poses, setPoses] = useState([]);
 	const [defaultPreview, setDefaultPreview] = useState(null);
 	const defaultImageRef = useRef(null);
 	const [archives, setArchives] = useState([]);
@@ -71,6 +73,7 @@ export default function EditAssistantPage() {
 				const loadedEmotions = data.emotions || [];
 				setEmotions(loadedEmotions);
 				setRestrictedEmotions(data.restricted_emotions || []);
+				setPoses(data.poses || []);
 				const defaultEmo = loadedEmotions.find((e) => e.name === 'default');
 				if (defaultEmo?.image_url) setDefaultPreview(defaultEmo.image_url);
 			} catch {
@@ -173,46 +176,6 @@ export default function EditAssistantPage() {
 		}
 	};
 
-	/* ── VRM emotion→blendshape handlers ── */
-
-	const handleAddVrmEmotion = async (name, blendshapes, restricted) => {
-		try {
-			const res = await api.post(route('assistants.emotions.store', { assistant: id }), {
-				name,
-				vrm_blendshapes: blendshapes,
-				restricted,
-			});
-			if (!res.ok) {
-				const error = await res.json().catch(() => ({}));
-				throw new Error(error.message || 'Failed to add emotion');
-			}
-			const data = await res.json();
-			if (restricted) {
-				setRestrictedEmotions((prev) => [...prev, data]);
-			} else {
-				setEmotions((prev) => [...prev, data]);
-			}
-			addToast('Emotion added', 'success');
-		} catch (e) {
-			addToast(e.message || 'Failed to add emotion', 'error');
-		}
-	};
-
-	const handleUpdateVrmBlendshapes = async (emotion, blendshapes) => {
-		try {
-			const res = await api.post(route('assistants.emotions.update', { assistant: id, emotion: emotion.id }), {
-				vrm_blendshapes: blendshapes,
-			});
-			if (!res.ok) throw new Error('Update failed');
-			const data = await res.json();
-			setEmotions((prev) => prev.map((e) => (e.id === emotion.id ? data : e)));
-			setRestrictedEmotions((prev) => prev.map((e) => (e.id === emotion.id ? data : e)));
-			addToast('Expression mapping saved', 'success');
-		} catch {
-			addToast('Failed to save expression mapping', 'error');
-		}
-	};
-
 	/* ── Emotion handlers (individual API calls) ── */
 
 	const handleReplaceDefaultImage = async (e) => {
@@ -301,6 +264,148 @@ export default function EditAssistantPage() {
 			addToast('Image updated', 'success');
 		} catch {
 			addToast('Failed to update emotion', 'error');
+		}
+	};
+
+	/* ── Pose handlers ── */
+
+	const handleAddPose = async (poseName, blendshapes, animationFile) => {
+		try {
+			const res = await api.post(route('assistants.poses.store', { assistant: id }), {
+				name: poseName,
+				vrm_blendshapes: blendshapes,
+			});
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Failed to add pose');
+			}
+			let data = await res.json();
+
+			if (animationFile) {
+				const formData = new FormData();
+				formData.append('animation', animationFile);
+				const animRes = await api.postForm(route('assistants.poses.animation.store', { assistant: id, pose: data.id }), formData);
+				if (!animRes.ok) {
+					const animError = await animRes.json().catch(() => ({}));
+					addToast(animError.message || 'Pose added, but the animation upload failed', 'error');
+				} else {
+					const animData = await animRes.json();
+					data = { ...data, animation_url: animData.animation_url };
+				}
+			}
+
+			setPoses((prev) => [...prev, data]);
+			addToast('Pose added', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to add pose', 'error');
+		}
+	};
+
+	const handleUpdatePoseBlendshapes = async (pose, name, blendshapes) => {
+		try {
+			const res = await api.post(route('assistants.poses.update', { assistant: id, pose: pose.id }), {
+				name,
+				vrm_blendshapes: blendshapes,
+			});
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Update failed');
+			}
+			const data = await res.json();
+			setPoses((prev) => prev.map((p) => (p.id === pose.id ? data : p)));
+			addToast('Pose saved', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to save pose', 'error');
+		}
+	};
+
+	const handleDeletePose = async (pose) => {
+		try {
+			const res = await api.delete(route('assistants.poses.destroy', { assistant: id, pose: pose.id }));
+			if (!res.ok) throw new Error('Delete failed');
+			setPoses((prev) => prev.filter((p) => p.id !== pose.id));
+			addToast('Pose deleted', 'success');
+		} catch {
+			addToast('Failed to delete pose', 'error');
+		}
+	};
+
+	const handleUploadPoseAnimation = async (pose, file) => {
+		const formData = new FormData();
+		formData.append('animation', file);
+
+		try {
+			const res = await api.postForm(route('assistants.poses.animation.store', { assistant: id, pose: pose.id }), formData);
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Upload failed');
+			}
+			const data = await res.json();
+			setPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, animation_url: data.animation_url } : p)));
+			addToast('Pose animation uploaded', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to upload pose animation', 'error');
+		}
+	};
+
+	const handleDeletePoseAnimation = async (pose) => {
+		try {
+			const res = await api.delete(route('assistants.poses.animation.destroy', { assistant: id, pose: pose.id }));
+			if (!res.ok) throw new Error('Delete failed');
+			setPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, animation_url: null } : p)));
+			addToast('Pose animation deleted', 'success');
+		} catch {
+			addToast('Failed to delete pose animation', 'error');
+		}
+	};
+
+	/* ── Default pose handlers ── */
+
+	const handleUpdateDefaultPoseBlendshapes = async (blendshapes) => {
+		try {
+			const res = await api.post(route('assistants.poses.default.update', { assistant: id }), {
+				vrm_blendshapes: blendshapes,
+			});
+			if (!res.ok) throw new Error('Update failed');
+			const data = await res.json();
+			setPoses((prev) => (prev.some((p) => p.name === 'default') ? prev.map((p) => (p.name === 'default' ? data : p)) : [...prev, data]));
+			addToast('Default pose saved', 'success');
+		} catch {
+			addToast('Failed to save default pose', 'error');
+		}
+	};
+
+	const handleUploadDefaultPoseAnimation = async (file) => {
+		const formData = new FormData();
+		formData.append('animation', file);
+
+		try {
+			const res = await api.postForm(route('assistants.poses.default.animation.store', { assistant: id }), formData);
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Upload failed');
+			}
+			const data = await res.json();
+			setPoses((prev) => {
+				const patch = { animation_url: data.animation_url, animation_original_name: data.animation_original_name };
+				return prev.some((p) => p.name === 'default')
+					? prev.map((p) => (p.name === 'default' ? { ...p, ...patch } : p))
+					: [...prev, { id: data.id, name: 'default', vrm_blendshapes: null, ...patch }];
+			});
+			addToast('Default pose animation uploaded', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to upload default pose animation', 'error');
+		}
+	};
+
+	const handleDeleteDefaultPoseAnimation = async () => {
+		try {
+			const res = await api.delete(route('assistants.poses.default.animation.destroy', { assistant: id }));
+			if (!res.ok) throw new Error('Delete failed');
+			setPoses((prev) => prev.map((p) => (p.name === 'default' ? { ...p, animation_url: null, animation_original_name: null } : p)));
+			addToast('Default pose animation deleted', 'success');
+		} catch {
+			addToast('Failed to delete default pose animation', 'error');
 		}
 	};
 
@@ -562,19 +667,20 @@ export default function EditAssistantPage() {
 					<>
 						<div className="border-t border-line-1" />
 
-						<VrmEmotionEditor
-							emotions={emotions}
-							onAdd={(name, blendshapes) => handleAddVrmEmotion(name, blendshapes, false)}
-							onDelete={handleDeleteEmotion}
-							onUpdateBlendshapes={handleUpdateVrmBlendshapes}
+						<DefaultPoseEditor
+							pose={poses.find((p) => p.name === 'default') || { name: 'default', vrm_blendshapes: null, animation_url: null, animation_original_name: null }}
+							onUpdateBlendshapes={handleUpdateDefaultPoseBlendshapes}
+							onUploadAnimation={handleUploadDefaultPoseAnimation}
+							onDeleteAnimation={handleDeleteDefaultPoseAnimation}
 						/>
 
-						<VrmEmotionEditor
-							label="Restricted Emotions"
-							emotions={restrictedEmotions}
-							onAdd={(name, blendshapes) => handleAddVrmEmotion(name, blendshapes, true)}
-							onDelete={handleDeleteEmotion}
-							onUpdateBlendshapes={handleUpdateVrmBlendshapes}
+						<PoseEditor
+							poses={poses.filter((p) => p.name !== 'default')}
+							onAdd={handleAddPose}
+							onDelete={handleDeletePose}
+							onUpdateBlendshapes={handleUpdatePoseBlendshapes}
+							onUploadAnimation={handleUploadPoseAnimation}
+							onDeleteAnimation={handleDeletePoseAnimation}
 						/>
 					</>
 				)}
@@ -654,9 +760,16 @@ export default function EditAssistantPage() {
 
 			{confirmingVrmDelete && (
 				<ConfirmationModal
+					title="Delete VRM avatar"
 					message="Delete the VRM avatar file?"
-					onConfirm={handleVrmDelete}
-					onCancel={() => setConfirmingVrmDelete(false)}
+					options={[
+						{ label: 'DELETE', value: 'confirm', destructive: true },
+						{ label: 'CANCEL', value: 'cancel', cancel: true },
+					]}
+					onSelect={(value) => {
+						if (value === 'confirm') handleVrmDelete();
+						else setConfirmingVrmDelete(false);
+					}}
 				/>
 			)}
 		</>
