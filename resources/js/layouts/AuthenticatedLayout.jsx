@@ -60,6 +60,7 @@ export default function AuthenticatedLayout() {
 					poseBlendshapes={currentPose ? getPoseBlendshapes(currentPose.name) : []}
 					poseAnimationUrl={currentPose ? getPoseAnimationUrl(currentPose.name) : null}
 					poseTriggerId={currentPose?.triggerId ?? null}
+					poseName={currentPose?.name ?? null}
 					defaultPoseBlendshapes={getPoseBlendshapes('default')}
 					defaultPoseAnimationUrl={getPoseAnimationUrl('default')}
 					portraitType={portraitType}

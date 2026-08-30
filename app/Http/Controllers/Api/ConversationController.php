@@ -203,6 +203,7 @@ class ConversationController extends Controller
                 'thinking' => $generated['enhanced_prompt'],
                 'emotion' => $generated['emotion'],
                 'intimate' => $generated['intimate'],
+                'pose' => $generated['pose'],
                 'tts_instructions' => null,
             ]);
         }
@@ -239,6 +240,7 @@ class ConversationController extends Controller
             return response()->json([
                 'conversation_id' => $conversation->id,
                 'content' => $parsed['content'],
+                'pose' => $parsed['pose'],
                 'thinking' => null,
                 'tts_instructions' => null,
                 'tool_calls' => null,
@@ -486,6 +488,7 @@ class ConversationController extends Controller
             'content' => $parsed['content'],
             'emotion' => $parsed['emotion'],
             'intimate' => $parsed['intimate'],
+            'pose' => $parsed['pose'],
             'image_url' => $image->url,
             'enhanced_prompt' => $enhancedPrompt,
         ];
