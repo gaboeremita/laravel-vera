@@ -39,8 +39,6 @@ class ConversationController extends Controller
 
     private const BACKGROUND_TAG_INSTRUCTION = 'When the scene/setting you and the user are in has just clearly changed to a new location, prefix your reply with a tag describing the new setting: [scene: <short description of the new location>]. Only include this tag when the setting has actually changed, never when it is unchanged. Never mention the tag itself.';
 
-    private const POSE_TAG_INSTRUCTION = 'As a 3D avatar, you express yourself through poses — they cover both mood/expression (like being happy or sad) and physical actions or gestures (like a spin, a wave, or a dance). When you are expressing a mood or performing an action, prefix your reply with that pose\'s exact name in brackets, e.g. [happy] or [spin] — reproduce the name exactly as listed below, including any spaces or underscores in it, rather than shortening or rewording it. Only use a pose name from the list below, and only when it is actually happening in that reply. Never mention the tag itself.';
-
     public function index(Request $request, int $assistant): JsonResponse
     {
 
@@ -445,10 +443,7 @@ class ConversationController extends Controller
             $poses = $assistantModel->promptPoseNames();
 
             if (! empty($poses)) {
-                $director->append('pose tags', [
-                    'instruction' => self::POSE_TAG_INSTRUCTION,
-                    'available poses' => $poses,
-                ]);
+                $director->append('pose tags', ['available poses' => $poses]);
             }
 
             return;

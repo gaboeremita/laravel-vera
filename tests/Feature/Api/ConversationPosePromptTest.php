@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
-test('the pose-tags instruction and pose names are added to the system prompt when poses are configured', function () {
+test('pose names are added to the system prompt under a pose tags section when poses are configured', function () {
     [$user, $assistant, $conversation] = setUpAgentAssistant('assistant', ['portrait_type' => 'avatar3d']);
     Pose::factory()->create(['assistant_id' => $assistant->id, 'name' => 'spin']);
     Pose::factory()->create(['assistant_id' => $assistant->id, 'name' => 'dance']);
@@ -23,7 +23,7 @@ test('the pose-tags instruction and pose names are added to the system prompt wh
     Http::assertSent(function ($request) {
         $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
 
-        return str_contains($systemContent, 'you express yourself through poses')
+        return str_contains($systemContent, 'Pose tags')
             && str_contains($systemContent, 'spin')
             && str_contains($systemContent, 'dance');
     });
@@ -44,7 +44,7 @@ test('the pose-tags section is omitted for an assistant with no poses configured
     Http::assertSent(function ($request) {
         $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
 
-        return ! str_contains($systemContent, 'you express yourself through poses');
+        return ! str_contains($systemContent, 'Pose tags');
     });
 });
 
@@ -64,6 +64,6 @@ test('the pose-tags section is omitted for an image-portrait assistant even with
     Http::assertSent(function ($request) {
         $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
 
-        return ! str_contains($systemContent, 'you express yourself through poses');
+        return ! str_contains($systemContent, 'Pose tags');
     });
 });
