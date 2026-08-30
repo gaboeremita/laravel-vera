@@ -6,7 +6,7 @@
 
 ## Summary
 
-Add a per-assistant "pose" system for 3D avatar mode: each pose has a name, and independently-configurable blendshake weights (facial expression) and/or an uploaded animation file — `.vrma` or `.fbx` — for body movement. The two configuration halves are combinable, not an exclusive choice. Poses are prompted to the LLM separately from emotions, as physical actions/gestures rather than emotional states, and triggered via a `[pose: name]` tag. All research decisions are documented in [research.md](research.md).
+Add a per-assistant "pose" system that is the sole expression/action system for 3D avatar mode, replacing the emotion system in that mode entirely (image-portrait assistants keep emotions, untouched). Each pose has a name, and independently-configurable blendshape weights (facial expression) and/or an uploaded animation file — `.vrma` or `.fbx` — for body movement. The two configuration halves are combinable, not an exclusive choice. A distinguished, name-locked "default" pose acts as the idle baseline: its animation (if configured) loops continuously until a triggered pose interrupts it, then resumes. Poses are prompted to the LLM via a "pose tags" section listing available names, authored the same way emotion-tag instructions are, and triggered via a bare `[name]` tag — the same tag grammar the emotion system already uses. An existing 3D avatar assistant's configured emotions are converted to equivalent poses automatically. All research decisions are documented in [research.md](research.md).
 
 ## Technical Context
 
@@ -69,42 +69,47 @@ app/
 │   └── Concerns/
 │       └── HasNormalizedBlendshapes.php      (new — extracted from Emotion)
 ├── Http/Controllers/Api/
-│   ├── AssistantPoseController.php           (new — store, update, destroy)
-│   ├── AssistantPoseAnimationController.php  (new — store, destroy)
-│   ├── EmotionController.php                 (modified — envelope adds `poses`)
-│   └── ConversationController.php            (modified — pose tags prompt section, POSE_TAG_INSTRUCTION)
+│   ├── AssistantController.php               (modified — store() creates poses instead of emotions for avatar3d)
+│   ├── AssistantEmotionController.php        (modified — guards against use on avatar3d assistants)
+│   ├── AssistantPoseController.php           (new — store, update, destroy, updateDefault)
+│   ├── AssistantPoseAnimationController.php  (new — store, destroy, storeDefault, destroyDefault)
+│   ├── EmotionController.php                 (modified — envelope adds `poses`, `portrait_type` gates which of `emotions`/`poses` is populated)
+│   └── ConversationController.php            (modified — pose tags prompt section appends configured pose names to assistant-authored prompt content, mirroring emotion tags)
 
 database/migrations/
 ├── ..._create_poses_table.php                        (new)
-└── ..._create_pose_animation_files_table.php          (new)
+├── ..._create_pose_animation_files_table.php          (new)
+└── ..._convert_avatar3d_emotions_to_poses.php         (new — one-time data migration: converts existing avatar3d assistants' emotions to equivalent poses, then removes the emotion records)
 
 database/factories/
 ├── PoseFactory.php                            (new)
 └── PoseAnimationFileFactory.php                (new)
 
 routes/
-└── api.php                                    (modified — 5 new pose routes)
+└── api.php                                    (modified — 8 pose routes: 5 per-pose CRUD/animation + 3 default-pose)
 
 tests/Feature/Api/
 ├── AssistantPoseTest.php                      (new)
-└── AssistantPoseAnimationTest.php              (new)
+├── AssistantPoseAnimationTest.php              (new)
+└── ConversationPosePromptTest.php              (new — pose tags section presence/absence)
 
 resources/js/
 ├── components/
-│   ├── Portrait.jsx                           (modified — poseBlendshapes/poseAnimationUrl props)
-│   ├── VrmAvatar.jsx                          (modified — VRMA playback, idle-sway pause/resume)
-│   └── PoseEditor.jsx                         (new)
+│   ├── Portrait.jsx                           (modified — poseBlendshapes/poseAnimationUrl/poseName props, mood label reflects current pose)
+│   ├── VrmAvatar.jsx                          (modified — VRMA/FBX playback, default-pose loop, static-pose hold, idle-sway pause/resume)
+│   ├── PoseEditor.jsx                         (new — collapsible per-pose rows)
+│   └── DefaultPoseEditor.jsx                  (new — dedicated, undeletable, name-locked default-pose section)
 ├── hooks/
 │   └── useEmotions.js                         (modified — poses, getPoseBlendshapes, getPoseAnimationUrl)
 ├── utils/
 │   ├── parsers.js                             (modified — parsePoseFromResponse)
 │   └── mixamoRetargeting.js                   (new — Mixamo→VRM bone-name mapping for .fbx playback)
 ├── layouts/
-│   └── AuthenticatedLayout.jsx                (modified — currentPose state)
+│   └── AuthenticatedLayout.jsx                (modified — currentPose state, poseName prop)
 └── pages/
-    ├── ChatPage.jsx                           (modified — parse & set currentPose)
-    ├── EditAssistantPage.jsx                  (modified — renders PoseEditor)
-    └── CreateAssistantPage.jsx                (modified — renders PoseEditor)
+    ├── ChatPage.jsx                           (modified — parse & set currentPose; setCurrentEmotion never called for avatar3d)
+    ├── EditAssistantPage.jsx                  (modified — renders DefaultPoseEditor + PoseEditor in place of VrmEmotionEditor for avatar3d)
+    └── CreateAssistantPage.jsx                (modified — same, staged pose creation)
 ```
 
 **Structure Decision**: Follows the exact directory layout and file-per-concern conventions established by `004-vrm-3d-avatar` and `005-avatar-backgrounds` — no new top-level directories.

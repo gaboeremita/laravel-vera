@@ -10,11 +10,13 @@
 |---|---|---|---|
 | `id` | bigint PK | no | |
 | `assistant_id` | bigint FK → `assistants.id` | no | cascade delete |
-| `name` | string | no | the tag identifier the LLM uses (`[pose: name]`) |
+| `name` | string | no | the tag identifier the LLM uses (bare `[name]`, same grammar as an emotion tag) |
 | `vrm_blendshapes` | json | yes | `array<{expression: string, weight: float}>`, 0.0–1.0 scale, same shape as `emotions.vrm_blendshapes` |
 | `created_at` / `updated_at` | timestamp | | |
 
 Unique index: `(assistant_id, name)` — a pose name is unique per assistant (mirrors the existing per-assistant emotion name uniqueness check in `AssistantEmotionController::store`).
+
+**The `"default"` pose**: every 3D avatar assistant has exactly one pose named `"default"`, created implicitly rather than through the normal create flow. It is a row in this same table with no schema distinction from any other pose — "default-ness" is entirely name-based, enforced at the controller layer: `AssistantPoseController::store`/`update`/`destroy` reject any request that would create, rename to, or delete a pose named `"default"`, and `updateDefault` is the only route that may modify it. Its `vrm_blendshapes` are the facial baseline whenever no triggered pose's hold window is active; its associated `PoseAnimationFile`, if present, loops continuously as the idle animation instead of playing once.
 
 Migration: `create_poses_table`
 
@@ -74,8 +76,12 @@ Extracted from `Emotion::normalizeBlendshapes()` (`app/Models/Emotion.php:50-60`
 ### `Assistant` model
 
 - New relationship: `poses(): HasMany` → `Pose`
-- New method: `promptPoseNames(): array<string>` — the assistant's own `Pose` names, for LLM prompt injection (no regular/intimate split — poses have no restricted concept)
+- New method: `promptPoseNames(): array<string>` — the assistant's own non-default `Pose` names, for LLM prompt injection (no regular/intimate split — poses have no restricted concept)
+
+## Data Migration: Convert Existing avatar3d Emotions to Poses
+
+A one-time migration (`convert_avatar3d_emotions_to_poses`) runs against existing data, not schema: for every assistant with `portrait_type = 'avatar3d'` that has `Emotion` records, it creates an equivalent `Pose` per `Emotion` (same `name`, same `vrm_blendshapes`), then deletes the original `Emotion` records (and their associated image/video files, if any) for that assistant. This is what makes "poses replace emotions for 3D avatar mode" (see [research.md Decision 10](research.md#decision-10-poses-replace-emotions-for-3d-avatar-mode)) safe to ship without silently discarding any assistant's existing expressive configuration. Image-portrait assistants' `Emotion` records are untouched.
 
 ## No Existing Table Changes
 
-`emotions` and `vrm_files` are unchanged. `poses` and `pose_animation_files` are additive.
+`emotions` and `vrm_files` are structurally unchanged — no new columns, no dropped columns. `poses` and `pose_animation_files` are additive. `emotions` *rows* belonging to avatar3d assistants are removed by the data migration above, but the table itself, and its behavior for image-portrait assistants, is unaffected.

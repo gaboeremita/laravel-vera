@@ -52,13 +52,13 @@ This guide covers the runnable scenarios that prove the feature works end-to-end
 
 ---
 
-## Scenario 4: LLM Prompt Includes Poses
+## Scenario 4: LLM Prompt Includes Poses, Never Emotions
 
 1. With poses configured on the assistant (from Scenarios 1–3), open the chat view and send any message.
-2. Inspect the assistant's response for character/behavior consistent with awareness of "spin," "wave," and "happy-hands" as physical actions (not emotions) it can perform — or inspect server logs / a debug endpoint if available for the constructed system prompt.
-3. **Expected**: The prompt sent to the LLM includes a `pose tags` section separate from the `emotion tags` section, listing all three pose names.
+2. Inspect the assistant's response for character/behavior consistent with awareness of "spin," "wave," and "happy-hands" it can perform — or inspect server logs / a debug endpoint if available for the constructed system prompt.
+3. **Expected**: The prompt sent to the LLM includes a `pose tags` section listing all three pose names, and no `emotion tags` section at all for this assistant.
 
-**Verifies**: FR-008, FR-009, US3 Scenarios 1 and 3
+**Verifies**: FR-008, FR-009, FR-016, US3 Scenarios 1 and 3
 
 ---
 
@@ -75,27 +75,42 @@ This guide covers the runnable scenarios that prove the feature works end-to-end
 
 ---
 
-## Scenario 6: Combined Pose + Emotion
+## Scenario 6: Pose Combines Body Animation and Facial Expression
 
-1. Ask the character to do something that would plausibly trigger both an emotion and the "wave" pose (e.g., "wave happily at me").
-2. **Expected**: The avatar's face shows the emotional expression while simultaneously playing the wave animation and/or applying the pose's own blendshape weights — neither signal is dropped or overridden by the other.
+1. Ask the character to do something that would trigger the "wave" pose (configured in Scenario 3 with both a blendshape weight and an animation file).
+2. **Expected**: The avatar plays the wave animation and applies the pose's own blendshape weights simultaneously — neither signal is dropped or overridden by the other.
 
-**Verifies**: FR-012, FR-016, US2 Scenario 3, SC-006, SC-007
+**Verifies**: FR-012, US2 Scenario 3, SC-006
 
 **Note**: Visual verification only.
 
 ---
 
-## Scenario 7: Image Mode / No Poses Is Unchanged
+## Scenario 7: Image Mode Is Unaffected; Existing avatar3d Emotions Convert to Poses
 
 1. Confirm that an assistant with no poses configured shows no pose-related prompt guidance (repeat Scenario 4's inspection with a pose-free assistant).
-2. Confirm that an assistant in image portrait mode shows no pose configuration controls in its settings, and behaves exactly as before this feature.
+2. Confirm that an assistant in image portrait mode shows no pose configuration controls in its settings, still has its emotion editor, and behaves exactly as before this feature — sending a chat message still yields emotion-tag-driven behavior, never pose tags.
+3. For an assistant that had configured emotions on `portrait_type = 'avatar3d'` before this feature shipped, confirm each of those emotions now appears as an equivalent pose (same name, same blendshape weights) and the assistant's emotion editor is gone.
 
-**Verifies**: FR-002, FR-009, FR-013, SC-003
+**Verifies**: FR-002, FR-009, FR-013, FR-020, SC-003, SC-007
 
 ---
 
-## Scenario 8: File Size and Format Rejection
+## Scenario 8: Default Pose as Idle Baseline
+
+1. On the 3D avatar assistant's edit page, open the always-present "default" pose section (separate from the regular pose list, cannot be renamed or deleted).
+2. Set a blendshape weight (e.g., `relaxed` at 30%) and upload an idle-loop animation file. Save.
+3. **Expected**: With no pose currently triggered, the avatar's face reflects the configured weight and its body continuously loops the uploaded animation.
+4. Trigger a different pose (e.g., "spin" from Scenario 2).
+5. **Expected**: The spin animation plays, interrupting the default loop; once it finishes, the default loop resumes smoothly (no visible snap on either transition).
+6. Delete the default pose's animation file (leaving the blendshape weight in place).
+7. **Expected**: The avatar's body returns to the pre-existing hardcoded idle stance, while the face still reflects the configured blendshape weight.
+
+**Verifies**: FR-018, FR-019, US4 Scenarios 1–5, SC-008
+
+---
+
+## Scenario 9: File Size and Format Rejection
 
 1. In assistant settings, attempt to upload an animation file (`.vrma` or `.fbx`) larger than 10 MB to a pose.
 2. **Expected**: The upload is rejected with a clear error message.

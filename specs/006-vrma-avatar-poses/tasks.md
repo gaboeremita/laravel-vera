@@ -76,15 +76,15 @@ description: "Task list for VRMA avatar pose animations"
 
 ## Phase 4: User Story 2 - LLM-Triggered Pose Playback in Chat (Priority: P2)
 
-**Goal**: When a chat response signals a configured pose, the 3D avatar plays the uploaded animation and/or applies the pose's blendshape expression, concurrently with any active emotion.
+**Goal**: When a chat response signals a configured pose, the 3D avatar plays the uploaded animation and/or applies the pose's blendshape expression.
 
-**Independent Test**: Configure a pose (Story 1), send a chat message containing a `[pose: name]` tag, and observe the avatar perform the associated animation and/or expression.
+**Independent Test**: Configure a pose (Story 1), send a chat message containing a `[name]` tag, and observe the avatar perform the associated animation and/or expression.
 
 **Note**: No automated tests — 3D rendering/playback is verified manually per `quickstart.md` Scenarios 5–6, consistent with `004-vrm-3d-avatar`'s own scope for VRM rendering behavior.
 
 ### Implementation for User Story 2
 
-- [X] T018 [P] [US2] Add `parsePoseFromResponse(text, validPoseNames)` to `resources/js/utils/parsers.js`, mirroring `parseEmotionFromResponse` — strips a leading `[pose: name]` tag after any `[emotion]`/`[intimate]` tags (research.md Decision 5)
+- [X] T018 [P] [US2] Add `parsePoseFromResponse(text, validPoseNames)` to `resources/js/utils/parsers.js`, mirroring `parseEmotionFromResponse` — strips a leading bare `[name]` tag (research.md Decision 5)
 - [X] T019 [P] [US2] Create `mixamoRetargeting.js` in `resources/js/utils/mixamoRetargeting.js` — Mixamo skeleton → VRM humanoid bone-name mapping, ported from `@pixiv/three-vrm`'s official Mixamo-animation example (research.md Decision 9) (depends on T001)
 - [X] T020 [US2] Update `VrmAvatar.jsx` (`resources/js/components/VrmAvatar.jsx`): accept `poseBlendshapes`/`poseAnimationUrl` props; branch by file extension — `.vrma` via `VRMAnimationLoaderPlugin`, `.fbx` via `THREE.FBXLoader` + `mixamoRetargeting.js`; play once via `AnimationMixer` inside the existing `useFrame` loop; pause/resume idle head-sway around playback; merge `poseBlendshapes` into the existing blendshape lerp target map (contracts/frontend-components.md, research.md Decision 6) (depends on T001, T019)
 - [X] T021 [US2] Update `Portrait.jsx` (`resources/js/components/Portrait.jsx`): pass `poseBlendshapes`/`poseAnimationUrl` props through to `VrmAvatar` (depends on T020)
@@ -115,14 +115,39 @@ description: "Task list for VRMA avatar pose animations"
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 6: User Story 4 - Default Pose as the Idle Baseline (Priority: P2)
+
+**Goal**: Poses become the sole expression/action system for 3D avatar assistants (emotions removed from that mode, existing emotions converted to poses), and a name-locked, undeletable "default" pose acts as the idle baseline — its animation loops continuously until interrupted by a triggered pose, then resumes.
+
+**Independent Test**: Configure the default pose's weights and/or animation, confirm the avatar reflects them while idle, and confirm a triggered pose correctly interrupts and hands back to it.
+
+- [X] T030 [P] Data migration `convert_avatar3d_emotions_to_poses` in `database/migrations/` — converts every avatar3d assistant's existing `Emotion` records into equivalent `Pose` records (name + blendshapes), then deletes the original emotion (and image/video) records (data-model.md)
+- [X] T031 [P] Guard `AssistantEmotionController` (`store`/`update`/`destroy`) against use on avatar3d assistants in `app/Http/Controllers/Api/AssistantEmotionController.php`
+- [X] T032 Update `EmotionController::index` in `app/Http/Controllers/Api/EmotionController.php`: only populate `emotions` for image-portrait assistants, only populate `poses` for avatar3d assistants (depends on T008)
+- [X] T033 [P] Update `AssistantController::store` in `app/Http/Controllers/Api/AssistantController.php`: create poses instead of emotions when the new assistant is avatar3d
+- [X] T034 [US4] Extend `AssistantPoseController` (`app/Http/Controllers/Api/AssistantPoseController.php`) with `updateDefault`; reject any create/rename/delete targeting the name `"default"` through the regular routes (depends on T011)
+- [X] T035 [US4] Extend `AssistantPoseAnimationController` (`app/Http/Controllers/Api/AssistantPoseAnimationController.php`) with `storeDefault`/`destroyDefault` (depends on T012)
+- [X] T036 [US4] Register `/poses/default`, `/poses/default/animation` routes in `routes/api.php`, before the `{pose}` wildcard group (contracts/api.md) (depends on T034, T035)
+- [X] T037 [P] [US4] Create `DefaultPoseEditor.jsx` in `resources/js/components/DefaultPoseEditor.jsx` — name-locked, undeletable, reuses `BlendshapeRows`/`AnimationFileControl` (depends on T015)
+- [X] T038 [US4] Update `EditAssistantPage.jsx`/`CreateAssistantPage.jsx`: render `<DefaultPoseEditor>` + `<PoseEditor>` in place of `VrmEmotionEditor` for avatar3d (depends on T037, T016, T017)
+- [X] T039 [US4] Update `VrmAvatar.jsx`: default-pose animation loops continuously as the idle baseline, is interrupted by a triggered pose, and resumes with a smooth blend afterward, replacing the previous fixed idle stance when configured (depends on T020)
+- [X] T040 [US4] Update `VrmAvatar.jsx`: a triggered pose's facial expression holds for as long as its body animation is actually playing, not a fixed timer independent of it — a long animation no longer goes blank before the body finishes (depends on T020)
+- [X] T041 [US4] Update `Portrait.jsx`/`AuthenticatedLayout.jsx`: `mood:` label reflects the current pose name (new `poseName` prop) instead of the no-longer-updated `emotion` state for avatar3d (depends on T021, T022)
+- [X] T042 [US4] Update `ChatPage.jsx`: never call `setCurrentEmotion` for avatar3d, in the normal reply path, the `/create-image` reaction, and the `/change-background` reaction; wire the pose parsed server-side for the latter two reactions through to `setCurrentPose` (`ConversationController::generateImageMessage` and the background-change response both now return `pose`) (depends on T023)
+- [X] T043 [US4] Rework `appendExpressionTags` in `app/Http/Controllers/Api/ConversationController.php`: remove the hardcoded `POSE_TAG_INSTRUCTION` constant; append only `available poses` to the `pose tags` section, matching how `emotion tags`' instructional wording is entirely assistant-authored rather than backend-injected (research.md Decision 4) (depends on T025)
+
+**Checkpoint**: All four user stories are independently functional. Known gap tracked as a follow-up, not blocking: a single-frame pose export's hold doesn't yet render its true stance correctly in all cases (browser-only, not caught by any automated test) — see the repo issue tracker.
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
 
 **Purpose**: Quality gates that span all stories.
 
-- [X] T026 [P] Run `vendor/bin/pint --dirty --format agent` and fix any violations across all new/modified PHP files
-- [X] T027 [P] Run `npm run lint` and fix any violations across all new/modified JS files
-- [X] T028 Run `php artisan test --compact --filter=AssistantPose` and `php artisan test --compact --filter=ConversationPosePrompt`; confirm all pass
-- [ ] T029 Manually validate [quickstart.md](quickstart.md) Scenarios 1–8 in the browser (3D rendering/playback verification cannot be automated)
+- [X] T044 [P] Run `vendor/bin/pint --format agent` and fix any violations across all new/modified PHP files
+- [X] T045 [P] Run `npm run lint` and fix any violations across all new/modified JS files
+- [X] T046 Run `php artisan test --compact`; confirm all pass
+- [ ] T047 Manually validate [quickstart.md](quickstart.md) Scenarios 1–9 in the browser (3D rendering/playback verification cannot be automated)
 
 ---
 
