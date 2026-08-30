@@ -299,6 +299,29 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 
 		return () => {
 			cancelled = true;
+
+			// vrmUrl can change without this component remounting (e.g.
+			// switching between two avatar3d assistants without a full page
+			// reload) — every ref below either targets the now-disposed
+			// scene graph or reflects state from the old avatar, and must be
+			// reset so the next VRM starts clean instead of silently ending
+			// up with no pose animation and no idle motion for the rest of
+			// the session.
+			mixerRef.current?.stopAllAction();
+			mixerRef.current = null;
+			poseActionRef.current = null;
+			posePlayingRef.current = false;
+			loadedPoseTriggerRef.current = null;
+			restPoseRef.current = null;
+			poseBlendFromRef.current = null;
+			poseBlendRef.current = { active: false, mode: null, elapsed: 0 };
+			poseClipDurationRef.current = 0;
+			poseHoldRemainingRef.current = 0;
+			pendingPoseTransitionRef.current = null;
+			defaultActionRef.current = null;
+			defaultLoopActiveRef.current = false;
+			loadedDefaultUrlRef.current = null;
+
 			if (vrmRef.current) {
 				scene.remove(vrmRef.current.scene);
 				VRMUtils.deepDispose(vrmRef.current.scene);

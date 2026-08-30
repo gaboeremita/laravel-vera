@@ -102,30 +102,24 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
 
 	return (
 		<div className="border border-line-1 bg-bg-1">
-			<button
-				onClick={() => setExpanded((prev) => !prev)}
-				className="w-full flex items-center gap-2 p-3 cursor-pointer text-left"
-			>
-				<span className={`text-fg-3 text-[0.6rem] transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`}>▸</span>
-				<span className="flex-1 min-w-0 truncate text-accent text-[0.7rem] tracking-[0.05em]">{pose.name}</span>
-				<span
-					role="button"
-					tabIndex={0}
-					onClick={(e) => {
-						e.stopPropagation();
-						onDelete();
-					}}
-					onKeyDown={(e) => {
-						if (e.key === 'Enter' || e.key === ' ') {
-							e.stopPropagation();
-							onDelete();
-						}
-					}}
+			<div className="w-full flex items-center gap-2 p-3">
+				<button
+					type="button"
+					onClick={() => setExpanded((prev) => !prev)}
+					aria-expanded={expanded}
+					className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer text-left"
+				>
+					<span className={`text-fg-3 text-[0.6rem] transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`}>▸</span>
+					<span className="flex-1 min-w-0 truncate text-accent text-[0.7rem] tracking-[0.05em]">{pose.name}</span>
+				</button>
+				<button
+					type="button"
+					onClick={onDelete}
 					className="text-danger text-[0.65rem] cursor-pointer hover:text-danger transition-colors shrink-0"
 				>
 					✕ DELETE
-				</span>
-			</button>
+				</button>
+			</div>
 
 			{expanded && (
 				<div className="p-3 pt-0 space-y-2">

@@ -24,18 +24,20 @@ return new class extends Migration
             return;
         }
 
-        foreach ($emotions as $emotion) {
-            DB::table('poses')->updateOrInsert(
-                ['assistant_id' => $emotion->assistant_id, 'name' => $emotion->name],
-                ['vrm_blendshapes' => $emotion->vrm_blendshapes, 'created_at' => now(), 'updated_at' => now()]
-            );
-        }
+        DB::transaction(function () use ($emotions) {
+            foreach ($emotions as $emotion) {
+                DB::table('poses')->updateOrInsert(
+                    ['assistant_id' => $emotion->assistant_id, 'name' => $emotion->name],
+                    ['vrm_blendshapes' => $emotion->vrm_blendshapes, 'created_at' => now(), 'updated_at' => now()]
+                );
+            }
 
-        $emotionIds = $emotions->pluck('id');
+            $emotionIds = $emotions->pluck('id');
 
-        DB::table('images')->where('imageable_type', 'App\\Models\\Emotion')->whereIn('imageable_id', $emotionIds)->delete();
-        DB::table('videos')->where('videoable_type', 'App\\Models\\Emotion')->whereIn('videoable_id', $emotionIds)->delete();
-        DB::table('emotions')->whereIn('id', $emotionIds)->delete();
+            DB::table('images')->where('imageable_type', 'App\\Models\\Emotion')->whereIn('imageable_id', $emotionIds)->delete();
+            DB::table('videos')->where('videoable_type', 'App\\Models\\Emotion')->whereIn('videoable_id', $emotionIds)->delete();
+            DB::table('emotions')->whereIn('id', $emotionIds)->delete();
+        });
     }
 
     /**

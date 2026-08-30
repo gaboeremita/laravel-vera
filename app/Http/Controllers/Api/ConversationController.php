@@ -424,11 +424,6 @@ class ConversationController extends Controller
     }
 
     /**
-     * Appends the assistant's expressive-signal prompt section: pose tags for
-     * 3D avatar assistants (poses are their only expression/action system),
-     * emotion tags for image-mode assistants.
-     */
-    /**
      * Appends the assistant's expressive-signal prompt section — pose tags
      * for 3D avatar assistants (poses are their only expression/action
      * system, so emotion tags never apply), emotion tags for image-mode
@@ -495,9 +490,6 @@ class ConversationController extends Controller
     }
 
     /**
-     * @return array{content: string, emotion: ?string, intimate: bool}
-     */
-    /**
      * Strips the assistant's leading expression tag from content — a bare
      * [name] tag means a pose for 3D avatar assistants, or an emotion
      * (optionally followed by [intimate]) for image-mode assistants. Only
@@ -516,10 +508,22 @@ class ConversationController extends Controller
 
             // Unlike emotion names, pose names aren't restricted to a single
             // letters-only word (e.g. "deer_dance", "happy hands") — match
-            // anything up to the closing ], not [a-zA-Z]+.
+            // anything up to the closing ], not [a-zA-Z]+. Only strip it when
+            // it actually matches one of the assistant's configured poses —
+            // otherwise a reply that happens to start with an unrelated
+            // bracketed aside (e.g. "[Note] ...") would have that content
+            // silently eaten. Matched case-insensitively but resolved to the
+            // pose's actual stored name, since the frontend looks it up with
+            // an exact match.
             if (preg_match('/^\[([^\]]+)\]/', $content, $match)) {
-                $pose = trim($match[1]);
-                $content = trim(substr($content, strlen($match[0])));
+                $matchedText = trim($match[1]);
+                $canonical = collect($assistantModel->promptPoseNames())
+                    ->first(fn (string $name) => strcasecmp($name, $matchedText) === 0);
+
+                if ($canonical !== null) {
+                    $pose = $canonical;
+                    $content = trim(substr($content, strlen($match[0])));
+                }
             }
 
             return ['content' => $content, 'emotion' => null, 'intimate' => false, 'pose' => $pose];

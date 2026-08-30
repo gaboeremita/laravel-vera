@@ -50,7 +50,9 @@ export default function DefaultPoseEditor({ pose, onUpdateBlendshapes, onUploadA
 
 			<div className="border border-line-1 bg-bg-1">
 				<button
+					type="button"
 					onClick={() => setExpanded((prev) => !prev)}
+					aria-expanded={expanded}
 					className="w-full flex items-center gap-2 p-3 cursor-pointer text-left"
 				>
 					<span className={`text-fg-3 text-[0.6rem] transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`}>▸</span>

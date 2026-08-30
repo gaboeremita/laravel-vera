@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
+/**
+ * @return array{User, Assistant, Pose}
+ */
 function setUpPoseForAnimation(): array
 {
     Storage::fake('public');

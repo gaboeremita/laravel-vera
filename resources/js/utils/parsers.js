@@ -54,10 +54,18 @@ export function parsePoseFromResponse(text, validPoseNames = []) {
 
     const poseMatch = remaining.match(/^\[([^\]]+)\]/);
     if (poseMatch) {
-        remaining = remaining.slice(poseMatch[0].length);
-        const matchedPose = poseMatch[1].trim().toLowerCase();
-        if (validPoseNames.some((p) => p.toLowerCase() === matchedPose)) {
-            pose = matchedPose;
+        const matchedText = poseMatch[1].trim().toLowerCase();
+        const canonical = validPoseNames.find((p) => p.toLowerCase() === matchedText);
+
+        // Only strip the tag (and resolve `pose`) when it actually matches a
+        // configured pose — otherwise a reply that happens to start with an
+        // unrelated bracketed aside (e.g. "[Note] ...") would have that
+        // content silently eaten. Resolved to the pose's actual stored name
+        // (not the LLM's typed casing), since callers look it up with an
+        // exact match against the stored pose list.
+        if (canonical !== undefined) {
+            pose = canonical;
+            remaining = remaining.slice(poseMatch[0].length);
         }
     }
 

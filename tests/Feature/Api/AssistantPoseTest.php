@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
+/**
+ * @return array{User, Assistant}
+ */
 function setUpAssistantForPoses(): array
 {
     $user = User::factory()->create();
