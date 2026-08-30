@@ -16,7 +16,7 @@ function setUpPoseForAnimation(): array
     Storage::fake('public');
 
     $user = User::factory()->create();
-    $assistant = Assistant::factory()->create();
+    $assistant = Assistant::factory()->create(['portrait_type' => 'avatar3d']);
     AssistantUser::factory()->create([
         'user_id' => $user->id,
         'assistant_id' => $assistant->id,

@@ -181,10 +181,9 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - NEVER edit existing migration files. Always create a new migration to modify the database schema.
 
-## Linting
+## Linting and Test Verification Cadence
 
-- PHP code must be Pint-compliant: run `vendor/bin/pint --test` before considering PHP changes done, and `vendor/bin/pint` to fix violations.
-- Frontend code must be ESLint-compliant: run `npm run lint` before considering JS/TS changes done.
+- PHP code must be Pint-compliant and frontend code must be ESLint-compliant, and any Pest-covered behavior touched must have passing tests — verified exactly once, right before pushing or opening a PR. NON-NEGOTIABLE: "the task" is the entire implementation effort, start to finish — every file touched, every fix, every round of the user testing and reporting something still broken, all of it is the same single task. None of that is itself a reason to run any code-checking command. This is not limited to Pint/ESLint/Pest by name — it covers every form of verification, including `php -l`, `node --check`, type checkers, or any other syntax/style/test/correctness check, in any invocation. Do not rationalize a tool as "just a sanity check" or "fundamentally different from what was asked" to justify running it anyway — that reasoning is exactly what's forbidden. Do not run anything in this category until the user says the implementation is done and it's time to push/PR. At that point, run the real gates once — `vendor/bin/pint`, `npm run lint`, `php artisan test` — and fix whatever surfaces in that single pass.
 
 ## Before Taking Action
 

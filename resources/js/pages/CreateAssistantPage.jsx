@@ -5,8 +5,8 @@ import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
-import VrmEmotionEditor from '../components/VrmEmotionEditor.jsx';
 import PoseEditor from '../components/PoseEditor.jsx';
+import DefaultPoseEditor from '../components/DefaultPoseEditor.jsx';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
 export default function CreateAssistantPage() {
@@ -27,10 +27,6 @@ export default function CreateAssistantPage() {
 	// Staged emotions — local File objects, not yet uploaded
 	const [stagedEmotions, setStagedEmotions] = useState([]);
 	const [stagedRestrictedEmotions, setStagedRestrictedEmotions] = useState([]);
-
-	// Staged VRM emotion → blendshape mappings (avatar3d mode, no files involved)
-	const [stagedVrmEmotions, setStagedVrmEmotions] = useState([]);
-	const [stagedVrmRestrictedEmotions, setStagedVrmRestrictedEmotions] = useState([]);
 
 	// Staged poses (avatar3d mode) — blendshapes and/or a pending animation file, not yet uploaded
 	const [stagedPoses, setStagedPoses] = useState([]);
@@ -112,32 +108,21 @@ export default function CreateAssistantPage() {
 		);
 	};
 
-	const handleAddVrmEmotion = (emotionName, blendshapes) => {
-		setStagedVrmEmotions((prev) => [...prev, { id: crypto.randomUUID(), name: emotionName, vrm_blendshapes: blendshapes }]);
-	};
-
-	const handleDeleteVrmEmotion = (emotion) => {
-		setStagedVrmEmotions((prev) => prev.filter((e) => e !== emotion));
-	};
-
-	const handleUpdateVrmEmotion = (emotion, blendshapes) => {
-		setStagedVrmEmotions((prev) => prev.map((e) => (e === emotion ? { ...e, vrm_blendshapes: blendshapes } : e)));
-	};
-
-	const handleAddVrmRestrictedEmotion = (emotionName, blendshapes) => {
-		setStagedVrmRestrictedEmotions((prev) => [...prev, { id: crypto.randomUUID(), name: emotionName, vrm_blendshapes: blendshapes }]);
-	};
-
-	const handleDeleteVrmRestrictedEmotion = (emotion) => {
-		setStagedVrmRestrictedEmotions((prev) => prev.filter((e) => e !== emotion));
-	};
-
-	const handleUpdateVrmRestrictedEmotion = (emotion, blendshapes) => {
-		setStagedVrmRestrictedEmotions((prev) => prev.map((e) => (e === emotion ? { ...e, vrm_blendshapes: blendshapes } : e)));
-	};
-
-	const handleAddPose = (poseName, blendshapes) => {
-		setStagedPoses((prev) => [...prev, { id: crypto.randomUUID(), name: poseName, vrm_blendshapes: blendshapes, animation_url: null }]);
+	const handleAddPose = (poseName, blendshapes, file) => {
+		const localId = crypto.randomUUID();
+		if (file) {
+			stagedPoseFilesRef.current[localId] = file;
+		}
+		setStagedPoses((prev) => [
+			...prev,
+			{
+				id: localId,
+				name: poseName,
+				vrm_blendshapes: blendshapes,
+				animation_url: file ? URL.createObjectURL(file) : null,
+				animation_original_name: file ? file.name : null,
+			},
+		]);
 	};
 
 	const handleDeletePose = (pose) => {
@@ -146,8 +131,8 @@ export default function CreateAssistantPage() {
 		delete stagedPoseFilesRef.current[pose.id];
 	};
 
-	const handleUpdatePoseBlendshapes = (pose, blendshapes) => {
-		setStagedPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, vrm_blendshapes: blendshapes } : p)));
+	const handleUpdatePoseBlendshapes = (pose, name, blendshapes) => {
+		setStagedPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, name, vrm_blendshapes: blendshapes } : p)));
 	};
 
 	const handleUploadPoseAnimation = (pose, file) => {
@@ -160,6 +145,41 @@ export default function CreateAssistantPage() {
 		delete stagedPoseFilesRef.current[pose.id];
 		if (pose.animation_url) URL.revokeObjectURL(pose.animation_url);
 		setStagedPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, animation_url: null } : p)));
+	};
+
+	/* ── Default pose (staged like any other pose, but name-locked and never shown in the general list) ── */
+
+	const handleUpdateDefaultPoseBlendshapes = (blendshapes) => {
+		setStagedPoses((prev) => {
+			if (prev.some((p) => p.name === 'default')) {
+				return prev.map((p) => (p.name === 'default' ? { ...p, vrm_blendshapes: blendshapes } : p));
+			}
+			return [...prev, { id: crypto.randomUUID(), name: 'default', vrm_blendshapes: blendshapes, animation_url: null, animation_original_name: null }];
+		});
+	};
+
+	const handleUploadDefaultPoseAnimation = (file) => {
+		const preview = URL.createObjectURL(file);
+		setStagedPoses((prev) => {
+			const existing = prev.find((p) => p.name === 'default');
+			const localId = existing?.id ?? crypto.randomUUID();
+			stagedPoseFilesRef.current[localId] = file;
+			if (existing) {
+				return prev.map((p) => (p.name === 'default' ? { ...p, animation_url: preview, animation_original_name: file.name } : p));
+			}
+			return [...prev, { id: localId, name: 'default', vrm_blendshapes: null, animation_url: preview, animation_original_name: file.name }];
+		});
+	};
+
+	const handleDeleteDefaultPoseAnimation = () => {
+		setStagedPoses((prev) => {
+			const existing = prev.find((p) => p.name === 'default');
+			if (existing) {
+				delete stagedPoseFilesRef.current[existing.id];
+				if (existing.animation_url) URL.revokeObjectURL(existing.animation_url);
+			}
+			return prev.map((p) => (p.name === 'default' ? { ...p, animation_url: null, animation_original_name: null } : p));
+		});
 	};
 
 	const handleSubmit = async () => {
@@ -215,22 +235,6 @@ export default function CreateAssistantPage() {
 					formData.append(`restricted_emotions[${i}][image]`, emotion.file);
 				});
 			} else {
-				stagedVrmEmotions.forEach((emotion, i) => {
-					formData.append(`emotions[${i}][name]`, emotion.name);
-					(emotion.vrm_blendshapes || []).forEach((b, j) => {
-						formData.append(`emotions[${i}][vrm_blendshapes][${j}][expression]`, b.expression);
-						formData.append(`emotions[${i}][vrm_blendshapes][${j}][weight]`, b.weight);
-					});
-				});
-
-				stagedVrmRestrictedEmotions.forEach((emotion, i) => {
-					formData.append(`restricted_emotions[${i}][name]`, emotion.name);
-					(emotion.vrm_blendshapes || []).forEach((b, j) => {
-						formData.append(`restricted_emotions[${i}][vrm_blendshapes][${j}][expression]`, b.expression);
-						formData.append(`restricted_emotions[${i}][vrm_blendshapes][${j}][weight]`, b.weight);
-					});
-				});
-
 				stagedPoses.forEach((pose, i) => {
 					formData.append(`poses[${i}][name]`, pose.name);
 					(pose.vrm_blendshapes || []).forEach((b, j) => {
@@ -460,26 +464,15 @@ export default function CreateAssistantPage() {
 						{/* Divider */}
 						<div className="border-t border-line-1" />
 
-						<VrmEmotionEditor
-							emotions={stagedVrmEmotions}
-							onAdd={handleAddVrmEmotion}
-							onDelete={handleDeleteVrmEmotion}
-							onUpdateBlendshapes={handleUpdateVrmEmotion}
+						<DefaultPoseEditor
+							pose={stagedPoses.find((p) => p.name === 'default') || { name: 'default', vrm_blendshapes: null, animation_url: null, animation_original_name: null }}
+							onUpdateBlendshapes={handleUpdateDefaultPoseBlendshapes}
+							onUploadAnimation={handleUploadDefaultPoseAnimation}
+							onDeleteAnimation={handleDeleteDefaultPoseAnimation}
 						/>
-
-						<VrmEmotionEditor
-							label="Restricted Emotions"
-							emotions={stagedVrmRestrictedEmotions}
-							onAdd={handleAddVrmRestrictedEmotion}
-							onDelete={handleDeleteVrmRestrictedEmotion}
-							onUpdateBlendshapes={handleUpdateVrmRestrictedEmotion}
-						/>
-
-						{/* Divider */}
-						<div className="border-t border-line-1" />
 
 						<PoseEditor
-							poses={stagedPoses}
+							poses={stagedPoses.filter((p) => p.name !== 'default')}
 							onAdd={handleAddPose}
 							onDelete={handleDeletePose}
 							onUpdateBlendshapes={handleUpdatePoseBlendshapes}

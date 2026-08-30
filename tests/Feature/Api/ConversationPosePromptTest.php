@@ -23,7 +23,7 @@ test('the pose-tags instruction and pose names are added to the system prompt wh
     Http::assertSent(function ($request) {
         $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
 
-        return str_contains($systemContent, '[pose:')
+        return str_contains($systemContent, 'you express yourself through poses')
             && str_contains($systemContent, 'spin')
             && str_contains($systemContent, 'dance');
     });
@@ -44,7 +44,7 @@ test('the pose-tags section is omitted for an assistant with no poses configured
     Http::assertSent(function ($request) {
         $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
 
-        return ! str_contains($systemContent, '[pose:');
+        return ! str_contains($systemContent, 'you express yourself through poses');
     });
 });
 
@@ -64,6 +64,6 @@ test('the pose-tags section is omitted for an image-portrait assistant even with
     Http::assertSent(function ($request) {
         $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
 
-        return ! str_contains($systemContent, '[pose:');
+        return ! str_contains($systemContent, 'you express yourself through poses');
     });
 });

@@ -20,6 +20,7 @@ export default function ChatPage() {
 		setCurrentPose,
 		emotionNames,
 		poseNames,
+		portraitType,
 		addToast,
 		fetchEmotions,
 		unlocked,
@@ -124,13 +125,22 @@ export default function ChatPage() {
 				const data = await res.json();
 				let lastEmotion = null;
 
+				// Poses are one-off triggers, not an ongoing state, so history
+				// isn't replayed into currentPose the way the last emotion is —
+				// reopening a conversation just starts the avatar idle.
 				const mapped = data.messages.map((msg) => {
-					if (msg.role === 'assistant') {
-						const { emotion, text } = parseEmotionFromResponse(msg.content, emotionNames);
-						lastEmotion = emotion;
+					if (msg.role !== 'assistant') {
+						return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+					}
+
+					if (portraitType === 'avatar3d') {
+						const { text } = parsePoseFromResponse(msg.content, poseNames);
 						return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
 					}
-					return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+
+					const { emotion, text } = parseEmotionFromResponse(msg.content, emotionNames);
+					lastEmotion = emotion;
+					return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
 				});
 
 				setMessages(mapped);
@@ -174,11 +184,17 @@ export default function ChatPage() {
 			const data = await res.json();
 
 			const mapped = data.messages.map((msg) => {
-				if (msg.role === 'assistant') {
-					const { text } = parseEmotionFromResponse(msg.content, emotionNames);
+				if (msg.role !== 'assistant') {
+					return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+				}
+
+				if (portraitType === 'avatar3d') {
+					const { text } = parsePoseFromResponse(msg.content, poseNames);
 					return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
 				}
-				return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+
+				const { text } = parseEmotionFromResponse(msg.content, emotionNames);
+				return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
 			});
 
 			setMessages((prev) => [...mapped, ...prev]);
@@ -317,8 +333,20 @@ export default function ChatPage() {
 				const rawReply = data.content || '[default]\n...signal lost. Try again.';
 				const thinking = data.thinking || null;
 
-				const { emotion, intimate, text: emotionCleanText } = parseEmotionFromResponse(rawReply, emotionNames);
-				const { pose, text: cleanText } = parsePoseFromResponse(emotionCleanText, poseNames);
+				// Poses and emotions are mutually exclusive by portrait type
+				// (a 3D avatar has no emotion tags to disambiguate against),
+				// so only the applicable parser ever runs on a given reply.
+				let emotion = 'default';
+				let intimate = false;
+				let pose = null;
+				let cleanText = rawReply;
+
+				if (portraitType === 'avatar3d') {
+					({ pose, text: cleanText } = parsePoseFromResponse(rawReply, poseNames));
+				} else {
+					({ emotion, intimate, text: cleanText } = parseEmotionFromResponse(rawReply, emotionNames));
+				}
+
 				const ttsInstructions = data.tts_instructions ?? null;
 
 				if (intimate !== unlocked) {
@@ -335,7 +363,7 @@ export default function ChatPage() {
 					}));
 
 				setCurrentEmotion(emotion);
-				setCurrentPose(pose);
+				if (pose) setCurrentPose({ name: pose, triggerId: Date.now() });
 				setHasError(false);
 				setMessages([
 					...updatedMessages,

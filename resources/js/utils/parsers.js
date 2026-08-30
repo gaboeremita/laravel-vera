@@ -36,21 +36,27 @@ export function parseEmotionFromResponse(text, validEmotions = []) {
 }
 
 /**
- * Parses a pose tag (e.g. "[pose: spin] ...") from the start of text,
- * distinct from the emotion tag syntax so a pose name can never be mistaken
- * for an emotion tag. Intended to run on the text already returned by
- * parseEmotionFromResponse, after any [emotion]/[intimate] tags are
- * stripped, so both tags can appear on the same message.
+ * Parses a pose tag (e.g. "[spin] ...") from the start of text — same bare
+ * bracket format as an emotion tag. There's no separate "pose:" syntax:
+ * poses are the only expression/action signal a 3D avatar assistant emits
+ * (it has no emotion tags to disambiguate against), so a plain [name] is
+ * unambiguous. Unlike parseEmotionFromResponse, an unmatched/unrecognized
+ * tag leaves `pose` as null rather than falling back to a default name —
+ * a pose is a one-off trigger, not an ongoing state to default into.
+ *
+ * Pose names aren't restricted to a single letters-only word the way
+ * emotion names are (e.g. "deer_dance", "happy hands") — the bracket
+ * content is matched as anything up to the closing `]`, not [a-zA-Z]+.
  */
 export function parsePoseFromResponse(text, validPoseNames = []) {
     let remaining = text;
     let pose = null;
 
-    const poseMatch = remaining.match(/^\[pose:\s*([^\]]+)\]/i);
+    const poseMatch = remaining.match(/^\[([^\]]+)\]/);
     if (poseMatch) {
         remaining = remaining.slice(poseMatch[0].length);
-        const matchedPose = poseMatch[1].trim();
-        if (validPoseNames.some((p) => p.toLowerCase() === matchedPose.toLowerCase())) {
+        const matchedPose = poseMatch[1].trim().toLowerCase();
+        if (validPoseNames.some((p) => p.toLowerCase() === matchedPose)) {
             pose = matchedPose;
         }
     }

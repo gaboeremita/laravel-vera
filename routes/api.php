@@ -81,6 +81,12 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
         Route::prefix('/poses')->name('assistants.poses.')->group(function () {
+            // Registered before the {pose} wildcard routes below so the
+            // literal "default" segment isn't swallowed by them.
+            Route::post('/default', [AssistantPoseController::class, 'updateDefault'])->name('default.update');
+            Route::post('/default/animation', [AssistantPoseAnimationController::class, 'storeDefault'])->name('default.animation.store');
+            Route::delete('/default/animation', [AssistantPoseAnimationController::class, 'destroyDefault'])->name('default.animation.destroy');
+
             Route::post('/', [AssistantPoseController::class, 'store'])->name('store');
             Route::post('/{pose}', [AssistantPoseController::class, 'update'])->name('update');
             Route::delete('/{pose}', [AssistantPoseController::class, 'destroy'])->name('destroy');

@@ -57,8 +57,11 @@ export default function AuthenticatedLayout() {
 					getImageUrl={getImageUrl}
 					getVideoUrl={getVideoUrl}
 					getVrmBlendshapes={getVrmBlendshapes}
-					poseBlendshapes={currentPose ? getPoseBlendshapes(currentPose) : []}
-					poseAnimationUrl={currentPose ? getPoseAnimationUrl(currentPose) : null}
+					poseBlendshapes={currentPose ? getPoseBlendshapes(currentPose.name) : []}
+					poseAnimationUrl={currentPose ? getPoseAnimationUrl(currentPose.name) : null}
+					poseTriggerId={currentPose?.triggerId ?? null}
+					defaultPoseBlendshapes={getPoseBlendshapes('default')}
+					defaultPoseAnimationUrl={getPoseAnimationUrl('default')}
 					portraitType={portraitType}
 					vrmUrl={vrmUrl}
 					assistantId={activeAssistantId}
@@ -77,6 +80,7 @@ export default function AuthenticatedLayout() {
 						setCurrentPose,
 						emotionNames,
 						poseNames,
+						portraitType,
 						fetchEmotions,
 						unlocked,
 						addToast,

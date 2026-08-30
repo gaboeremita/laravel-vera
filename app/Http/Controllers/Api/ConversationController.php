@@ -9,6 +9,7 @@ use App\Enums\AssistantPortraitType;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAvatarBackground;
 use App\Jobs\SummarizeConversation;
+use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\DiscordChannel;
@@ -38,7 +39,7 @@ class ConversationController extends Controller
 
     private const BACKGROUND_TAG_INSTRUCTION = 'When the scene/setting you and the user are in has just clearly changed to a new location, prefix your reply with a tag describing the new setting: [scene: <short description of the new location>]. Only include this tag when the setting has actually changed, never when it is unchanged. Never mention the tag itself.';
 
-    private const POSE_TAG_INSTRUCTION = 'You can also perform physical actions or gestures with your body — separate from and in addition to your emotional expression. These are not emotions; they represent things you can do, like a spin, a dance, or a wave. When the user asks you to do one of your available poses, or it clearly fits what you are doing, include a tag naming it: [pose: <pose name>]. Only use a pose name from the list below, and only when it is actually being performed right now. Never mention the tag itself.';
+    private const POSE_TAG_INSTRUCTION = 'As a 3D avatar, you express yourself through poses — they cover both mood/expression (like being happy or sad) and physical actions or gestures (like a spin, a wave, or a dance). When you are expressing a mood or performing an action, prefix your reply with that pose\'s exact name in brackets, e.g. [happy] or [spin] — reproduce the name exactly as listed below, including any spaces or underscores in it, rather than shortening or rewording it. Only use a pose name from the list below, and only when it is actually happening in that reply. Never mention the tag itself.';
 
     public function index(Request $request, int $assistant): JsonResponse
     {
@@ -227,7 +228,7 @@ class ConversationController extends Controller
                 return response()->json(['message' => $e->getMessage()], 502);
             }
 
-            $parsed = $this->extractEmotionTag($reaction->content);
+            $parsed = $this->extractExpressionTag($reaction->content, $assistantUser->assistant);
 
             $assistantMessage = $conversation->messages()->create([
                 'role' => 'assistant',
@@ -248,8 +249,6 @@ class ConversationController extends Controller
 
         $assistantModel = $assistantUser->assistant;
 
-        $emotions = $assistantModel->promptEmotionNames();
-
         $archive = $assistantModel->archive;
 
         $excludedSections = ['opening_message'];
@@ -265,20 +264,11 @@ class ConversationController extends Controller
             $excludedSections[] = 'voice mode';
         }
 
-        $director = (new PromptDirector($assistantModel->prompt))
-            ->append('emotion tags', ['available emotions' => $emotions]);
+        $director = new PromptDirector($assistantModel->prompt);
+        $this->appendExpressionTags($director, $assistantModel, $excludedSections);
 
         if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
             $director->append('background tags', self::BACKGROUND_TAG_INSTRUCTION);
-
-            $poses = $assistantModel->promptPoseNames();
-
-            if (! empty($poses)) {
-                $director->append('pose tags', [
-                    'instruction' => self::POSE_TAG_INSTRUCTION,
-                    'available poses' => $poses,
-                ]);
-            }
         }
 
         $director->except($excludedSections);
@@ -434,6 +424,43 @@ class ConversationController extends Controller
     }
 
     /**
+     * Appends the assistant's expressive-signal prompt section: pose tags for
+     * 3D avatar assistants (poses are their only expression/action system),
+     * emotion tags for image-mode assistants.
+     */
+    /**
+     * Appends the assistant's expressive-signal prompt section — pose tags
+     * for 3D avatar assistants (poses are their only expression/action
+     * system, so emotion tags never apply), emotion tags for image-mode
+     * assistants — and excludes whichever section doesn't apply from
+     * $excludedSections, so a stale section baked into the assistant's
+     * stored prompt (e.g. from before it was in this mode) never renders
+     * alongside it and confuses the model with two competing tag formats.
+     */
+    private function appendExpressionTags(PromptDirector $director, Assistant $assistantModel, array &$excludedSections): void
+    {
+        if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
+            $excludedSections[] = 'emotion tags';
+
+            $poses = $assistantModel->promptPoseNames();
+
+            if (! empty($poses)) {
+                $director->append('pose tags', [
+                    'instruction' => self::POSE_TAG_INSTRUCTION,
+                    'available poses' => $poses,
+                ]);
+            }
+
+            return;
+        }
+
+        $excludedSections[] = 'pose tags';
+
+        $emotions = $assistantModel->promptEmotionNames();
+        $director->append('emotion tags', ['available emotions' => $emotions]);
+    }
+
+    /**
      * Runs the full /create-image pipeline (enhance -> generate -> in-character reaction -> persist),
      * shared by every channel (web, Discord, ...). Callers format their own channel-specific response.
      *
@@ -447,7 +474,7 @@ class ConversationController extends Controller
         $enhancedPrompt = $result['enhancedPrompt'];
 
         $reaction = $this->reactToGeneratedImage($request, $assistantUser, $conversation, $rawPrompt, $enhancedPrompt);
-        $parsed = $this->extractEmotionTag($reaction->content);
+        $parsed = $this->extractExpressionTag($reaction->content, $assistantUser->assistant);
 
         $assistantMessage = $conversation->messages()->create([
             'role' => 'assistant',
@@ -472,8 +499,34 @@ class ConversationController extends Controller
     /**
      * @return array{content: string, emotion: ?string, intimate: bool}
      */
-    private function extractEmotionTag(string $content): array
+    /**
+     * Strips the assistant's leading expression tag from content — a bare
+     * [name] tag means a pose for 3D avatar assistants, or an emotion
+     * (optionally followed by [intimate]) for image-mode assistants. Only
+     * one format is ever attempted per assistant: the two are mutually
+     * exclusive by portrait type, so there's no ambiguity to resolve and
+     * nothing for the model to disambiguate — used by the server-side-parsed
+     * reply flows (image-gen reaction, background-change reaction, Discord),
+     * which don't go through the frontend's client-side parsers.
+     *
+     * @return array{content: string, emotion: ?string, intimate: bool, pose: ?string}
+     */
+    private function extractExpressionTag(string $content, Assistant $assistantModel): array
     {
+        if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
+            $pose = null;
+
+            // Unlike emotion names, pose names aren't restricted to a single
+            // letters-only word (e.g. "deer_dance", "happy hands") — match
+            // anything up to the closing ], not [a-zA-Z]+.
+            if (preg_match('/^\[([^\]]+)\]/', $content, $match)) {
+                $pose = trim($match[1]);
+                $content = trim(substr($content, strlen($match[0])));
+            }
+
+            return ['content' => $content, 'emotion' => null, 'intimate' => false, 'pose' => $pose];
+        }
+
         $emotion = null;
         $intimate = false;
 
@@ -487,7 +540,7 @@ class ConversationController extends Controller
             $content = trim(substr($content, strlen($match[0])));
         }
 
-        return ['content' => $content, 'emotion' => $emotion, 'intimate' => $intimate];
+        return ['content' => $content, 'emotion' => $emotion, 'intimate' => $intimate, 'pose' => null];
     }
 
     /**
@@ -498,18 +551,17 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $emotions = $assistantModel->promptEmotionNames();
-
         $excludedSections = ['opening_message', 'voice mode'];
 
         if ($conversation->discord_channel_id) {
-            // Discord has no UI to render an emotion tag against — same reasoning as the normal Discord reply flow.
+            // Discord has no UI to render an emotion/pose tag against — same reasoning as the normal Discord reply flow.
             $excludedSections[] = 'emotion tags';
+            $excludedSections[] = 'pose tags';
         }
 
-        $director = (new PromptDirector($assistantModel->prompt))
-            ->append('emotion tags', ['available emotions' => $emotions])
-            ->except($excludedSections);
+        $director = new PromptDirector($assistantModel->prompt);
+        $this->appendExpressionTags($director, $assistantModel, $excludedSections);
+        $director->except($excludedSections);
 
         $archive = $assistantModel->archive;
         if ($archive) {
@@ -549,17 +601,16 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $emotions = $assistantModel->promptEmotionNames();
-
         $excludedSections = ['opening_message', 'voice mode'];
 
         if ($conversation->discord_channel_id) {
             $excludedSections[] = 'emotion tags';
+            $excludedSections[] = 'pose tags';
         }
 
-        $director = (new PromptDirector($assistantModel->prompt))
-            ->append('emotion tags', ['available emotions' => $emotions])
-            ->except($excludedSections);
+        $director = new PromptDirector($assistantModel->prompt);
+        $this->appendExpressionTags($director, $assistantModel, $excludedSections);
+        $director->except($excludedSections);
 
         $archive = $assistantModel->archive;
         if ($archive) {
@@ -734,7 +785,7 @@ class ConversationController extends Controller
             return response()->json(['message' => $e->getMessage()], 502);
         }
 
-        $parsed = $this->extractEmotionTag($response->content);
+        $parsed = $this->extractExpressionTag($response->content, $assistantModel);
 
         $assistantMessage = $conversation->messages()->create([
             'role' => 'assistant',

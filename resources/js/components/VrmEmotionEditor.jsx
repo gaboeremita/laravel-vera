@@ -216,9 +216,16 @@ export default function VrmEmotionEditor({ emotions, onAdd, onDelete, onUpdateBl
 
 			{deleteTarget && (
 				<ConfirmationModal
+					title="Delete emotion"
 					message={`Delete emotion "${deleteTarget.name}"?`}
-					onConfirm={handleConfirmDelete}
-					onCancel={() => setDeleteTarget(null)}
+					options={[
+						{ label: 'DELETE', value: 'confirm', destructive: true },
+						{ label: 'CANCEL', value: 'cancel', cancel: true },
+					]}
+					onSelect={(value) => {
+						if (value === 'confirm') handleConfirmDelete();
+						else setDeleteTarget(null);
+					}}
 				/>
 			)}
 		</div>

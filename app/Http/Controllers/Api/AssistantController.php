@@ -12,6 +12,7 @@ use App\Models\Pose;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Enum;
 
 class AssistantController extends Controller
@@ -93,6 +94,7 @@ class AssistantController extends Controller
                 'name' => $pose->name,
                 'vrm_blendshapes' => $pose->vrm_blendshapes,
                 'animation_url' => $pose->animationFile?->url,
+                'animation_original_name' => $pose->animationFile?->original_name,
             ]);
 
         return response()->json([
@@ -131,19 +133,13 @@ class AssistantController extends Controller
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
             'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
-            'emotions' => [$isAvatarMode ? 'nullable' : 'required', 'array', $isAvatarMode ? 'min:0' : 'min:1'],
+            'emotions' => $isAvatarMode ? ['prohibited'] : ['required', 'array', 'min:1'],
             'emotions.*.name' => ['required', 'string', 'max:255', 'distinct'],
-            'emotions.*.image' => [$isAvatarMode ? 'sometimes' : 'required', 'file', 'image', 'max:10480'],
-            'emotions.*.vrm_blendshapes' => ['sometimes', 'array'],
-            'emotions.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
-            'emotions.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
-            'restricted_emotions' => ['sometimes', 'array'],
+            'emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
+            'restricted_emotions' => $isAvatarMode ? ['prohibited'] : ['sometimes', 'array'],
             'restricted_emotions.*.name' => ['required', 'string', 'max:255', 'distinct'],
-            'restricted_emotions.*.image' => [$isAvatarMode ? 'sometimes' : 'required', 'file', 'image', 'max:10480'],
-            'restricted_emotions.*.vrm_blendshapes' => ['sometimes', 'array'],
-            'restricted_emotions.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
-            'restricted_emotions.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
-            'poses' => ['sometimes', 'array'],
+            'restricted_emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
+            'poses' => $isAvatarMode ? ['sometimes', 'array'] : ['prohibited'],
             'poses.*.name' => ['required', 'string', 'max:255', 'distinct'],
             'poses.*.vrm_blendshapes' => ['sometimes', 'array'],
             'poses.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
@@ -223,7 +219,11 @@ class AssistantController extends Controller
                 ]);
 
                 if (isset($poseData['animation'])) {
-                    $path = $poseData['animation']->store("poses/{$assistant->id}/{$pose->id}", 'public');
+                    // See AssistantPoseAnimationController::store for why the
+                    // extension must come from the client's filename, not
+                    // store()'s MIME-guessed one.
+                    $filename = Str::random(40).'.'.$poseData['animation']->getClientOriginalExtension();
+                    $path = $poseData['animation']->storeAs("poses/{$assistant->id}/{$pose->id}", $filename, 'public');
 
                     $pose->animationFile()->create([
                         'path' => $path,

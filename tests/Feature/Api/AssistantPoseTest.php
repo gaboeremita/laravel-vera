@@ -13,7 +13,7 @@ uses(RefreshDatabase::class);
 function setUpAssistantForPoses(): array
 {
     $user = User::factory()->create();
-    $assistant = Assistant::factory()->create();
+    $assistant = Assistant::factory()->create(['portrait_type' => 'avatar3d']);
     AssistantUser::factory()->create([
         'user_id' => $user->id,
         'assistant_id' => $assistant->id,
@@ -61,6 +61,20 @@ it('rejects a duplicate pose name on the same assistant', function () {
         ]);
 
     $response->assertStatus(422)->assertJsonValidationErrors(['name']);
+});
+
+it('rejects pose creation for an image-portrait assistant', function () {
+    $user = User::factory()->create();
+    $assistant = Assistant::factory()->create(['portrait_type' => 'image']);
+    AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $assistant->id]);
+
+    $response = $this->actingAs($user)
+        ->postJson(route('assistants.poses.store', ['assistant' => $assistant->id]), [
+            'name' => 'spin',
+        ]);
+
+    $response->assertStatus(422);
+    expect($assistant->poses()->count())->toBe(0);
 });
 
 it('scopes pose creation to owner — another user gets 404', function () {

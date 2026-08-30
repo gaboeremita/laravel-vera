@@ -188,18 +188,32 @@ export default function PromptEditor({
 			{/* Section delete confirmation */}
 			{deleteTarget && (
 				<ConfirmationModal
+					title="Delete section"
 					message={`Delete section "${deleteTarget[deleteTarget.length - 1]}"?`}
-					onConfirm={handleConfirmDelete}
-					onCancel={() => setDeleteTarget(null)}
+					options={[
+						{ label: 'DELETE', value: 'confirm', destructive: true },
+						{ label: 'CANCEL', value: 'cancel', cancel: true },
+					]}
+					onSelect={(value) => {
+						if (value === 'confirm') handleConfirmDelete();
+						else setDeleteTarget(null);
+					}}
 				/>
 			)}
 
 			{/* Full prompt delete confirmation */}
 			{destroy && showDeletePrompt && (
 				<ConfirmationModal
+					title="Delete prompt"
 					message="Delete the entire prompt? This cannot be undone."
-					onConfirm={handleDestroyPrompt}
-					onCancel={() => setShowDeletePrompt(false)}
+					options={[
+						{ label: 'DELETE', value: 'confirm', destructive: true },
+						{ label: 'CANCEL', value: 'cancel', cancel: true },
+					]}
+					onSelect={(value) => {
+						if (value === 'confirm') handleDestroyPrompt();
+						else setShowDeletePrompt(false);
+					}}
 				/>
 			)}
 		</div>

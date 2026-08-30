@@ -2,7 +2,7 @@ import { useId, useRef, useState } from 'react';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
 import { BlendshapeRows, EXPRESSION_SUGGESTIONS } from './VrmEmotionEditor.jsx';
 
-function AnimationFileControl({ pose, onUploadAnimation, onDeleteAnimation }) {
+export function AnimationFileControl({ pose, onUploadAnimation, onDeleteAnimation }) {
 	const inputRef = useRef(null);
 	const [isUploading, setIsUploading] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
@@ -59,9 +59,16 @@ function AnimationFileControl({ pose, onUploadAnimation, onDeleteAnimation }) {
 
 			{confirmingDelete && (
 				<ConfirmationModal
+					title="Delete animation"
 					message={`Delete the animation file for "${pose.name}"?`}
-					onConfirm={handleConfirmDelete}
-					onCancel={() => setConfirmingDelete(false)}
+					options={[
+						{ label: 'DELETE', value: 'confirm', destructive: true },
+						{ label: 'CANCEL', value: 'cancel', cancel: true },
+					]}
+					onSelect={(value) => {
+						if (value === 'confirm') handleConfirmDelete();
+						else setConfirmingDelete(false);
+					}}
 				/>
 			)}
 		</div>
@@ -69,48 +76,80 @@ function AnimationFileControl({ pose, onUploadAnimation, onDeleteAnimation }) {
 }
 
 function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation, datalistId }) {
+	const [expanded, setExpanded] = useState(false);
 	const [draft, setDraft] = useState(() => (pose.vrm_blendshapes || []).map((b) => (b.weight <= 1 ? { ...b, weight: Math.round(b.weight * 100) } : b)));
+	const [nameDraft, setNameDraft] = useState(pose.name);
 	const [syncedPose, setSyncedPose] = useState(pose);
 	const [isSaving, setIsSaving] = useState(false);
 
 	if (syncedPose !== pose) {
 		setSyncedPose(pose);
 		setDraft((pose.vrm_blendshapes || []).map((b) => (b.weight <= 1 ? { ...b, weight: Math.round(b.weight * 100) } : b)));
+		setNameDraft(pose.name);
 	}
 
 	const handleSave = async () => {
+		const trimmedName = nameDraft.trim();
+		if (!trimmedName) return;
+
 		setIsSaving(true);
 		try {
-			await onSave(draft.filter((b) => b.expression.trim()));
+			await onSave(trimmedName, draft.filter((b) => b.expression.trim()));
 		} finally {
 			setIsSaving(false);
 		}
 	};
 
 	return (
-		<div className="border border-line-1 bg-bg-1 p-3 space-y-2">
-			<div className="flex items-center justify-between">
-				<span className="text-accent text-[0.7rem] tracking-[0.05em]">{pose.name}</span>
-				<button
-					onClick={onDelete}
-					className="text-danger text-[0.65rem] cursor-pointer hover:text-danger transition-colors"
+		<div className="border border-line-1 bg-bg-1">
+			<button
+				onClick={() => setExpanded((prev) => !prev)}
+				className="w-full flex items-center gap-2 p-3 cursor-pointer text-left"
+			>
+				<span className={`text-fg-3 text-[0.6rem] transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`}>▸</span>
+				<span className="flex-1 min-w-0 truncate text-accent text-[0.7rem] tracking-[0.05em]">{pose.name}</span>
+				<span
+					role="button"
+					tabIndex={0}
+					onClick={(e) => {
+						e.stopPropagation();
+						onDelete();
+					}}
+					onKeyDown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.stopPropagation();
+							onDelete();
+						}
+					}}
+					className="text-danger text-[0.65rem] cursor-pointer hover:text-danger transition-colors shrink-0"
 				>
 					✕ DELETE
-				</button>
-			</div>
-			<BlendshapeRows blendshapes={draft} onChange={setDraft} datalistId={datalistId} />
-			<div className="flex justify-end">
-				<button
-					onClick={handleSave}
-					disabled={isSaving}
-					className={`px-3 py-1 text-[0.65rem] tracking-[0.1em] transition-colors ${
-						isSaving ? 'bg-bg-3 text-fg-3 cursor-default' : 'button-success cursor-pointer'
-					}`}
-				>
-					{isSaving ? 'SAVING...' : 'SAVE'}
-				</button>
-			</div>
-			<AnimationFileControl pose={pose} onUploadAnimation={onUploadAnimation} onDeleteAnimation={onDeleteAnimation} />
+				</span>
+			</button>
+
+			{expanded && (
+				<div className="p-3 pt-0 space-y-2">
+					<input
+						type="text"
+						value={nameDraft}
+						onChange={(e) => setNameDraft(e.target.value)}
+						className="w-full bg-bg-0 border border-line-1 text-accent text-[0.7rem] tracking-[0.05em] px-2 py-1 outline-none focus:border-accent/50 transition-colors"
+					/>
+					<BlendshapeRows blendshapes={draft} onChange={setDraft} datalistId={datalistId} />
+					<div className="flex justify-end">
+						<button
+							onClick={handleSave}
+							disabled={isSaving || !nameDraft.trim()}
+							className={`px-3 py-1 text-[0.65rem] tracking-[0.1em] transition-colors ${
+								isSaving || !nameDraft.trim() ? 'bg-bg-3 text-fg-3 cursor-default' : 'button-success cursor-pointer'
+							}`}
+						>
+							{isSaving ? 'SAVING...' : 'SAVE'}
+						</button>
+					</div>
+					<AnimationFileControl pose={pose} onUploadAnimation={onUploadAnimation} onDeleteAnimation={onDeleteAnimation} />
+				</div>
+			)}
 		</div>
 	);
 }
@@ -124,7 +163,7 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
  * @param {Array} poses - [{id, name, vrm_blendshapes, animation_url}]
  * @param {function} onAdd - (name, blendshapes) => void
  * @param {function} onDelete - (pose) => void
- * @param {function} onUpdateBlendshapes - (pose, blendshapes) => void
+ * @param {function} onUpdateBlendshapes - (pose, name, blendshapes) => void
  * @param {function} onUploadAnimation - (pose, file) => void
  * @param {function} onDeleteAnimation - (pose) => void
  */
@@ -133,21 +172,31 @@ export default function PoseEditor({ poses, onAdd, onDelete, onUpdateBlendshapes
 	const [isAdding, setIsAdding] = useState(false);
 	const [newName, setNewName] = useState('');
 	const [newBlendshapes, setNewBlendshapes] = useState([{ expression: '', weight: 100 }]);
+	const [newAnimationFile, setNewAnimationFile] = useState(null);
+	const newFileInputRef = useRef(null);
 	const [deleteTarget, setDeleteTarget] = useState(null);
+	const [isAddingPose, setIsAddingPose] = useState(false);
 
-	const handleAdd = () => {
+	const handleAdd = async () => {
 		const trimmed = newName.trim();
 		if (!trimmed) return;
 
-		onAdd(trimmed, newBlendshapes.filter((b) => b.expression.trim()));
-		setNewName('');
-		setNewBlendshapes([{ expression: '', weight: 100 }]);
-		setIsAdding(false);
+		setIsAddingPose(true);
+		try {
+			await onAdd(trimmed, newBlendshapes.filter((b) => b.expression.trim()), newAnimationFile);
+			setNewName('');
+			setNewBlendshapes([{ expression: '', weight: 100 }]);
+			setNewAnimationFile(null);
+			setIsAdding(false);
+		} finally {
+			setIsAddingPose(false);
+		}
 	};
 
 	const handleCancelAdd = () => {
 		setNewName('');
 		setNewBlendshapes([{ expression: '', weight: 100 }]);
+		setNewAnimationFile(null);
 		setIsAdding(false);
 	};
 
@@ -175,7 +224,7 @@ export default function PoseEditor({ poses, onAdd, onDelete, onUpdateBlendshapes
 					<PoseRow
 						key={pose.id}
 						pose={pose}
-						onSave={(blendshapes) => onUpdateBlendshapes(pose, blendshapes)}
+						onSave={(name, blendshapes) => onUpdateBlendshapes(pose, name, blendshapes)}
 						onDelete={() => setDeleteTarget(pose)}
 						onUploadAnimation={onUploadAnimation}
 						onDeleteAnimation={onDeleteAnimation}
@@ -201,21 +250,53 @@ export default function PoseEditor({ poses, onAdd, onDelete, onUpdateBlendshapes
 							autoFocus
 						/>
 						<BlendshapeRows blendshapes={newBlendshapes} onChange={setNewBlendshapes} datalistId={datalistId} />
+						<div className="space-y-1.5">
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">Animation File (.vrma / .fbx)</label>
+							{newAnimationFile ? (
+								<div className="flex items-center gap-2">
+									<span className="text-accent text-xs truncate flex-1">{newAnimationFile.name}</span>
+									<button
+										onClick={() => {
+											setNewAnimationFile(null);
+											if (newFileInputRef.current) newFileInputRef.current.value = '';
+										}}
+										className="text-danger text-xs cursor-pointer hover:text-danger transition-colors shrink-0"
+									>
+										✕
+									</button>
+								</div>
+							) : (
+								<button
+									onClick={() => newFileInputRef.current?.click()}
+									className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-line-1 text-fg-3 hover:border-fg-3 transition-colors cursor-pointer"
+								>
+									UPLOAD ANIMATION
+								</button>
+							)}
+							<input
+								ref={newFileInputRef}
+								type="file"
+								accept=".vrma,.fbx"
+								onChange={(e) => setNewAnimationFile(e.target.files?.[0] ?? null)}
+								className="hidden"
+							/>
+						</div>
 						<div className="flex justify-end gap-2">
 							<button
 								onClick={handleCancelAdd}
-								className="px-3 py-1 text-[0.65rem] tracking-[0.1em] border border-line-1 text-fg-3 cursor-pointer hover:text-fg-1 transition-colors"
+								disabled={isAddingPose}
+								className="px-3 py-1 text-[0.65rem] tracking-[0.1em] border border-line-1 text-fg-3 cursor-pointer hover:text-fg-1 transition-colors disabled:opacity-50 disabled:cursor-default"
 							>
 								CANCEL
 							</button>
 							<button
 								onClick={handleAdd}
-								disabled={!newName.trim()}
+								disabled={!newName.trim() || isAddingPose}
 								className={`px-3 py-1 text-[0.65rem] tracking-[0.1em] transition-colors ${
-									newName.trim() ? 'button-success cursor-pointer' : 'bg-bg-3 text-fg-3 cursor-default'
+									newName.trim() && !isAddingPose ? 'button-success cursor-pointer' : 'bg-bg-3 text-fg-3 cursor-default'
 								}`}
 							>
-								ADD
+								{isAddingPose ? 'ADDING...' : 'ADD'}
 							</button>
 						</div>
 					</div>
@@ -224,9 +305,16 @@ export default function PoseEditor({ poses, onAdd, onDelete, onUpdateBlendshapes
 
 			{deleteTarget && (
 				<ConfirmationModal
+					title="Delete pose"
 					message={`Delete pose "${deleteTarget.name}"?`}
-					onConfirm={handleConfirmDelete}
-					onCancel={() => setDeleteTarget(null)}
+					options={[
+						{ label: 'DELETE', value: 'confirm', destructive: true },
+						{ label: 'CANCEL', value: 'cancel', cancel: true },
+					]}
+					onSelect={(value) => {
+						if (value === 'confirm') handleConfirmDelete();
+						else setDeleteTarget(null);
+					}}
 				/>
 			)}
 		</div>

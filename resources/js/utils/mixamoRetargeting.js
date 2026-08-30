@@ -74,9 +74,15 @@ export const MIXAMO_VRM_BONE_MAP = {
  * @returns {import('three').AnimationClip | null}
  */
 export function retargetMixamoAnimation(fbxAsset, vrm, clipName = 'mixamo.com') {
-	const clip = AnimationClip.findByName(fbxAsset.animations, clipName);
+	// Falls back to the first embedded clip rather than requiring the exact
+	// name "mixamo.com" — that literal name only holds for an unmodified
+	// Mixamo export; FBX files re-exported or converted through other tools
+	// (e.g. Blender) commonly rename or prefix the clip, which made this
+	// silently return null (console.warn only) for otherwise-valid Mixamo
+	// rigs.
+	const clip = AnimationClip.findByName(fbxAsset.animations, clipName) ?? fbxAsset.animations[0];
 	if (!clip) {
-		console.warn(`[mixamoRetargeting] animation clip "${clipName}" not found in FBX asset`);
+		console.warn('[mixamoRetargeting] no animation clip found in FBX asset');
 		return null;
 	}
 
