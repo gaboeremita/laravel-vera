@@ -8,6 +8,13 @@
 
 **Input**: User description: "Just as we have conversations for a singular assistant, we should have sessions for worlds, we need a new page, similar to assistants page, for sessions, where we can select and continue new sessions, or start a new one, or delete current sessions"
 
+## Clarifications
+
+### Session 2026-08-31
+
+- Q: When a user "resumes" a past session, what should actually be restored in the world? → A: Restore the user's last recorded position in the world, and that session's conversations with world residents.
+- Q: When a user starts a new session in a world, should their conversations with that world's residents start fresh, or continue the same ongoing conversation history shared across all of that world's sessions? → A: Each session gets its own conversation per resident — starting a new session means fresh conversations with everyone in that world.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - View and resume past sessions in a world (Priority: P1)
@@ -21,7 +28,7 @@ A user opens a world they've visited before and sees a list of their past sessio
 **Acceptance Scenarios**:
 
 1. **Given** a world with two prior sessions, **When** the user opens that world's sessions page, **Then** both sessions are listed, most recently active first.
-2. **Given** a listed session, **When** the user selects it, **Then** the user is taken into that world resuming from that session's saved state.
+2. **Given** a listed session, **When** the user selects it, **Then** the user is taken into that world at their last recorded position, with that session's conversations with world residents available.
 3. **Given** a world with no prior sessions, **When** the user opens that world's sessions page, **Then** the page shows an empty state with a way to start a new session.
 
 ---
@@ -36,7 +43,7 @@ A user wants a fresh start in a world without disturbing their existing sessions
 
 **Acceptance Scenarios**:
 
-1. **Given** a user on a world's sessions page, **When** they choose to start a new session, **Then** a new session is created and the user enters the world in that fresh session.
+1. **Given** a user on a world's sessions page, **When** they choose to start a new session, **Then** a new session is created and the user enters the world in that fresh session, with no position history and no conversations yet started with any resident.
 2. **Given** a user starts a new session, **When** they later return to the sessions page, **Then** both the new session and all prior sessions are listed.
 
 ---
@@ -69,7 +76,9 @@ A user no longer wants a particular session and removes it from the list.
 - **FR-001**: System MUST provide a sessions page for each world, listing all sessions belonging to the current user for that world.
 - **FR-002**: Sessions list MUST be ordered by most recently active first.
 - **FR-003**: Each listed session MUST display an identifying label (a title, defaulting to a generic name, and/or a timestamp) so the user can distinguish between sessions.
-- **FR-004**: Users MUST be able to select a listed session and resume it from its saved state.
+- **FR-004**: Users MUST be able to select a listed session and resume it, returning them to their last recorded position in the world with that session's conversations with world residents available.
+- **FR-011**: System MUST record and restore the user's last known position in the world for each session.
+- **FR-012**: Each session's conversations with world residents MUST be distinct from every other session's — starting a new session MUST NOT carry over conversation history from any other session in that world.
 - **FR-005**: Users MUST be able to start a new session for a world, distinct from any existing session, and immediately enter the world within it.
 - **FR-006**: Users MUST be able to delete a session, with confirmation before permanent removal.
 - **FR-007**: Deleting a session MUST remove it from the list and make its state permanently inaccessible.
@@ -79,7 +88,7 @@ A user no longer wants a particular session and removes it from the list.
 
 ### Key Entities
 
-- **World Session**: Represents one continuous thread of a user's activity within a specific world — analogous to how a Conversation represents one thread with an Assistant. Belongs to exactly one world and one user. Has an identifying label and tracks when it was last active, used for ordering and resuming.
+- **World Session**: Represents one continuous thread of a user's activity within a specific world — analogous to how a Conversation represents one thread with an Assistant. Belongs to exactly one world and one user. Has an identifying label, a last known position within the world, and tracks when it was last active, used for ordering and resuming. Owns its own set of conversations with that world's residents, distinct from any other session's.
 
 ## Success Criteria *(mandatory)*
 
@@ -96,4 +105,4 @@ A user no longer wants a particular session and removes it from the list.
 - The sessions page follows the same list/select/create/delete interaction pattern already established by the Assistants and Conversations pages, applied to worlds instead.
 - Renaming a session (analogous to renaming a conversation) is a reasonable extension but not explicitly requested; it is out of scope for this spec unless clarified otherwise.
 - "Current sessions" in the request refers to a user's own existing sessions for a given world, not a global or shared session list.
-- A session's saved state (what "resuming" restores) is whatever the world experience already persists per visit; this spec does not change what is saved, only how users navigate between saved threads.
+- A session's saved state is the user's last recorded position in the world plus that session's own conversations with world residents (see Clarifications); no other in-world state (scene objects, physics, other users' positions) is captured or restored by this feature.
