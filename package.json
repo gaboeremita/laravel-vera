@@ -5,7 +5,8 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "lint": "eslint ."
+        "lint": "eslint .",
+        "test:world-collision": "node --test tests/Unit/WorldCollision.test.js"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

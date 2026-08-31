@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { AnimationMixer, LoopOnce } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { applyBoneQuaternions, captureBoneQuaternions, loadPoseClip } from '../VrmAvatar.jsx';
-import { ceilingHeight, getGroundHeight } from './groundHeight.js';
-import { isPathBlocked } from './collisionCheck.js';
-import { clampToBounds } from './clampToBounds.js';
+import { MAX_MOVEMENT_DELTA } from './collisionCheck.js';
+
+const ROAM_SPEED = 0.9;
 
 // Slower than the portrait's own POSE_BLEND_SECONDS (0.25s) — a resident
 // has no idle animation to blend back into, so a snappy return read as
@@ -16,7 +16,7 @@ const POSE_RETURN_SECONDS = 0.6;
 // pose (no body animation to ride along with) holds before decaying.
 const POSE_EXPRESSION_HOLD_SECONDS = 3.5;
 
-export default function ResidentController({ resident, playerPosition, paused, activePose, worldBounds, collisionMeshes, environmentScene }) {
+export default function ResidentController({ resident, playerPosition, paused, activePose, collisionWorld, residentPositions }) {
 	const { scene } = useThree();
 	const vrm = useRef(null);
 	const mixer = useRef(null);
@@ -29,17 +29,16 @@ export default function ResidentController({ resident, playerPosition, paused, a
 	const activeBlendshapesRef = useRef([]);
 	const currentWeightsRef = useRef({});
 	const [loaded, setLoaded] = useState(false);
-	const rawPosition = resident.position ?? { x: 0, y: 0, z: 0 };
-	const clamped = clampToBounds(rawPosition.x, rawPosition.y, rawPosition.z, worldBounds?.current);
-	// The configured Y is free-form user input against a coordinate system
-	// nobody can see ahead of time — instead of trusting it, rest the
-	// resident on the real floor height at its X/Z, same as the player.
-	const groundY = getGroundHeight(clamped.x, clamped.z, environmentScene?.current, clamped.y, ceilingHeight(worldBounds?.current));
-	const position = { x: clamped.x, y: groundY, z: clamped.z };
-	const distance = Math.hypot(playerPosition[0] - position.x, playerPosition[1] - position.y, playerPosition[2] - position.z);
+	const { x = 0, y = 0, z = 0 } = resident.position ?? {};
+	const position = useMemo(() => collisionWorld.findSpawn({ x, y, z }), [collisionWorld, x, y, z]);
+	const distance = position ? Math.hypot(playerPosition[0] - position.x, playerPosition[1] - position.y, playerPosition[2] - position.z) : Infinity;
 
 	useEffect(() => {
-		if (loaded || distance > 30 || !resident.assistant.vrmUrl) return;
+		if (!position) console.warn(`No walkable spawn was found for resident ${resident.id}.`);
+	}, [position, resident.id]);
+
+	useEffect(() => {
+		if (loaded || !position || distance > 30 || !resident.assistant.vrmUrl) return;
 		let cancelled = false;
 		const loader = new GLTFLoader();
 		loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -50,6 +49,7 @@ export default function ResidentController({ resident, playerPosition, paused, a
 			vrm.current.scene.position.set(position.x, position.y, position.z);
 			vrm.current.scene.rotation.y = resident.rotation?.y ?? 0;
 			scene.add(vrm.current.scene);
+			residentPositions.current.set(resident.id, vrm.current.scene.position);
 
 			// VRM models load in T-pose; lower the arms to a relaxed stance
 			// before capturing it as the rest pose a triggered animation
@@ -64,15 +64,16 @@ export default function ResidentController({ resident, playerPosition, paused, a
 			setLoaded(true);
 		});
 		return () => { cancelled = true; };
-	}, [distance, loaded, position.x, position.y, position.z, resident.assistant.vrmUrl, resident.rotation?.y, scene]);
+	}, [distance, loaded, position, resident.id, resident.assistant.vrmUrl, resident.rotation?.y, residentPositions, scene]);
 
 	useEffect(() => () => {
+		residentPositions.current.delete(resident.id);
 		if (vrm.current) {
 			scene.remove(vrm.current.scene);
 			VRMUtils.deepDispose(vrm.current.scene);
 		}
 		mixer.current?.stopAllAction();
-	}, [scene]);
+	}, [resident.id, residentPositions, scene]);
 
 	// A resident's pose is a one-shot trigger (e.g. a greeting wave), not an
 	// ongoing state — its body animation (if any) plays once and eases back
@@ -131,39 +132,19 @@ export default function ResidentController({ resident, playerPosition, paused, a
 
 	useFrame((state, delta) => {
 		if (!vrm.current) return;
-		if (resident.behavior === 'roam' && !paused && distance < 30) {
+		const currentPosition = vrm.current.scene.position;
+		const currentDistance = Math.hypot(playerPosition[0] - currentPosition.x, playerPosition[1] - currentPosition.y, playerPosition[2] - currentPosition.z);
+		if (resident.behavior === 'roam' && !paused && currentDistance < 30) {
 			const radius = Math.min(Number(resident.behaviorSettings?.radius ?? 1.2), 3);
-			const roamed = clampToBounds(
-				position.x + Math.sin(state.clock.elapsedTime * 0.55) * radius,
-				position.y,
-				position.z + Math.cos(state.clock.elapsedTime * 0.55) * radius,
-				worldBounds?.current
-			);
-
-			// Same raycast-based check FirstPersonController.jsx uses for the
-			// player — without it, roaming walked straight through walls and
-			// furniture since only the outer room bounds were enforced above.
-			const currentGroundY = vrm.current.scene.position.y;
-			const roamedGroundY = getGroundHeight(roamed.x, roamed.z, environmentScene?.current, currentGroundY, ceilingHeight(worldBounds?.current));
-			const wallBlocked = isPathBlocked(vrm.current.scene.position.x, vrm.current.scene.position.z, roamed.x, roamed.z, currentGroundY, collisionMeshes?.current);
-
-			if (!wallBlocked) {
-				vrm.current.scene.position.x = roamed.x;
-				vrm.current.scene.position.y = roamedGroundY;
-				vrm.current.scene.position.z = roamed.z;
+			const dx = position.x + Math.sin(state.clock.elapsedTime * 0.55) * radius - currentPosition.x;
+			const dz = position.z + Math.cos(state.clock.elapsedTime * 0.55) * radius - currentPosition.z;
+			const targetDistance = Math.hypot(dx, dz);
+			if (targetDistance > 0) {
+				const fraction = Math.min(1, ROAM_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA) / targetDistance);
+				collisionWorld.move(currentPosition, dx * fraction, dz * fraction);
 			}
-		} else if (distance < 30) {
-			// The environment's bounding box/ground height and this VRM load
-			// in parallel, so the very first placement (in the load effect
-			// below) can land before either is known. Re-asserting the
-			// grounded position every frame — cheap, since it's just an
-			// assignment — self-corrects once they're ready instead of
-			// leaving a stationary resident stuck wherever it first spawned.
-			vrm.current.scene.position.x = position.x;
-			vrm.current.scene.position.y = position.y;
-			vrm.current.scene.position.z = position.z;
 		}
-		if (distance < 30) {
+		if (currentDistance < 30) {
 			mixer.current?.update(delta);
 
 			const blend = returnBlendRef.current;

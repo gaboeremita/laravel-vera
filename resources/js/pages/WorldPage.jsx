@@ -37,6 +37,11 @@ export default function WorldPage() {
 	const exit = useCallback(() => navigate('/worlds'), [navigate]);
 	const openChat = useCallback((resident) => setChatResident(resident), []);
 	const closeChat = useCallback(() => setChatResident(null), []);
+	const handleWorldReady = useCallback(() => setStatus('ready'), []);
+	const handleWorldError = useCallback((error) => {
+		addToast(error?.message || 'Failed to initialize world', 'error');
+		setStatus('error');
+	}, [addToast]);
 
 	useEffect(() => {
 		if (!chatResident) return;
@@ -56,7 +61,7 @@ export default function WorldPage() {
 				</div>
 			)}
 			<div className="relative flex-1 min-w-0">
-				<WorldScene world={world} explorationEnabled={status === 'ready' && !chatResident} onReady={() => setStatus('ready')} onError={() => setStatus('error')} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} />
+				<WorldScene key={`${world.id}:${world.environmentUrl}`} world={world} explorationEnabled={status === 'ready' && !chatResident} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} />
 				{status !== 'ready' && <div className="absolute inset-0 z-10 flex items-center justify-center bg-bg-0/80 text-fg-2 text-sm tracking-[0.12em]">INITIALIZING {world.name.toUpperCase()}...</div>}
 				<div className="absolute left-5 top-5 z-10 flex items-center gap-3">
 					<button type="button" onClick={exit} className="border border-line-1 bg-bg-0/90 px-3 py-2 text-fg-2 text-[0.7rem] tracking-[0.1em] hover:text-fg-1">EXIT WORLD</button>

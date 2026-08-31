@@ -1,23 +1,39 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 
 const INTERACTION_DISTANCE = 2.2;
 
-export default function InteractionSystem({ residents, playerPosition, onResidentChange, onInteract, enabled = true }) {
-	const nearest = useMemo(() => residents
-		.map((resident) => ({ resident, distance: Math.hypot(playerPosition[0] - resident.position.x, playerPosition[1] - resident.position.y, playerPosition[2] - resident.position.z) }))
-		.filter(({ distance }) => distance <= INTERACTION_DISTANCE)
-		.sort((left, right) => left.distance - right.distance)[0]?.resident ?? null, [playerPosition, residents]);
+export default function InteractionSystem({ residents, residentPositions, onResidentChange, onInteract, enabled = true }) {
+	const { camera } = useThree();
+	const nearest = useRef(null);
+
+	useFrame(() => {
+		let nextResident = null;
+		let nearestDistance = INTERACTION_DISTANCE;
+		if (enabled) {
+			for (const resident of residents) {
+				const position = residentPositions.current.get(resident.id);
+				if (!position) continue;
+				const distance = camera.position.distanceTo(position);
+				if (distance > nearestDistance) continue;
+				nearestDistance = distance;
+				nextResident = resident;
+			}
+		}
+		if (nextResident?.id !== nearest.current?.id) {
+			nearest.current = nextResident;
+			onResidentChange(nextResident);
+		}
+	});
 
 	useEffect(() => {
-		onResidentChange(nearest);
 		if (!enabled) return;
-
 		const keyDown = (event) => {
-			if (event.code === 'KeyC' && nearest) { event.preventDefault(); onInteract(nearest); }
+			if (event.code === 'KeyC' && nearest.current) { event.preventDefault(); onInteract(nearest.current); }
 		};
 		window.addEventListener('keydown', keyDown);
 		return () => window.removeEventListener('keydown', keyDown);
-	}, [nearest, onInteract, onResidentChange, enabled]);
+	}, [onInteract, enabled]);
 
 	return null;
 }
