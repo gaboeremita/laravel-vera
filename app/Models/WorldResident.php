@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['assistant_id', 'position', 'rotation', 'behavior', 'behavior_settings'])]
+#[Fillable(['assistant_id', 'position', 'rotation', 'behavior', 'behavior_settings', 'opening_message', 'custom_prompt'])]
 class WorldResident extends Model
 {
     /** @use HasFactory<WorldResidentFactory> */

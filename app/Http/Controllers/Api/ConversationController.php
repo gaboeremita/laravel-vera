@@ -102,7 +102,16 @@ class ConversationController extends Controller
 
     public function store(Request $request, int $assistant): JsonResponse
     {
+        $validated = $request->validate([
+            'worldId' => ['nullable', 'integer', 'exists:worlds,id'],
+        ]);
+
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+        $world = isset($validated['worldId'])
+            ? World::whereBelongsTo($request->user())->find($validated['worldId'])
+            : null;
+        $resident = $world?->residents()->where('assistant_id', $assistant)->first();
 
         $conversation = $assistantUser
             ->conversations()
@@ -110,10 +119,11 @@ class ConversationController extends Controller
 
         $conversation->messages()->create([
             'role' => 'assistant',
-            'content' => $assistantUser->assistant->opening_message ?? '',
+            'content' => $resident?->opening_message ?: $assistantUser->assistant->opening_message ?? '',
         ]);
 
-        if ($assistantUser->assistant->portrait_type === AssistantPortraitType::Avatar3D
+        if ($world === null
+            && $assistantUser->assistant->portrait_type === AssistantPortraitType::Avatar3D
             && ! empty($assistantUser->assistant->opening_message)) {
             GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, $assistantUser->assistant->opening_message);
         }
@@ -157,7 +167,7 @@ class ConversationController extends Controller
             'messages.*.content' => ['nullable', 'string'],
             'messages.*.images' => ['sometimes', 'array'],
             'voice_mode' => ['sometimes', 'boolean'],
-            'world_id' => ['nullable', 'integer', 'exists:worlds,id'],
+            'worldId' => ['nullable', 'integer', 'exists:worlds,id'],
         ]);
 
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
@@ -267,8 +277,8 @@ class ConversationController extends Controller
             $excludedSections[] = 'voice mode';
         }
 
-        $world = isset($validated['world_id'])
-            ? World::whereBelongsTo($request->user())->findOrFail($validated['world_id'])
+        $world = isset($validated['worldId'])
+            ? World::whereBelongsTo($request->user())->findOrFail($validated['worldId'])
             : null;
         $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world);
         $director = new PromptDirector($prompt);

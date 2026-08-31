@@ -18,8 +18,8 @@ it('creates a world with required context and environment fields', function () {
         'name' => 'Connection Node',
         'slug' => 'connection-node',
         'description' => 'A polished sci-fi room.',
-        'assistant_context_prompt' => 'You are in the Connection Node.',
-        'npc_context_prompt' => 'You are a Connection Node NPC.',
+        'assistantContextPrompt' => 'You are in the Connection Node.',
+        'npcContextPrompt' => 'You are a Connection Node NPC.',
         'environment' => UploadedFile::fake()->create('connection-node.glb', 100, 'model/gltf-binary'),
     ]);
 

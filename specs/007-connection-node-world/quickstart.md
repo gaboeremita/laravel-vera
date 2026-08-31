@@ -3,19 +3,19 @@
 ## Prerequisites
 
 - A normal assistant with a configured 3D avatar.
-- User-selected, licensed room assets delivered as a runtime GLB with its collision mesh names, recommended spawn position, and any license/source notes.
+- User-selected, licensed room assets delivered as a runtime GLB with its collision mesh names, recommended spawn position, and any license/source notes. Wall/furniture collision only works against meshes or groups whose name contains "collision" (case-insensitive) — a GLB without that naming has no collision beyond the outer room-bounds clamp.
 - A second 3D avatar and pose/animation assets if creating an NPC.
 
 ## Create the First World
 
-1. Open the Assistants area and select the Worlds section.
+1. From Home, select the Worlds section.
 2. Choose **Create world**.
 3. Name it **Connection Node**, provide its description, upload/select the approved room GLB, and save spawn/collision configuration.
 4. Add an eligible normal assistant as a companion resident and set its placement.
 5. Enter a companion assistant world-context prompt, for example: “You are in the Connection Node, a 3D space where the user can move freely. Ground your response in the room when relevant.”
 6. Enter a distinct NPC world-context prompt.
 7. Save. Confirm the new Connection Node appears as an ordinary world card and can be reopened for editing.
-8. Open the NPCs section below Assistants, create an NPC through the assistant-style model, animation, pose, archive, and base-prompt controls, then save it.
+8. From Home, open the NPCs section, create an NPC through the assistant-style model, animation, pose, archive, and base-prompt controls, then save it.
 9. Return to Connection Node editing, add the existing NPC as a resident, and set its placement and behavior.
 10. Delete a disposable test world and confirm its room environment asset is removed while its assistant and NPC records remain available in their library sections.
 

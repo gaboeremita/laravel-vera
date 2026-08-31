@@ -30,7 +30,7 @@ const POSE_STATIC_CLIP_SECONDS = 0.5;
 // every frame. Reading/writing the raw set here would silently do nothing
 // (or get immediately overwritten) — every bone lookup in this file must go
 // through getNormalizedBoneNode() to touch the nodes actually being driven.
-function captureBoneQuaternions(vrm) {
+export function captureBoneQuaternions(vrm) {
 	const map = new Map();
 	for (const name of Object.keys(vrm.humanoid.humanBones)) {
 		const node = vrm.humanoid.getNormalizedBoneNode(name);
@@ -39,7 +39,7 @@ function captureBoneQuaternions(vrm) {
 	return map;
 }
 
-function applyBoneQuaternions(vrm, quatMap) {
+export function applyBoneQuaternions(vrm, quatMap) {
 	for (const [name, quat] of quatMap) {
 		const node = vrm.humanoid.getNormalizedBoneNode(name);
 		if (node) node.quaternion.copy(quat);
@@ -49,7 +49,7 @@ function applyBoneQuaternions(vrm, quatMap) {
 // Shared by the one-shot triggered-pose loader and the looping default-pose
 // loader — parses a .vrma or .fbx animation URL into a THREE.AnimationClip
 // targeting this vrm's normalized bones.
-async function loadPoseClip(url, vrm) {
+export async function loadPoseClip(url, vrm) {
 	if (url.toLowerCase().endsWith('.fbx')) {
 		const fbxAsset = await new FBXLoader().loadAsync(url);
 		return retargetMixamoAnimation(fbxAsset, vrm);

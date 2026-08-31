@@ -57,6 +57,8 @@ Constraints:
 | `rotation` | JSON nullable | Optional x/y/z orientation |
 | `behavior` | enum | `WorldResidentBehavior` cast; defaults to `Stationary` |
 | `behavior_settings` | JSON nullable | Roam bounds, idle timing, and future tuning |
+| `opening_message` | text nullable | Overrides the assistant's own opening message for this placement only |
+| `custom_prompt` | text nullable | Added on top of the world's kind-level context prompt, for this placement only |
 | timestamps | timestamps | Standard Laravel timestamps |
 
 Relationships:
@@ -79,7 +81,7 @@ Constraints:
 
 ## Chat Context Boundary
 
-`world_id` is ephemeral request context supplied by the in-world chat UI. It is not persisted on `conversations`, because the same assistant or NPC can participate in normal conversations and may reside in multiple worlds.
+`worldId` is ephemeral request context supplied by the in-world chat UI. It is not persisted on `conversations`, because the same assistant or NPC can participate in normal conversations and may reside in multiple worlds.
 
 The server validates:
 

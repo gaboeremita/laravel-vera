@@ -40,6 +40,7 @@ export default function AssistantsPage() {
 		<>
 			<Header
 				hideSettings
+				onBack={() => navigate('/')}
 				status={{
 					label: isLoading ? 'LOADING' : 'WAITING',
 					color: isLoading ? 'text-warning' : 'text-info',
@@ -126,17 +127,6 @@ export default function AssistantsPage() {
 							+ ADD ASSISTANT
 						</button>
 					</div>
-
-						<div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-						<button type="button" onClick={() => navigate('/worlds')} className="border border-line-1 bg-bg-1 p-5 text-left transition-colors hover:border-accent/50">
-							<p className="text-accent text-sm tracking-[0.08em]">WORLDS</p>
-							<p className="mt-2 text-fg-3 text-xs">Create and configure explorable 3D spaces, residents, context prompts, and room environments.</p>
-						</button>
-						<button type="button" onClick={() => navigate('/npcs')} className="border border-line-1 bg-bg-1 p-5 text-left transition-colors hover:border-accent/50">
-							<p className="text-accent text-sm tracking-[0.08em]">NPCS</p>
-							<p className="mt-2 text-fg-3 text-xs">Manage assistant-backed NPCs with the same model, animation, prompt, and archive tools.</p>
-						</button>
-						</div>
 					</>
 				)}
 			</div>

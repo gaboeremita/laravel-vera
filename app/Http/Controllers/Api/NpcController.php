@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Assistant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class NpcController extends Controller
 {
@@ -15,11 +16,29 @@ class NpcController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        return response()->json($request->user()->assistants()->where('kind', AssistantKind::WorldNpc)->with('vrm')->get());
+        $npcs = $request->user()->assistants()->where('kind', AssistantKind::WorldNpc)->with(['vrm', 'cardImage'])->get()
+            ->map(fn (Assistant $npc) => [
+                'id' => $npc->id,
+                'name' => $npc->name,
+                'slug' => $npc->slug,
+                'description' => $npc->description,
+                'kind' => $npc->kind->value,
+                'portrait_type' => $npc->portrait_type->value,
+                'vrm_url' => $npc->vrm?->url,
+                'image_url' => $npc->cardImage?->url,
+            ]);
+
+        return response()->json($npcs);
     }
 
     public function store(Request $request): JsonResponse
     {
+        $request->merge([
+            'slug' => Str::slug($request->string('name')->toString()).'-'.Str::lower(Str::random(6)),
+            'mode' => 'assistant',
+            'portrait_type' => 'avatar3d',
+        ]);
+
         return $this->assistantController->store($request, AssistantKind::WorldNpc);
     }
 

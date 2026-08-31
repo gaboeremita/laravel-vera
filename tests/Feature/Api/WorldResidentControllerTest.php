@@ -24,7 +24,7 @@ it('adds and removes a resident placement without deleting the character', funct
     $user = User::factory()->create();
     $world = World::factory()->for($user)->create();
     $assistant = residentAssistantFor($user);
-    $payload = ['position' => ['x' => 1, 'y' => 0, 'z' => 2], 'behavior' => 'roam', 'behavior_settings' => ['radius' => 1]];
+    $payload = ['position' => ['x' => 1, 'y' => 0, 'z' => 2], 'behavior' => 'roam', 'behaviorSettings' => ['radius' => 1]];
 
     $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), $payload)
         ->assertSuccessful()
@@ -35,6 +35,27 @@ it('adds and removes a resident placement without deleting the character', funct
 
     expect(WorldResident::where('world_id', $world->id)->exists())->toBeFalse();
     expect(Assistant::find($assistant->id))->not->toBeNull();
+});
+
+it('persists a resident-specific opening message and custom prompt', function () {
+    $user = User::factory()->create();
+    $world = World::factory()->for($user)->create();
+    $assistant = residentAssistantFor($user);
+    $payload = [
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'behavior' => 'stationary',
+        'openingMessage' => 'Oh, hey — you found this room?',
+        'customPrompt' => 'You are especially wary of strangers near the archive.',
+    ];
+
+    $response = $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), $payload)
+        ->assertSuccessful()
+        ->assertJsonPath('openingMessage', $payload['openingMessage'])
+        ->assertJsonPath('customPrompt', $payload['customPrompt']);
+
+    expect(WorldResident::where('world_id', $world->id)->where('assistant_id', $assistant->id)->first())
+        ->opening_message->toBe($payload['openingMessage'])
+        ->custom_prompt->toBe($payload['customPrompt']);
 });
 
 it('rejects a resident without a VRM asset', function () {

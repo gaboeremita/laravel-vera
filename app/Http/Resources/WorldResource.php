@@ -20,9 +20,9 @@ class WorldResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'description' => $this->description,
-            'environment_url' => $this->environment_disk && $this->environment_path ? Storage::disk($this->environment_disk)->url($this->environment_path) : null,
-            'assistant_context_prompt' => $this->assistant_context_prompt,
-            'npc_context_prompt' => $this->npc_context_prompt,
+            'environmentUrl' => $this->environment_disk && $this->environment_path ? Storage::disk($this->environment_disk)->url($this->environment_path) : null,
+            'assistantContextPrompt' => $this->assistant_context_prompt,
+            'npcContextPrompt' => $this->npc_context_prompt,
             'settings' => $this->settings,
             'residents' => $this->relationLoaded('residents')
                 ? WorldResidentResource::collection($this->residents)

@@ -21,9 +21,9 @@ it('serializes world context and environment without loading residents', functio
     expect($payload)
         ->toMatchArray([
             'id' => $world->id,
-            'assistant_context_prompt' => 'Assistant context',
-            'npc_context_prompt' => 'NPC context',
-            'environment_url' => Storage::disk('public')->url('worlds/room.glb'),
+            'assistantContextPrompt' => 'Assistant context',
+            'npcContextPrompt' => 'NPC context',
+            'environmentUrl' => Storage::disk('public')->url('worlds/room.glb'),
         ])
         ->and($payload['residents'])->toBeEmpty();
 });

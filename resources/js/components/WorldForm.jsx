@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import Accordion from './common/Accordion.jsx';
 
-export default function WorldForm({ value, onChange, environmentFile, onEnvironmentChange, isSaving, submitLabel }) {
+const FIELD_LABEL = 'text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1';
+const FIELD_INPUT = 'w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors';
+
+export default function WorldForm({ value, onChange, environmentFile, onEnvironmentChange, isSaving, submitLabel, children }) {
 	const update = (field, fieldValue) => onChange({ ...value, [field]: fieldValue });
 	const [sections, setSections] = useState({ details: false, environment: false, context: false });
 	const toggle = (section) => setSections((current) => ({ ...current, [section]: !current[section] }));
@@ -9,19 +12,54 @@ export default function WorldForm({ value, onChange, environmentFile, onEnvironm
 	return (
 		<form onSubmit={(event) => { event.preventDefault(); submitLabel(); }} className="flex-1 overflow-y-auto p-5 custom-scrollbar space-y-5">
 			<Accordion label="DETAILS" collapsed={sections.details} onToggle={() => toggle('details')}>
-				<label className="block text-fg-3 text-[0.7rem] tracking-[0.1em]">NAME<input value={value.name} onChange={(event) => update('name', event.target.value)} className="mt-2 w-full bg-bg-1 border border-line-1 p-3 text-fg-1" required /></label>
-				<label className="block text-fg-3 text-[0.7rem] tracking-[0.1em]">SLUG<input value={value.slug} onChange={(event) => update('slug', event.target.value)} className="mt-2 w-full bg-bg-1 border border-line-1 p-3 text-fg-1" required /></label>
-				<label className="block text-fg-3 text-[0.7rem] tracking-[0.1em]">DESCRIPTION<textarea value={value.description} onChange={(event) => update('description', event.target.value)} className="mt-2 w-full min-h-24 bg-bg-1 border border-line-1 p-3 text-fg-1" required /></label>
+				<div>
+					<label className={FIELD_LABEL}>Name</label>
+					<input value={value.name} onChange={(event) => update('name', event.target.value)} className={FIELD_INPUT} required />
+				</div>
+				<div>
+					<label className={FIELD_LABEL}>Slug</label>
+					<input value={value.slug} onChange={(event) => update('slug', event.target.value)} className={FIELD_INPUT} required />
+				</div>
+				<div>
+					<label className={FIELD_LABEL}>Description</label>
+					<textarea value={value.description} onChange={(event) => update('description', event.target.value)} rows={3} className={`${FIELD_INPUT} resize-none`} required />
+				</div>
 			</Accordion>
 			<Accordion label="ENVIRONMENT" collapsed={sections.environment} onToggle={() => toggle('environment')}>
-				<label className="block text-fg-3 text-[0.7rem] tracking-[0.1em]">ROOM ENVIRONMENT (.GLB)<input type="file" accept=".glb,model/gltf-binary" onChange={(event) => onEnvironmentChange(event.target.files?.[0] ?? null)} className="mt-2 block text-sm text-fg-2" required={!environmentFile && !value.environmentUrl} /></label>
-				{value.environmentUrl && <a href={value.environmentUrl} className="text-info text-xs hover:text-fg-1" target="_blank" rel="noreferrer">CURRENT ENVIRONMENT</a>}
+				<div>
+					<label className={FIELD_LABEL}>Room Environment (.glb)</label>
+					<input
+						type="file"
+						accept=".glb,model/gltf-binary"
+						onChange={(event) => onEnvironmentChange(event.target.files?.[0] ?? null)}
+						className="w-full text-sm text-accent file:mr-3 file:border file:border-line-1 file:bg-bg-1 file:text-fg-3 file:text-[0.65rem] file:tracking-[0.1em] file:px-3 file:py-1 file:cursor-pointer"
+						required={!environmentFile && !value.environmentUrl}
+					/>
+					{environmentFile && <span className="text-fg-3 text-[0.65rem] mt-1 block">{environmentFile.name}</span>}
+					{!environmentFile && value.environmentUrl && <a href={value.environmentUrl} className="text-info text-xs hover:text-fg-1 mt-1 block" target="_blank" rel="noreferrer">CURRENT ENVIRONMENT</a>}
+				</div>
 			</Accordion>
 			<Accordion label="CONVERSATION CONTEXT" collapsed={sections.context} onToggle={() => toggle('context')}>
-				<label className="block text-fg-3 text-[0.7rem] tracking-[0.1em]">COMPANION ASSISTANT WORLD CONTEXT<textarea value={value.assistantContextPrompt} onChange={(event) => update('assistantContextPrompt', event.target.value)} className="mt-2 w-full min-h-28 bg-bg-1 border border-line-1 p-3 text-fg-1" required /></label>
-				<label className="block text-fg-3 text-[0.7rem] tracking-[0.1em]">NPC WORLD CONTEXT<textarea value={value.npcContextPrompt} onChange={(event) => update('npcContextPrompt', event.target.value)} className="mt-2 w-full min-h-28 bg-bg-1 border border-line-1 p-3 text-fg-1" required /></label>
+				<div>
+					<label className={FIELD_LABEL}>Companion Assistant World Context</label>
+					<textarea value={value.assistantContextPrompt} onChange={(event) => update('assistantContextPrompt', event.target.value)} rows={4} className={`${FIELD_INPUT} resize-none`} required />
+				</div>
+				<div>
+					<label className={FIELD_LABEL}>NPC World Context</label>
+					<textarea value={value.npcContextPrompt} onChange={(event) => update('npcContextPrompt', event.target.value)} rows={4} className={`${FIELD_INPUT} resize-none`} required />
+				</div>
 			</Accordion>
-			<button disabled={isSaving} className="button-primary text-[0.7rem]">{isSaving ? 'SAVING...' : 'SAVE WORLD'}</button>
+			{children}
+			<div className="flex justify-end pt-2 pb-4">
+				<button
+					disabled={isSaving}
+					className={`text-[0.75rem] tracking-[0.1em] px-6 py-2 transition-colors ${
+						isSaving ? 'bg-bg-3 text-fg-3 cursor-default' : 'button-success cursor-pointer'
+					}`}
+				>
+					{isSaving ? 'SAVING...' : 'SAVE WORLD'}
+				</button>
+			</div>
 		</form>
 	);
 }

@@ -7,6 +7,7 @@ import { Ziggy } from './ziggy.js';
 import AuthenticatedLayout from './layouts/AuthenticatedLayout.jsx';
 import AssistantLayout from './layouts/AssistantLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
+import HomePage from './pages/HomePage.jsx';
 import AssistantsPage from './pages/AssistantsPage.jsx';
 import CreateAssistantPage from './pages/CreateAssistantPage.jsx';
 import EditAssistantPage from './pages/EditAssistantPage.jsx';
@@ -35,6 +36,8 @@ createRoot(document.getElementById('root')).render(
                 <Routes>
                     <Route path="/login" element={<LoginPage />} />
                     <Route element={<AuthenticatedLayout />}>
+                        <Route path="/" element={<HomePage />} />
+
                         {/* Assistant management */}
                         <Route path="/assistants" element={<AssistantsPage />} />
                         <Route path="/assistants/create" element={<CreateAssistantPage />} />
@@ -61,7 +64,7 @@ createRoot(document.getElementById('root')).render(
                             <Route path="discord" element={<DiscordPage />} />
                         </Route>
                     </Route>
-                    <Route path="*" element={<Navigate to="/assistants" replace />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </BrowserRouter>
         </ThemeProvider>

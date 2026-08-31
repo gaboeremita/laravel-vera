@@ -18,6 +18,7 @@ export default function AuthenticatedLayout() {
 	const [currentPose, setCurrentPose] = useState(null);
 	const [activeAssistantId, setActiveAssistantId] = useState(null);
 	const [activeConversationId, setActiveConversationId] = useState(null);
+	const [hidePortrait, setHidePortrait] = useState(false);
 
 	const { emotionNames, poses, fetchEmotions, getImageUrl, getVideoUrl, getVrmBlendshapes, getPoseBlendshapes, getPoseAnimationUrl, unlocked, portraitType, vrmUrl } = useEmotions();
 	const { toasts, addToast, removeToast } = useToast();
@@ -49,26 +50,28 @@ export default function AuthenticatedLayout() {
 			<Scanlines />
 			<div className="absolute inset-0 pointer-events-none z-[11] viewport-ambient" />
 
-			<div className="w-[35%] min-w-50 max-w-400 shrink-0 border-r border-line-1 relative z-5">
-				<Portrait
-					emotion={currentEmotion}
-					authenticated={true}
-					hasAssistant={!!activeAssistantId}
-					getImageUrl={getImageUrl}
-					getVideoUrl={getVideoUrl}
-					getVrmBlendshapes={getVrmBlendshapes}
-					poseBlendshapes={currentPose ? getPoseBlendshapes(currentPose.name) : []}
-					poseAnimationUrl={currentPose ? getPoseAnimationUrl(currentPose.name) : null}
-					poseTriggerId={currentPose?.triggerId ?? null}
-					poseName={currentPose?.name ?? null}
-					defaultPoseBlendshapes={getPoseBlendshapes('default')}
-					defaultPoseAnimationUrl={getPoseAnimationUrl('default')}
-					portraitType={portraitType}
-					vrmUrl={vrmUrl}
-					assistantId={activeAssistantId}
-					conversationId={activeConversationId}
-				/>
-			</div>
+			{!hidePortrait && (
+				<div className="w-[35%] min-w-50 max-w-400 shrink-0 border-r border-line-1 relative z-5">
+					<Portrait
+						emotion={currentEmotion}
+						authenticated={true}
+						hasAssistant={!!activeAssistantId}
+						getImageUrl={getImageUrl}
+						getVideoUrl={getVideoUrl}
+						getVrmBlendshapes={getVrmBlendshapes}
+						poseBlendshapes={currentPose ? getPoseBlendshapes(currentPose.name) : []}
+						poseAnimationUrl={currentPose ? getPoseAnimationUrl(currentPose.name) : null}
+						poseTriggerId={currentPose?.triggerId ?? null}
+						poseName={currentPose?.name ?? null}
+						defaultPoseBlendshapes={getPoseBlendshapes('default')}
+						defaultPoseAnimationUrl={getPoseAnimationUrl('default')}
+						portraitType={portraitType}
+						vrmUrl={vrmUrl}
+						assistantId={activeAssistantId}
+						conversationId={activeConversationId}
+					/>
+				</div>
+			)}
 
 			<div className="flex-1 flex flex-col relative z-5 min-w-0">
 				{!booted ? (
@@ -88,6 +91,7 @@ export default function AuthenticatedLayout() {
 						activeAssistantId,
 						setActiveAssistantId,
 						setActiveConversationId,
+						setHidePortrait,
 					}} />
 				)}
 			</div>

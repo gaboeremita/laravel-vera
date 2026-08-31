@@ -18,6 +18,12 @@
 - Q: Where are NPCs managed and removed? → A: NPCs are assistant-backed records managed in a dedicated NPC section below Assistants. Worlds only add or remove their resident placements; permanent NPC deletion occurs only in NPC CRUD.
 - Q: What happens to a world environment asset when its world is deleted? → A: The environment asset is owned by its world and is permanently deleted with that world.
 
+### Session 2026-08-31
+
+- Q: Should Worlds and NPCs live below Assistants on the same page, or be sibling sections of their own? → A: Assistants, Worlds, and NPCs are three sibling sections, each with its own page, reachable from a new Home page; Assistants keeps its own page with a back button to Home.
+- Q: Can residents be selected while creating a world, or only after it's saved? → A: Resident selection is available on the create screen itself, staged locally and attached right after the world is created; the world editor keeps the same resident controls for later changes.
+- Q: Should the resident picker show ineligible assistants/NPCs with a reason, or just the eligible ones? → A: Just the eligible ones, grouped separately as Assistants and NPCs; ineligible records are omitted rather than shown disabled.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create and manage worlds (Priority: P1)
@@ -30,8 +36,8 @@ An authenticated user opens the Worlds section alongside Assistants, creates a w
 
 **Acceptance Scenarios**:
 
-1. **Given** the user is viewing Assistants, **When** they choose Worlds, **Then** they see existing world cards and an add-world card.
-2. **Given** the user creates a world with valid required fields, **When** they save it, **Then** the world appears in the Worlds section and can be edited or entered.
+1. **Given** the user is on Home, **When** they choose Worlds, **Then** they see existing world cards and an add-world card.
+2. **Given** the user creates a world with valid required fields and optionally selects eligible residents, **When** they save it, **Then** the world appears in the Worlds section with any selected residents already placed, and can be edited or entered.
 3. **Given** the user edits a world prompt, **When** they save it, **Then** later in-world conversations use the updated prompt.
 4. **Given** the user removes a world, **When** they confirm deletion, **Then** the world, its environment asset, and all resident placements are removed without deleting assistants, NPCs, or their conventional conversations.
 
@@ -73,7 +79,7 @@ The user configures eligible existing 3D assistants and NPCs as residents of a w
 
 ### User Story 4 - Configure NPCs and resident behavior (Priority: P2)
 
-The user manages NPCs in an NPC section below Assistants. Each NPC has a name, one editable character prompt, optional archive, 3D character model, and pose setup. The user then adds existing NPCs to worlds and configures their placement and stationary or roaming behavior there.
+The user manages NPCs in their own NPC section, reachable from Home alongside Assistants and Worlds. Each NPC has a name, one editable character prompt, optional archive, 3D character model, and pose setup. The user then adds existing NPCs to worlds and configures their placement and stationary or roaming behavior there.
 
 **Why this priority**: NPCs make a world feel inhabited while preserving a coherent, professional configuration model.
 
@@ -81,7 +87,7 @@ The user manages NPCs in an NPC section below Assistants. Each NPC has a name, o
 
 **Acceptance Scenarios**:
 
-1. **Given** the user edits a world, **When** they select companion residents, **Then** only owned assistants with usable 3D models are selectable and ineligible assistants explain why.
+1. **Given** the user edits a world, **When** they select companion residents, **Then** only owned assistants and NPCs with usable 3D models are listed as selectable, grouped separately by kind.
 2. **Given** the user creates an NPC with required settings, **When** they save it, **Then** it appears in the NPC section and can later be added to a world as a resident.
 3. **Given** a resident is set to roam, **When** the world is active, **Then** it stays inside its safe roaming area and stops roaming while in chat.
 
@@ -99,7 +105,7 @@ The user manages NPCs in an NPC section below Assistants. Each NPC has a name, o
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST provide Worlds and NPCs sections below Assistants; each lists owned records and includes its appropriate add action.
+- **FR-001**: The system MUST provide Assistants, Worlds, and NPCs as sibling sections reachable from a Home page; each lists owned records and includes its appropriate add action.
 - **FR-002**: Users MUST be able to create, edit, enter, and delete owned worlds; deletion MUST permanently remove the world-owned environment asset and resident placements only.
 - **FR-003**: A world MUST have a non-empty name, description, approved environment configuration, assistant context prompt, and NPC context prompt.
 - **FR-004**: The world editor MUST expose both context prompts as editable fields and MUST not hardcode their content.
@@ -107,14 +113,14 @@ The user manages NPCs in an NPC section below Assistants. Each NPC has a name, o
 - **FR-006**: The system MUST add the NPC context prompt only to NPC conversations initiated through that world.
 - **FR-007**: Conventional conversations outside a world MUST not receive a world context prompt.
 - **FR-008**: A world MUST provide a first-person single-room experience with keyboard/mouse controls, an explicit input-release path, and focus-loss movement stop.
-- **FR-009**: The system MUST prevent movement through configured room boundaries and solid furnishings.
+- **FR-009**: The system MUST prevent movement through configured room boundaries and solid furnishings, by blocking movement against any mesh or group in the environment GLB whose name contains "collision" (case-insensitive); a room asset with no such geometry has no furnishing/wall collision, only the outer room-bounds clamp.
 - **FR-010**: The system MUST let the user add and remove only owned, usable 3D assistants or NPCs as world residents without changing the underlying character record.
 - **FR-011**: The system MUST let the user create, edit, and permanently delete NPCs in the dedicated NPC section with a name, one character prompt, optional archive, 3D model, and pose configuration; worlds MUST configure only their placement and stationary or roaming behavior.
 - **FR-012**: NPCs MUST reuse the existing assistant character, prompt, archive, provider, conversation, voice, and pose behavior.
 - **FR-013**: The system MUST show a nearby resident's chat prompt only inside its interaction range and MUST open its chat with `C`.
 - **FR-014**: The system MUST use the selected resident's existing conversation identity and history while preserving user and assistant ownership boundaries.
 - **FR-015**: The system MUST display a graceful loading state and recoverable errors for unavailable environment, character, and chat resources.
-- **FR-016**: The system MUST reduce nonessential resident animation, roaming, and visual updates outside view and interaction range, and MUST release world-only resources when leaving a world.
+- **FR-016**: The system MUST reduce nonessential resident animation, roaming, and visual updates outside a fixed distance from the player, and MUST release world-only resources when leaving a world.
 - **FR-017**: World configuration, environment assets, and placements MUST be scoped to their owning user and world; assistants and NPCs MUST remain scoped to their owning user.
 - **FR-018**: V1 MUST exclude mobile controls, multiple rooms inside one world, generated environmental backgrounds, and open-world traversal.
 

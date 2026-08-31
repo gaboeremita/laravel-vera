@@ -19,8 +19,8 @@ Request body:
   "name": "Connection Node",
   "description": "A polished sci-fi communication room.",
   "environment": "uploaded-world-glb",
-  "assistant_context_prompt": "You are in the Connection Node, a 3D space where the user can move freely.",
-  "npc_context_prompt": "You are a resident of the Connection Node. Keep your replies grounded in the room.",
+  "assistantContextPrompt": "You are in the Connection Node, a 3D space where the user can move freely.",
+  "npcContextPrompt": "You are a resident of the Connection Node. Keep your replies grounded in the room.",
   "settings": {
     "player_spawn": { "x": 0, "y": 0, "z": 0 },
     "collision_map": ["Collision_Walls", "Collision_Furniture"]
@@ -53,9 +53,13 @@ Adds or updates an existing normal assistant or NPC resident.
   "position": { "x": 1.2, "y": 0, "z": -2.8 },
   "rotation": { "x": 0, "y": 2.3, "z": 0 },
   "behavior": "stationary",
-  "behavior_settings": null
+  "behaviorSettings": null,
+  "openingMessage": "Oh, hey — you found this room?",
+  "customPrompt": "You are especially wary of strangers near the archive."
 }
 ```
+
+`openingMessage` and `customPrompt` are optional per-placement overrides: `openingMessage` replaces the assistant's own opening message only for conversations started from this world, and `customPrompt` is appended on top of the world's kind-level context prompt only for this placement. Both are `null` by default, in which case the assistant's own opening message and the world's kind-level context prompt apply unchanged.
 
 The server rejects assistants or NPCs not owned by the user and characters without a usable 3D avatar.
 
@@ -83,13 +87,25 @@ Permanently deletes an owned NPC using the confirmed NPC CRUD action. Its world 
 
 ## In-World Conversation Context
 
-Existing conversation create/send operations accept an optional `world_id` only when invoked by `WorldPage`.
+Existing conversation create/send operations accept an optional `worldId` only when invoked by `WorldPage`.
+
+### `POST /api/assistants/{assistant}/conversations`
+
+```json
+{
+  "worldId": 42
+}
+```
+
+When `worldId` is present, the created conversation's opening message is the resident's `openingMessage` override if one is set on that placement, falling back to the assistant's own opening message otherwise. When absent, existing conversation behavior is unchanged (the assistant's own opening message).
+
+### `POST /api/assistants/{assistant}/conversations/{conversation}/messages`
 
 ```json
 {
   "content": "What is this place?",
-  "world_id": 42
+  "worldId": 42
 }
 ```
 
-When present, the server must verify that the requested assistant is a resident of world `42` and that world belongs to the authenticated user. It appends `assistant_context_prompt` for companion assistants or `npc_context_prompt` for `WorldNpc` assistants to that request's composed prompt. Invalid or unauthorized world context returns the application's standard validation/authorization response. When absent, existing conversation behavior is unchanged.
+When present, the server must verify that the requested assistant is a resident of world `42` and that world belongs to the authenticated user. It appends `assistantContextPrompt` for companion assistants or `npcContextPrompt` for `WorldNpc` assistants, plus that resident's `customPrompt` when set, to that request's composed prompt. Invalid or unauthorized world context returns the application's standard validation/authorization response. When absent, existing conversation behavior is unchanged.

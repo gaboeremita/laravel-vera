@@ -20,13 +20,15 @@ class WorldResidentResource extends JsonResource
                 'id' => $this->assistant->id,
                 'name' => $this->assistant->name,
                 'kind' => $this->assistant->kind->value,
-                'vrm_url' => $this->assistant->vrm?->url,
-                'opening_message' => $this->assistant->opening_message,
+                'vrmUrl' => $this->assistant->vrm?->url,
+                'openingMessage' => $this->assistant->opening_message,
             ],
             'position' => $this->position,
             'rotation' => $this->rotation,
             'behavior' => $this->behavior->value,
-            'behavior_settings' => $this->behavior_settings,
+            'behaviorSettings' => $this->behavior_settings,
+            'openingMessage' => $this->opening_message,
+            'customPrompt' => $this->custom_prompt,
         ];
     }
 }

@@ -14,12 +14,14 @@ class AppendWorldConversationContext
             return $assistant->prompt;
         }
 
-        if (! $world->residents()->where('assistant_id', $assistant->id)->exists()) {
+        $resident = $world->residents()->where('assistant_id', $assistant->id)->first();
+
+        if ($resident === null) {
             throw new AuthorizationException('The assistant is not a resident of this world.');
         }
 
         $prompt = $assistant->prompt;
-        $prompt['world_context'] = [$world->contextPromptFor($assistant->kind)];
+        $prompt['world_context'] = array_filter([$world->contextPromptFor($assistant->kind), $resident->custom_prompt]);
 
         return $prompt;
     }

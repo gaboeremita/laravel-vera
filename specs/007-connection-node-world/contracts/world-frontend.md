@@ -4,13 +4,14 @@
 
 | Route | Page | Purpose |
 |---|---|---|
-| `/worlds` | `WorldsPage` | List the current user's world cards; accessible from the Assistants area Worlds section |
-| `/worlds/create` | `CreateWorldPage` | Create a world with metadata, environment, context prompts, and later resident placement |
+| `/` | `HomePage` | Sibling Assistants/Worlds/NPCs cards; the app's landing page |
+| `/worlds` | `WorldsPage` | List the current user's world cards |
+| `/worlds/create` | `CreateWorldPage` | Create a world with metadata, environment, context prompts, and resident placement |
 | `/worlds/:worldId` | `WorldPage` | Load and explore the selected 3D world |
 | `/worlds/:worldId/edit` | `EditWorldPage` | Modify its world configuration |
-| `/npcs` | `NpcsPage` | List and manage assistant-backed NPC records below Assistants |
-| `/npcs/create` | `CreateNpcPage` | Create an NPC through the existing assistant configuration subset |
-| `/npcs/:npcId/edit` | `EditNpcPage` | Edit or permanently delete an NPC |
+| `/npcs` | `NpcsPage` | List and manage assistant-backed NPC records, with inline cards |
+| `/npcs/create` | `CreateNpcPage` | Renders `CreateAssistantPage` with `kind="world_npc"` |
+| `/npcs/:assistantId/edit` | `EditAssistantPage` (`kind="world_npc"`) | Edit or permanently delete an NPC |
 
 No route is reserved for Connection Node. It is ordinary user-created world content.
 
@@ -30,11 +31,14 @@ type WorldResource = {
     collisionMap?: string[];
   } | null;
   residents: Array<{
+    id: number;
     assistant: AssistantResource;
     position: { x: number; y: number; z: number };
     rotation: { x: number; y: number; z: number } | null;
     behavior: 'stationary' | 'roam';
     behaviorSettings: Record<string, unknown> | null;
+    openingMessage: string | null;
+    customPrompt: string | null;
   }>;
 };
 ```
@@ -59,7 +63,7 @@ The prompts are labelled professionally:
 1. **Loading transition**: world name and progress/error state while configuration and assets load.
 2. **Explore**: first-person scene, minimal controls/help affordance, interaction indicator only when relevant.
 3. **Resident interaction**: a nearby visible resident presents `C — Chat` (or the configured accessible equivalent).
-4. **Chat**: in-world overlay/drawer keeps the canvas alive, identifies the resident, and sends `world_id` with every create/send operation.
+4. **Chat**: in-world overlay/drawer keeps the canvas alive, identifies the resident, and sends `worldId` with every create/send operation.
 5. **Pause/settings**: controls/help, audio and visual-quality toggles where supported, and an explicit Exit World action. World editor settings remain separate from in-world preferences.
 6. **Error/empty state**: missing environment, failed asset, no residents, or unauthorized world has a recoverable route back to Worlds.
 
@@ -68,7 +72,6 @@ The prompts are labelled professionally:
 - `WorldScene`: owns scene lifecycle and asset disposal.
 - `FirstPersonController`: keyboard/mouse movement and collision integration.
 - `WorldEnvironment`: GLB loading, named collision mesh extraction, lights, and scene setup.
-- `ResidentController`: placement, stationary/roam behavior, and animation policy.
+- `ResidentController`: placement, stationary/roam behavior, animation policy, and the distance cutoff that suspends nonessential resident work (no separate `VisibilityPolicy` module).
 - `InteractionSystem`: proximity/line-of-sight checks and keyboard activation.
-- `VisibilityPolicy`: frustum/distance thresholds that suspend nonessential resident work.
-- `WorldChat`: existing conversation UI adapted to pass active `world_id`; no separate provider/chat system.
+- `WorldChat`: existing conversation UI adapted to pass active `worldId`; no separate provider/chat system.

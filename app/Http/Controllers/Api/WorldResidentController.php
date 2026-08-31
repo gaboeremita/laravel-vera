@@ -19,7 +19,16 @@ class WorldResidentController extends Controller
         abort_unless($assistant->users()->whereKey($request->user())->exists(), 404);
         abort_unless($assistant->portrait_type === AssistantPortraitType::Avatar3D && $assistant->vrm()->exists(), 422);
 
-        $resident = $world->residents()->updateOrCreate(['assistant_id' => $assistant->id], $request->validated());
+        $validated = $request->validated();
+
+        $resident = $world->residents()->updateOrCreate(['assistant_id' => $assistant->id], [
+            'position' => $validated['position'],
+            'rotation' => $validated['rotation'] ?? null,
+            'behavior' => $validated['behavior'],
+            'behavior_settings' => $validated['behaviorSettings'] ?? null,
+            'opening_message' => $validated['openingMessage'] ?? null,
+            'custom_prompt' => $validated['customPrompt'] ?? null,
+        ]);
 
         $resident->load('assistant.vrm');
 

@@ -28,8 +28,10 @@ class UpsertWorldResidentRequest extends FormRequest
             'rotation.y' => ['required_with:rotation', 'numeric'],
             'rotation.z' => ['required_with:rotation', 'numeric'],
             'behavior' => ['required', new Enum(WorldResidentBehavior::class)],
-            'behavior_settings' => ['nullable', 'array'],
-            'behavior_settings.radius' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
+            'behaviorSettings' => ['nullable', 'array'],
+            'behaviorSettings.radius' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
+            'openingMessage' => ['nullable', 'string'],
+            'customPrompt' => ['nullable', 'string'],
         ];
     }
 }

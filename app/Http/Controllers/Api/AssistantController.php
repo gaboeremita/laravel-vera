@@ -55,6 +55,7 @@ class AssistantController extends Controller
                     'name' => $assistant->name,
                     'slug' => $assistant->slug,
                     'description' => $assistant->description,
+                    'kind' => $assistant->kind->value,
                     'portrait_type' => $assistant->portrait_type->value,
                     'vrm_url' => $assistant->vrm?->url,
                     'image_url' => $cardImageUrl,
@@ -139,6 +140,9 @@ class AssistantController extends Controller
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
             'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
+            'vrm' => $kind === AssistantKind::WorldNpc
+                ? ['required', 'file', 'extensions:vrm', 'max:51200']
+                : ['sometimes', 'file', 'extensions:vrm', 'max:51200'],
             'emotions' => $isAvatarMode ? ['prohibited'] : ['required', 'array', 'min:1'],
             'emotions.*.name' => ['required', 'string', 'max:255', 'distinct'],
             'emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
@@ -191,6 +195,19 @@ class AssistantController extends Controller
             ]);
 
             $request->user()->assistants()->attach($assistant->id);
+
+            if (isset($validated['vrm'])) {
+                $vrm = $validated['vrm'];
+                $path = $vrm->store("vrm/{$assistant->id}", 'public');
+
+                $assistant->vrm()->create([
+                    'path' => $path,
+                    'disk' => 'public',
+                    'mime_type' => 'application/octet-stream',
+                    'size' => $vrm->getSize(),
+                    'original_name' => $vrm->getClientOriginalName(),
+                ]);
+            }
 
             $storeEmotion = function (array $emotionData, bool $restricted) use ($assistant): void {
                 $emotion = $assistant->emotions()->create([

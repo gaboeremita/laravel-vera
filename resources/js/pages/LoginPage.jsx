@@ -16,7 +16,7 @@ export default function LoginPage() {
 
 	useEffect(() => {
 		api.get(route('user.show')).then((res) => {
-			if (res.ok) navigate('/assistants', { replace: true });
+			if (res.ok) navigate('/', { replace: true });
 		}).catch(() => {});
 	}, []);
 
@@ -36,7 +36,7 @@ export default function LoginPage() {
 			const res = await api.login(email.trim(), password);
 
 			if (res.ok) {
-				navigate('/assistants', { replace: true });
+				navigate('/', { replace: true });
 			} else {
 				setError('Authentication failed. Check your email and password.');
 				setIsSubmitting(false);

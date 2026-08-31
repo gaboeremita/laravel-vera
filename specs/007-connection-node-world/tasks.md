@@ -65,13 +65,14 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 ### Implementation for User Story 1
 
 - [X] T018 [US1] Implement authorized list, create, show, update, and delete actions, including world-owned environment asset cleanup, in `app/Http/Controllers/Api/WorldController.php`
-- [ ] T019 [US1] Implement world environment upload/replace validation and storage using existing file-storage conventions in `app/Http/Controllers/Api/WorldEnvironmentController.php` and `routes/api.php`
+- [X] T019 [US1] Implement world environment upload/replace validation and storage using existing file-storage conventions directly in `app/Http/Controllers/Api/WorldController.php`'s `store`/`update` actions and `routes/api.php`, with no separate `WorldEnvironmentController.php`
 - [ ] T020 [P] [US1] Add a world API hook with loading, mutation, and error behavior in `resources/js/hooks/useWorlds.js`
 - [X] T021 [P] [US1] Create a reusable world card matching existing assistant-card styling in `resources/js/components/WorldCard.jsx`
 - [X] T022 [US1] Add the Worlds section, world cards, and create-world entry point to the existing library view in `resources/js/pages/AssistantsPage.jsx`
+- [X] T022a [US1] Move the Worlds/NPCs entry points off `resources/js/pages/AssistantsPage.jsx` into a new `resources/js/pages/HomePage.jsx` landing page (Assistants, Worlds, NPCs as sibling cards); restore `AssistantsPage.jsx` to an assistant-only view with a back button to Home; update `WorldsPage.jsx`/`NpcsPage.jsx` back navigation, the login redirect, and the `/` route/catch-all in `resources/js/app.jsx` to match
 - [X] T023 [US1] Create the reusable assistant-style world form with required metadata, environment, and professionally labelled assistant/NPC context prompt fields in `resources/js/components/WorldForm.jsx`
 - [X] T024 [US1] Create the create-world screen using `Header`, `Accordion`, and `WorldForm` in `resources/js/pages/CreateWorldPage.jsx`
-- [ ] T025 [US1] Create the edit-world screen with save and confirmation-modal deletion behavior in `resources/js/pages/EditWorldPage.jsx`
+- [X] T025 [US1] Create the edit-world screen with save and confirmation-modal deletion behavior in `resources/js/pages/EditWorldPage.jsx`
 - [X] T026 [US1] Register generic Worlds create/edit routes and preserve existing fallback behavior in `resources/js/app.jsx`
 
 **Checkpoint**: A user can manage worlds through a consistent UI. The app has no hardcoded Connection Node route, record, or prompt.
@@ -86,16 +87,16 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 ### Tests for User Story 2
 
-- [ ] T027 [P] [US2] Add feature coverage for authorized runtime-world retrieval, missing environment handling, and empty resident worlds in `tests/Feature/Api/WorldControllerTest.php`
+- [X] T027 [P] [US2] Add feature coverage for authorized runtime-world retrieval, missing environment handling, and empty resident worlds in `tests/Feature/Api/WorldControllerTest.php`
 
 ### Implementation for User Story 2
 
-- [ ] T028 [US2] Extract the reusable VRM loading, pose, animation, and disposal layer from the portrait preview into `resources/js/components/CharacterVrm.jsx` and refactor `resources/js/components/VrmAvatar.jsx` to consume it without changing portrait behavior
-- [ ] T029 [P] [US2] Implement GLB environment loading, named collision mesh extraction, scene lighting, load errors, and teardown in `resources/js/components/world/WorldEnvironment.jsx`
-- [ ] T030 [P] [US2] Implement keyboard/mouse first-person movement, focus-loss stop, pointer-lock release, and collision integration in `resources/js/components/world/FirstPersonController.jsx`
-- [ ] T031 [P] [US2] Implement world-only resource disposal and runtime error boundaries in `resources/js/components/world/WorldScene.jsx`
-- [ ] T032 [US2] Create loading, empty, failure, pause/settings, and exit-to-Worlds states around the scene in `resources/js/pages/WorldPage.jsx`
-- [ ] T033 [US2] Register the generic enter-world route in `resources/js/app.jsx`
+- [X] T028 [US2] Export the reusable VRM pose-loading and bone-quaternion helpers (`loadPoseClip`, `captureBoneQuaternions`, `applyBoneQuaternions`) from `resources/js/components/VrmAvatar.jsx` for direct reuse by world resident rendering, without a separate `CharacterVrm.jsx` extraction
+- [X] T029 [P] [US2] Implement GLB environment loading, named collision mesh extraction, scene lighting, load errors, and teardown in `resources/js/components/world/WorldEnvironment.jsx`
+- [X] T030 [P] [US2] Implement keyboard/mouse first-person movement, focus-loss stop, pointer-lock release, and collision integration in `resources/js/components/world/FirstPersonController.jsx`
+- [X] T031 [P] [US2] Implement world-only resource disposal and runtime error boundaries in `resources/js/components/world/WorldScene.jsx`
+- [X] T032 [US2] Create loading, empty, failure, pause/settings, and exit-to-Worlds states around the scene in `resources/js/pages/WorldPage.jsx`
+- [X] T033 [US2] Register the generic enter-world route in `resources/js/app.jsx`
 
 **Checkpoint**: A ready GLB world is independently explorable on desktop and returns cleanly to the normal application shell.
 
@@ -109,19 +110,19 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 ### Tests for User Story 3
 
-- [ ] T034 [P] [US3] Write feature coverage proving companion and NPC world prompts are appended only for authorized in-world sends and never for ordinary sends in `tests/Feature/Api/WorldConversationContextTest.php`
-- [ ] T035 [P] [US3] Write feature coverage rejecting foreign worlds and assistants that are not residents in `tests/Feature/Api/WorldConversationContextTest.php`
-- [ ] T036 [P] [US3] Write feature coverage for eligible assistant/NPC placement and removal without deleting the underlying character record in `tests/Feature/Api/WorldResidentControllerTest.php`
+- [X] T034 [P] [US3] Write feature coverage proving companion and NPC world prompts are appended only for authorized in-world sends and never for ordinary sends in `tests/Feature/Api/WorldConversationContextTest.php`
+- [X] T035 [P] [US3] Write feature coverage rejecting foreign worlds and assistants that are not residents in `tests/Feature/Api/WorldConversationContextTest.php`
+- [X] T036 [P] [US3] Write feature coverage for eligible assistant/NPC placement and removal without deleting the underlying character record in `tests/Feature/Api/WorldResidentControllerTest.php`
 
 ### Implementation for User Story 3
 
-- [ ] T037 [US3] Implement assistant/NPC resident add/update/remove authorization, 3D-avatar eligibility checks, placement validation, and resource responses in `app/Http/Controllers/Api/WorldResidentController.php`
-- [ ] T038 [US3] Implement one-request world-context composition and resident/owner validation in `app/Actions/AppendWorldConversationContext.php`
-- [ ] T039 [US3] Accept and validate optional `world_id` on conversation creation/send paths and invoke the context action before `PromptDirector` in `app/Http/Controllers/Api/ConversationController.php`
-- [ ] T040 [P] [US3] Implement positioned resident VRMs and active-chat movement pause state in `resources/js/components/world/ResidentController.jsx`
-- [ ] T041 [P] [US3] Implement proximity, line-of-sight, accessible `C — Chat` prompting, and input activation in `resources/js/components/world/InteractionSystem.jsx`
-- [ ] T042 [US3] Adapt the existing conversation UI into an in-world overlay that passes the active `world_id` without creating a second chat/provider pipeline in `resources/js/components/world/WorldChat.jsx`
-- [ ] T043 [US3] Integrate resident selection, interaction, chat panel, and exploration resume behavior in `resources/js/pages/WorldPage.jsx`
+- [X] T037 [US3] Implement assistant/NPC resident add/update/remove authorization, 3D-avatar eligibility checks, placement validation, and resource responses in `app/Http/Controllers/Api/WorldResidentController.php`
+- [X] T038 [US3] Implement one-request world-context composition and resident/owner validation in `app/Actions/AppendWorldConversationContext.php`
+- [X] T039 [US3] Accept and validate optional `worldId` on conversation creation/send paths and invoke the context action before `PromptDirector` in `app/Http/Controllers/Api/ConversationController.php`
+- [X] T040 [P] [US3] Implement positioned resident VRMs and active-chat movement pause state in `resources/js/components/world/ResidentController.jsx`
+- [X] T041 [P] [US3] Implement proximity, line-of-sight, accessible `C — Chat` prompting, and input activation in `resources/js/components/world/InteractionSystem.jsx`
+- [X] T042 [US3] Adapt the existing conversation UI into an in-world overlay that passes the active `worldId` without creating a second chat/provider pipeline in `resources/js/components/world/WorldChat.jsx`
+- [X] T043 [US3] Integrate resident selection, interaction, chat panel, and exploration resume behavior in `resources/js/pages/WorldPage.jsx`
 
 **Checkpoint**: In-world chat uses the same assistant conversation while applying only the correct world context for that request; ordinary chats stay unchanged.
 
@@ -135,17 +136,18 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 ### Tests for User Story 4
 
-- [ ] T044 [P] [US4] Write factory-backed NPC-library CRUD, permanent deletion, ownership, archive, VRM eligibility, and `WorldNpc` reuse coverage in `tests/Feature/Api/NpcControllerTest.php`
+- [X] T044 [P] [US4] Write factory-backed NPC-library CRUD, permanent deletion, ownership, archive, VRM eligibility, and `WorldNpc` reuse coverage in `tests/Feature/Api/NpcControllerTest.php`
 - [ ] T045 [P] [US4] Add roaming behavior validation and resident behavior enum coverage in `tests/Feature/Api/WorldResidentControllerTest.php`
 
 ### Implementation for User Story 4
 
-- [ ] T046 [US4] Implement dedicated NPC-library CRUD by reusing assistant persistence, uploads, archive assignment, pose configuration, and confirmed permanent deletion in `app/Http/Controllers/Api/NpcController.php`
-- [ ] T047 [P] [US4] Create NPC library pages and cards, reusing the assistant configuration subset and confirmation modal in `resources/js/pages/NpcsPage.jsx`, `resources/js/pages/CreateNpcPage.jsx`, `resources/js/pages/EditNpcPage.jsx`, and `resources/js/components/NpcCard.jsx`
-- [ ] T048 [US4] Register NPC library routes and entry points below Assistants in `resources/js/app.jsx` and `resources/js/pages/AssistantsPage.jsx`
-- [ ] T049 [US4] Add owned assistant/NPC resident selection and placement accordions to the world editor without duplicating NPC model or pose configuration in `resources/js/components/WorldResidentsEditor.jsx` and `resources/js/components/WorldForm.jsx`
-- [ ] T050 [US4] Implement stationary and bounded-roam state, safe-area checks, and chat pause/resume behavior in `resources/js/components/world/ResidentController.jsx`
-- [ ] T051 [US4] Add camera-frustum/distance-driven animation and roaming suspension, with pre-interaction readiness thresholds, in `resources/js/components/world/VisibilityPolicy.jsx`
+- [X] T046 [US4] Implement dedicated NPC-library CRUD by reusing assistant persistence, uploads, archive assignment, pose configuration, and confirmed permanent deletion in `app/Http/Controllers/Api/NpcController.php`
+- [X] T047 [P] [US4] Create the NPC library list with inline cards in `resources/js/pages/NpcsPage.jsx`, and reuse `CreateAssistantPage.jsx`/`EditAssistantPage.jsx` with a `kind="world_npc"` prop (via `resources/js/pages/CreateNpcPage.jsx` and the `/npcs/:assistantId/edit` route) instead of separate `EditNpcPage.jsx`/`NpcCard.jsx` files
+- [X] T048 [US4] Register NPC library routes and entry points below Assistants in `resources/js/app.jsx` and `resources/js/pages/AssistantsPage.jsx` — superseded by T022a: the NPCs entry point now lives on `HomePage.jsx`, not `AssistantsPage.jsx`
+- [X] T049 [US4] Add owned assistant/NPC resident selection and placement accordions to the world editor without duplicating NPC model or pose configuration in `resources/js/components/WorldResidentsEditor.jsx` and `resources/js/components/WorldForm.jsx`
+- [X] T049a [US4] Make `WorldResidentsEditor.jsx` usable before a world exists (stage add/remove/placement changes locally when `world.id` is unset instead of calling the resident endpoints) and render it in `resources/js/pages/CreateWorldPage.jsx`, flushing staged residents to `worlds.residents.upsert` after world creation succeeds
+- [X] T050 [US4] Implement stationary and bounded-roam state, safe-area checks, and chat pause/resume behavior in `resources/js/components/world/ResidentController.jsx`
+- [X] T051 [US4] Add a flat distance-cutoff (not camera-frustum culling) gating VRM load and animation in `resources/js/components/world/ResidentController.jsx`, with no separate `VisibilityPolicy.jsx`
 - [ ] T052 [US4] Connect visibility policy and configured resident behavior to the scene lifecycle in `resources/js/components/world/WorldScene.jsx`
 **Checkpoint**: NPCs are assistant-backed library records with no parallel conversation or avatar pipeline, and worlds only attach or detach their placements.
 
