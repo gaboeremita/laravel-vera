@@ -20,11 +20,26 @@ it('creates a world with required context and environment fields', function () {
         'description' => 'A polished sci-fi room.',
         'assistantContextPrompt' => 'You are in the Connection Node.',
         'npcContextPrompt' => 'You are a Connection Node NPC.',
+        'settings' => ['theme' => 'terminal'],
         'environment' => UploadedFile::fake()->create('connection-node.glb', 100, 'model/gltf-binary'),
     ]);
 
     $response->assertCreated()->assertJsonPath('name', 'Connection Node');
-    expect(World::where('user_id', $user->id)->exists())->toBeTrue();
+    expect(World::where('user_id', $user->id)->first())->settings->toBe(['theme' => 'terminal']);
+});
+
+it('requires a theme when creating a world', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson(route('worlds.store'), [
+        'name' => 'Connection Node',
+        'slug' => 'connection-node',
+        'description' => 'A polished sci-fi room.',
+        'assistantContextPrompt' => 'You are in the Connection Node.',
+        'npcContextPrompt' => 'You are a Connection Node NPC.',
+        'environment' => UploadedFile::fake()->create('connection-node.glb', 100, 'model/gltf-binary'),
+    ])->assertUnprocessable()->assertJsonValidationErrors('settings.theme');
 });
 
 it('deletes the world environment without deleting resident assistants', function () {

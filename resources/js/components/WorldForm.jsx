@@ -24,6 +24,15 @@ export default function WorldForm({ value, onChange, environmentFile, onEnvironm
 					<label className={FIELD_LABEL}>Description</label>
 					<textarea value={value.description} onChange={(event) => update('description', event.target.value)} rows={3} className={`${FIELD_INPUT} resize-none`} required />
 				</div>
+				<div>
+					<label className={FIELD_LABEL}>Theme</label>
+					<select value={value.settings?.theme ?? 'default'} onChange={(event) => update('settings', { ...value.settings, theme: event.target.value })} className={FIELD_INPUT} required>
+						<option value="default">Default</option>
+						<option value="terminal">Terminal</option>
+						<option value="slate">Slate</option>
+						<option value="grimoire">Grimoire</option>
+					</select>
+				</div>
 			</Accordion>
 			<Accordion label="ENVIRONMENT" collapsed={sections.environment} onToggle={() => toggle('environment')}>
 				<div>

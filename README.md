@@ -339,12 +339,33 @@ This app never talks to Discord directly and never stores a bot token. The bridg
 - `GET /api/assistants/{assistant}/discord/discovery` — returns the bridge's live view of its servers/channels, and this app's own config for each (trigger mode, prompt). Also syncs `discord_servers`/`discord_channels` so they have a stable internal id to attach prompts to.
 - `POST /api/assistants/{assistant}/discord-messages` — the bridge calls this once it decides a message should get a reply (per the trigger mode). Conversation history for that Discord channel is resolved and loaded entirely server-side, same as Telegram — the bridge only ever sends the new message, never the whole history.
 
+## Worlds
+
+Beyond one-on-one chat, any assistant (or a lightweight NPC) can also live in a **World** — a single-room 3D space you explore in first person and where you approach and talk to residents in place, rather than through a conversation list. Reachable from the Home page alongside Assistants and NPCs. See [ARCHITECTURE.md → Worlds](./ARCHITECTURE.md#worlds) for the full runtime and data model.
+
+### Creating a World
+
+From the Worlds section, **Create world** asks for a name, slug, description, a runtime environment GLB (the room itself), a **theme** (one of the app's four themes — see [Theming](#theming) — applied while chatting inside that world), and two separate context prompts: one appended only to companion-assistant conversations started in this world, one appended only to NPC conversations started in this world. Residents can be added and placed on the same create screen — staged locally and attached right after the world itself is saved — or later from the edit screen, which also has a delete-with-confirmation action.
+
+A resident placement has a position, a stationary-or-roam behavior (roam takes a bounded radius), and two optional overrides scoped to that placement only: an **opening message** (replaces the resident's own opening message for conversations started in this world) and a **custom prompt** (appended on top of the world's own context prompt, for that resident alone).
+
+### NPCs
+
+NPCs are lightweight, assistant-backed characters managed in their own section (reachable from Home), reusing the same model/pose/prompt/archive tooling as a normal assistant — `CreateNpcPage`/`EditAssistantPage` render the existing assistant forms with `kind="world_npc"` rather than separate NPC-specific pages. An NPC is not tied to any one world; it can be added as a resident to any number of them, and removing it from a world only removes that placement, never the NPC itself (permanent deletion happens only from the NPC section, with confirmation).
+
+### Exploring a World
+
+Entering a world loads its GLB, builds a collision octree from it, and spawns you at the nearest walkable point to the room's center. Movement is keyboard + mouse first-person with pointer lock; collision is resolved against real triangle geometry (not a bounding box), so passing through an actual doorway works while walking into a wall or furnishing doesn't — but only geometry whose mesh or group name contains "collision" (case-insensitive) is collidable. A GLB without that naming has no wall/furniture collision, only the room's own outer bounds. Losing browser focus stops movement until you click back in.
+
+Approaching a resident within interaction range shows a `C — Chat` prompt; pressing `C` opens an in-world chat panel (pausing that resident's roaming) using the assistant's existing conversation, history, archive, and prompt — plus whichever world context prompt and per-resident overrides apply, and the world's own theme for as long as the panel is open. Residents far from the player skip animation/pose work entirely until back in range.
+
 ## Project Structure
 
 ```
 laravel-vera/
 ├── app/
 │   ├── Actions/
+│   │   ├── AppendWorldConversationContext.php # Appends the world's context prompt + resident custom_prompt override to an in-world conversation
 │   │   ├── BuildArchiveFile.php               # Renders an archive + entries to Markdown via FileBuilder
 │   │   ├── SearchArchiveEntries.php           # Hybrid (full-text + vector) archive entry search, merged via Reciprocal Rank Fusion
 │   │   └── SummarizeConversation.php          # Long-term memory summarization logic (wrapped by the queued job)
@@ -370,6 +391,8 @@ laravel-vera/
 │   ├── Enums/
 │   │   ├── AiProviderFormat.php              # generic | anthropic
 │   │   ├── AssistantMode.php                 # assistant | agent
+│   │   ├── AssistantKind.php                 # assistant | world_npc
+│   │   ├── WorldResidentBehavior.php         # stationary | roam
 │   │   ├── ImageGenProviderFormat.php        # openrouter | openai_compatible
 │   │   └── VoiceProviderFormat.php           # openai_compatible | openai_tts | deepgram | elevenlabs
 │   ├── Http/Controllers/
@@ -394,7 +417,10 @@ laravel-vera/
 │   │       ├── SettingsController.php        # Theme + active LLM/voice/image-gen model + voice selection + Discord trigger mode
 │   │       ├── VoiceController.php           # Transcribe / synthesize
 │   │       ├── VoiceProviderController.php   # Full CRUD + prompt-only update
-│   │       └── VoiceModelController.php      # Full CRUD + prompt-only update (store() currently broken)
+│   │       ├── VoiceModelController.php      # Full CRUD + prompt-only update (store() currently broken)
+│   │       ├── WorldController.php           # CRUD for worlds, including environment upload/replace and world-owned asset cleanup
+│   │       ├── WorldResidentController.php   # Add/update/remove a resident placement (position, behavior, opening message/prompt overrides)
+│   │       └── NpcController.php             # Dedicated NPC CRUD, reusing AssistantController under the hood
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions, mode, agent_config)
@@ -417,7 +443,11 @@ laravel-vera/
 │   │   ├── ArchiveEntry.php
 │   │   ├── Tag.php
 │   │   ├── Image.php                         # Polymorphic, stored on disk
-│   │   └── Video.php                         # Polymorphic, stored on disk
+│   │   ├── Video.php                         # Polymorphic, stored on disk
+│   │   ├── World.php                         # name/slug/description, environment metadata, assistant/npc context prompts, settings (incl. theme)
+│   │   └── WorldResident.php                 # A world's placement of an assistant/NPC: position, rotation, behavior, per-placement overrides
+│   ├── Policies/
+│   │   └── WorldPolicy.php                   # Worlds are scoped to their owning user
 │   ├── Jobs/
 │   │   ├── EmbedArchiveEntry.php             # Async vector embedding for archive entries
 │   │   └── SummarizeConversation.php         # Queues Actions\SummarizeConversation; manages the memory_summarizing_at lock
@@ -468,7 +498,9 @@ laravel-vera/
 │   │   ├── create_discord_servers_table.php  # discord_guild_id/name
 │   │   ├── create_discord_channels_table.php # discord_server_id/discord_channel_id/name
 │   │   ├── create_assistant_discord_servers_table.php  # assistant_user_id/discord_server_id/prompt (json)
-│   │   └── create_assistant_discord_channels_table.php # assistant_user_id/discord_channel_id/trigger_mode/prompt (json)
+│   │   ├── create_assistant_discord_channels_table.php # assistant_user_id/discord_channel_id/trigger_mode/prompt (json)
+│   │   ├── create_worlds_table.php           # user_id/name/slug/environment metadata/assistant+npc context prompts/settings (incl. theme)
+│   │   └── create_world_residents_table.php  # world_id/assistant_id/position/rotation/behavior/behavior_settings/opening_message/custom_prompt
 │   └── seeders/
 │       └── VoiceProviderSeeder.php           # Seeds the TTS catalog (Orpheus, KittenTTS) — re-run to add more
 ├── resources/js/
@@ -480,9 +512,10 @@ laravel-vera/
 │   │   └── AssistantLayout.jsx               # Assistant-scoped context (conversations, settings)
 │   ├── pages/
 │   │   ├── LoginPage.jsx
+│   │   ├── HomePage.jsx                      # Landing page: Assistants/Worlds/NPCs as sibling sections
 │   │   ├── AssistantsPage.jsx                # List/delete assistants
-│   │   ├── CreateAssistantPage.jsx           # Multipart assistant creation form
-│   │   ├── EditAssistantPage.jsx             # Edit assistant + manage emotions
+│   │   ├── CreateAssistantPage.jsx           # Multipart assistant creation form (also renders NPC creation via a kind prop)
+│   │   ├── EditAssistantPage.jsx             # Edit assistant + manage emotions (also renders NPC editing via a kind prop)
 │   │   ├── ConversationsPage.jsx             # Conversation list
 │   │   ├── ChatPage.jsx                      # Main chat interface; debounced localStorage draft persistence
 │   │   ├── MemoryPage.jsx                    # Conversation long-term memory editor + auto-summarize toggle
@@ -492,7 +525,12 @@ laravel-vera/
 │   │   ├── ProvidersPage.jsx                 # AI provider/model management
 │   │   ├── ImageGenProvidersPage.jsx          # Image-gen provider/model management (same pattern as ProvidersPage)
 │   │   ├── VoicePage.jsx                     # Voice provider/model management; select model/voice, edit prompts
-│   │   └── DiscordPage.jsx                   # Discord servers/channels; trigger mode + prompt editor per channel
+│   │   ├── DiscordPage.jsx                   # Discord servers/channels; trigger mode + prompt editor per channel
+│   │   ├── WorldsPage.jsx                    # List/edit/enter worlds
+│   │   ├── CreateWorldPage.jsx               # World creation form + staged resident placement
+│   │   ├── EditWorldPage.jsx                 # Edit world + delete-with-confirmation
+│   │   ├── WorldPage.jsx                     # First-person 3D exploration + in-world chat panel
+│   │   └── NpcsPage.jsx                      # NPC list with inline cards; CreateNpcPage renders CreateAssistantPage with kind="world_npc"
 │   ├── components/
 │   │   ├── common/
 │   │   │   ├── Accordion.jsx                 # Reusable collapsible accordion
@@ -520,7 +558,20 @@ laravel-vera/
 │   │   ├── BootSequence.jsx                  # Boot animation
 │   │   ├── ConversationList.jsx              # Sidebar conversation list
 │   │   ├── ToastContainer.jsx                # Toast notification display
-│   │   └── Scanlines.jsx                     # CRT scanline overlay
+│   │   ├── Scanlines.jsx                     # CRT scanline overlay
+│   │   ├── WorldCard.jsx                     # World card (edit/enter)
+│   │   ├── WorldForm.jsx                     # Shared create/edit world form: metadata, environment, theme, context prompts
+│   │   ├── WorldResidentsEditor.jsx          # Eligible assistant/NPC picker + per-resident placement, behavior, and overrides
+│   │   └── world/
+│   │       ├── WorldScene.jsx                # Canvas: environment, first-person controller, residents, interaction system
+│   │       ├── WorldEnvironment.jsx          # Loads the GLB, builds the collision octree, resolves spawn position
+│   │       ├── FirstPersonController.jsx     # Keyboard/mouse movement, pointer lock, collision-resolved stepping
+│   │       ├── ResidentController.jsx        # Resident VRM load, pose/expression playback, stationary/roam movement
+│   │       ├── InteractionSystem.jsx         # Proximity detection (via a resident-position ref map) + C-to-chat
+│   │       ├── WorldChat.jsx                 # In-world chat panel; applies the world's theme while open
+│   │       ├── collisionCheck.js             # WorldCollision: octree build, blocked-body check, stepped movement, spawn-finding
+│   │       ├── groundHeight.js               # Raycast-based ground height lookup against the collision octree
+│   │       └── clampToBounds.js              # Clamps a position to the environment's overall bounding box
 │   ├── hooks/
 │   │   ├── useAssistants.js                  # Assistant list + delete
 │   │   ├── useEmotions.js                    # Emotion set fetching
@@ -530,8 +581,10 @@ laravel-vera/
 │   │   ├── useProviders.js                   # Provider/model CRUD + active model state
 │   │   ├── useImageGenProviders.js           # Image-gen provider/model CRUD + active model state
 │   │   ├── useConversationMemory.js          # Memory show/save/summarize/unlock, polls while summarizing
+│   │   ├── useConversationChat.js            # Shared message send/receive + pose-tag parsing, used by ChatPage and WorldChat
 │   │   ├── useVoiceProviders.js              # Provider/model CRUD + model/voice selection
 │   │   ├── useDiscordSettings.js             # Discovery data + immediate-save trigger mode changes
+│   │   ├── useWorlds.js                      # World list fetching
 │   │   ├── useToast.js                       # Toast notification state
 │   │   └── useVoiceMode.js                   # Mic capture + voice activity detection
 │   └── utils/
@@ -576,6 +629,7 @@ laravel-vera/
 - **Per-provider/per-model voice prompts** — backend-specific instructions (e.g. Orpheus's inline vocal tags) live on the `VoiceProvider`/`VoiceModel` record and are injected only while that backend is active, via the same visual prompt-tree editor used for assistant prompts
 - **Agent mode** — assistants can be switched to an agentic loop that calls tools (`get_current_datetime`, `basic_calculator`, `generate_image`) across multiple steps before replying, with a step limit, per-tool timeout/retry, and a live progress indicator in the chat UI. See [Agent Mode](#agent-mode)
 - **Image generation** — DB-managed, user-editable provider/model catalog (same pattern as LLM providers); generate an image manually via `/create-image <description>` in chat, or let an agent-mode assistant call it as a tool. See [Image Generation Providers](#image-generation-providers)
+- **Configurable 3D worlds** — user-created, single-room 3D spaces you explore in first person, with assistant and NPC residents you approach and chat with in place. See [Worlds](#worlds)
 
 ### Planned / Nice-to-Have
 

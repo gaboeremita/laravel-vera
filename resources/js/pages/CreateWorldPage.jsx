@@ -9,7 +9,7 @@ import WorldResidentsEditor from '../components/WorldResidentsEditor.jsx';
 export default function CreateWorldPage() {
 	const navigate = useNavigate();
 	const { addToast } = useOutletContext();
-	const [value, setValue] = useState({ name: '', slug: '', description: '', assistantContextPrompt: '', npcContextPrompt: '', residents: [] });
+	const [value, setValue] = useState({ name: '', slug: '', description: '', assistantContextPrompt: '', npcContextPrompt: '', settings: { theme: 'default' }, residents: [] });
 	const [environment, setEnvironment] = useState(null);
 	const [isSaving, setIsSaving] = useState(false);
 
@@ -19,7 +19,7 @@ export default function CreateWorldPage() {
 		try {
 			const form = new FormData();
 			form.append('name', value.name); form.append('slug', value.slug); form.append('description', value.description);
-			form.append('assistantContextPrompt', value.assistantContextPrompt); form.append('npcContextPrompt', value.npcContextPrompt); form.append('environment', environment);
+			form.append('assistantContextPrompt', value.assistantContextPrompt); form.append('npcContextPrompt', value.npcContextPrompt); form.append('settings', JSON.stringify(value.settings)); form.append('environment', environment);
 			const response = await api.postForm(route('worlds.store'), form);
 			if (!response.ok) throw new Error((await response.json()).message);
 			const world = await response.json();

@@ -3,6 +3,7 @@ import { route } from 'ziggy-js';
 import { api } from '../../utils/api.js';
 import { useEmotions } from '../../hooks/useEmotions.js';
 import { useConversationChat } from '../../hooks/useConversationChat.js';
+import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
 
 export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger }) {
@@ -10,6 +11,15 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 	const [input, setInput] = useState('');
 	const scrollRef = useRef(null);
 	const { poses, portraitType, fetchEmotions } = useEmotions();
+	const { theme, setTheme } = useTheme();
+
+	useEffect(() => {
+		const worldTheme = world.settings?.theme;
+		if (!worldTheme || worldTheme === theme) return;
+		const previousTheme = theme;
+		setTheme(worldTheme);
+		return () => setTheme(previousTheme);
+	}, [world.settings?.theme]);
 
 	useEffect(() => {
 		let active = true;

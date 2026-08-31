@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Theme;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Enum;
 
 class UpdateWorldRequest extends FormRequest
 {
@@ -13,6 +15,13 @@ class UpdateWorldRequest extends FormRequest
     public function authorize(): bool
     {
         return $this->user() !== null;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->input('settings'))) {
+            $this->merge(['settings' => json_decode($this->input('settings'), true)]);
+        }
     }
 
     /**
@@ -28,7 +37,8 @@ class UpdateWorldRequest extends FormRequest
             'description' => ['required', 'string'],
             'assistantContextPrompt' => ['required', 'string'],
             'npcContextPrompt' => ['required', 'string'],
-            'settings' => ['nullable', 'array'],
+            'settings' => ['required', 'array'],
+            'settings.theme' => ['required', new Enum(Theme::class)],
             'environment' => ['sometimes', 'file', 'extensions:glb', 'max:51200'],
         ];
     }
