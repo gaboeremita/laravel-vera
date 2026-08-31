@@ -15,6 +15,7 @@
 - Q: How should world NPCs access setting knowledge? → A: NPCs reuse the existing assistant archive access.
 - Q: How should worlds manage unused character work? → A: Character animation, roaming, and related updates are reduced when a resident is not visible or nearby.
 - Q: How are spaces created and contextualized? → A: Users create and edit Worlds from the Assistants area, and each world has separate editable context prompts for companion assistants and NPCs.
+- Q: Where are NPCs managed and removed? → A: NPCs are assistant-backed records managed in a dedicated NPC section below Assistants. Worlds only add or remove their resident placements; permanent NPC deletion occurs only in NPC CRUD.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -31,7 +32,7 @@ An authenticated user opens the Worlds section alongside Assistants, creates a w
 1. **Given** the user is viewing Assistants, **When** they choose Worlds, **Then** they see existing world cards and an add-world card.
 2. **Given** the user creates a world with valid required fields, **When** they save it, **Then** the world appears in the Worlds section and can be edited or entered.
 3. **Given** the user edits a world prompt, **When** they save it, **Then** later in-world conversations use the updated prompt.
-4. **Given** the user removes a world, **When** they confirm deletion, **Then** the world and its world-only residents are removed without deleting companion assistants or their conventional conversations.
+4. **Given** the user removes a world, **When** they confirm deletion, **Then** the world and all resident placements are removed without deleting assistants, NPCs, or their conventional conversations.
 
 ---
 
@@ -53,11 +54,11 @@ The user selects a world card and enters a dedicated first-person, single-room e
 
 ### User Story 3 - Meet and chat with residents (Priority: P1)
 
-The user configures eligible 3D companion assistants and NPCs as residents of a world. Approaching a resident presents a chat prompt; pressing `C` opens or resumes that resident's existing conversation in an in-world panel.
+The user configures eligible existing 3D assistants and NPCs as residents of a world. Approaching a resident presents a chat prompt; pressing `C` opens or resumes that resident's existing conversation in an in-world panel.
 
 **Why this priority**: Embodied, proximity-based conversation is the purpose of the world.
 
-**Independent Test**: Add two companion residents and one NPC, approach each one, use `C`, exchange messages, close chat, and verify the correct conversation and world context are retained.
+**Independent Test**: Add two companion assistants and one existing NPC as residents, approach each one, use `C`, exchange messages, close chat, and verify the correct conversation and world context are retained.
 
 **Acceptance Scenarios**:
 
@@ -71,16 +72,16 @@ The user configures eligible 3D companion assistants and NPCs as residents of a 
 
 ### User Story 4 - Configure NPCs and resident behavior (Priority: P2)
 
-The user adds NPCs from a world editor. Each NPC has a name, one editable character prompt, optional archive, 3D character model, pose setup, placement, and stationary or roaming behavior. NPCs reuse existing assistant behavior while avoiding unrelated assistant administration screens.
+The user manages NPCs in an NPC section below Assistants. Each NPC has a name, one editable character prompt, optional archive, 3D character model, and pose setup. The user then adds existing NPCs to worlds and configures their placement and stationary or roaming behavior there.
 
 **Why this priority**: NPCs make a world feel inhabited while preserving a coherent, professional configuration model.
 
-**Independent Test**: Create an NPC, attach a model and pose, select an archive, configure roaming, enter the world, and verify both behavior and archive-grounded conversation.
+**Independent Test**: Create an NPC in the NPC section, attach a model and pose, select an archive, add it to a world, configure roaming, enter the world, and verify both behavior and archive-grounded conversation.
 
 **Acceptance Scenarios**:
 
 1. **Given** the user edits a world, **When** they select companion residents, **Then** only owned assistants with usable 3D models are selectable and ineligible assistants explain why.
-2. **Given** the user creates an NPC with required settings, **When** they save it, **Then** it becomes a resident of that world and uses the existing character and conversation behavior.
+2. **Given** the user creates an NPC with required settings, **When** they save it, **Then** it appears in the NPC section and can later be added to a world as a resident.
 3. **Given** a resident is set to roam, **When** the world is active, **Then** it stays inside its safe roaming area and stops roaming while in chat.
 
 ### Edge Cases
@@ -89,36 +90,37 @@ The user adds NPCs from a world editor. Each NPC has a name, one editable charac
 - A missing room or character asset produces a recoverable error without exposing another user's data or opening the wrong conversation.
 - Losing browser focus stops movement until the user intentionally resumes world controls.
 - A resident outside the camera view and interaction range does not continue nonessential animation or roaming work, but is ready before the user can see or interact with it.
-- Removing a world never removes companion assistants; removing a world NPC removes only that NPC and its world-specific assets.
+- Removing a world removes only its resident placements; it never deletes assistants, NPCs, or their conversations.
+- Removing an assistant or NPC from a world removes only that placement; permanent NPC deletion is available only through the NPC section and requires confirmation.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST provide a Worlds section in the Assistants area that lists owned worlds and includes an add-world action.
+- **FR-001**: The system MUST provide Worlds and NPCs sections below Assistants; each lists owned records and includes its appropriate add action.
 - **FR-002**: Users MUST be able to create, edit, enter, and delete owned worlds.
-- **FR-003**: A world MUST have a name, description, approved environment configuration, assistant context prompt, and NPC context prompt.
+- **FR-003**: A world MUST have a non-empty name, description, approved environment configuration, assistant context prompt, and NPC context prompt.
 - **FR-004**: The world editor MUST expose both context prompts as editable fields and MUST not hardcode their content.
 - **FR-005**: The system MUST add the assistant context prompt only to companion-assistant conversations initiated through that world.
 - **FR-006**: The system MUST add the NPC context prompt only to NPC conversations initiated through that world.
 - **FR-007**: Conventional conversations outside a world MUST not receive a world context prompt.
 - **FR-008**: A world MUST provide a first-person single-room experience with keyboard/mouse controls, an explicit input-release path, and focus-loss movement stop.
 - **FR-009**: The system MUST prevent movement through configured room boundaries and solid furnishings.
-- **FR-010**: The system MUST let the user select only owned, usable 3D companion assistants as world residents.
-- **FR-011**: The system MUST let the user create, edit, and remove NPC residents with a name, one character prompt, optional archive, 3D model, pose configuration, placement, and stationary or roaming behavior.
+- **FR-010**: The system MUST let the user add and remove only owned, usable 3D assistants or NPCs as world residents without changing the underlying character record.
+- **FR-011**: The system MUST let the user create, edit, and permanently delete NPCs in the dedicated NPC section with a name, one character prompt, optional archive, 3D model, and pose configuration; worlds MUST configure only their placement and stationary or roaming behavior.
 - **FR-012**: NPCs MUST reuse the existing assistant character, prompt, archive, provider, conversation, voice, and pose behavior.
 - **FR-013**: The system MUST show a nearby resident's chat prompt only inside its interaction range and MUST open its chat with `C`.
 - **FR-014**: The system MUST use the selected resident's existing conversation identity and history while preserving user and assistant ownership boundaries.
 - **FR-015**: The system MUST display a graceful loading state and recoverable errors for unavailable environment, character, and chat resources.
 - **FR-016**: The system MUST reduce nonessential resident animation, roaming, and visual updates outside view and interaction range, and MUST release world-only resources when leaving a world.
-- **FR-017**: World configuration, placements, residents, NPCs, prompts, and assets MUST be scoped to their owning user and world.
+- **FR-017**: World configuration and placements MUST be scoped to their owning user and world; assistants and NPCs MUST remain scoped to their owning user.
 - **FR-018**: V1 MUST exclude mobile controls, multiple rooms inside one world, generated environmental backgrounds, and open-world traversal.
 
 ### Key Entities
 
 - **World**: A user-owned, named single-room 3D space with environment settings and separate context prompts for companion assistants and NPCs.
 - **World Resident**: A world-specific placement and behavior configuration for a companion assistant or NPC.
-- **World NPC**: A constrained assistant resident created through the world editor, retaining the existing character, archive, and conversation capabilities.
+- **World NPC**: An assistant-backed NPC record created and managed in the NPC section, retaining the existing character, archive, and conversation capabilities and addable to one or more worlds.
 - **World Context Prompt**: An editable instruction appended only to a conversation that occurs in its associated world, selected by resident kind.
 - **World Asset**: An approved room, furnishing, or ambient asset with its source, license, and runtime suitability record.
 
@@ -139,5 +141,5 @@ The user adds NPCs from a world editor. Each NPC has a name, one editable charac
 - Each world contains one bounded room in v1; a user may create more than one world.
 - Companion assistants and NPCs are scoped to the same authenticated user who owns the world.
 - Final room and furnishing assets are user-supplied and approved before integration.
-- NPCs use the same underlying assistant infrastructure while their editor intentionally exposes fewer fields.
+- NPCs use the same underlying assistant infrastructure while their dedicated CRUD intentionally exposes only the required subset of assistant configuration.
 - World prompts describe the current environment and are dynamic conversation context, not permanent changes to an assistant's base prompt.

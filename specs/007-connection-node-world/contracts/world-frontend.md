@@ -5,9 +5,12 @@
 | Route | Page | Purpose |
 |---|---|---|
 | `/worlds` | `WorldsPage` | List the current user's world cards; accessible from the Assistants area Worlds section |
-| `/worlds/create` | `CreateWorldPage` | Create a world with metadata, environment, context prompts, companions, and NPCs |
+| `/worlds/create` | `CreateWorldPage` | Create a world with metadata, environment, context prompts, and later resident placement |
 | `/worlds/:worldId` | `WorldPage` | Load and explore the selected 3D world |
 | `/worlds/:worldId/edit` | `EditWorldPage` | Modify its world configuration |
+| `/npcs` | `NpcsPage` | List and manage assistant-backed NPC records below Assistants |
+| `/npcs/create` | `CreateNpcPage` | Create an NPC through the existing assistant configuration subset |
+| `/npcs/:npcId/edit` | `EditNpcPage` | Edit or permanently delete an NPC |
 
 No route is reserved for Connection Node. It is ordinary user-created world content.
 
@@ -18,10 +21,10 @@ type WorldResource = {
   id: number;
   name: string;
   slug: string;
-  description: string | null;
-  environmentUrl: string | null;
-  assistantContextPrompt: string | null;
-  npcContextPrompt: string | null;
+  description: string;
+  environmentUrl: string;
+  assistantContextPrompt: string;
+  npcContextPrompt: string;
   settings: {
     playerSpawn?: { x: number; y: number; z: number };
     collisionMap?: string[];
@@ -41,15 +44,15 @@ type WorldResource = {
 `CreateWorldPage` and `EditWorldPage` reuse the existing assistant editor language:
 
 - Header and card patterns for page structure.
-- Accordions for environment, companion residents, NPC residents, and prompt configuration.
-- Existing VRM uploader and pose/animation editors for NPC configuration.
+- Accordions for environment, resident selection/placement, and prompt configuration.
+- A link or clear path to the dedicated NPC section for NPC model and pose configuration.
 - Existing prompt builder/editor components for the world context prompts.
 - Existing confirmation modal for deletion.
 
 The prompts are labelled professionally:
 
 - **Companion assistant world context**: context given to selected normal assistant residents during in-world chat.
-- **NPC world context**: context given to NPC residents during in-world chat.
+- **NPC world context**: context given to selected NPC residents during in-world chat.
 
 ## Runtime UI States
 

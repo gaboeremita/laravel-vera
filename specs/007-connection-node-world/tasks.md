@@ -9,7 +9,7 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md), [data-model.md](./data-model.md), [world API contract](./contracts/world-api.md), [world frontend contract](./contracts/world-frontend.md), [quickstart.md](./quickstart.md)
 
-**Tests**: Pest feature tests are required by the project constitution for touched behavior. Frontend behavior is validated with the existing supported test tooling where available; the complete first-person acceptance flow is additionally validated against `quickstart.md` in a desktop browser.
+**Tests**: Pest feature tests are required by the project constitution for touched behavior. Frontend behavior is validated with the existing supported test tooling where available; the user performs the complete first-person acceptance flow in a desktop browser with the selected assets.
 
 **Organization**: Tasks are grouped by user story so each increment can be implemented and demonstrated independently after the foundational schema and authorization work is complete.
 
@@ -45,7 +45,7 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 - [ ] T012 Create ownership policies for worlds and resident changes in `app/Policies/WorldPolicy.php` and register/discover them according to the existing authorization convention
 - [ ] T013 [P] Create reusable world validation requests in `app/Http/Requests/StoreWorldRequest.php` and `app/Http/Requests/UpdateWorldRequest.php`
 - [ ] T014 [P] Create stable world editor/runtime serialization in `app/Http/Resources/WorldResource.php` and `app/Http/Resources/WorldResidentResource.php`
-- [ ] T015 Add authenticated generic world and nested resident/NPC routes with route-model binding in `routes/api.php`
+- [ ] T015 Add authenticated generic world, resident-placement, and NPC-library routes with route-model binding in `routes/api.php`
 
 **Checkpoint**: Migrations, models, factories, ownership rules, requests, resources, and API route placeholders are ready. No route or model may assume a canonical Connection Node record.
 
@@ -69,7 +69,7 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 - [ ] T020 [P] [US1] Add a world API hook with loading, mutation, and error behavior in `resources/js/hooks/useWorlds.js`
 - [ ] T021 [P] [US1] Create a reusable world card matching existing assistant-card styling in `resources/js/components/WorldCard.jsx`
 - [ ] T022 [US1] Add the Worlds section, world cards, and create-world entry point to the existing library view in `resources/js/pages/AssistantsPage.jsx`
-- [ ] T023 [US1] Create the reusable assistant-style world form with metadata, environment, and professionally labelled companion/NPC context prompt fields in `resources/js/components/WorldForm.jsx`
+- [ ] T023 [US1] Create the reusable assistant-style world form with required metadata, environment, and professionally labelled assistant/NPC context prompt fields in `resources/js/components/WorldForm.jsx`
 - [ ] T024 [US1] Create the create-world screen using `Header`, `Accordion`, and `WorldForm` in `resources/js/pages/CreateWorldPage.jsx`
 - [ ] T025 [US1] Create the edit-world screen with save and confirmation-modal deletion behavior in `resources/js/pages/EditWorldPage.jsx`
 - [ ] T026 [US1] Register generic Worlds create/edit routes and preserve existing fallback behavior in `resources/js/app.jsx`
@@ -111,11 +111,11 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 - [ ] T034 [P] [US3] Write feature coverage proving companion and NPC world prompts are appended only for authorized in-world sends and never for ordinary sends in `tests/Feature/Api/WorldConversationContextTest.php`
 - [ ] T035 [P] [US3] Write feature coverage rejecting foreign worlds and assistants that are not residents in `tests/Feature/Api/WorldConversationContextTest.php`
-- [ ] T036 [P] [US3] Write feature coverage for eligible companion placement and removal without deleting the underlying assistant in `tests/Feature/Api/WorldResidentControllerTest.php`
+- [ ] T036 [P] [US3] Write feature coverage for eligible assistant/NPC placement and removal without deleting the underlying character record in `tests/Feature/Api/WorldResidentControllerTest.php`
 
 ### Implementation for User Story 3
 
-- [ ] T037 [US3] Implement resident add/update/remove authorization, 3D-avatar eligibility checks, placement validation, and resource responses in `app/Http/Controllers/Api/WorldResidentController.php`
+- [ ] T037 [US3] Implement assistant/NPC resident add/update/remove authorization, 3D-avatar eligibility checks, placement validation, and resource responses in `app/Http/Controllers/Api/WorldResidentController.php`
 - [ ] T038 [US3] Implement one-request world-context composition and resident/owner validation in `app/Actions/AppendWorldConversationContext.php`
 - [ ] T039 [US3] Accept and validate optional `world_id` on conversation creation/send paths and invoke the context action before `PromptDirector` in `app/Http/Controllers/Api/ConversationController.php`
 - [ ] T040 [P] [US3] Implement positioned resident VRMs and active-chat movement pause state in `resources/js/components/world/ResidentController.jsx`
@@ -129,25 +129,25 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 ## Phase 6: User Story 4 - Configure NPCs and Resident Behavior (Priority: P2)
 
-**Goal**: A user can create and configure lightweight NPC residents within the world editor, using the existing assistant asset/archive/prompt behavior and stationary or bounded roaming movement.
+**Goal**: A user can manage lightweight assistant-backed NPCs below Assistants, then add existing NPCs to worlds and configure their stationary or bounded roaming behavior there.
 
-**Independent Test**: Create an NPC with model, pose, optional archive, and prompt; configure roam behavior; enter the world; verify bounded movement, chat pause, archive grounding, and context selection.
+**Independent Test**: Create an NPC in the NPC section with model, pose, optional archive, and prompt; add it to a world; configure roam behavior; enter the world; verify bounded movement, chat pause, archive grounding, and context selection.
 
 ### Tests for User Story 4
 
-- [ ] T044 [P] [US4] Write factory-backed NPC create/update/remove, ownership, archive, VRM eligibility, and `WorldNpc` reuse coverage in `tests/Feature/Api/WorldNpcControllerTest.php`
+- [ ] T044 [P] [US4] Write factory-backed NPC-library CRUD, permanent deletion, ownership, archive, VRM eligibility, and `WorldNpc` reuse coverage in `tests/Feature/Api/NpcControllerTest.php`
 - [ ] T045 [P] [US4] Add roaming behavior validation and resident behavior enum coverage in `tests/Feature/Api/WorldResidentControllerTest.php`
 
 ### Implementation for User Story 4
 
-- [ ] T046 [US4] Implement world-scoped NPC create/update/remove by reusing assistant persistence, uploads, archive assignment, pose configuration, and resident placement in `app/Http/Controllers/Api/WorldNpcController.php`
-- [ ] T047 [US4] Add normal-assistant resident selection and NPC editor accordions using existing uploader, pose, archive, prompt, and confirmation components in `resources/js/components/WorldResidentsEditor.jsx`
-- [ ] T048 [US4] Integrate resident and NPC configuration into the create/edit world form without duplicating assistant feature controls in `resources/js/components/WorldForm.jsx`
-- [ ] T049 [US4] Implement stationary and bounded-roam state, safe-area checks, and chat pause/resume behavior in `resources/js/components/world/ResidentController.jsx`
-- [ ] T050 [US4] Add camera-frustum/distance-driven animation and roaming suspension, with pre-interaction readiness thresholds, in `resources/js/components/world/VisibilityPolicy.jsx`
-- [ ] T051 [US4] Connect visibility policy and configured resident behavior to the scene lifecycle in `resources/js/components/world/WorldScene.jsx`
-
-**Checkpoint**: NPCs are assistant-backed residents with no parallel conversation or avatar pipeline, and inactive residents avoid unnecessary work.
+- [ ] T046 [US4] Implement dedicated NPC-library CRUD by reusing assistant persistence, uploads, archive assignment, pose configuration, and confirmed permanent deletion in `app/Http/Controllers/Api/NpcController.php`
+- [ ] T047 [P] [US4] Create NPC library pages and cards, reusing the assistant configuration subset and confirmation modal in `resources/js/pages/NpcsPage.jsx`, `resources/js/pages/CreateNpcPage.jsx`, `resources/js/pages/EditNpcPage.jsx`, and `resources/js/components/NpcCard.jsx`
+- [ ] T048 [US4] Register NPC library routes and entry points below Assistants in `resources/js/app.jsx` and `resources/js/pages/AssistantsPage.jsx`
+- [ ] T049 [US4] Add owned assistant/NPC resident selection and placement accordions to the world editor without duplicating NPC model or pose configuration in `resources/js/components/WorldResidentsEditor.jsx` and `resources/js/components/WorldForm.jsx`
+- [ ] T050 [US4] Implement stationary and bounded-roam state, safe-area checks, and chat pause/resume behavior in `resources/js/components/world/ResidentController.jsx`
+- [ ] T051 [US4] Add camera-frustum/distance-driven animation and roaming suspension, with pre-interaction readiness thresholds, in `resources/js/components/world/VisibilityPolicy.jsx`
+- [ ] T052 [US4] Connect visibility policy and configured resident behavior to the scene lifecycle in `resources/js/components/world/WorldScene.jsx`
+**Checkpoint**: NPCs are assistant-backed library records with no parallel conversation or avatar pipeline, and worlds only attach or detach their placements.
 
 ---
 
@@ -155,11 +155,11 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 **Purpose**: Complete cross-cutting reliability, accessibility, performance, and release checks after all desired stories are integrated.
 
-- [ ] T052 [P] Verify all editable world prompts, empty/error states, and keyboard interaction labels are accessible and visually consistent with existing UI in `resources/js/pages/WorldPage.jsx`, `resources/js/components/WorldForm.jsx`, and `resources/js/components/world/WorldChat.jsx`
-- [ ] T053 [P] Verify asset-load failure, scene teardown, and resident visibility transitions fail loudly without leaking another user's data in `resources/js/components/world/WorldScene.jsx` and `app/Http/Controllers/Api/WorldController.php`
-- [ ] T054 Execute the complete desktop acceptance walkthrough, including user-provided asset/license handoff, in `specs/007-connection-node-world/quickstart.md`
-- [ ] T055 Run focused world feature tests with `php artisan test --compact tests/Feature/Api/WorldControllerTest.php tests/Feature/Api/WorldResourceTest.php tests/Feature/Api/WorldResidentControllerTest.php tests/Feature/Api/WorldConversationContextTest.php tests/Feature/Api/WorldNpcControllerTest.php`
-- [ ] T056 Run formatting and lint quality gates with `vendor/bin/pint --dirty --format agent` and `npm run lint` from the repository root
+- [ ] T053 [P] Verify all editable world prompts, empty/error states, and keyboard interaction labels are accessible and visually consistent with existing UI in `resources/js/pages/WorldPage.jsx`, `resources/js/components/WorldForm.jsx`, and `resources/js/components/world/WorldChat.jsx`
+- [ ] T054 [P] Verify asset-load failure, scene teardown, and resident visibility transitions fail loudly without leaking another user's data in `resources/js/components/world/WorldScene.jsx` and `app/Http/Controllers/Api/WorldController.php`
+- [ ] T055 Ask the user to execute the desktop-browser acceptance and profiling walkthrough with the selected assets in `specs/007-connection-node-world/quickstart.md`
+- [ ] T056 Run focused world feature tests with `php artisan test --compact tests/Feature/Api/WorldControllerTest.php tests/Feature/Api/WorldResourceTest.php tests/Feature/Api/WorldResidentControllerTest.php tests/Feature/Api/WorldConversationContextTest.php tests/Feature/Api/NpcControllerTest.php`
+- [ ] T057 Run formatting and lint quality gates with `vendor/bin/pint --dirty --format agent`, `vendor/bin/pint --test`, and `npm run lint` from the repository root
 
 ---
 
@@ -172,7 +172,7 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 - **US1 (Phase 3)**: Depends on Phase 2; establishes the management MVP.
 - **US2 (Phase 4)**: Depends on Phase 2 and a world produced by US1.
 - **US3 (Phase 5)**: Depends on Phase 2 and uses the World page created in US2; its backend context tests and action can proceed alongside US2 scene work after the foundation.
-- **US4 (Phase 6)**: Depends on Phase 2 and integrates into the world editor/runtime established by US1–US3.
+- **US4 (Phase 6)**: Depends on Phase 2 and adds NPC library CRUD plus world placement integration to the editor/runtime established by US1–US3.
 - **Phase 7**: Depends on the stories selected for delivery.
 
 ### User Story Completion Order
@@ -187,7 +187,7 @@ US1 is the management MVP. US2 and the backend portion of US3 can progress in pa
 - In US1, tests T016–T017 and frontend hook/card work T020–T021 are parallel once their contracts are stable.
 - In US2, environment, controller, and scene-lifecycle modules T029–T031 can proceed in parallel after T028's shared VRM extraction is complete.
 - In US3, tests T034–T036 and scene modules T040–T041 can proceed in parallel; T038 and T039 remain sequential because the controller consumes the action.
-- In US4, tests T044–T045 can proceed together, then runtime behavior T049–T050 can proceed in parallel after resident render state is available.
+- In US4, tests T044–T045 and NPC page work T047 can proceed in parallel; runtime behavior T050–T051 can proceed in parallel after resident render state is available.
 
 ## Parallel Example: User Story 3
 

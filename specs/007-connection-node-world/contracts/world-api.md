@@ -40,13 +40,13 @@ Updates the editable world metadata, environment, settings, and the two context 
 
 ### `DELETE /api/worlds/{world}`
 
-Deletes the world and its resident placements according to the confirmed lifecycle policy. It never deletes underlying assistant records unless the user separately deletes an NPC assistant through the approved flow.
+Deletes the world and its resident placements. It never deletes underlying assistant or NPC records.
 
 ## Companion Residents
 
 ### `PUT /api/worlds/{world}/residents/{assistant}`
 
-Adds or updates a normal assistant resident.
+Adds or updates an existing normal assistant or NPC resident.
 
 ```json
 {
@@ -57,25 +57,29 @@ Adds or updates a normal assistant resident.
 }
 ```
 
-The server rejects assistants not owned by the user, assistants without a 3D avatar, and `WorldNpc` assistants on this companion endpoint.
+The server rejects assistants or NPCs not owned by the user and characters without a usable 3D avatar.
 
 ### `DELETE /api/worlds/{world}/residents/{assistant}`
 
-Removes the placement only; it preserves the assistant and prior conversations.
+Removes the placement only; it preserves the assistant or NPC and prior conversations.
 
-## World NPC Residents
+## NPC Library
 
-### `POST /api/worlds/{world}/npcs`
+### `GET /api/npcs`
 
-Creates an `AssistantKind::WorldNpc` and its initial `WorldResident` placement. The request reuses the existing assistant editor fields for name, base prompt, archive, VRM, animations, poses, and avatar settings, plus the placement fields above.
+Returns the current user's `AssistantKind::WorldNpc` records for the NPC section.
 
-### `PATCH /api/worlds/{world}/npcs/{assistant}`
+### `POST /api/npcs`
 
-Updates the NPC using the same assistant configuration capabilities, then updates its resident placement if included.
+Creates an `AssistantKind::WorldNpc` using the existing assistant configuration subset: name, base prompt, archive, VRM, animations, poses, and avatar settings. It does not create a world placement.
 
-### `DELETE /api/worlds/{world}/npcs/{assistant}`
+### `GET /api/npcs/{assistant}` and `PATCH /api/npcs/{assistant}`
 
-Removes the NPC's placement. Deleting the underlying assistant record requires an explicit separately-confirmed deletion action consistent with the existing assistant editor.
+Returns or updates an owned NPC. These operations never modify world placements.
+
+### `DELETE /api/npcs/{assistant}`
+
+Permanently deletes an owned NPC using the confirmed NPC CRUD action. Its world placements are removed by the configured relationship lifecycle; this operation is not available from a world editor.
 
 ## In-World Conversation Context
 

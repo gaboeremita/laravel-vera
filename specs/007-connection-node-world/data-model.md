@@ -21,12 +21,12 @@ An NPC follows all normal assistant ownership and data rules; its kind controls 
 | `user_id` | foreign key | Required; owner relationship and authorization scope |
 | `name` | string | Required, user-visible |
 | `slug` | string | Required, unique per user, generated or validated for readable routes |
-| `description` | text nullable | User-visible setting and editor context |
-| `environment_disk` | string nullable | Existing storage disk convention |
-| `environment_path` | string nullable | Runtime GLB environment path; required before entering |
-| `environment_original_name` | string nullable | Asset traceability |
-| `assistant_context_prompt` | text nullable | Editable context appended only to companion resident chats in this world |
-| `npc_context_prompt` | text nullable | Editable context appended only to NPC resident chats in this world |
+| `description` | text | Required user-visible setting and editor context |
+| `environment_disk` | string | Required existing storage disk convention |
+| `environment_path` | string | Required runtime GLB environment path |
+| `environment_original_name` | string | Required asset traceability |
+| `assistant_context_prompt` | text | Required editable context appended only to companion resident chats in this world |
+| `npc_context_prompt` | text | Required editable context appended only to NPC resident chats in this world |
 | `settings` | JSON nullable | Spawn, collision map, loader/presentation options, and forward-compatible world settings |
 | timestamps | timestamps | Standard Laravel timestamps |
 
@@ -67,6 +67,7 @@ Constraints:
 
 - `(world_id, assistant_id)` unique.
 - The assistant must be owned by the world owner and have a valid 3D avatar.
+- Both normal assistants and `WorldNpc` assistants may be added to a world and may be attached to multiple worlds.
 
 ## New Enum: WorldResidentBehavior
 
@@ -77,7 +78,7 @@ Constraints:
 
 ## Chat Context Boundary
 
-`world_id` is ephemeral request context supplied by the in-world chat UI. It is not persisted on `conversations`, because the same assistant can participate in normal conversations and may reside in multiple worlds.
+`world_id` is ephemeral request context supplied by the in-world chat UI. It is not persisted on `conversations`, because the same assistant or NPC can participate in normal conversations and may reside in multiple worlds.
 
 The server validates:
 

@@ -14,8 +14,9 @@
 4. Add an eligible normal assistant as a companion resident and set its placement.
 5. Enter a companion assistant world-context prompt, for example: “You are in the Connection Node, a 3D space where the user can move freely. Ground your response in the room when relevant.”
 6. Enter a distinct NPC world-context prompt.
-7. Add an NPC through the existing assistant-style model, animation, pose, archive, and base-prompt controls; set its placement and behavior.
-8. Save. Confirm the new Connection Node appears as an ordinary world card and can be reopened for editing.
+7. Save. Confirm the new Connection Node appears as an ordinary world card and can be reopened for editing.
+8. Open the NPCs section below Assistants, create an NPC through the assistant-style model, animation, pose, archive, and base-prompt controls, then save it.
+9. Return to Connection Node editing, add the existing NPC as a resident, and set its placement and behavior.
 
 ## Explore and Chat
 
@@ -27,3 +28,7 @@
 6. Open the same assistant's normal conversation outside Worlds. Confirm no world context is applied.
 7. Move far from or face away from residents, then use profiling/logging appropriate to the implementation to verify roaming/nonessential animation is suspended or reduced.
 8. Exit the world, return to the normal app shell, and re-enter to confirm clean lifecycle behavior.
+
+## User-Run Browser Validation
+
+The user performs the real desktop-browser acceptance and profiling pass with the selected assets. Automated coverage is limited to deterministic backend and supported frontend behavior.

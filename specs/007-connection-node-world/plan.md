@@ -48,7 +48,7 @@ The existing React/Three/VRM stack remains the browser runtime. The Laravel appl
 | migrations | New `worlds` and `world_residents` tables; never alter prior migrations |
 | `app/Http/Controllers/WorldController.php` | Authorized Worlds list/create/show/update/delete endpoints |
 | `app/Http/Controllers/WorldResidentController.php` | Authorize companion resident selection and placement updates |
-| `app/Http/Controllers/WorldNpcController.php` | Create/update/delete `WorldNpc` assistants through existing upload, pose, archive, and prompt fields |
+| `app/Http/Controllers/Api/NpcController.php` | Dedicated NPC CRUD that persists `AssistantKind::WorldNpc` through existing assistant features |
 | Form Requests / API Resources | Validate world fields and present a stable editor/runtime payload |
 | `app/Actions/AppendWorldConversationContext.php` | Dynamically append the correct world context to an eligible in-world conversation request |
 | Conversation flow | Accept an optional `world_id`, authorize membership, then apply contextual prompt before calling existing `PromptDirector`; ordinary chats skip this action |
@@ -57,9 +57,10 @@ The existing React/Three/VRM stack remains the browser runtime. The Laravel appl
 
 | Area | Change |
 |---|---|
-| Assistant index | Add a Worlds section and create-world action using existing card styling |
+| Assistant index | Add Worlds and NPCs sections and their create actions using existing card styling |
+| `NpcsPage` / `CreateNpcPage` / `EditNpcPage` | Dedicated NPC library CRUD using the existing assistant configuration subset |
 | `WorldsPage` | Lists user-owned world cards with edit and enter actions |
-| `CreateWorldPage` / `EditWorldPage` | Assistant-editor-style form for metadata, environment asset, companion residents, NPC residents, and the two context prompts |
+| `CreateWorldPage` / `EditWorldPage` | Assistant-editor-style form for metadata, environment asset, existing resident selection and placement, and the two context prompts |
 | `WorldPage` | Loading transition, first-person canvas, minimal HUD, close-range interaction affordance, in-world chat panel, pause/settings menu, and exit action |
 | `WorldScene` modules | Environment, player controller, collision, resident controller, visibility policy, interaction system, and world-only asset disposal |
 | Shared avatar modules | Extract `CharacterVrm`; preserve existing portrait-specific backdrop wrapper |
@@ -73,7 +74,7 @@ Key rules:
 
 1. A `World` belongs to one user and has a user-unique slug only for readable routing/display; it is never identified by a hardcoded canonical key.
 2. A `WorldResident` references one existing `Assistant`; the `(world_id, assistant_id)` pair is unique.
-3. A companion resident must be an owned, normal assistant with a 3D avatar. An NPC is an owned `AssistantKind::WorldNpc` created inside the world editor and stored through the same assistant features.
+3. A resident must be an owned normal assistant or `AssistantKind::WorldNpc` with a 3D avatar. NPCs are created in their dedicated library section and worlds only attach or detach their placements.
 4. `assistant_context_prompt` applies only when chatting in that world with a companion resident. `npc_context_prompt` applies only when chatting in that world with a world NPC.
 5. `world_id` is request context, not a permanent conversation attribute: users may hold ordinary conversations with the same assistant outside a world, without world text bleeding into those messages.
 
@@ -89,7 +90,7 @@ Key rules:
 ## Delivery Phases
 
 1. **Foundation**: schema, enums, models, policies, requests, resources, routes, and generic world CRUD.
-2. **Editor**: Worlds listing, create/edit form, environment upload/metadata, companion selection, and reusable NPC editing.
+2. **Editors**: Worlds listing and configuration, plus NPC library CRUD and shared resident selection/placement.
 3. **Prompt boundary**: dynamic world-context action plus in-world conversation API integration and coverage proving no ordinary-chat leakage.
 4. **Runtime**: shared VRM renderer extraction, loading transition, first-person scene, collision, interaction, chat overlay, culling, and teardown.
 5. **Polish and acceptance**: settings/pause behavior, empty states, validation, accessibility, focused test suite, Pint, and user-selected asset handoff verification.
@@ -100,6 +101,6 @@ Key rules:
 |---|---|
 | Large or inconsistent user assets hurt frame time | Require GLB delivery metadata/collision maps, lazy-load residents, cap active behavior, and dispose scene resources on exit |
 | World text leaks into normal chats | Centralize injection in the action; require an authorized `world_id` and test both in-world and ordinary paths |
-| NPC feature drift | Store NPCs as assistants with `AssistantKind::WorldNpc`; reuse existing uploader, animation, prompt, archive, and provider code |
+| NPC feature drift | Store NPCs as assistants with `AssistantKind::WorldNpc`; reuse existing uploader, animation, prompt, archive, and provider code through a dedicated NPC CRUD surface |
 | Editor becomes visually inconsistent | Compose existing form, accordion, uploader, pose, modal, and card components; inspect sibling usage before changes |
 | Scope expands into multi-room or mobile game systems | Keep one bounded room per configurable world and desktop navigation for this feature |

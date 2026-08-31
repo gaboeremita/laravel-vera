@@ -25,9 +25,9 @@
 
 ## Decision 4: Reuse Assistant for NPCs
 
-**Decision**: Represent NPCs with `AssistantKind::WorldNpc`, plus a `WorldResident` relationship that supplies placement and behavior.
+**Decision**: Represent NPCs with `AssistantKind::WorldNpc`, manage them through a dedicated NPC library section, and use `WorldResident` only for world placement and behavior.
 
-**Rationale**: NPCs require the same model uploads, VRM configuration, animations, poses, prompts, archive access, provider behavior, and chat pipeline. A second NPC model would duplicate these capabilities and drift.
+**Rationale**: NPCs require the same model uploads, VRM configuration, animations, poses, prompts, archive access, provider behavior, and chat pipeline. A second NPC model would duplicate these capabilities and drift. Separating NPC CRUD from world membership allows one configured NPC to be deliberately reused across worlds and makes deletion semantics unambiguous.
 
 ## Decision 5: Dynamic, scoped world prompt injection
 
