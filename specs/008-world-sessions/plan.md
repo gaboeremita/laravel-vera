@@ -10,12 +10,15 @@
 
 Add a per-world sessions page, mirroring the existing per-assistant conversations
 page: list a world's past sessions ordered by recency, resume one, start a new
-one, or delete one. A new `WorldSession` model/table scoped to `World` (which is
-already scoped to a single owning user) backs the feature; a `WorldSessionController`
-exposes the same index/store/update/destroy shape as `ConversationController`,
-nested under `worlds/{world}/sessions`; a `WorldSessionsPage.jsx` (list) plus a
-reusable `WorldSessionList.jsx` component mirror `ConversationsPage.jsx` /
-`ConversationList.jsx`.
+one, or delete one. This requires first restructuring `World` to be shared via a
+`WorldUser` pivot exactly like `Assistant`/`AssistantUser`, rather than owned
+directly via `worlds.user_id` — so `World` and `Assistant` follow the same
+relationship shape end to end. A new `WorldSession` model/table then belongs to
+`WorldUser` the same way `Conversation` belongs to `AssistantUser`. A
+`WorldSessionController` exposes the same index/store/update/destroy shape as
+`ConversationController`, nested under `worlds/{world}/sessions`; a
+`WorldSessionsPage.jsx` (list) plus a reusable `WorldSessionList.jsx` component
+mirror `ConversationsPage.jsx` / `ConversationList.jsx`.
 
 ## Technical Context
 
@@ -35,7 +38,12 @@ reusable `WorldSessionList.jsx` component mirror `ConversationsPage.jsx` /
 
 **Constraints**: Must follow existing Assistants/Conversations UI and API conventions; sessions must not leak across worlds or across users
 
-**Scale/Scope**: One new model, one new controller, one migration, ~2 new React pages/components, mirrors existing Conversations feature scope
+**Scale/Scope**: Two new models (`WorldUser`, `WorldSession`), one restructured
+model (`World` drops direct `user_id`), one new controller
+(`WorldSessionController`), updates to `WorldController`/`WorldPolicy`/`User`
+to route through the pivot, three migrations (create `world_user`, backfill
+data, drop `worlds.user_id`), ~2 new React pages/components. Mirrors the
+existing Assistant/AssistantUser/Conversation scope exactly.
 
 ## Constitution Check
 
@@ -44,10 +52,10 @@ reusable `WorldSessionList.jsx` component mirror `ConversationsPage.jsx` /
 - **I. Lint-Enforced Code Style**: New PHP/JS files will follow existing formatting; Pint/ESLint are run once at push/PR time per CLAUDE.md, not during planning. PASS (deferred, not a plan-time gate).
 - **II. Append-Only Migrations**: Feature adds a new `create_world_sessions_table` migration; no existing migration is edited. PASS.
 - **III. Comments Justify Only Non-Obvious Decisions**: No comments planned beyond what's non-obvious (none anticipated). PASS.
-- **IV. Data Isolation by Ownership**: `WorldSession` belongs to `World`, and `World` already belongs to exactly one owning `User`. All session queries MUST be scoped through `$request->user()`'s own worlds (e.g., route-model-bound `World` checked against the authenticated user, same as `WorldController` does today), never a bare `WorldSession::find()`. This is the central design constraint for the controller — see data-model.md. PASS, with this explicit scoping rule carried into Phase 1.
+- **IV. Data Isolation by Ownership**: `WorldSession` belongs to `WorldUser`, and `WorldUser` is the same per-user-per-world pivot pattern as `AssistantUser`. All session queries MUST be scoped through the authenticated user's own `WorldUser` row (route-model-bound `World`, then resolve/authorize the requesting user's `WorldUser` for it), never a bare `WorldSession::find()` or a `World::user_id` check. `WorldPolicy::view/update/delete` MUST be updated to check pivot membership (`$world->users->contains($user)`) instead of `$world->user_id === $user->id`. This is the central design constraint for the controller — see data-model.md. PASS, with this explicit scoping rule carried into Phase 1.
 - **V. Errors Fail Loudly**: Controller actions will let exceptions propagate/return proper error responses; no empty catch blocks planned. PASS.
-- **VI. Feature-Test-First, Factory-Backed**: A `WorldSessionFactory` will be created; Pest feature tests will cover index/store/update/destroy and cross-world/cross-user isolation, mirroring `ConversationController`'s test coverage. PASS.
-- **VII. No Speculative Abstraction**: No pivot table (e.g. `WorldUser`) is introduced — `World` already has a direct `user_id`, so `WorldSession` only needs `world_id`. No generalized "session" abstraction shared with `Conversation` is introduced since spec does not require one. PASS.
+- **VI. Feature-Test-First, Factory-Backed**: A `WorldUserFactory` and `WorldSessionFactory` will be created; Pest feature tests will cover `WorldController`'s and `WorldSessionController`'s index/store/update/destroy and cross-world/cross-user isolation, mirroring `AssistantController`/`ConversationController`'s test coverage. Existing `WorldTest`/`WorldPolicyTest`-style coverage (if present) that asserts direct `user_id` ownership MUST be updated to assert pivot-based ownership instead. PASS.
+- **VII. No Speculative Abstraction**: Introducing `WorldUser` is not speculative here — it is the explicit, current requirement (World must match Assistant's real sharing model), not a guess about a future caller. No further generalization (e.g. a shared base "ownable pivot" class between `AssistantUser` and `WorldUser`) is introduced, since nothing today needs that abstraction beyond the two existing concrete pivots. PASS.
 
 No violations; Complexity Tracking section is not needed.
 
@@ -70,15 +78,23 @@ specs/[###-feature]/
 ```text
 app/
 ├── Models/
-│   └── WorldSession.php
+│   ├── World.php              # modified: drop belongsTo(User), add users()/worldUsers()
+│   ├── WorldUser.php          # new: pivot, mirrors AssistantUser
+│   └── WorldSession.php       # new
+├── Policies/
+│   └── WorldPolicy.php        # modified: pivot-membership checks
 └── Http/Controllers/Api/
-    └── WorldSessionController.php
+    ├── WorldController.php    # modified: create/list through pivot
+    └── WorldSessionController.php  # new
 
 database/
 ├── factories/
+│   ├── WorldUserFactory.php
 │   └── WorldSessionFactory.php
 └── migrations/
-    └── ..._create_world_sessions_table.php
+    ├── ..._create_world_user_table.php
+    ├── ..._backfill_world_user_from_worlds_user_id.php
+    └── ..._drop_user_id_from_worlds_table.php
 
 routes/
 └── api.php   # nested under worlds/{world}/sessions
@@ -92,7 +108,8 @@ resources/js/
     └── useWorldSessions.js   # if list-fetching hook is warranted, mirroring useWorlds.js
 
 tests/Feature/
-└── WorldSessionTest.php
+├── WorldSessionTest.php
+└── WorldTest.php   # modified: assert pivot-based ownership instead of user_id
 ```
 
 **Structure Decision**: Existing single-repo Laravel + React web application
