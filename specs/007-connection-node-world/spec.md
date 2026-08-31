@@ -16,6 +16,7 @@
 - Q: How should worlds manage unused character work? → A: Character animation, roaming, and related updates are reduced when a resident is not visible or nearby.
 - Q: How are spaces created and contextualized? → A: Users create and edit Worlds from the Assistants area, and each world has separate editable context prompts for companion assistants and NPCs.
 - Q: Where are NPCs managed and removed? → A: NPCs are assistant-backed records managed in a dedicated NPC section below Assistants. Worlds only add or remove their resident placements; permanent NPC deletion occurs only in NPC CRUD.
+- Q: What happens to a world environment asset when its world is deleted? → A: The environment asset is owned by its world and is permanently deleted with that world.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -32,7 +33,7 @@ An authenticated user opens the Worlds section alongside Assistants, creates a w
 1. **Given** the user is viewing Assistants, **When** they choose Worlds, **Then** they see existing world cards and an add-world card.
 2. **Given** the user creates a world with valid required fields, **When** they save it, **Then** the world appears in the Worlds section and can be edited or entered.
 3. **Given** the user edits a world prompt, **When** they save it, **Then** later in-world conversations use the updated prompt.
-4. **Given** the user removes a world, **When** they confirm deletion, **Then** the world and all resident placements are removed without deleting assistants, NPCs, or their conventional conversations.
+4. **Given** the user removes a world, **When** they confirm deletion, **Then** the world, its environment asset, and all resident placements are removed without deleting assistants, NPCs, or their conventional conversations.
 
 ---
 
@@ -92,13 +93,14 @@ The user manages NPCs in an NPC section below Assistants. Each NPC has a name, o
 - A resident outside the camera view and interaction range does not continue nonessential animation or roaming work, but is ready before the user can see or interact with it.
 - Removing a world removes only its resident placements; it never deletes assistants, NPCs, or their conversations.
 - Removing an assistant or NPC from a world removes only that placement; permanent NPC deletion is available only through the NPC section and requires confirmation.
+- Deleting a world permanently removes its world-owned environment asset; it never removes character assets owned by assistants or NPCs.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 - **FR-001**: The system MUST provide Worlds and NPCs sections below Assistants; each lists owned records and includes its appropriate add action.
-- **FR-002**: Users MUST be able to create, edit, enter, and delete owned worlds.
+- **FR-002**: Users MUST be able to create, edit, enter, and delete owned worlds; deletion MUST permanently remove the world-owned environment asset and resident placements only.
 - **FR-003**: A world MUST have a non-empty name, description, approved environment configuration, assistant context prompt, and NPC context prompt.
 - **FR-004**: The world editor MUST expose both context prompts as editable fields and MUST not hardcode their content.
 - **FR-005**: The system MUST add the assistant context prompt only to companion-assistant conversations initiated through that world.
@@ -113,7 +115,7 @@ The user manages NPCs in an NPC section below Assistants. Each NPC has a name, o
 - **FR-014**: The system MUST use the selected resident's existing conversation identity and history while preserving user and assistant ownership boundaries.
 - **FR-015**: The system MUST display a graceful loading state and recoverable errors for unavailable environment, character, and chat resources.
 - **FR-016**: The system MUST reduce nonessential resident animation, roaming, and visual updates outside view and interaction range, and MUST release world-only resources when leaving a world.
-- **FR-017**: World configuration and placements MUST be scoped to their owning user and world; assistants and NPCs MUST remain scoped to their owning user.
+- **FR-017**: World configuration, environment assets, and placements MUST be scoped to their owning user and world; assistants and NPCs MUST remain scoped to their owning user.
 - **FR-018**: V1 MUST exclude mobile controls, multiple rooms inside one world, generated environmental backgrounds, and open-world traversal.
 
 ### Key Entities

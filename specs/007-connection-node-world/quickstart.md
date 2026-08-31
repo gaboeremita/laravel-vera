@@ -17,6 +17,7 @@
 7. Save. Confirm the new Connection Node appears as an ordinary world card and can be reopened for editing.
 8. Open the NPCs section below Assistants, create an NPC through the assistant-style model, animation, pose, archive, and base-prompt controls, then save it.
 9. Return to Connection Node editing, add the existing NPC as a resident, and set its placement and behavior.
+10. Delete a disposable test world and confirm its room environment asset is removed while its assistant and NPC records remain available in their library sections.
 
 ## Explore and Chat
 

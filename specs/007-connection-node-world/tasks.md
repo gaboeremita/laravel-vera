@@ -59,12 +59,12 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 ### Tests for User Story 1
 
-- [ ] T016 [P] [US1] Write world CRUD, validation, ownership-isolation, and deletion-preservation feature coverage in `tests/Feature/Api/WorldControllerTest.php`
+- [ ] T016 [P] [US1] Write world CRUD, validation, ownership-isolation, environment-asset cleanup, and character-preservation feature coverage in `tests/Feature/Api/WorldControllerTest.php`
 - [ ] T017 [P] [US1] Write world resource serialization coverage for context prompts, environment metadata, and resident-safe payloads in `tests/Feature/Api/WorldResourceTest.php`
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] Implement authorized list, create, show, update, and delete actions in `app/Http/Controllers/Api/WorldController.php`
+- [ ] T018 [US1] Implement authorized list, create, show, update, and delete actions, including world-owned environment asset cleanup, in `app/Http/Controllers/Api/WorldController.php`
 - [ ] T019 [US1] Implement world environment upload/replace validation and storage using existing file-storage conventions in `app/Http/Controllers/Api/WorldEnvironmentController.php` and `routes/api.php`
 - [ ] T020 [P] [US1] Add a world API hook with loading, mutation, and error behavior in `resources/js/hooks/useWorlds.js`
 - [ ] T021 [P] [US1] Create a reusable world card matching existing assistant-card styling in `resources/js/components/WorldCard.jsx`

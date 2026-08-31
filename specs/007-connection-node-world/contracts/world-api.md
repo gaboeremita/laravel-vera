@@ -40,7 +40,7 @@ Updates the editable world metadata, environment, settings, and the two context 
 
 ### `DELETE /api/worlds/{world}`
 
-Deletes the world and its resident placements. It never deletes underlying assistant or NPC records.
+Permanently deletes the world, its world-owned environment asset, and its resident placements. It never deletes underlying assistant or NPC records or their owned assets.
 
 ## Companion Residents
 

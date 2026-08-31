@@ -46,7 +46,7 @@ The existing React/Three/VRM stack remains the browser runtime. The Laravel appl
 | `app/Enums/AssistantKind.php` | Add `WorldNpc`; retain normal assistant behavior unchanged |
 | `app/Enums/WorldResidentBehavior.php` | `Stationary` and `Roam` values for runtime behavior |
 | migrations | New `worlds` and `world_residents` tables; never alter prior migrations |
-| `app/Http/Controllers/WorldController.php` | Authorized Worlds list/create/show/update/delete endpoints |
+| `app/Http/Controllers/WorldController.php` | Authorized Worlds list/create/show/update/delete endpoints, including world-owned environment asset cleanup |
 | `app/Http/Controllers/WorldResidentController.php` | Authorize companion resident selection and placement updates |
 | `app/Http/Controllers/Api/NpcController.php` | Dedicated NPC CRUD that persists `AssistantKind::WorldNpc` through existing assistant features |
 | Form Requests / API Resources | Validate world fields and present a stable editor/runtime payload |

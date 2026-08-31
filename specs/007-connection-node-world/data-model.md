@@ -44,6 +44,7 @@ Constraints:
 
 - `(user_id, slug)` unique.
 - A user may create multiple worlds. No canonical world key exists.
+- The environment file is owned by the world and is permanently removed when the world is deleted; assistant and NPC-owned assets are never removed by this lifecycle.
 
 ## New Entity: WorldResident
 
