@@ -69,4 +69,9 @@ class User extends Authenticatable
             ->using(AssistantUser::class)
             ->withTimestamps();
     }
+
+    public function worlds(): HasMany
+    {
+        return $this->hasMany(World::class);
+    }
 }

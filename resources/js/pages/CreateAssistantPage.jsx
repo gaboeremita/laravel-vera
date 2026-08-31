@@ -9,9 +9,11 @@ import PoseEditor from '../components/PoseEditor.jsx';
 import DefaultPoseEditor from '../components/DefaultPoseEditor.jsx';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
-export default function CreateAssistantPage() {
+export default function CreateAssistantPage({ kind = 'assistant' }) {
 	const navigate = useNavigate();
 	const { addToast } = useOutletContext();
+	const isNpc = kind === 'world_npc';
+	const collectionPath = isNpc ? '/npcs' : '/assistants';
 
 	const [name, setName] = useState('');
 	const [slug, setSlug] = useState('');
@@ -248,7 +250,7 @@ export default function CreateAssistantPage() {
 				});
 			}
 
-			const res = await api.postForm(route('assistants.store'), formData);
+			const res = await api.postForm(route(isNpc ? 'npcs.store' : 'assistants.store'), formData);
 
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
@@ -263,16 +265,16 @@ export default function CreateAssistantPage() {
 				const vrmRes = await api.postForm(route('assistants.vrm.store', { id: created.id }), vrmForm);
 				if (!vrmRes.ok) {
 					const vrmError = await vrmRes.json().catch(() => ({}));
-					addToast(vrmError.message || 'Assistant created, but the VRM upload failed', 'error');
-					navigate('/assistants');
+					addToast(vrmError.message || `${isNpc ? 'NPC' : 'Assistant'} created, but the VRM upload failed`, 'error');
+					navigate(collectionPath);
 					return;
 				}
 			}
 
-			addToast('Assistant created', 'success');
-			navigate('/assistants');
+			addToast(`${isNpc ? 'NPC' : 'Assistant'} created`, 'success');
+			navigate(collectionPath);
 		} catch (e) {
-			addToast(e.message || 'Failed to create assistant', 'error');
+			addToast(e.message || `Failed to create ${isNpc ? 'NPC' : 'assistant'}`, 'error');
 		} finally {
 			setIsSaving(false);
 		}
@@ -287,9 +289,9 @@ export default function CreateAssistantPage() {
 					dot: '●',
 					blink: isSaving,
 				}}
-				onBack={() => navigate('/assistants')}
+				onBack={() => navigate(collectionPath)}
 			>
-				<span className="text-fg-2 text-sm tracking-[0.05em]">New Assistant</span>
+				<span className="text-fg-2 text-sm tracking-[0.05em]">New {isNpc ? 'NPC' : 'Assistant'}</span>
 			</Header>
 
 			<div className="flex-1 overflow-y-auto p-5 custom-scrollbar space-y-6">

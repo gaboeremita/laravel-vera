@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\DeleteAssistantAssets;
+use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
 use App\Http\Controllers\Controller;
@@ -22,8 +24,9 @@ class AssistantController extends Controller
     {
         $assistants = $request->user()
             ->assistants()
+            ->where('kind', AssistantKind::Assistant)
             ->withCount(['emotions'])
-            ->with('cardImage')
+            ->with(['cardImage', 'vrm'])
             ->get()
             ->map(function (Assistant $assistant) {
                 $pivotId = $assistant->pivot->id;
@@ -52,6 +55,8 @@ class AssistantController extends Controller
                     'name' => $assistant->name,
                     'slug' => $assistant->slug,
                     'description' => $assistant->description,
+                    'portrait_type' => $assistant->portrait_type->value,
+                    'vrm_url' => $assistant->vrm?->url,
                     'image_url' => $cardImageUrl,
                     'conversations_count' => (int) ($stats->conversations_count ?? 0),
                     'last_activity' => $stats->last_activity,
@@ -117,7 +122,7 @@ class AssistantController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, AssistantKind $kind = AssistantKind::Assistant): JsonResponse
     {
         if (is_string($request->input('prompt'))) {
             $request->merge(['prompt' => json_decode($request->input('prompt'), true)]);
@@ -172,7 +177,7 @@ class AssistantController extends Controller
             }
         }
 
-        $assistant = DB::transaction(function () use ($request, $validated) {
+        $assistant = DB::transaction(function () use ($request, $validated, $kind) {
             $assistant = Assistant::create([
                 'name' => $validated['name'],
                 'slug' => $validated['slug'],
@@ -182,6 +187,7 @@ class AssistantController extends Controller
                 'archive_id' => $validated['archive_id'] ?? null,
                 'mode' => $validated['mode'] ?? AssistantMode::Assistant->value,
                 'portrait_type' => $validated['portrait_type'] ?? AssistantPortraitType::Image->value,
+                'kind' => $kind,
             ]);
 
             $request->user()->assistants()->attach($assistant->id);
@@ -269,12 +275,12 @@ class AssistantController extends Controller
         return response()->json($assistant);
     }
 
-    public function destroy(Request $request, int $id): JsonResponse
+    public function destroy(Request $request, int $id, DeleteAssistantAssets $deleteAssistantAssets): JsonResponse
     {
-        $request->user()
+        $assistant = $request->user()
             ->assistants()
-            ->findOrFail($id)
-            ->delete();
+            ->findOrFail($id);
+        $deleteAssistantAssets->handle($assistant);
 
         return response()->json(['message' => 'Assistant deleted']);
     }

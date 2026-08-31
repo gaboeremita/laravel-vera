@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
 use Database\Factories\AssistantFactory;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['name', 'slug', 'description', 'prompt', 'opening_message', 'archive_id', 'mode', 'agent_config', 'portrait_type'])]
+#[Fillable(['name', 'slug', 'description', 'prompt', 'opening_message', 'archive_id', 'mode', 'agent_config', 'portrait_type', 'kind'])]
 class Assistant extends Model
 {
     /** @use HasFactory<AssistantFactory> */
@@ -26,6 +27,7 @@ class Assistant extends Model
             'mode' => AssistantMode::class,
             'agent_config' => 'array',
             'portrait_type' => AssistantPortraitType::class,
+            'kind' => AssistantKind::class,
         ];
     }
 
@@ -59,6 +61,11 @@ class Assistant extends Model
     public function cardImage(): MorphOne
     {
         return $this->morphOne(Image::class, 'imageable');
+    }
+
+    public function worldResidents(): HasMany
+    {
+        return $this->hasMany(WorldResident::class);
     }
 
     /**

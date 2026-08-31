@@ -18,6 +18,12 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import ProvidersPage from './pages/ProvidersPage.jsx';
 import ImageGenProvidersPage from './pages/ImageGenProvidersPage.jsx';
 import VoicePage from './pages/VoicePage.jsx';
+import WorldsPage from './pages/WorldsPage.jsx';
+import CreateWorldPage from './pages/CreateWorldPage.jsx';
+import EditWorldPage from './pages/EditWorldPage.jsx';
+import NpcsPage from './pages/NpcsPage.jsx';
+import CreateNpcPage from './pages/CreateNpcPage.jsx';
+import WorldPage from './pages/WorldPage.jsx';
 import MemoryPage from './pages/MemoryPage.jsx';
 import DiscordPage from './pages/DiscordPage.jsx';
 globalThis.Ziggy = Ziggy;
@@ -32,6 +38,13 @@ createRoot(document.getElementById('root')).render(
                         {/* Assistant management */}
                         <Route path="/assistants" element={<AssistantsPage />} />
                         <Route path="/assistants/create" element={<CreateAssistantPage />} />
+                        <Route path="/worlds" element={<WorldsPage />} />
+                        <Route path="/worlds/create" element={<CreateWorldPage />} />
+                        <Route path="/worlds/:worldId/edit" element={<EditWorldPage />} />
+						<Route path="/worlds/:worldId" element={<WorldPage />} />
+                        <Route path="/npcs" element={<NpcsPage />} />
+                        <Route path="/npcs/create" element={<CreateNpcPage />} />
+						<Route path="/npcs/:assistantId/edit" element={<EditAssistantPage kind="world_npc" />} />
                         <Route path="/assistants/:assistantId/edit" element={<EditAssistantPage />} />
 
                         {/* Assistant-scoped routes */}

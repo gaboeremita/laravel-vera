@@ -22,10 +22,10 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 **Purpose**: Establish the implementation boundaries and obtain the user-supplied assets required to exercise a real world without introducing generated art or new dependencies.
 
-- [ ] T001 Confirm the existing assistant upload, VRM, pose, archive, and conversation integration points before modification in `app/Models/Assistant.php`, `app/Http/Controllers/Api/AssistantController.php`, `app/Http/Controllers/Api/ConversationController.php`, and `resources/js/pages/EditAssistantPage.jsx`
+- [X] T001 Confirm the existing assistant upload, VRM, pose, archive, and conversation integration points before modification in `app/Models/Assistant.php`, `app/Http/Controllers/Api/AssistantController.php`, `app/Http/Controllers/Api/ConversationController.php`, and `resources/js/pages/EditAssistantPage.jsx`
 - [ ] T002 Obtain the user-approved Connection Node room delivery as a runtime GLB plus named collision meshes, spawn position, placement notes, source, and license information per `specs/007-connection-node-world/quickstart.md`
 - [ ] T003 Obtain any user-approved NPC VRM, pose, and animation assets to exercise the reused assistant upload flow per `specs/007-connection-node-world/quickstart.md`
-- [ ] T004 Verify the existing package lock and imports can support the documented Three/React Three Fiber/VRM runtime without dependency changes in `package.json` and `resources/js/components/VrmAvatar.jsx`
+- [X] T004 Verify the existing package lock and imports can support the documented Three/React Three Fiber/VRM runtime without dependency changes in `package.json` and `resources/js/components/VrmAvatar.jsx`
 
 ---
 
@@ -35,17 +35,17 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 **⚠️ CRITICAL**: Complete this phase before beginning the user-story phases.
 
-- [ ] T005 Create an append-only migration for the `assistant_kind` field and update `app/Enums/AssistantKind.php`, `app/Models/Assistant.php`, and `database/factories/AssistantFactory.php` to support normal assistants and `WorldNpc`
-- [ ] T006 [P] Create an append-only `worlds` table migration with ownership, user-unique slug, environment metadata, two context prompts, and JSON settings in `database/migrations/*_create_worlds_table.php`
-- [ ] T007 [P] Create an append-only `world_residents` table migration with unique world/assistant membership, transforms, behavior enum, and behavior settings in `database/migrations/*_create_world_residents_table.php`
-- [ ] T008 Create `app/Enums/WorldResidentBehavior.php` with `Stationary` and `Roam` cases and use enum casts rather than persisted magic strings
-- [ ] T009 Create `app/Models/World.php` with owner and resident relationships, guarded/fillable fields matching local conventions, casts, and `contextPromptFor(AssistantKind $kind): ?string`
-- [ ] T010 Create `app/Models/WorldResident.php` with typed world/assistant relationships and transform/behavior casts in `app/Models/WorldResident.php`
-- [ ] T011 [P] Create factory-backed world test data in `database/factories/WorldFactory.php` and `database/factories/WorldResidentFactory.php`
-- [ ] T012 Create ownership policies for worlds and resident changes in `app/Policies/WorldPolicy.php` and register/discover them according to the existing authorization convention
-- [ ] T013 [P] Create reusable world validation requests in `app/Http/Requests/StoreWorldRequest.php` and `app/Http/Requests/UpdateWorldRequest.php`
-- [ ] T014 [P] Create stable world editor/runtime serialization in `app/Http/Resources/WorldResource.php` and `app/Http/Resources/WorldResidentResource.php`
-- [ ] T015 Add authenticated generic world, resident-placement, and NPC-library routes with route-model binding in `routes/api.php`
+- [X] T005 Create an append-only migration for the `assistant_kind` field and update `app/Enums/AssistantKind.php`, `app/Models/Assistant.php`, and `database/factories/AssistantFactory.php` to support normal assistants and `WorldNpc`
+- [X] T006 [P] Create an append-only `worlds` table migration with ownership, user-unique slug, environment metadata, two context prompts, and JSON settings in `database/migrations/*_create_worlds_table.php`
+- [X] T007 [P] Create an append-only `world_residents` table migration with unique world/assistant membership, transforms, behavior enum, and behavior settings in `database/migrations/*_create_world_residents_table.php`
+- [X] T008 Create `app/Enums/WorldResidentBehavior.php` with `Stationary` and `Roam` cases and use enum casts rather than persisted magic strings
+- [X] T009 Create `app/Models/World.php` with owner and resident relationships, guarded/fillable fields matching local conventions, casts, and `contextPromptFor(AssistantKind $kind): ?string`
+- [X] T010 Create `app/Models/WorldResident.php` with typed world/assistant relationships and transform/behavior casts in `app/Models/WorldResident.php`
+- [X] T011 [P] Create factory-backed world test data in `database/factories/WorldFactory.php` and `database/factories/WorldResidentFactory.php`
+- [X] T012 Create ownership policies for worlds and resident changes in `app/Policies/WorldPolicy.php` and register/discover them according to the existing authorization convention
+- [X] T013 [P] Create reusable world validation requests in `app/Http/Requests/StoreWorldRequest.php` and `app/Http/Requests/UpdateWorldRequest.php`
+- [X] T014 [P] Create stable world editor/runtime serialization in `app/Http/Resources/WorldResource.php` and `app/Http/Resources/WorldResidentResource.php`
+- [X] T015 Add authenticated generic world, resident-placement, and NPC-library routes with route-model binding in `routes/api.php`
 
 **Checkpoint**: Migrations, models, factories, ownership rules, requests, resources, and API route placeholders are ready. No route or model may assume a canonical Connection Node record.
 
@@ -59,20 +59,20 @@ description: "Dependency-ordered implementation tasks for Configurable Worlds"
 
 ### Tests for User Story 1
 
-- [ ] T016 [P] [US1] Write world CRUD, validation, ownership-isolation, environment-asset cleanup, and character-preservation feature coverage in `tests/Feature/Api/WorldControllerTest.php`
-- [ ] T017 [P] [US1] Write world resource serialization coverage for context prompts, environment metadata, and resident-safe payloads in `tests/Feature/Api/WorldResourceTest.php`
+- [X] T016 [P] [US1] Write world CRUD, validation, ownership-isolation, environment-asset cleanup, and character-preservation feature coverage in `tests/Feature/Api/WorldControllerTest.php`
+- [X] T017 [P] [US1] Write world resource serialization coverage for context prompts, environment metadata, and resident-safe payloads in `tests/Feature/Api/WorldResourceTest.php`
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] Implement authorized list, create, show, update, and delete actions, including world-owned environment asset cleanup, in `app/Http/Controllers/Api/WorldController.php`
+- [X] T018 [US1] Implement authorized list, create, show, update, and delete actions, including world-owned environment asset cleanup, in `app/Http/Controllers/Api/WorldController.php`
 - [ ] T019 [US1] Implement world environment upload/replace validation and storage using existing file-storage conventions in `app/Http/Controllers/Api/WorldEnvironmentController.php` and `routes/api.php`
 - [ ] T020 [P] [US1] Add a world API hook with loading, mutation, and error behavior in `resources/js/hooks/useWorlds.js`
-- [ ] T021 [P] [US1] Create a reusable world card matching existing assistant-card styling in `resources/js/components/WorldCard.jsx`
-- [ ] T022 [US1] Add the Worlds section, world cards, and create-world entry point to the existing library view in `resources/js/pages/AssistantsPage.jsx`
-- [ ] T023 [US1] Create the reusable assistant-style world form with required metadata, environment, and professionally labelled assistant/NPC context prompt fields in `resources/js/components/WorldForm.jsx`
-- [ ] T024 [US1] Create the create-world screen using `Header`, `Accordion`, and `WorldForm` in `resources/js/pages/CreateWorldPage.jsx`
+- [X] T021 [P] [US1] Create a reusable world card matching existing assistant-card styling in `resources/js/components/WorldCard.jsx`
+- [X] T022 [US1] Add the Worlds section, world cards, and create-world entry point to the existing library view in `resources/js/pages/AssistantsPage.jsx`
+- [X] T023 [US1] Create the reusable assistant-style world form with required metadata, environment, and professionally labelled assistant/NPC context prompt fields in `resources/js/components/WorldForm.jsx`
+- [X] T024 [US1] Create the create-world screen using `Header`, `Accordion`, and `WorldForm` in `resources/js/pages/CreateWorldPage.jsx`
 - [ ] T025 [US1] Create the edit-world screen with save and confirmation-modal deletion behavior in `resources/js/pages/EditWorldPage.jsx`
-- [ ] T026 [US1] Register generic Worlds create/edit routes and preserve existing fallback behavior in `resources/js/app.jsx`
+- [X] T026 [US1] Register generic Worlds create/edit routes and preserve existing fallback behavior in `resources/js/app.jsx`
 
 **Checkpoint**: A user can manage worlds through a consistent UI. The app has no hardcoded Connection Node route, record, or prompt.
 
