@@ -33,11 +33,14 @@ world (FR-001–FR-009, spec Key Entities: World Session).
 | `id` | bigint, PK | |
 | `world_user_id` | bigint, FK → `world_user.id`, cascade on delete | Required. Scopes the session to one user's access to one world (FR-009, FR-010) — mirrors `Conversation.assistant_user_id`. |
 | `title` | string, nullable | Defaults to `'New session'` at creation, matching `Conversation`'s pattern. User-editable (max 100 chars) for future rename support. |
+| `position` | json, nullable | The user's last recorded position in the world (FR-011). Shape mirrors whatever the world view already uses internally (e.g. `{x, y, z}`); opaque to the backend beyond storing/returning it. |
 | `created_at` | timestamp | |
 | `updated_at` | timestamp | Bumped whenever the session's saved state changes; drives list ordering (FR-002). |
 
 **Relationships**:
 - `WorldSession belongsTo WorldUser` (`world_user_id`).
+- `WorldSession hasMany Conversation` (`world_session_id`) — the session's own,
+  isolated conversations with that world's residents (FR-012).
 - A session's world is reached via `worldSession->worldUser->world`; its
   owning user via `worldSession->worldUser->user` — exactly the same
   indirection `Conversation` uses today for `Assistant`/`User`.
@@ -49,9 +52,13 @@ world (FR-001–FR-009, spec Key Entities: World Session).
   trusted from client input.
 - `title`, when provided on create/update, MUST be a string of at most 100
   characters (mirrors `ConversationController::update`'s validation).
+- `position`, when provided, MUST be a JSON-serializable value; the backend
+  does not validate its internal shape beyond that (it is round-tripped for
+  the world view to interpret).
 
-**State transitions**: None beyond create → (optionally renamed) → delete.
-No status/lifecycle field is introduced — the spec does not require one.
+**State transitions**: None beyond create → (position updates / optionally
+renamed) → delete. No status/lifecycle field is introduced — the spec does
+not require one.
 
 **Deletion**: Deleting a `WorldSession` MUST make its state permanently
 inaccessible (FR-007). Deleting a `WorldUser` (e.g. a user's access to a world
@@ -69,14 +76,20 @@ their `WorldSession` rows.
 - **WorldPolicy**: `view`/`update`/`delete` check pivot membership
   (`$world->users->contains($user)` or an equivalent `WorldUser::query()`
   check) instead of `$world->user_id === $user->id`.
+- **Conversation**: gains a nullable `world_session_id` (FK →
+  `world_sessions.id`, cascade on delete) and a `belongsTo(WorldSession)`
+  relation. Null for conversations started outside any world (direct
+  assistant chat) — unchanged behavior for those. When set, the conversation
+  belongs to exactly one session (FR-012); `ConversationController::store`
+  resolves/creates per `(assistant_user_id, world_session_id)` instead of per
+  `assistant_user_id` alone when a `world_session_id` is present.
 
 ## Non-goals for this data model
 
-- No session-state/snapshot columns are added here — how a world visit's
-  progress is actually persisted (e.g. world scene/physics state) is assumed
-  to already exist or be out of scope per the spec's Assumptions section;
-  `WorldSession` here is the addressable "thread" record the sessions page
-  lists, selects, and deletes, not a new persistence format for in-world
-  state.
+- Beyond `position` and per-session conversations, no other in-world state
+  (scene objects, physics, other users' positions) is captured or restored —
+  per the spec's Assumptions section, this feature's persistence is limited
+  to what the 2026-08-31 clarification specifies.
 - No change to `WorldResident` — it already keys off `world_id` +
-  `assistant_id` and is unaffected by how `World` is owned by users.
+  `assistant_id` and is unaffected by how `World` is owned by users or how
+  conversations are scoped to sessions.

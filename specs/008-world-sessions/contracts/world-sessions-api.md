@@ -22,10 +22,21 @@ Lists sessions belonging to the authenticated user's `WorldUser` for
 ## `POST /worlds/{world}/sessions` — `worlds.sessions.store`
 
 Creates a new session under the authenticated user's `WorldUser` for
-`{world}`, with the default title `'New session'`.
+`{world}`, with the default title `'New session'` and a null `position`.
 
 - **Auth**: same check as above.
-- **Response 201**: `{ "session": { "id", "title", "updated_at" } }`.
+- **Response 201**: `{ "session": { "id", "title", "updated_at", "position" } }`.
+
+## `PUT /worlds/{world}/sessions/{session}/position` — `worlds.sessions.position.update`
+
+Updates the session's last recorded position (FR-011). Called by the world
+view as the user's position changes meaningfully (e.g. periodically or on
+exit) — not part of the sessions-page UI itself.
+
+- **Body**: `{ "position": <JSON value, shape owned by the world view> }`.
+- **Auth**: `{session}` MUST belong to the authenticated user's `WorldUser`
+  for `{world}`.
+- **Response 200**: `{ "session": { "id", "position", "updated_at" } }`.
 
 ## `PATCH /worlds/{world}/sessions/{session}` — `worlds.sessions.update`
 
@@ -49,3 +60,14 @@ Permanently deletes a session (FR-006, FR-007).
   `WorldUser` for `{world}` (wrong world, wrong user, or no `WorldUser` row
   at all): 404 (not exposing existence of other users'/worlds' data —
   FR-009, FR-010).
+
+## Change to existing contract: `POST /assistants/{assistant}/conversations`
+
+`ConversationController::store`'s existing `worldId` body parameter is joined
+by a new optional `worldSessionId` parameter. When present, the created (or
+resolved, if one already exists for this resident within that session)
+conversation is scoped to that `world_session_id` instead of being the
+assistant's single shared conversation (FR-012). `WorldChat.jsx` passes the
+active session's id here once a session is selected/started. Existing calls
+without `worldSessionId` are unaffected — direct assistant chat keeps
+behaving exactly as it does today.

@@ -79,6 +79,48 @@ of introducing a parallel timestamp field with overlapping meaning.
 considered for clarity, but rejected as redundant with `updated_at` given no
 requirement distinguishes "last modified" from "last active" for a session.
 
+## Decision: `WorldSession` stores the user's last position
+
+**Decision**: `WorldSession` gets a `position` column (JSON, nullable),
+holding whatever coordinate shape the world view already uses internally
+(e.g. `{x, y, z}`), updated whenever the user's position changes meaningfully
+in the world and read back when the session is resumed.
+
+**Rationale**: Direct answer to the 2026-08-31 clarification — "what I care
+about most is the position of the user, and the conversations." No existing
+column captures this today (confirmed: no persistence found in
+`WorldPage.jsx`/`WorldScene.jsx`).
+
+**Alternatives considered**: Separate `x`/`y`/`z` columns were considered for
+queryability, but rejected — nothing needs to query or sort by position, so a
+single JSON column (matching the existing `settings`/`agent_config` JSON-cast
+pattern already used on `World`/`Assistant`) avoids unnecessary schema
+rigidity.
+
+## Decision: `Conversation` gains a nullable `world_session_id`, scoping it to one session
+
+**Decision**: Add a nullable `world_session_id` (FK → `world_sessions`,
+cascade on delete) to `conversations`, via a new migration — `Conversation`
+gains `belongsTo(WorldSession)`. `ConversationController::store` and
+`WorldChat.jsx`'s conversation-resolution logic change from "find or create
+the resident's one conversation for this assistant" to "find or create the
+conversation for this assistant **scoped to the given `world_session_id`**."
+Conversations created outside any world (direct assistant chat) keep
+`world_session_id` null, unaffected by this change.
+
+**Rationale**: Direct answer to the second clarification — starting a new
+session must give fresh conversations with every resident, not continue a
+shared history. Today's `WorldChat.jsx` (`resolveConversation`) always reuses
+"the first conversation for this assistant" regardless of world or session,
+which is the exact behavior that must change.
+
+**Alternatives considered**: A separate `WorldSessionConversation` join table
+(session × conversation) was considered, to avoid adding a nullable column to
+an existing high-traffic table. Rejected as speculative — a conversation
+belongs to exactly one session (or none, for direct assistant chat), which is
+a plain one-to-many relationship; a join table would model a many-to-many
+relationship nothing requires.
+
 ## Decision: Default title and rename support
 
 **Decision**: New sessions default to a title of `'New session'` (mirroring
