@@ -10,7 +10,7 @@ export default function WorldsPage() {
 
 	return (
 		<>
-			<Header hideSettings status={{ label: isLoading ? 'LOADING' : 'WAITING', color: isLoading ? 'text-warning' : 'text-info', dot: '●', blink: isLoading }} counter={!isLoading ? `WORLDS: ${worlds.length}` : null}>
+			<Header hideSettings onBack={() => navigate('/assistants')} status={{ label: isLoading ? 'LOADING' : 'WAITING', color: isLoading ? 'text-warning' : 'text-info', dot: '●', blink: isLoading }} counter={!isLoading ? `WORLDS: ${worlds.length}` : null}>
 				<span className="text-fg-2 text-lg tracking-[0.05em]">Worlds</span>
 			</Header>
 			<div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
