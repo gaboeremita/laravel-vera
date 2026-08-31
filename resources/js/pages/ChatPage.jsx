@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Pencil, Mic, MicOff, Volume2, VolumeX, Brain } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
-import { parseEmotionFromResponse, parsePoseFromResponse, stripForSpeech } from '../utils/parsers.js';
+import { stripForSpeech } from '../utils/parsers.js';
 import { useVoiceMode } from '../hooks/useVoiceMode.js';
+import { useConversationChat } from '../hooks/useConversationChat.js';
 import ChatMessage from '../components/ChatMessage.jsx';
 import Header from '../components/Header.jsx';
 import AgentProgressIndicator from '../components/AgentProgressIndicator.jsx';
@@ -31,13 +32,8 @@ export default function ChatPage() {
 
 	const draftKey = `chatDraft:${assistantId}:${id}`;
 
-	const [messages, setMessages] = useState([]);
 	const [input, setInput] = useState(() => localStorage.getItem(draftKey) || '');
-	const [isLoading, setIsLoading] = useState(false);
-	const [hasError, setHasError] = useState(false);
 	const [pendingImage, setPendingImage] = useState(null);
-	const [hasMore, setHasMore] = useState(false);
-	const [isLoadingMore, setIsLoadingMore] = useState(false);
 	const scrollRef = useRef(null);
 	const inputRef = useRef(null);
 	const fileInputRef = useRef(null);
@@ -110,122 +106,6 @@ export default function ChatPage() {
 		}
 	}, [isEditingTitle]);
 
-	// Load conversation messages
-	useEffect(() => {
-		setActiveConversationId(Number(id));
-
-		const loadMessages = async () => {
-			try {
-				const res = await api.get(route('conversations.show', { assistant: assistantId, id }));
-				if (!res.ok) {
-					navigate(`/assistants/${assistantId}/conversations`, { replace: true });
-					return;
-				}
-
-				const data = await res.json();
-				let lastEmotion = null;
-
-				// Poses are one-off triggers, not an ongoing state, so history
-				// isn't replayed into currentPose the way the last emotion is —
-				// reopening a conversation just starts the avatar idle.
-				const mapped = data.messages.map((msg) => {
-					if (msg.role !== 'assistant') {
-						return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
-					}
-
-					if (portraitType === 'avatar3d') {
-						const { text } = parsePoseFromResponse(msg.content, poseNames);
-						return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
-					}
-
-					const { emotion, text } = parseEmotionFromResponse(msg.content, emotionNames);
-					lastEmotion = emotion;
-					return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
-				});
-
-				setMessages(mapped);
-				setHasMore(data.has_more);
-				if (lastEmotion) setCurrentEmotion(lastEmotion);
-			} catch {
-				navigate(`/assistants/${assistantId}/conversations`, { replace: true });
-			}
-		};
-		loadMessages();
-
-		return () => setActiveConversationId(null);
-	}, [id]);
-
-	useEffect(() => {
-		if (scrollRef.current) {
-			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-		}
-	}, [messages]);
-
-	useEffect(() => {
-		if (inputRef.current) inputRef.current.focus();
-	}, []);
-
-	const loadOlderMessages = useCallback(async () => {
-		if (isLoadingMore || !hasMore || messages.length === 0) return;
-
-		const oldestId = messages[0].id;
-		if (!oldestId) return;
-
-		setIsLoadingMore(true);
-
-		const scrollEl = scrollRef.current;
-		const previousScrollHeight = scrollEl?.scrollHeight ?? 0;
-
-		try {
-			const url = route('conversations.show', { assistant: assistantId, id }) + `?before=${oldestId}`;
-			const res = await api.get(url);
-			if (!res.ok) return;
-
-			const data = await res.json();
-
-			const mapped = data.messages.map((msg) => {
-				if (msg.role !== 'assistant') {
-					return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
-				}
-
-				if (portraitType === 'avatar3d') {
-					const { text } = parsePoseFromResponse(msg.content, poseNames);
-					return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
-				}
-
-				const { text } = parseEmotionFromResponse(msg.content, emotionNames);
-				return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, image: msg.image_url };
-			});
-
-			setMessages((prev) => [...mapped, ...prev]);
-			setHasMore(data.has_more);
-
-			requestAnimationFrame(() => {
-				if (scrollEl) {
-					scrollEl.scrollTop = scrollEl.scrollHeight - previousScrollHeight;
-				}
-			});
-		} catch {
-			addToast('Failed to load older messages', 'error');
-		} finally {
-			setIsLoadingMore(false);
-		}
-	}, [isLoadingMore, hasMore, messages, assistantId, id, emotionNames]);
-
-	useEffect(() => {
-		const scrollEl = scrollRef.current;
-		if (!scrollEl) return;
-
-		const handleScroll = () => {
-			if (scrollEl.scrollTop < 100) {
-				loadOlderMessages();
-			}
-		};
-
-		scrollEl.addEventListener('scroll', handleScroll);
-		return () => scrollEl.removeEventListener('scroll', handleScroll);
-	}, [loadOlderMessages]);
-
 	const playSynthesizedAudio = async (rawText, ttsInstructions = null) => {
 		const text = stripForSpeech(rawText);
 		if (!text) return;
@@ -258,160 +138,72 @@ export default function ChatPage() {
 		}
 	};
 
-	const sendMessage = async (overrideText, { voiceMode = false } = {}) => {
+	const {
+		messages,
+		isLoading,
+		hasError,
+		isLoadingMore,
+		sendMessage: sendChatMessage,
+		loadOlderMessages: loadOlderChatMessages,
+	} = useConversationChat({
+		assistantId,
+		conversationId: id,
+		portraitType,
+		poseNames,
+		emotionNames,
+		onPoseChange: setCurrentPose,
+		onEmotionChange: setCurrentEmotion,
+		onVoiceReply: (text, ttsInstructions) => { if (!voiceMuted) playSynthesizedAudio(text, ttsInstructions); },
+		onLoadError: () => navigate(`/assistants/${assistantId}/conversations`, { replace: true }),
+		addToast,
+		fetchEmotions,
+		unlocked,
+	});
+
+	useEffect(() => {
+		setActiveConversationId(Number(id));
+		return () => setActiveConversationId(null);
+	}, [id]);
+
+	useEffect(() => {
+		if (scrollRef.current) {
+			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+		}
+	}, [messages]);
+
+	useEffect(() => {
+		if (inputRef.current) inputRef.current.focus();
+	}, []);
+
+	useEffect(() => {
+		const scrollEl = scrollRef.current;
+		if (!scrollEl) return;
+
+		const handleScroll = () => {
+			if (scrollEl.scrollTop < 100) {
+				loadOlderChatMessages(scrollEl);
+			}
+		};
+
+		scrollEl.addEventListener('scroll', handleScroll);
+		return () => scrollEl.removeEventListener('scroll', handleScroll);
+	}, [loadOlderChatMessages]);
+
+	const sendMessage = (overrideText, options = {}) => {
 		const usingOverride = overrideText !== undefined;
 		const text = (usingOverride ? overrideText : input).trim();
 		if ((!text && !pendingImage) || isLoading) return;
 
-		const isImageGen = text.toLowerCase().startsWith('/create-image ');
-
-		const userMsg = {
-			id: `temp-${Date.now()}`,
-			role: 'user',
-			content: text,
-			image: pendingImage || null,
-		};
-		const updatedMessages = [...messages, userMsg];
-		setMessages([
-			...updatedMessages,
-			{ role: 'assistant', content: '', loading: true, generatingImage: isImageGen },
-		]);
+		const image = pendingImage;
 		if (!usingOverride) setInput('');
 		setPendingImage(null);
-		setIsLoading(true);
 		clearTimeout(draftTimeoutRef.current);
 		localStorage.removeItem(draftKey);
 
-		// Build API message format
-		const apiMessages = updatedMessages.map((m) => {
-			const msg = { role: m.role, content: m.content || '' };
-			if (m.image && m.image.startsWith('data:')) {
-				msg.images = [m.image.replace(/^data:image\/\w+;base64,/, '')];
-			}
-			return msg;
-		});
-
-		const maxRetries = 3;
-		let lastError = null;
-
-		for (let attempt = 1; attempt <= maxRetries; attempt++) {
-			try {
-				const creatorTrigger = '[creator mode: "tsuru tuneado"]';
-				if (text.toLowerCase().includes(creatorTrigger.toLowerCase())) {
-					fetchEmotions(assistantId);
-				}
-
-				const response = await api.post(route('conversations.sendMessage', { assistant: assistantId, id }), {
-					messages: apiMessages,
-					...(voiceMode ? { voice_mode: true } : {}),
-				});
-
-				if (!response.ok) {
-					const errorData = await response.json().catch(() => ({}));
-					throw new Error(errorData.message || 'Request failed');
-				}
-
-				const data = await response.json();
-
-				if (data.image_url) {
-					if (data.intimate !== unlocked) {
-						fetchEmotions(assistantId);
-					}
-
-					if (portraitType === 'avatar3d') {
-						if (data.pose) setCurrentPose({ name: data.pose, triggerId: Date.now() });
-					} else {
-						setCurrentEmotion(data.emotion || (data.intimate ? 'seduced' : 'default'));
-					}
-
-					setHasError(false);
-					setMessages([
-						...updatedMessages,
-						{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: data.content || '', thinking: data.thinking || null, image: data.image_url },
-					]);
-					setIsLoading(false);
-					return;
-				}
-
-				const rawReply = data.content || '[default]\n...signal lost. Try again.';
-				const thinking = data.thinking || null;
-
-				// Poses and emotions are mutually exclusive by portrait type
-				// (a 3D avatar has no emotion tags to disambiguate against),
-				// so only the applicable parser ever runs on a given reply.
-				// A background-change reply already has its tag stripped and
-				// its pose parsed server-side (data.pose is present, unlike a
-				// normal reply) — use that directly instead of re-parsing
-				// content that no longer has a tag to find.
-				let emotion = 'default';
-				let intimate = false;
-				let pose = data.pose !== undefined ? data.pose : null;
-				let cleanText = rawReply;
-
-				if (data.pose === undefined) {
-					if (portraitType === 'avatar3d') {
-						({ pose, text: cleanText } = parsePoseFromResponse(rawReply, poseNames));
-					} else {
-						({ emotion, intimate, text: cleanText } = parseEmotionFromResponse(rawReply, emotionNames));
-					}
-				}
-
-				const ttsInstructions = data.tts_instructions ?? null;
-
-				if (intimate !== unlocked) {
-					fetchEmotions(assistantId);
-				}
-
-				const generatedImageMessages = (data.tool_calls || [])
-					.filter((call) => call.result?.image_url)
-					.map((call, index) => ({
-						id: `temp-${Date.now()}-image-${index}`,
-						role: 'assistant',
-						content: '',
-						image: call.result.image_url,
-					}));
-
-				if (portraitType === 'avatar3d') {
-					if (pose) setCurrentPose({ name: pose, triggerId: Date.now() });
-				} else {
-					setCurrentEmotion(emotion);
-				}
-				setHasError(false);
-				setMessages([
-					...updatedMessages,
-					...generatedImageMessages,
-					{ id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions, toolCalls: data.tool_calls || null },
-				]);
-				setIsLoading(false);
-				if (voiceMode && !voiceMuted) {
-					playSynthesizedAudio(cleanText, ttsInstructions);
-				}
-				return;
-			} catch (error) {
-				lastError = error;
-				setHasError(true);
-
-				const msg = error.message?.toLowerCase() || '';
-				const isTimeout = msg.includes('timeout') ||
-					msg.includes('execution time') ||
-					msg.includes('502') ||
-					msg.includes('504');
-
-				if (isTimeout && attempt < maxRetries) {
-					addToast(`Signal interference. Retrying... (${attempt}/${maxRetries})`, 'error');
-					await new Promise((r) => setTimeout(r, 2000));
-					continue;
-				}
-				break;
-			}
-		}
-
-		addToast(lastError?.message || 'Connection to The Bridge failed', 'error');
-		setMessages([...updatedMessages]);
-		setIsLoading(false);
+		sendChatMessage(text, { voiceMode: options.voiceMode, image });
 	};
 
-	const handleSpeechEnd = useCallback(async (audioBlob) => {
+	const handleSpeechEnd = async (audioBlob) => {
 		const formData = new FormData();
 		formData.append('audio', audioBlob, 'speech.wav');
 
@@ -433,7 +225,7 @@ export default function ChatPage() {
 		} catch (error) {
 			addToast(error.message || 'Failed to transcribe audio', 'error');
 		}
-	}, [assistantId, sendMessage, addToast]);
+	};
 
 	const { isListening, isSpeaking, error: voiceError, start: startVoiceMode, stop: stopVoiceMode } = useVoiceMode({
 		onSpeechEnd: handleSpeechEnd,

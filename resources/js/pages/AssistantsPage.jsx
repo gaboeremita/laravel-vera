@@ -40,6 +40,7 @@ export default function AssistantsPage() {
 		<>
 			<Header
 				hideSettings
+				onBack={() => navigate('/')}
 				status={{
 					label: isLoading ? 'LOADING' : 'WAITING',
 					color: isLoading ? 'text-warning' : 'text-info',
@@ -55,6 +56,7 @@ export default function AssistantsPage() {
 				{isLoading ? (
 					<span className="text-fg-3 text-sm cursor-effect">Loading...</span>
 				) : (
+					<>
 					<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
 						{/* Assistant cards */}
 						{assistants.map((assistant) => (
@@ -125,6 +127,7 @@ export default function AssistantsPage() {
 							+ ADD ASSISTANT
 						</button>
 					</div>
+					</>
 				)}
 			</div>
 

@@ -19,10 +19,13 @@ use App\Http\Controllers\Api\DiscordController;
 use App\Http\Controllers\Api\EmotionController;
 use App\Http\Controllers\Api\ImageGenModelController;
 use App\Http\Controllers\Api\ImageGenProviderController;
+use App\Http\Controllers\Api\NpcController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\VoiceController;
 use App\Http\Controllers\Api\VoiceModelController;
 use App\Http\Controllers\Api\VoiceProviderController;
+use App\Http\Controllers\Api\WorldController;
+use App\Http\Controllers\Api\WorldResidentController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -38,6 +41,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/assistants/{id}/vrm', [AssistantVrmController::class, 'destroy'])->name('assistants.vrm.destroy');
     Route::post('/assistants/{id}/image', [AssistantImageController::class, 'store'])->name('assistants.image.store');
     Route::delete('/assistants/{id}/image', [AssistantImageController::class, 'destroy'])->name('assistants.image.destroy');
+
+    Route::apiResource('worlds', WorldController::class);
+    Route::put('/worlds/{world}/residents/{assistant}', [WorldResidentController::class, 'upsert'])->name('worlds.residents.upsert');
+    Route::delete('/worlds/{world}/residents/{assistant}', [WorldResidentController::class, 'destroy'])->name('worlds.residents.destroy');
+    Route::apiResource('npcs', NpcController::class);
 
     Route::prefix('assistants/{assistant}')->group(function () {
         Route::get('/settings', [SettingsController::class, 'show'])->name('settings.show');

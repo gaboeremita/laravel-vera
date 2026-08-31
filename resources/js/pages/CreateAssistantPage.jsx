@@ -9,9 +9,11 @@ import PoseEditor from '../components/PoseEditor.jsx';
 import DefaultPoseEditor from '../components/DefaultPoseEditor.jsx';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
-export default function CreateAssistantPage() {
+export default function CreateAssistantPage({ kind = 'assistant' }) {
 	const navigate = useNavigate();
 	const { addToast } = useOutletContext();
+	const isNpc = kind === 'world_npc';
+	const collectionPath = isNpc ? '/npcs' : '/assistants';
 
 	const [name, setName] = useState('');
 	const [slug, setSlug] = useState('');
@@ -40,7 +42,7 @@ export default function CreateAssistantPage() {
 	const [assistantMode, setAssistantMode] = useState('assistant');
 
 	// Portrait type
-	const [portraitType, setPortraitType] = useState('image');
+	const [portraitType, setPortraitType] = useState(isNpc ? 'avatar3d' : 'image');
 	const [pendingVrmFile, setPendingVrmFile] = useState(null);
 
 	useEffect(() => {
@@ -183,8 +185,13 @@ export default function CreateAssistantPage() {
 	};
 
 	const handleSubmit = async () => {
-		if (!name.trim() || !slug.trim()) {
-			addToast('Name and slug are required', 'error');
+		if (!name.trim() || (!isNpc && !slug.trim())) {
+			addToast(isNpc ? 'Name is required' : 'Name and slug are required', 'error');
+			return;
+		}
+
+		if (isNpc && !pendingVrmFile) {
+			addToast('NPCs require a 3D avatar file', 'error');
 			return;
 		}
 
@@ -198,11 +205,12 @@ export default function CreateAssistantPage() {
 		try {
 			const formData = new FormData();
 			formData.append('name', name.trim());
-			formData.append('slug', slug.trim());
+			if (!isNpc) formData.append('slug', slug.trim());
 			formData.append('description', description.trim());
 			formData.append('opening_message', openingMessage.trim());
-			formData.append('mode', assistantMode);
+			formData.append('mode', isNpc ? 'assistant' : assistantMode);
 			formData.append('portrait_type', portraitType);
+			if (isNpc) formData.append('vrm', pendingVrmFile);
 
 			if (promptMode === 'json') {
 				try {
@@ -248,7 +256,7 @@ export default function CreateAssistantPage() {
 				});
 			}
 
-			const res = await api.postForm(route('assistants.store'), formData);
+			const res = await api.postForm(route(isNpc ? 'npcs.store' : 'assistants.store'), formData);
 
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
@@ -257,22 +265,22 @@ export default function CreateAssistantPage() {
 
 			const created = await res.json();
 
-			if (portraitType === 'avatar3d' && pendingVrmFile && created.id) {
+			if (!isNpc && portraitType === 'avatar3d' && pendingVrmFile && created.id) {
 				const vrmForm = new FormData();
 				vrmForm.append('vrm', pendingVrmFile);
 				const vrmRes = await api.postForm(route('assistants.vrm.store', { id: created.id }), vrmForm);
 				if (!vrmRes.ok) {
 					const vrmError = await vrmRes.json().catch(() => ({}));
-					addToast(vrmError.message || 'Assistant created, but the VRM upload failed', 'error');
-					navigate('/assistants');
+					addToast(vrmError.message || `${isNpc ? 'NPC' : 'Assistant'} created, but the VRM upload failed`, 'error');
+					navigate(collectionPath);
 					return;
 				}
 			}
 
-			addToast('Assistant created', 'success');
-			navigate('/assistants');
+			addToast(`${isNpc ? 'NPC' : 'Assistant'} created`, 'success');
+			navigate(collectionPath);
 		} catch (e) {
-			addToast(e.message || 'Failed to create assistant', 'error');
+			addToast(e.message || `Failed to create ${isNpc ? 'NPC' : 'assistant'}`, 'error');
 		} finally {
 			setIsSaving(false);
 		}
@@ -287,9 +295,9 @@ export default function CreateAssistantPage() {
 					dot: '●',
 					blink: isSaving,
 				}}
-				onBack={() => navigate('/assistants')}
+				onBack={() => navigate(collectionPath)}
 			>
-				<span className="text-fg-2 text-sm tracking-[0.05em]">New Assistant</span>
+				<span className="text-fg-2 text-sm tracking-[0.05em]">New {isNpc ? 'NPC' : 'Assistant'}</span>
 			</Header>
 
 			<div className="flex-1 overflow-y-auto p-5 custom-scrollbar space-y-6">
@@ -308,7 +316,7 @@ export default function CreateAssistantPage() {
 						/>
 					</div>
 
-					<div>
+					{!isNpc && <div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
 							Slug
 						</label>
@@ -319,7 +327,7 @@ export default function CreateAssistantPage() {
 							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
 							placeholder="e.g. vera"
 						/>
-					</div>
+					</div>}
 
 					<div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
@@ -334,7 +342,7 @@ export default function CreateAssistantPage() {
 						/>
 					</div>
 
-					<div>
+					{!isNpc && <div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
 							Opening Message
 						</label>
@@ -345,7 +353,7 @@ export default function CreateAssistantPage() {
 							className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors resize-none"
 							placeholder="First message when a new conversation starts"
 						/>
-					</div>
+					</div>}
 
 					<div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
@@ -363,7 +371,7 @@ export default function CreateAssistantPage() {
 						</select>
 					</div>
 
-					<div>
+					{!isNpc && <div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
 							Mode
 						</label>
@@ -375,9 +383,9 @@ export default function CreateAssistantPage() {
 							<option value="assistant">Assistant</option>
 							<option value="agent">Agent</option>
 						</select>
-					</div>
+					</div>}
 
-					<div>
+					{!isNpc && <div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
 							Portrait Type
 						</label>
@@ -389,12 +397,12 @@ export default function CreateAssistantPage() {
 							<option value="image">Image</option>
 							<option value="avatar3d">3D Avatar</option>
 						</select>
-					</div>
+					</div>}
 
 					{portraitType === 'avatar3d' && (
 						<div className="space-y-1">
 							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
-								VRM File <span className="text-fg-3 normal-case">(optional, can upload later)</span>
+								VRM File {isNpc ? <span className="text-danger">*</span> : <span className="text-fg-3 normal-case">(optional, can upload later)</span>}
 							</label>
 							<input
 								type="file"
@@ -547,7 +555,7 @@ export default function CreateAssistantPage() {
 								: 'button-success cursor-pointer'
 						}`}
 					>
-						{isSaving ? 'CREATING...' : 'CREATE ASSISTANT'}
+						{isSaving ? 'CREATING...' : `CREATE ${isNpc ? 'NPC' : 'ASSISTANT'}`}
 					</button>
 				</div>
 			</div>

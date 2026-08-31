@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\AssistantKind;
 use App\Models\Assistant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -25,6 +26,7 @@ class AssistantFactory extends Factory
                 'identity' => [fake()->sentence()],
             ],
             'opening_message' => fake()->sentence(),
+            'kind' => AssistantKind::Assistant,
         ];
     }
 }

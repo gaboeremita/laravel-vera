@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\AppendWorldConversationContext;
 use App\Directors\PromptDirector;
 use App\DTOs\LlmResponse;
 use App\Enums\AssistantMode;
@@ -14,6 +15,7 @@ use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\DiscordChannel;
 use App\Models\Image;
+use App\Models\World;
 use App\Services\AgentLoop\AgentLoopRunner;
 use App\Services\AgentLoop\Tools\AvatarBackgroundTool;
 use App\Services\AgentLoop\Tools\BasicCalculatorTool;
@@ -100,7 +102,16 @@ class ConversationController extends Controller
 
     public function store(Request $request, int $assistant): JsonResponse
     {
+        $validated = $request->validate([
+            'worldId' => ['nullable', 'integer', 'exists:worlds,id'],
+        ]);
+
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
+
+        $world = isset($validated['worldId'])
+            ? World::whereBelongsTo($request->user())->find($validated['worldId'])
+            : null;
+        $resident = $world?->residents()->where('assistant_id', $assistant)->first();
 
         $conversation = $assistantUser
             ->conversations()
@@ -108,10 +119,11 @@ class ConversationController extends Controller
 
         $conversation->messages()->create([
             'role' => 'assistant',
-            'content' => $assistantUser->assistant->opening_message ?? '',
+            'content' => $resident?->opening_message ?: $assistantUser->assistant->opening_message ?? '',
         ]);
 
-        if ($assistantUser->assistant->portrait_type === AssistantPortraitType::Avatar3D
+        if ($world === null
+            && $assistantUser->assistant->portrait_type === AssistantPortraitType::Avatar3D
             && ! empty($assistantUser->assistant->opening_message)) {
             GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, $assistantUser->assistant->opening_message);
         }
@@ -155,6 +167,7 @@ class ConversationController extends Controller
             'messages.*.content' => ['nullable', 'string'],
             'messages.*.images' => ['sometimes', 'array'],
             'voice_mode' => ['sometimes', 'boolean'],
+            'worldId' => ['nullable', 'integer', 'exists:worlds,id'],
         ]);
 
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
@@ -264,7 +277,11 @@ class ConversationController extends Controller
             $excludedSections[] = 'voice mode';
         }
 
-        $director = new PromptDirector($assistantModel->prompt);
+        $world = isset($validated['worldId'])
+            ? World::whereBelongsTo($request->user())->findOrFail($validated['worldId'])
+            : null;
+        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world);
+        $director = new PromptDirector($prompt);
         $this->appendExpressionTags($director, $assistantModel, $excludedSections);
 
         if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {

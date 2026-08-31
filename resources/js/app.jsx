@@ -7,6 +7,7 @@ import { Ziggy } from './ziggy.js';
 import AuthenticatedLayout from './layouts/AuthenticatedLayout.jsx';
 import AssistantLayout from './layouts/AssistantLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
+import HomePage from './pages/HomePage.jsx';
 import AssistantsPage from './pages/AssistantsPage.jsx';
 import CreateAssistantPage from './pages/CreateAssistantPage.jsx';
 import EditAssistantPage from './pages/EditAssistantPage.jsx';
@@ -18,6 +19,12 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import ProvidersPage from './pages/ProvidersPage.jsx';
 import ImageGenProvidersPage from './pages/ImageGenProvidersPage.jsx';
 import VoicePage from './pages/VoicePage.jsx';
+import WorldsPage from './pages/WorldsPage.jsx';
+import CreateWorldPage from './pages/CreateWorldPage.jsx';
+import EditWorldPage from './pages/EditWorldPage.jsx';
+import NpcsPage from './pages/NpcsPage.jsx';
+import CreateNpcPage from './pages/CreateNpcPage.jsx';
+import WorldPage from './pages/WorldPage.jsx';
 import MemoryPage from './pages/MemoryPage.jsx';
 import DiscordPage from './pages/DiscordPage.jsx';
 globalThis.Ziggy = Ziggy;
@@ -29,9 +36,18 @@ createRoot(document.getElementById('root')).render(
                 <Routes>
                     <Route path="/login" element={<LoginPage />} />
                     <Route element={<AuthenticatedLayout />}>
+                        <Route path="/" element={<HomePage />} />
+
                         {/* Assistant management */}
                         <Route path="/assistants" element={<AssistantsPage />} />
                         <Route path="/assistants/create" element={<CreateAssistantPage />} />
+                        <Route path="/worlds" element={<WorldsPage />} />
+                        <Route path="/worlds/create" element={<CreateWorldPage />} />
+                        <Route path="/worlds/:worldId/edit" element={<EditWorldPage />} />
+						<Route path="/worlds/:worldId" element={<WorldPage />} />
+                        <Route path="/npcs" element={<NpcsPage />} />
+                        <Route path="/npcs/create" element={<CreateNpcPage />} />
+						<Route path="/npcs/:assistantId/edit" element={<EditAssistantPage kind="world_npc" />} />
                         <Route path="/assistants/:assistantId/edit" element={<EditAssistantPage />} />
 
                         {/* Assistant-scoped routes */}
@@ -48,7 +64,7 @@ createRoot(document.getElementById('root')).render(
                             <Route path="discord" element={<DiscordPage />} />
                         </Route>
                     </Route>
-                    <Route path="*" element={<Navigate to="/assistants" replace />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </BrowserRouter>
         </ThemeProvider>

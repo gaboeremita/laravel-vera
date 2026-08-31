@@ -10,10 +10,12 @@ import DefaultPoseEditor from '../components/DefaultPoseEditor.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
-export default function EditAssistantPage() {
+export default function EditAssistantPage({ kind = 'assistant' }) {
 	const { assistantId: id } = useParams();
 	const navigate = useNavigate();
 	const { addToast } = useOutletContext();
+	const isNpc = kind === 'world_npc';
+	const collectionPath = isNpc ? '/npcs' : '/assistants';
 
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
@@ -57,7 +59,7 @@ export default function EditAssistantPage() {
 			try {
 				const res = await api.get(route('assistants.show', { id }));
 				if (!res.ok) {
-					navigate('/assistants', { replace: true });
+					navigate(collectionPath, { replace: true });
 					return;
 				}
 				const data = await res.json();
@@ -78,7 +80,7 @@ export default function EditAssistantPage() {
 				if (defaultEmo?.image_url) setDefaultPreview(defaultEmo.image_url);
 			} catch {
 				addToast('Failed to load assistant', 'error');
-				navigate('/assistants', { replace: true });
+				navigate(collectionPath, { replace: true });
 			} finally {
 				setIsLoading(false);
 			}
@@ -109,7 +111,7 @@ export default function EditAssistantPage() {
 				throw new Error(error.message || 'Save failed');
 			}
 
-			addToast('Assistant saved', 'success');
+			addToast(`${isNpc ? 'NPC' : 'Assistant'} saved`, 'success');
 		} catch (e) {
 			addToast(e.message || 'Failed to save assistant', 'error');
 		} finally {
@@ -414,9 +416,9 @@ export default function EditAssistantPage() {
 			<>
 				<Header
 					status={{ label: 'LOADING', color: 'text-warning', dot: '●', blink: true }}
-					onBack={() => navigate('/assistants')}
+					onBack={() => navigate(collectionPath)}
 				>
-					<span className="text-fg-2 text-sm tracking-[0.05em]">Edit Assistant</span>
+					<span className="text-fg-2 text-sm tracking-[0.05em]">Edit {isNpc ? 'NPC' : 'Assistant'}</span>
 				</Header>
 				<div className="flex-1 p-5">
 					<span className="text-fg-3 text-sm cursor-effect">Loading...</span>
@@ -434,7 +436,7 @@ export default function EditAssistantPage() {
 					dot: '●',
 					blink: isSaving,
 				}}
-				onBack={() => navigate('/assistants')}
+				onBack={() => navigate(collectionPath)}
 			>
 				<span className="text-fg-2 text-sm tracking-[0.05em]">
 					Edit — {name}

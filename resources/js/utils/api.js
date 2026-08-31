@@ -57,5 +57,14 @@ export const api = {
                 'Accept': 'application/json',
             },
             body: formData,
-    }),
+        }),
+    patchForm: (url, formData) =>
+        fetch(url, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: {
+                Accept: 'application/json',
+            },
+            body: formData,
+        }),
 };

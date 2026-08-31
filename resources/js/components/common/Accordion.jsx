@@ -1,8 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function Accordion({ label, title, collapsed, onToggle, onDelete, badge, actions, children }) {
+export default function Accordion({ label, title, collapsed, onToggle, onDelete, badge, actions, children, className = '' }) {
 	return (
-		<div className="border border-line-1">
+		<div className={`border border-line-1 ${className}`}>
 			{/* Header */}
 			<div
 				onClick={onToggle}
