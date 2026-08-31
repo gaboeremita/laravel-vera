@@ -1,57 +1,54 @@
-# Research: Connection Node World
+# Research: Configurable Worlds
 
-## Browser runtime
+## Decision 1: Browser-native renderer, not Unity WebGL
 
-**Decision**: Build the world in the existing React Three Fiber runtime.
+**Decision**: Reuse the existing Three.js, React Three Fiber, Drei, and VRM dependencies for the interactive world.
 
-**Rationale**: VERA already has Three.js, VRM, and pose animation support. This keeps authentication, assistant data, chat, archive retrieval, voice, and theme behavior in one application.
+**Rationale**: The application already renders VRM assistants in React. A browser-native scene shares asset loading, model behavior, authentication, deployment, UI composition, and chat state. Unity WebGL would add a second runtime, bridge layer, build pipeline, and duplicate avatar/chat integration for a single-room proof of concept.
 
-**Alternative considered**: Unity WebGL would add a second browser application and integration boundary for every existing service.
+**Alternatives considered**:
 
-## Environment delivery
+- Unity WebGL: strong authoring tooling, but disproportionate integration and payload cost for the current scope.
+- Babylon.js: capable, but would duplicate an installed renderer stack without a problem it uniquely solves.
 
-**Decision**: Ship the approved room as GLB. FBX is accepted as an authoring or animation source format.
+## Decision 2: GLB runtime assets; FBX accepted as source material
 
-**Rationale**: Three.js recommends GLB/glTF for runtime delivery. It is compact and carries meshes, materials, textures, skins, and animation predictably.
+**Decision**: Standardize delivered runtime environments and avatars on GLB. Accept FBX source models or animations only when they are converted and validated before runtime use.
 
-**Evidence**: [Three.js model workflow](https://threejs.org/manual/en/loading-3d-models.html), [GLTFLoader](https://threejs.org/docs/pages/GLTFLoader.html).
+**Rationale**: GLB packages geometry, materials, and scene data in one web-friendly asset. It matches Three.js loading and reduces runtime conversion ambiguity. User-selected marketplace assets remain valid acquisition sources.
 
-## NPC model
+## Decision 3: Worlds are user-created configuration, not a fixed feature surface
 
-**Decision**: Add `AssistantKind` and represent an NPC as an `Assistant` with `WorldNpc` kind.
+**Decision**: Create a general `World` domain and editor. Connection Node is the first user-configured world.
 
-**Rationale**: `Assistant` already owns prompts, archives, VRM files, poses, conversations, provider selection, and user ownership. The NPC editor can expose a smaller configuration surface without creating a second AI or conversation stack.
+**Rationale**: The user wants to add spaces as they add assistants. A generalized model allows more rooms later without a migration from a hardcoded endpoint, routing key, or singleton record.
 
-## World-specific data
+## Decision 4: Reuse Assistant for NPCs
 
-**Decision**: Keep resident selection, placement, interaction radius, and roaming configuration in `World` and `WorldResident` records.
+**Decision**: Represent NPCs with `AssistantKind::WorldNpc`, plus a `WorldResident` relationship that supplies placement and behavior.
 
-**Rationale**: These settings belong to a room. They should not be hardcoded or attached permanently to an assistant.
+**Rationale**: NPCs require the same model uploads, VRM configuration, animations, poses, prompts, archive access, provider behavior, and chat pipeline. A second NPC model would duplicate these capabilities and drift.
 
-## Movement and collision
+## Decision 5: Dynamic, scoped world prompt injection
 
-**Decision**: Use authored collision volumes and waypoint roaming in v1.
+**Decision**: Store `assistant_context_prompt` and `npc_context_prompt` on `World`. At an authorized in-world chat boundary, dynamically append the matching prompt to the resident's existing prompt before the existing `PromptDirector` runs.
 
-**Rationale**: One bounded room has known geometry. This is testable, tunable, and avoids a general physics dependency until the product requires dynamic obstacles or complex navigation.
+**Rationale**: The assistant remains knowledgeable through the existing archive path while its world situation is supplied only when relevant. Storing the text in the assistant base prompt would contaminate conversations held elsewhere and make the same assistant harder to reuse across worlds.
 
-## Resource controls
+## Decision 6: Reuse, then extract shared avatar rendering
 
-**Decision**: Reduce pose, idle, and roaming updates for residents outside both the visible view and interaction range. Dispose world-only resources on exit.
+**Decision**: Extract a low-level `CharacterVrm` renderer from the existing `VrmAvatar` preview; preserve portrait-only framing/backdrop in the existing wrapper.
 
-**Rationale**: Multiple skinned VRM characters and large textures compete for browser resources. Unseen work does not improve the experience.
+**Rationale**: This prevents divergent VRM loading, pose application, animation control, and disposal while retaining the editor's current presentation.
 
-**Evidence**: [Three.js cleanup](https://threejs.org/manual/en/cleanup.html), [texture memory](https://threejs.org/manual/en/textures.html).
+## Decision 7: Collision uses authored collision meshes
 
-## Prompt and archive configuration
+**Decision**: User-provided environment deliveries include named collision meshes or an explicit collision map. The runtime hides collision meshes and uses them only for movement blocking.
 
-**Decision**: NPC editing offers one prompt field and archive selection, then stores them through the current structured prompt and retrieval path.
+**Rationale**: Mesh-based collision is more predictable than guessing from visual geometry and lets the asset provider tune walkable space.
 
-**Rationale**: `PromptDirector` and `PromptBuilder` already provide prompt composition and archive context safely. Hardcoded NPC prompts would bypass user configuration.
+## Decision 8: Visibility and distance govern resident work
 
-## Interfaces and abstractions
+**Decision**: Visible and nearby residents update at full rate. Distant or off-camera residents suspend roaming and reduce or pause nonessential animation/mixer updates. World exit disposes all world-owned geometry, textures, mixers, and listeners.
 
-**Decision**: Use existing provider contracts and add actions/form requests for world operations. Do not add a fake NPC participant interface when `Assistant` is intentionally the only conversation participant.
-
-**Rationale**: Laravel interfaces should represent an actual swappable boundary. The reusable boundary here is the character renderer and the documented API contracts.
-
-**Evidence**: [Laravel container bindings](https://laravel.com/docs/13.x/container#binding-interfaces-to-implementations), [Eloquent enum casting](https://laravel.com/docs/13.x/eloquent-mutators#enum-casting).
+**Rationale**: This gives the highest payoff for a contained scene with several VRM characters and avoids retaining heavy state after returning to the application.

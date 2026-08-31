@@ -1,135 +1,105 @@
-# Implementation Plan: Connection Node World
+# Implementation Plan: Configurable Worlds
 
-**Branch**: `007-connection-node-world` | **Date**: 2026-08-30 | **Spec**: [spec.md](spec.md)
+**Branch**: `007-connection-node-world` | **Spec**: [spec.md](./spec.md) | **Date**: 2026-08-30
 
 ## Summary
 
-Add a desktop-first, single-room world launched from the Assistants area. It has first-person exploration, collision, configurable assistant residents, world NPCs, proximity-based chat, and a world editor. NPCs are a constrained kind of the existing `Assistant`, retaining its prompts, archives, model resolution, conversations, VRM assets, poses, and voice behavior. One shared React Three Fiber canvas reuses the existing VRM and animation behavior after it is separated from the portrait-only backdrop.
+Add a desktop-first Worlds experience beside the existing assistant library. Users can create, configure, enter, edit, and remove single-room 3D worlds. Each world has a supplied GLB environment, selected assistant residents, optional lightweight NPC residents, and two editable context prompts: one for companion assistants and one for NPCs. The Connection Node is the first configured world, not a fixed route or singleton.
+
+The existing React/Three/VRM stack remains the browser runtime. The Laravel application owns world configuration and authorization; the browser owns first-person movement, collision, proximity interaction, and rendering. World-specific context is appended dynamically to a resident's existing prompt only while the user chats from that world.
 
 ## Technical Context
 
-**Language/Version**: PHP 8.4, Laravel 13, JavaScript ES2023, React 19
+**Language/Version**: PHP 8.4 / Laravel 13; JavaScript with React 19
 
-**Primary Dependencies**: React Router 7, Tailwind CSS 4, Framer Motion, Three.js 0.185, React Three Fiber 9, `@pixiv/three-vrm` 3.5, `@pixiv/three-vrm-animation` 3.5
+**Primary Dependencies**: Existing Inertia-style React application, Three.js, React Three Fiber, Drei, `@pixiv/three-vrm`, Tailwind CSS 4, Laravel Sanctum
 
-**Storage**: PostgreSQL for world and resident configuration; public disk for character and approved room assets
+**Storage**: Existing relational database and configured file disks; use existing upload/VRM/pose conventions
 
-**Testing**: Pest 4 feature tests with factories; ESLint and Pint after implementation
+**Testing**: Pest feature tests for authorization, validation, resident configuration, NPC reuse, and world-context injection; focused frontend tests only where the existing suite supports them
 
-**Target Platform**: Authenticated laptop and desktop browsers with WebGL, keyboard, and mouse
+**Target Platform**: Laptop/desktop browser; keyboard + mouse, no mobile target in this phase
 
-**Performance Goals**: Usable world within 5 seconds on the reference laptop; stable rendering through 15 minutes with up to 10 residents; no nonessential roaming or pose work for residents outside view and interaction range
+**Performance Goals**: Responsive exploration in a furnished room with an initial limited resident set; non-visible or distant residents must not consume full animation/roaming work
 
-**Constraints**: One room; no mobile, generated background scene, or open-world traversal; all configuration scoped to the authenticated user; user supplies approved assets
+**Constraints**: No new package without approval; no generated production environment art; reuse existing assistant, archive, provider, avatar, animation, pose, prompt, and shared UI patterns
 
-## Constitution Check
+## Architecture and Design Principles
 
-| Principle | Status | Plan response |
-|---|---|---|
-| Lint and tests | Pass | Run final Pint, ESLint, and focused Pest tests. |
-| Append-only migrations | Pass | Add migrations only. |
-| Data isolation | Pass | Scope every world, resident, NPC, and assistant lookup through user ownership. |
-| Feature tests | Pass | Use factories for world, resident, and NPC APIs. |
-| No speculative abstraction | Pass | Reuse assistant, VRM, pose, prompt, archive, and conversation systems. |
-| Render-state discipline | Pass | Perform synchronous state alignment in render and asynchronous scene loads in local effects. |
+- Keep domain concepts explicit: `World`, `WorldResident`, and `AssistantKind::WorldNpc`.
+- Reuse `Assistant` for NPCs. A world NPC is an assistant with a different kind, not a parallel data or conversation model.
+- Use PHP enums for persisted state and a `World::contextPromptFor(AssistantKind $kind)` method to centralize prompt selection rather than scattering conditionals.
+- Use a concrete `AppendWorldConversationContext` action at the conversation boundary. It validates that the assistant is a resident of the requested world and appends only the matching world context to the existing prompt before `PromptDirector` builds the request. Do not permanently change the assistant prompt or force an interface where no alternate implementation exists.
+- Bind interfaces only at genuine variable integrations (for example, existing provider or storage boundaries); retain Laravel's direct concrete injection for application actions and controllers.
+- Keep runtime rendering separable from persistence: the API returns a world DTO/resource, and the Three scene receives normalized runtime configuration.
+- Extract a shared `CharacterVrm` renderer from the current portrait preview so the world and assistant editor use the same VRM loading, pose, and disposal behavior.
+- Reuse existing `Header`, `Accordion`, `ConfirmationModal`, `Toggle`, pose editors, uploader controls, prompt components, and visual language. New world forms follow the assistant editor's structure rather than introducing a separate design system.
 
-## Research Decisions
+## Proposed File-Level Design
 
-See [research.md](research.md) for the browser runtime, GLB asset pipeline, assistant-kind NPC model, placement layer, visibility-aware work, and interface-boundary decisions.
+### Backend
 
-## Project Structure
+| Area | Change |
+|---|---|
+| `app/Models/World.php` | New user-owned model with name, slug, description, environment metadata, assistant context prompt, NPC context prompt, settings, relationships, and `contextPromptFor()` |
+| `app/Models/WorldResident.php` | Placement and behavior for an assistant assigned to a world |
+| `app/Enums/AssistantKind.php` | Add `WorldNpc`; retain normal assistant behavior unchanged |
+| `app/Enums/WorldResidentBehavior.php` | `Stationary` and `Roam` values for runtime behavior |
+| migrations | New `worlds` and `world_residents` tables; never alter prior migrations |
+| `app/Http/Controllers/WorldController.php` | Authorized Worlds list/create/show/update/delete endpoints |
+| `app/Http/Controllers/WorldResidentController.php` | Authorize companion resident selection and placement updates |
+| `app/Http/Controllers/WorldNpcController.php` | Create/update/delete `WorldNpc` assistants through existing upload, pose, archive, and prompt fields |
+| Form Requests / API Resources | Validate world fields and present a stable editor/runtime payload |
+| `app/Actions/AppendWorldConversationContext.php` | Dynamically append the correct world context to an eligible in-world conversation request |
+| Conversation flow | Accept an optional `world_id`, authorize membership, then apply contextual prompt before calling existing `PromptDirector`; ordinary chats skip this action |
 
-```text
-app/
-├── Actions/Worlds/
-│   ├── CreateWorldNpc.php
-│   ├── SyncWorldResidents.php
-│   └── UpdateWorldNpc.php
-├── Enums/
-│   ├── AssistantKind.php
-│   └── WorldResidentBehavior.php
-├── Http/Controllers/Api/
-│   ├── WorldController.php
-│   ├── WorldNpcController.php
-│   └── WorldResidentController.php
-├── Http/Requests/Worlds/
-└── Models/
-    ├── Assistant.php
-    ├── World.php
-    └── WorldResident.php
+### Frontend
 
-resources/js/
-├── components/
-│   ├── CharacterVrm.jsx
-│   ├── WorldChatPanel.jsx
-│   ├── WorldLoader.jsx
-│   ├── WorldNpcEditor.jsx
-│   └── WorldResidentEditor.jsx
-├── hooks/
-│   ├── useWorld.js
-│   ├── useWorldChat.js
-│   └── useWorldControls.js
-├── pages/
-│   ├── WorldPage.jsx
-│   └── EditWorldPage.jsx
-└── scenes/
-    ├── ConnectionNodeScene.jsx
-    ├── WorldCharacter.jsx
-    ├── WorldCollisionMap.js
-    └── WorldResidentController.js
-```
+| Area | Change |
+|---|---|
+| Assistant index | Add a Worlds section and create-world action using existing card styling |
+| `WorldsPage` | Lists user-owned world cards with edit and enter actions |
+| `CreateWorldPage` / `EditWorldPage` | Assistant-editor-style form for metadata, environment asset, companion residents, NPC residents, and the two context prompts |
+| `WorldPage` | Loading transition, first-person canvas, minimal HUD, close-range interaction affordance, in-world chat panel, pause/settings menu, and exit action |
+| `WorldScene` modules | Environment, player controller, collision, resident controller, visibility policy, interaction system, and world-only asset disposal |
+| Shared avatar modules | Extract `CharacterVrm`; preserve existing portrait-specific backdrop wrapper |
+| Routes | Generic `/worlds`, `/worlds/create`, `/worlds/:worldId`, and `/worlds/:worldId/edit` routes; no fixed Connection Node route |
 
-**Structure Decision**: Existing Laravel and React directories remain in place. `CharacterVrm` is extracted because portrait and world scenes both need the same VRM, expression, and pose behavior. World code stays separate from existing chat and assistant-editor pages.
+## Data and API Shape
 
-## Implementation Phases
+See [data-model.md](./data-model.md), [world-api.md](./contracts/world-api.md), and [world-frontend.md](./contracts/world-frontend.md).
 
-### Phase A — Domain and ownership
+Key rules:
 
-1. Add `AssistantKind` (`Companion`, `WorldNpc`) and `WorldResidentBehavior` (`Stationary`, `Roam`).
-2. Add `World` and `WorldResident` models, migrations, factories, and user-scoped relations.
-3. Create a per-user Connection Node idempotently; do not hardcode a database row.
-4. Add actions and form requests. `CreateWorldNpc` stores an NPC as an assistant with `WorldNpc` kind, structured single-prompt data, standard ownership, and optional archive.
-5. Preserve `Assistant` as the single source for VRM uploads, poses, archives, conversations, voice, and provider resolution.
+1. A `World` belongs to one user and has a user-unique slug only for readable routing/display; it is never identified by a hardcoded canonical key.
+2. A `WorldResident` references one existing `Assistant`; the `(world_id, assistant_id)` pair is unique.
+3. A companion resident must be an owned, normal assistant with a 3D avatar. An NPC is an owned `AssistantKind::WorldNpc` created inside the world editor and stored through the same assistant features.
+4. `assistant_context_prompt` applies only when chatting in that world with a companion resident. `npc_context_prompt` applies only when chatting in that world with a world NPC.
+5. `world_id` is request context, not a permanent conversation attribute: users may hold ordinary conversations with the same assistant outside a world, without world text bleeding into those messages.
 
-### Phase B — APIs and management UI
+## Runtime Flow
 
-1. Add endpoints for world summary/configuration, resident synchronization, placement, and NPC lifecycle.
-2. Return only eligible 3D-avatar companion assistants; reject cross-user or invalid placement data.
-3. Reuse current VRM and pose upload flows for NPC assistants.
-4. Exclude `WorldNpc` records from the normal Assistants index but preserve standard conversations and archive retrieval through world APIs.
-5. Add a Worlds section and Connection Node card to `AssistantsPage`.
-6. Build `EditWorldPage` with existing `Header`, `Accordion`, `ConfirmationModal`, `Toggle`, theme tokens, and compact editor patterns.
-7. Extract a reusable VRM file control from the assistant editor; use it in assistant and NPC flows.
+1. The user selects a world card; the app shows a branded loading transition while it fetches world configuration and prepares assets.
+2. `WorldPage` loads the room GLB, collision meshes, and nearby resident avatars. The initial player spawn is part of world configuration.
+3. The player uses keyboard and mouse to move in first person. Collision prevents passing through configured colliders.
+4. When a resident is in interaction range and line of sight, the HUD shows an accessible prompt such as `C — Chat`.
+5. Opening chat sends the active `world_id` with the normal conversation operation. The backend verifies the resident and dynamically adds its applicable world context prompt before the existing assistant/archive pipeline runs.
+6. Off-screen or sufficiently distant residents suspend roaming and lower animation work. Leaving the world disposes only world-owned scene resources, then returns to the normal application shell.
 
-### Phase C — Shared world runtime
+## Delivery Phases
 
-1. Extract portrait-independent VRM loading, expressions, default poses, triggered poses, and cleanup into `CharacterVrm`.
-2. Keep `VrmAvatar` as the portrait wrapper with its existing generated backdrop.
-3. Create `ConnectionNodeScene` with one canvas, GLB environment, player camera, collision volumes, resident actors, proximity zones, and HUD.
-4. Implement keyboard/mouse controls, cursor release, focus-loss stop, and chat-open movement lock.
-5. Implement deterministic waypoint roaming within resident-specific safe bounds; selected residents stop roaming during chat.
-6. Add `WorldChatPanel` on the existing conversation/message/voice pipeline.
+1. **Foundation**: schema, enums, models, policies, requests, resources, routes, and generic world CRUD.
+2. **Editor**: Worlds listing, create/edit form, environment upload/metadata, companion selection, and reusable NPC editing.
+3. **Prompt boundary**: dynamic world-context action plus in-world conversation API integration and coverage proving no ordinary-chat leakage.
+4. **Runtime**: shared VRM renderer extraction, loading transition, first-person scene, collision, interaction, chat overlay, culling, and teardown.
+5. **Polish and acceptance**: settings/pause behavior, empty states, validation, accessibility, focused test suite, Pint, and user-selected asset handoff verification.
 
-### Phase D — Performance, assets, and resilience
+## Risk Register
 
-1. Load the approved room as GLB; use FBX only during asset preparation.
-2. Add a graceful loader, readiness/error surface, and disposal on world exit.
-3. Pause nonessential animation and roaming outside view and interaction range; restore before visibility or interaction.
-4. Cap device pixel ratio and use conservative lighting and shadows.
-5. Validate asset license, GLB validity, texture dimensions, scale/orientation, collision map, spawn, stations, and roaming areas.
-
-### Phase E — Verification
-
-1. Add factory-backed feature tests for ownership, eligibility, NPC creation, archive linking, placement, and conversation access.
-2. Run Pint, ESLint, focused Pest tests, and the [quickstart](quickstart.md) scenarios after implementation.
-
-## User-Owned Asset Work
-
-1. Source a polished futuristic sci-fi room and props with portfolio-compatible licenses.
-2. Supply the source files and license/source records.
-3. Approve the converted GLB, room scale, texture quality, and visual direction.
-4. Supply or approve a layout map for solid geometry, spawn, resident stations, and roaming areas.
-
-## Complexity Tracking
-
-No constitution violation is required. World entities represent real configuration, while NPCs reuse the assistant system rather than duplicating AI, assets, animation, or conversations.
+| Risk | Mitigation |
+|---|---|
+| Large or inconsistent user assets hurt frame time | Require GLB delivery metadata/collision maps, lazy-load residents, cap active behavior, and dispose scene resources on exit |
+| World text leaks into normal chats | Centralize injection in the action; require an authorized `world_id` and test both in-world and ordinary paths |
+| NPC feature drift | Store NPCs as assistants with `AssistantKind::WorldNpc`; reuse existing uploader, animation, prompt, archive, and provider code |
+| Editor becomes visually inconsistent | Compose existing form, accordion, uploader, pose, modal, and card components; inspect sibling usage before changes |
+| Scope expands into multi-room or mobile game systems | Keep one bounded room per configurable world and desktop navigation for this feature |

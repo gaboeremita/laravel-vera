@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Connection Node World
+# Specification Quality Checklist: Configurable Worlds
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-08-30
@@ -31,4 +31,4 @@
 
 ## Notes
 
-- The exact Connection Node environment and furnishing assets remain user-selected. Their sourcing, license confirmation, approval, and handoff are explicit delivery requirements rather than unresolved feature scope.
+- Worlds are user-created configuration. Connection Node is the first example; its exact environment and furnishing assets remain user-selected. Their sourcing, license confirmation, approval, and handoff are explicit delivery requirements rather than unresolved feature scope.

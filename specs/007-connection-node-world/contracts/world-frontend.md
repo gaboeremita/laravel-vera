@@ -1,9 +1,71 @@
-# Connection Node Frontend Contract
+# Frontend Contract: Configurable Worlds
 
-`/worlds/connection-node` transitions to a loader until the environment and residents are ready. The runtime moves through `Loading`, `Exploring`, `Chatting`, and `Error` states.
+## Routes
 
-`ConnectionNodeScene` receives the world and resident collection. `WorldCharacter` owns local visibility-aware animation state and reports proximity changes. `WorldChatPanel` pauses movement while using the selected resident's existing conversation.
+| Route | Page | Purpose |
+|---|---|---|
+| `/worlds` | `WorldsPage` | List the current user's world cards; accessible from the Assistants area Worlds section |
+| `/worlds/create` | `CreateWorldPage` | Create a world with metadata, environment, context prompts, companions, and NPCs |
+| `/worlds/:worldId` | `WorldPage` | Load and explore the selected 3D world |
+| `/worlds/:worldId/edit` | `EditWorldPage` | Modify its world configuration |
 
-`EditWorldPage` uses the current header and accordion styling. Its sections are Residents, NPCs, Environment, and Experience. NPC editing composes existing VRM and pose controls with name, one prompt, archive, and placement fields.
+No route is reserved for Connection Node. It is ordinary user-created world content.
 
-When the route unmounts, it disposes world-only resources. Residents outside visible and interactive space suspend nonessential behavior and restore it before interaction or visibility.
+## World Resource Consumed by UI
+
+```ts
+type WorldResource = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  environmentUrl: string | null;
+  assistantContextPrompt: string | null;
+  npcContextPrompt: string | null;
+  settings: {
+    playerSpawn?: { x: number; y: number; z: number };
+    collisionMap?: string[];
+  } | null;
+  residents: Array<{
+    assistant: AssistantResource;
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number } | null;
+    behavior: 'stationary' | 'roam';
+    behaviorSettings: Record<string, unknown> | null;
+  }>;
+};
+```
+
+## Editor Composition
+
+`CreateWorldPage` and `EditWorldPage` reuse the existing assistant editor language:
+
+- Header and card patterns for page structure.
+- Accordions for environment, companion residents, NPC residents, and prompt configuration.
+- Existing VRM uploader and pose/animation editors for NPC configuration.
+- Existing prompt builder/editor components for the world context prompts.
+- Existing confirmation modal for deletion.
+
+The prompts are labelled professionally:
+
+- **Companion assistant world context**: context given to selected normal assistant residents during in-world chat.
+- **NPC world context**: context given to NPC residents during in-world chat.
+
+## Runtime UI States
+
+1. **Loading transition**: world name and progress/error state while configuration and assets load.
+2. **Explore**: first-person scene, minimal controls/help affordance, interaction indicator only when relevant.
+3. **Resident interaction**: a nearby visible resident presents `C — Chat` (or the configured accessible equivalent).
+4. **Chat**: in-world overlay/drawer keeps the canvas alive, identifies the resident, and sends `world_id` with every create/send operation.
+5. **Pause/settings**: controls/help, audio and visual-quality toggles where supported, and an explicit Exit World action. World editor settings remain separate from in-world preferences.
+6. **Error/empty state**: missing environment, failed asset, no residents, or unauthorized world has a recoverable route back to Worlds.
+
+## Runtime Modules
+
+- `WorldScene`: owns scene lifecycle and asset disposal.
+- `FirstPersonController`: keyboard/mouse movement and collision integration.
+- `WorldEnvironment`: GLB loading, named collision mesh extraction, lights, and scene setup.
+- `ResidentController`: placement, stationary/roam behavior, and animation policy.
+- `InteractionSystem`: proximity/line-of-sight checks and keyboard activation.
+- `VisibilityPolicy`: frustum/distance thresholds that suspend nonessential resident work.
+- `WorldChat`: existing conversation UI adapted to pass active `world_id`; no separate provider/chat system.

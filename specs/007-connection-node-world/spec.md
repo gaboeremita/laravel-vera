@@ -1,4 +1,4 @@
-# Feature Specification: Connection Node World
+# Feature Specification: Configurable Worlds
 
 **Feature Branch**: `007-connection-node-world`
 
@@ -6,166 +6,138 @@
 
 **Status**: Draft
 
-**Input**: User description: "Add the Connection Node: a desktop-first, single-room 3D world accessed from the Assistants area through a Worlds section. Eligible assistants are persistently present as embodied characters. The user can explore with walking controls, collide with room furniture and boundaries, observe assistants idle and roam within safe zones, approach an assistant, and press C to open that assistant's existing conversation. The experience is a polished futuristic sci-fi social simulation, distinct from the conventional conversation page. The implementation plan must separate user-owned asset sourcing and approval from agent-owned application work. V1 excludes mobile, multiple rooms, generated backgrounds, and open-world features."
+**Input**: User description: "Add user-created, desktop-first 3D worlds to the Assistants area. A world such as the Connection Node is a single room containing selected 3D assistant residents and configurable NPC residents. Users can walk, interact with nearby residents, and use in-world chat. Each world has editable context prompts for companion assistants and NPCs."
 
 ## Clarifications
 
 ### Session 2026-08-30
 
-- Q: How should world NPCs access setting knowledge? → A: World NPCs reuse the existing assistant archive access so they can respond knowledgeably about the world.
-- Q: How should the Connection Node manage unused character work? → A: Character animation, roaming, and related updates are reduced when an assistant is not visible or nearby, then restored before the assistant can be observed or interacted with.
+- Q: How should world NPCs access setting knowledge? → A: NPCs reuse the existing assistant archive access.
+- Q: How should worlds manage unused character work? → A: Character animation, roaming, and related updates are reduced when a resident is not visible or nearby.
+- Q: How are spaces created and contextualized? → A: Users create and edit Worlds from the Assistants area, and each world has separate editable context prompts for companion assistants and NPCs.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Enter the Connection Node (Priority: P1)
+### User Story 1 - Create and manage worlds (Priority: P1)
 
-An authenticated user opens the Assistants area, selects the Connection Node from a Worlds section, and enters a dedicated, immersive world view instead of a normal conversation page. A graceful transition and loader make clear that the room and its residents are being prepared.
+An authenticated user opens the Worlds section alongside Assistants, creates a world, names and describes it, sets its room assets and editable assistant/NPC context prompts, then returns later to edit or remove it.
 
-**Why this priority**: The world must be discoverable and clearly distinct from conventional chat before its social interactions can provide value.
+**Why this priority**: Worlds are user-owned content, so the Connection Node must be a configurable example rather than a fixed application surface.
 
-**Independent Test**: From the Assistants area, select the Connection Node and verify that the user enters the single-room world with a visible starting position and clear desktop controls.
+**Independent Test**: Create a world called Connection Node, save its prompts, reopen it, edit its settings, and confirm it appears as a world card.
 
 **Acceptance Scenarios**:
 
-1. **Given** an authenticated user is viewing the Assistants area, **When** they select the Connection Node world card, **Then** they enter the Connection Node without selecting a conversation first.
-2. **Given** the user selects the Connection Node, **When** the world is preparing, **Then** the user sees a graceful transition and a clear loading state rather than a broken or empty interaction surface.
-3. **Given** the user is in the Connection Node, **When** they leave the world, **Then** they can return to the Assistants area without losing or changing any existing conversations.
+1. **Given** the user is viewing Assistants, **When** they choose Worlds, **Then** they see existing world cards and an add-world card.
+2. **Given** the user creates a world with valid required fields, **When** they save it, **Then** the world appears in the Worlds section and can be edited or entered.
+3. **Given** the user edits a world prompt, **When** they save it, **Then** later in-world conversations use the updated prompt.
+4. **Given** the user removes a world, **When** they confirm deletion, **Then** the world and its world-only residents are removed without deleting companion assistants or their conventional conversations.
 
 ---
 
-### User Story 2 - Explore the room (Priority: P1)
+### User Story 2 - Enter and explore a world (Priority: P1)
 
-The user explores the single Connection Node room from a first-person perspective using a laptop keyboard and mouse. Walls and placed furniture make the room feel physical by preventing the user from walking through them.
+The user selects a world card and enters a dedicated first-person, single-room experience. A graceful transition and loader prepare the approved environment and residents. The user walks with keyboard and mouse controls, while walls and selected furnishings prevent movement through them.
 
-**Why this priority**: Movement and believable boundaries are the core difference between this social world and the existing portrait-based chat experience.
+**Why this priority**: Exploration is the central experience that distinguishes a world from a conventional conversation page.
 
-**Independent Test**: Enter the room, move in every supported direction, look around with the mouse, and attempt to cross a wall and each collision-marked furnishing.
+**Independent Test**: Enter a configured world, use every movement control, attempt to pass through collision-marked room features, release controls, and return to the Worlds section.
 
 **Acceptance Scenarios**:
 
-1. **Given** the user has entered the Connection Node, **When** they use the documented movement and look controls, **Then** they can walk and look around the room from their point of view.
-2. **Given** the user walks into a wall or collision-marked furnishing, **When** they continue moving toward it, **Then** they remain outside the object and can move away normally.
-3. **Given** the user pauses or releases world controls, **When** they move the pointer outside the world interaction surface, **Then** they can regain normal browser interaction without becoming trapped in the world controls.
+1. **Given** a world is ready, **When** the user selects its card, **Then** they see a clear loading transition before the room becomes interactive.
+2. **Given** the world is active, **When** the user walks or looks using documented laptop controls, **Then** they can explore without becoming trapped in world input.
+3. **Given** the user walks into a solid room boundary or furnishing, **When** they continue moving toward it, **Then** they remain outside the object and can move away normally.
 
 ---
 
-### User Story 3 - Meet and chat with an assistant (Priority: P1)
+### User Story 3 - Meet and chat with residents (Priority: P1)
 
-Every eligible assistant is visibly and persistently represented by its 3D character in the Connection Node. When the user approaches an assistant, an interaction prompt identifies the available chat action; pressing `C` starts or resumes that assistant's existing conversation from an in-world chat experience.
+The user configures eligible 3D companion assistants and NPCs as residents of a world. Approaching a resident presents a chat prompt; pressing `C` opens or resumes that resident's existing conversation in an in-world panel.
 
-**Why this priority**: Embodied, proximity-based conversation is the defining social purpose of the Connection Node.
+**Why this priority**: Embodied, proximity-based conversation is the purpose of the world.
 
-**Independent Test**: Approach multiple assistants, confirm that only nearby assistants offer the chat prompt, use `C`, exchange messages, leave the chat, and confirm that each conversation remains associated with the correct assistant.
+**Independent Test**: Add two companion residents and one NPC, approach each one, use `C`, exchange messages, close chat, and verify the correct conversation and world context are retained.
 
 **Acceptance Scenarios**:
 
-1. **Given** one or more eligible assistants exist, **When** the user enters the Connection Node, **Then** every eligible assistant is present in the room at its assigned persistent location or roaming area.
-2. **Given** the user is outside an assistant's interaction range, **When** they press `C`, **Then** no conversation opens accidentally.
-3. **Given** the user is within an assistant's interaction range, **When** they press `C`, **Then** an in-world chat experience opens for that assistant and identifies the assistant being addressed.
-4. **Given** the user has an existing conversation with the selected assistant, **When** the chat experience opens, **Then** they can continue that conversation without accessing another assistant's history.
-5. **Given** the user has no prior conversation with the selected assistant, **When** they begin chatting, **Then** a new conversation is created using the application's existing assistant behavior.
-6. **Given** the user closes the in-world chat experience, **When** the world becomes active again, **Then** they remain in the Connection Node near the assistant they were addressing.
+1. **Given** a selected companion has a usable 3D character model, **When** the user enters the world, **Then** the companion appears at its configured location or roaming area.
+2. **Given** the user is outside a resident's interaction range, **When** they press `C`, **Then** no chat opens.
+3. **Given** the user is within interaction range, **When** they press `C`, **Then** an in-world panel opens for that resident and pauses world movement.
+4. **Given** a world chat is active, **When** the resident responds, **Then** the response uses the resident's existing conversation behavior, prompt, archive knowledge, and the applicable world context prompt.
+5. **Given** the user closes the panel, **When** exploration resumes, **Then** they remain near the selected resident.
 
 ---
 
-### User Story 4 - Experience a living shared room (Priority: P2)
+### User Story 4 - Configure NPCs and resident behavior (Priority: P2)
 
-While the user explores, assistants remain visibly present, play idle behavior, and may move within their assigned safe roaming areas. The room has a polished futuristic sci-fi appearance supplied through approved environment and furnishing assets.
+The user adds NPCs from a world editor. Each NPC has a name, one editable character prompt, optional archive, 3D character model, pose setup, placement, and stationary or roaming behavior. NPCs reuse existing assistant behavior while avoiding unrelated assistant administration screens.
 
-**Why this priority**: Persistent presence and restrained movement make the Connection Node feel inhabited without expanding v1 into a multi-room or open-world simulation.
+**Why this priority**: NPCs make a world feel inhabited while preserving a coherent, professional configuration model.
 
-**Independent Test**: Remain in the Connection Node long enough to observe each assistant's idle state and observe a roaming assistant move without passing through boundaries, furniture, or another assistant's protected interaction space.
-
-**Acceptance Scenarios**:
-
-1. **Given** an assistant has a safe roaming area, **When** the Connection Node is active, **Then** the assistant may move within that area and remains inside its boundaries.
-2. **Given** an assistant has no safe roaming area, **When** the Connection Node is active, **Then** the assistant remains at its assigned location while continuing idle behavior.
-3. **Given** an assistant is engaged in chat, **When** the user is addressing that assistant, **Then** the assistant remains available for that interaction and does not wander away.
-4. **Given** an approved environment asset or furnishing asset is unavailable, **When** the user enters the Connection Node, **Then** the user receives a clear recoverable error rather than a misleading interactive world.
-
----
-
-### User Story 5 - Configure residents and NPCs (Priority: P2)
-
-The user opens a dedicated Connection Node editor to choose eligible 3D-avatar assistants, configure their presence in the room, and add or edit world NPCs. An NPC has the same character, animation, prompt, conversation, and archive knowledge capabilities as an assistant, while the editor presents only the world-relevant controls.
-
-**Why this priority**: The Connection Node needs a professional, maintainable way to curate its residents without duplicating the existing character and AI configuration systems.
-
-**Independent Test**: Open the Connection Node editor, select an eligible assistant, add an NPC with a name, prompt, 3D character model, and poses, then verify that both can be placed and interacted with in the world.
+**Independent Test**: Create an NPC, attach a model and pose, select an archive, configure roaming, enter the world, and verify both behavior and archive-grounded conversation.
 
 **Acceptance Scenarios**:
 
-1. **Given** the user is editing the Connection Node, **When** they choose residents, **Then** only assistants with usable 3D character models are selectable and unavailable assistants explain why they cannot be selected.
-2. **Given** the user creates an NPC, **When** they provide its name, prompt, 3D character model, and pose configuration, **Then** the NPC can be added as a resident of the Connection Node.
-3. **Given** an NPC is configured with an archive, **When** the user chats with that NPC, **Then** its responses use the archive's relevant world knowledge through the same behavior available to assistants.
-4. **Given** the user changes a resident's stationary or roaming behavior, **When** they save the world configuration, **Then** the new behavior is reflected on the next Connection Node visit.
+1. **Given** the user edits a world, **When** they select companion residents, **Then** only owned assistants with usable 3D models are selectable and ineligible assistants explain why.
+2. **Given** the user creates an NPC with required settings, **When** they save it, **Then** it becomes a resident of that world and uses the existing character and conversation behavior.
+3. **Given** a resident is set to roam, **When** the world is active, **Then** it stays inside its safe roaming area and stops roaming while in chat.
 
 ### Edge Cases
 
-- What happens when no assistants are eligible for embodiment? The Connection Node remains enterable and clearly explains that no assistants are available to meet; it must not fail to load.
-- What happens when many eligible assistants cannot be placed safely in the initial room layout? The room must preserve non-overlapping positions and usable movement paths; the system must not stack assistants or place them inside furniture.
-- What happens when an assistant's character presentation cannot load? The user sees a visible fallback representation for that assistant, and the proximity chat interaction remains available.
-- What happens when the active chat cannot be created or resumed? The user receives a clear error and remains in the Connection Node without losing their position or opening a chat for a different assistant.
-- What happens when the user changes browser focus while walking? Movement stops until the user intentionally returns to the world controls.
-- What happens when an assistant is outside the user's view and interaction range? Its nonessential animation and roaming work is reduced without making it unavailable when the user returns.
+- A world without configured residents remains enterable and explains that no residents are available.
+- A missing room or character asset produces a recoverable error without exposing another user's data or opening the wrong conversation.
+- Losing browser focus stops movement until the user intentionally resumes world controls.
+- A resident outside the camera view and interaction range does not continue nonessential animation or roaming work, but is ready before the user can see or interact with it.
+- Removing a world never removes companion assistants; removing a world NPC removes only that NPC and its world-specific assets.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST add a Worlds section to the Assistants area containing a card for the Connection Node.
-- **FR-002**: The system MUST provide a dedicated Connection Node experience that is distinct from conventional conversation navigation.
-- **FR-003**: The system MUST present the Connection Node as one bounded room in v1.
-- **FR-004**: The system MUST support first-person walking and mouse-based looking for laptop and desktop users.
-- **FR-005**: The system MUST provide a visible way to release world input and return to normal browser interaction.
-- **FR-006**: The system MUST prevent the user from moving through room boundaries and furnishings designated as solid.
-- **FR-007**: The system MUST make every eligible assistant persistently present as a 3D character in the Connection Node for the duration of a visit.
-- **FR-008**: The system MUST give each assistant an assigned non-overlapping location and, where configured, a bounded roaming area.
-- **FR-009**: The system MUST support idle behavior for every assistant and optional bounded roaming behavior that does not cross room boundaries, collision-marked furnishings, or protected interaction positions.
-- **FR-010**: The system MUST show a nearby assistant's chat prompt only while the user is within that assistant's interaction range.
-- **FR-011**: The system MUST open the nearby assistant's chat experience when the user presses `C` and MUST prevent that input from opening a chat while no assistant is in range.
-- **FR-012**: The in-world chat experience MUST use the selected assistant's existing identity, conversation behavior, and conversation history while preserving ownership boundaries between assistants.
-- **FR-013**: The system MUST let the user leave an in-world chat and resume exploring from the same Connection Node visit.
-- **FR-014**: The system MUST preserve the Connection Node's polished futuristic sci-fi visual direction while allowing the approved room and furnishing assets to be selected separately from application implementation.
-- **FR-015**: The delivery plan MUST include explicit user-owned tasks for sourcing, licensing, approving, and handing off room and furnishing assets, together with agent-owned tasks for validating, integrating, and placing those assets.
-- **FR-016**: The system MUST clearly communicate loading and recoverable failures for the room, character presentation, and chat without corrupting existing conversations.
-- **FR-017**: The system MUST stop movement when the world loses browser focus.
-- **FR-018**: The system MUST exclude mobile controls, additional rooms, generated environmental backgrounds, and open-world traversal from v1.
-- **FR-019**: The system MUST provide a Connection Node editor accessible from the Worlds section.
-- **FR-020**: The Connection Node editor MUST let the user select only assistants with usable 3D character models as world residents and MUST identify assistants that are ineligible.
-- **FR-021**: The Connection Node editor MUST let the user create, edit, and remove NPC residents with a name, a single character prompt, a 3D character model, pose configuration, placement, and stationary or roaming behavior.
-- **FR-022**: NPC residents MUST reuse the existing assistant character, animation, prompt, conversation, and archive knowledge behavior rather than introduce a separate NPC interaction system.
-- **FR-023**: The system MUST reduce nonessential animation, roaming, and related visual-update work for assistants outside the user's view and interaction range, while restoring their expected behavior before they become visible or interactable.
-- **FR-024**: The system MUST release Connection Node resources when the user leaves the world so repeated visits do not accumulate unused room or character resources.
+- **FR-001**: The system MUST provide a Worlds section in the Assistants area that lists owned worlds and includes an add-world action.
+- **FR-002**: Users MUST be able to create, edit, enter, and delete owned worlds.
+- **FR-003**: A world MUST have a name, description, approved environment configuration, assistant context prompt, and NPC context prompt.
+- **FR-004**: The world editor MUST expose both context prompts as editable fields and MUST not hardcode their content.
+- **FR-005**: The system MUST add the assistant context prompt only to companion-assistant conversations initiated through that world.
+- **FR-006**: The system MUST add the NPC context prompt only to NPC conversations initiated through that world.
+- **FR-007**: Conventional conversations outside a world MUST not receive a world context prompt.
+- **FR-008**: A world MUST provide a first-person single-room experience with keyboard/mouse controls, an explicit input-release path, and focus-loss movement stop.
+- **FR-009**: The system MUST prevent movement through configured room boundaries and solid furnishings.
+- **FR-010**: The system MUST let the user select only owned, usable 3D companion assistants as world residents.
+- **FR-011**: The system MUST let the user create, edit, and remove NPC residents with a name, one character prompt, optional archive, 3D model, pose configuration, placement, and stationary or roaming behavior.
+- **FR-012**: NPCs MUST reuse the existing assistant character, prompt, archive, provider, conversation, voice, and pose behavior.
+- **FR-013**: The system MUST show a nearby resident's chat prompt only inside its interaction range and MUST open its chat with `C`.
+- **FR-014**: The system MUST use the selected resident's existing conversation identity and history while preserving user and assistant ownership boundaries.
+- **FR-015**: The system MUST display a graceful loading state and recoverable errors for unavailable environment, character, and chat resources.
+- **FR-016**: The system MUST reduce nonessential resident animation, roaming, and visual updates outside view and interaction range, and MUST release world-only resources when leaving a world.
+- **FR-017**: World configuration, placements, residents, NPCs, prompts, and assets MUST be scoped to their owning user and world.
+- **FR-018**: V1 MUST exclude mobile controls, multiple rooms inside one world, generated environmental backgrounds, and open-world traversal.
 
-### Key Entities *(include if feature involves data)*
+### Key Entities
 
-- **Connection Node**: The single canonical room users can enter from the Worlds section; it defines the bounded visit and visual identity of the v1 world.
-- **World Placement**: A resident's persisted position, orientation, and optional safe roaming area within the Connection Node.
-- **World NPC**: A world-managed assistant resident configured through the Connection Node editor with a reduced management surface, while reusing the existing character, conversation, and archive knowledge capabilities.
-- **Interaction Zone**: The nearby space around a resident in which the user can see and activate the chat prompt.
-- **World Asset**: An approved room, furnishing, or ambient asset used to present the Connection Node, including its source and suitability for the intended use.
+- **World**: A user-owned, named single-room 3D space with environment settings and separate context prompts for companion assistants and NPCs.
+- **World Resident**: A world-specific placement and behavior configuration for a companion assistant or NPC.
+- **World NPC**: A constrained assistant resident created through the world editor, retaining the existing character, archive, and conversation capabilities.
+- **World Context Prompt**: An editable instruction appended only to a conversation that occurs in its associated world, selected by resident kind.
+- **World Asset**: An approved room, furnishing, or ambient asset with its source, license, and runtime suitability record.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: A user can enter the Connection Node from the Assistants area in no more than two selections.
-- **SC-002**: A user can walk from the starting position to any assistant's interaction zone in the initial room without passing through a boundary or collision-marked furnishing.
-- **SC-003**: In a room with up to 10 eligible assistants, every assistant is visible or reachable through unobstructed walkable paths during a Connection Node visit.
-- **SC-004**: At least 95% of successful nearby interaction attempts open the intended assistant's conversation after a single press of `C`.
-- **SC-005**: A user can leave an in-world chat and resume exploration in under 2 seconds without losing their Connection Node position.
-- **SC-006**: The Connection Node remains usable throughout a 15-minute exploration session without unbounded visual degradation or loss of chat availability.
-- **SC-007**: A user can distinguish the Connection Node from the conventional conversation interface without instructions, based on its Worlds entry point and immersive room presentation.
-- **SC-008**: During a 15-minute visit with up to 10 residents, an assistant outside the user's view and interaction range does not continue visible roaming or interaction behavior until the user can observe or approach that assistant again.
+- **SC-001**: A user can create a configured world and return to its editor in under 3 minutes, excluding time spent sourcing assets.
+- **SC-002**: A user can enter a ready world from the Worlds section in no more than two selections.
+- **SC-003**: In a world with up to 10 residents, every resident is visible or reachable through unobstructed walkable paths.
+- **SC-004**: At least 95% of nearby interaction attempts open the intended resident's conversation after one press of `C`.
+- **SC-005**: A world context prompt appears in 100% of applicable in-world responses and in 0% of conventional responses outside that world.
+- **SC-006**: The world remains usable during a 15-minute visit without loss of chat availability or accumulated resource degradation after repeated entry and exit.
 
 ## Assumptions
 
-- The feature reuses the application's existing authenticated user and assistant ownership rules.
-- An assistant is eligible for embodiment when it has a usable 3D character presentation; assistants that cannot be embodied do not block use of the world.
-- The initial Connection Node has a layout sized to accommodate the currently expected resident count, up to 10 embodied assistants and NPCs for v1 validation.
-- The user will source and approve the environment and furnishing assets; the implementation work begins after those assets are available and validated for the project.
-- The final visual direction is polished futuristic sci-fi, while the exact asset pack and furniture selection remain a user decision.
-- Assistant and NPC wandering is ambient behavior only; it does not create autonomous conversations, alter conversation memory, or cause residents to leave the Connection Node.
-- Existing conversations, voice behavior, character expressions, and pose behavior remain the source of truth for in-world chat.
-- V1 targets laptop and desktop browsers with a keyboard and mouse; mobile and touch interaction are out of scope.
+- The Connection Node is the first configured world, not a hardcoded singleton.
+- Each world contains one bounded room in v1; a user may create more than one world.
+- Companion assistants and NPCs are scoped to the same authenticated user who owns the world.
+- Final room and furnishing assets are user-supplied and approved before integration.
+- NPCs use the same underlying assistant infrastructure while their editor intentionally exposes fewer fields.
+- World prompts describe the current environment and are dynamic conversation context, not permanent changes to an assistant's base prompt.

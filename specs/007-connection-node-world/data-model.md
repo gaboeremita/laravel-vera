@@ -1,38 +1,88 @@
-# Data Model: Connection Node World
+# Data Model: Configurable Worlds
 
-## Assistant
+## Existing Entity Reused: Assistant
 
-Existing entity extended with `kind`, cast to `AssistantKind` and defaulting to `Companion`.
+`Assistant` remains the source of truth for a character's name, base prompt, archive access, VRM asset, poses, animations, provider setup, ownership, and conversations.
 
-- `Companion` assistants appear in the normal Assistants area.
-- `WorldNpc` assistants are created and managed through the Connection Node editor.
-- Both kinds use existing `prompt`, `archive_id`, `vrm`, `poses`, `users`, and conversation relations.
-- A resident requires `portrait_type = avatar3d` and a usable VRM asset.
+### Enum Extension: `AssistantKind`
 
-## World
-
-One user-owned Connection Node configuration.
-
-| Field | Purpose |
+| Value | Meaning |
 |---|---|
-| `user_id` | World owner. |
-| `key` | Canonical `connection-node` key. |
-| `name`, `description` | Display copy. |
-| `environment_path`, `environment_disk`, `environment_original_name` | Approved runtime room asset. |
-| `settings` | Ambient audio and visual quality preferences. |
+| `Assistant` | Existing configurable companion assistant |
+| `WorldNpc` | An assistant configured as an NPC through a world's editor |
 
-Has many `WorldResident` records.
+An NPC follows all normal assistant ownership and data rules; its kind controls selection eligibility and the applicable world context prompt.
 
-## WorldResident
+## New Entity: World
 
-Connects an assistant to a world and owns placement behavior.
+| Field | Type | Rules |
+|---|---|---|
+| `id` | primary key | Internal identifier |
+| `user_id` | foreign key | Required; owner relationship and authorization scope |
+| `name` | string | Required, user-visible |
+| `slug` | string | Required, unique per user, generated or validated for readable routes |
+| `description` | text nullable | User-visible setting and editor context |
+| `environment_disk` | string nullable | Existing storage disk convention |
+| `environment_path` | string nullable | Runtime GLB environment path; required before entering |
+| `environment_original_name` | string nullable | Asset traceability |
+| `assistant_context_prompt` | text nullable | Editable context appended only to companion resident chats in this world |
+| `npc_context_prompt` | text nullable | Editable context appended only to NPC resident chats in this world |
+| `settings` | JSON nullable | Spawn, collision map, loader/presentation options, and forward-compatible world settings |
+| timestamps | timestamps | Standard Laravel timestamps |
 
-| Field | Purpose |
+Relationships:
+
+- `belongsTo(User::class)`
+- `hasMany(WorldResident::class)`
+
+Domain behavior:
+
+- `contextPromptFor(AssistantKind $kind): ?string` returns `assistant_context_prompt` for companion assistants and `npc_context_prompt` for `WorldNpc`.
+- Prompt selection is centralized here; callers do not rely on string values or duplicated conditionals.
+
+Constraints:
+
+- `(user_id, slug)` unique.
+- A user may create multiple worlds. No canonical world key exists.
+
+## New Entity: WorldResident
+
+| Field | Type | Rules |
+|---|---|---|
+| `id` | primary key | Internal identifier |
+| `world_id` | foreign key | Cascades on world deletion |
+| `assistant_id` | foreign key | References an owned existing assistant; restrict deletion or use existing assistant lifecycle convention |
+| `position` | JSON | Required x/y/z world coordinates |
+| `rotation` | JSON nullable | Optional x/y/z orientation |
+| `behavior` | enum | `WorldResidentBehavior` cast; defaults to `Stationary` |
+| `behavior_settings` | JSON nullable | Roam bounds, idle timing, and future tuning |
+| timestamps | timestamps | Standard Laravel timestamps |
+
+Relationships:
+
+- `belongsTo(World::class)`
+- `belongsTo(Assistant::class)`
+
+Constraints:
+
+- `(world_id, assistant_id)` unique.
+- The assistant must be owned by the world owner and have a valid 3D avatar.
+
+## New Enum: WorldResidentBehavior
+
+| Value | Runtime meaning |
 |---|---|
-| `world_id`, `assistant_id` | Owner and resident identity. |
-| `position_x`, `position_y`, `position_z`, `rotation_y` | Persistent location and facing. |
-| `behavior` | `Stationary` or `Roam`. |
-| `roaming_bounds` | Validated local bounds and waypoints. |
-| `interaction_radius` | Proximity-chat distance. |
+| `Stationary` | Idle/pose behavior at its configured position |
+| `Roam` | Random bounded movement defined by `behavior_settings` |
 
-Rules: one assistant is resident once per world; all records are user-scoped; placements stay inside the approved layout and outside collision or protected areas. Removing a companion resident does not delete the assistant. Deleting an NPC uses the existing assistant cleanup path.
+## Chat Context Boundary
+
+`world_id` is ephemeral request context supplied by the in-world chat UI. It is not persisted on `conversations`, because the same assistant can participate in normal conversations and may reside in multiple worlds.
+
+The server validates:
+
+1. The world belongs to the authenticated user.
+2. The assistant is an active resident of that world.
+3. The assistant kind maps to the correct world context field.
+
+It then appends the selected prompt to the existing assistant prompt for that one provider request. Archive retrieval, assistant base prompts, and ordinary conversations remain unchanged.
