@@ -22,7 +22,7 @@ function residentAssistantFor(User $user): Assistant
 
 it('adds and removes a resident placement without deleting the character', function () {
     $user = User::factory()->create();
-    $world = World::factory()->for($user)->create();
+    $world = World::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
     $payload = ['position' => ['x' => 1, 'y' => 0, 'z' => 2], 'behavior' => 'roam', 'behaviorSettings' => ['radius' => 1]];
 
@@ -39,7 +39,7 @@ it('adds and removes a resident placement without deleting the character', funct
 
 it('persists a resident-specific opening message and custom prompt', function () {
     $user = User::factory()->create();
-    $world = World::factory()->for($user)->create();
+    $world = World::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
     $payload = [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
@@ -60,7 +60,7 @@ it('persists a resident-specific opening message and custom prompt', function ()
 
 it('rejects a resident without a VRM asset', function () {
     $user = User::factory()->create();
-    $world = World::factory()->for($user)->create();
+    $world = World::factory()->forUser($user)->create();
     $assistant = Assistant::factory()->create(['portrait_type' => AssistantPortraitType::Avatar3D]);
     AssistantUser::factory()->create(['assistant_id' => $assistant->id, 'user_id' => $user->id]);
 

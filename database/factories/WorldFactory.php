@@ -19,7 +19,6 @@ class WorldFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory(),
             'name' => fake()->words(2, true),
             'slug' => fake()->unique()->slug(2),
             'description' => fake()->sentence(),
@@ -30,5 +29,15 @@ class WorldFactory extends Factory
             'npc_context_prompt' => fake()->sentence(),
             'settings' => ['player_spawn' => ['x' => 0, 'y' => 0, 'z' => 0]],
         ];
+    }
+
+    /**
+     * Attach the given user to the world via the world_user pivot, replacing
+     * the old direct user_id ownership (World::factory()->for($user) no
+     * longer applies since World has no belongsTo(User) relation).
+     */
+    public function forUser(User $user): static
+    {
+        return $this->afterCreating(fn (World $world) => $world->users()->attach($user));
     }
 }

@@ -33,7 +33,7 @@ class UpdateWorldRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', Rule::unique('worlds', 'slug')->where('user_id', $this->user()->id)->ignore($this->route('world'))],
+            'slug' => ['required', 'string', 'max:255', Rule::unique('worlds', 'slug')->where(fn ($query) => $query->whereIn('id', $this->user()->worlds()->pluck('worlds.id')))->ignore($this->route('world'))],
             'description' => ['required', 'string'],
             'assistantContextPrompt' => ['required', 'string'],
             'npcContextPrompt' => ['required', 'string'],

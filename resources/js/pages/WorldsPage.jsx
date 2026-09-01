@@ -15,7 +15,7 @@ export default function WorldsPage() {
 			</Header>
 			<div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
 				<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-					{worlds.map((world) => <WorldCard key={world.id} world={world} onEdit={() => navigate(`/worlds/${world.id}/edit`)} onEnter={() => navigate(`/worlds/${world.id}`)} />)}
+					{worlds.map((world) => <WorldCard key={world.id} world={world} onEdit={() => navigate(`/worlds/${world.id}/edit`)} onEnter={() => navigate(`/worlds/${world.id}/sessions`)} />)}
 					<button type="button" onClick={() => navigate('/worlds/create')} className="border border-dashed border-line-1 flex items-center justify-center min-h-48 text-success text-[0.75rem] tracking-[0.1em] cursor-pointer hover:border-success/50 hover:bg-bg-1 transition-colors">+ ADD WORLD</button>
 				</div>
 			</div>

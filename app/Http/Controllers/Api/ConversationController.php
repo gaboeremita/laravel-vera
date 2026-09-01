@@ -15,7 +15,7 @@ use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\DiscordChannel;
 use App\Models\Image;
-use App\Models\World;
+use App\Models\WorldUser;
 use App\Services\AgentLoop\AgentLoopRunner;
 use App\Services\AgentLoop\Tools\AvatarBackgroundTool;
 use App\Services\AgentLoop\Tools\BasicCalculatorTool;
@@ -48,6 +48,7 @@ class ConversationController extends Controller
 
         $conversations = $assistantUser
             ->conversations()
+            ->when($request->filled('worldSessionId'), fn ($query) => $query->where('world_session_id', $request->integer('worldSessionId')))
             ->orderByDesc('updated_at')
             ->get(['id', 'title', 'updated_at']);
 
@@ -104,18 +105,30 @@ class ConversationController extends Controller
     {
         $validated = $request->validate([
             'worldId' => ['nullable', 'integer', 'exists:worlds,id'],
+            'worldSessionId' => ['nullable', 'integer', 'exists:world_sessions,id'],
         ]);
 
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
 
         $world = isset($validated['worldId'])
-            ? World::whereBelongsTo($request->user())->find($validated['worldId'])
+            ? $request->user()->worlds()->find($validated['worldId'])
             : null;
         $resident = $world?->residents()->where('assistant_id', $assistant)->first();
 
+        $worldSessionId = null;
+        if (isset($validated['worldSessionId'])) {
+            $worldUser = WorldUser::where('world_id', $world->id)->where('user_id', $request->user()->id)->firstOrFail();
+            $worldSessionId = $worldUser->sessions()->findOrFail($validated['worldSessionId'])->id;
+
+            $existing = $assistantUser->conversations()->where('world_session_id', $worldSessionId)->first();
+            if ($existing !== null) {
+                return response()->json($existing, 201);
+            }
+        }
+
         $conversation = $assistantUser
             ->conversations()
-            ->create(['title' => 'New conversation']);
+            ->create(['title' => 'New conversation', 'world_session_id' => $worldSessionId]);
 
         $conversation->messages()->create([
             'role' => 'assistant',
@@ -278,7 +291,7 @@ class ConversationController extends Controller
         }
 
         $world = isset($validated['worldId'])
-            ? World::whereBelongsTo($request->user())->findOrFail($validated['worldId'])
+            ? $request->user()->worlds()->findOrFail($validated['worldId'])
             : null;
         $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world);
         $director = new PromptDirector($prompt);

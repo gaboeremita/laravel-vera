@@ -52,7 +52,7 @@ it('adds a resident-specific custom prompt on top of the world context', functio
 
 it('uses a resident-specific opening message when starting a fresh world conversation', function () {
     $user = User::factory()->create();
-    $world = World::factory()->for($user)->create();
+    $world = World::factory()->forUser($user)->create();
     $assistant = Assistant::factory()->create(['opening_message' => 'Base greeting']);
     AssistantUser::factory()->create(['assistant_id' => $assistant->id, 'user_id' => $user->id]);
     $world->residents()->create([
@@ -71,7 +71,7 @@ it('uses a resident-specific opening message when starting a fresh world convers
 
 it('falls back to the assistant\'s own opening message when the resident has no override', function () {
     $user = User::factory()->create();
-    $world = World::factory()->for($user)->create();
+    $world = World::factory()->forUser($user)->create();
     $assistant = Assistant::factory()->create(['opening_message' => 'Base greeting']);
     AssistantUser::factory()->create(['assistant_id' => $assistant->id, 'user_id' => $user->id]);
     $world->residents()->create(['assistant_id' => $assistant->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);

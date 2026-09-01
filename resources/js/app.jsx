@@ -25,6 +25,7 @@ import EditWorldPage from './pages/EditWorldPage.jsx';
 import NpcsPage from './pages/NpcsPage.jsx';
 import CreateNpcPage from './pages/CreateNpcPage.jsx';
 import WorldPage from './pages/WorldPage.jsx';
+import WorldSessionsPage from './pages/WorldSessionsPage.jsx';
 import MemoryPage from './pages/MemoryPage.jsx';
 import DiscordPage from './pages/DiscordPage.jsx';
 globalThis.Ziggy = Ziggy;
@@ -44,6 +45,7 @@ createRoot(document.getElementById('root')).render(
                         <Route path="/worlds" element={<WorldsPage />} />
                         <Route path="/worlds/create" element={<CreateWorldPage />} />
                         <Route path="/worlds/:worldId/edit" element={<EditWorldPage />} />
+						<Route path="/worlds/:worldId/sessions" element={<WorldSessionsPage />} />
 						<Route path="/worlds/:worldId" element={<WorldPage />} />
                         <Route path="/npcs" element={<NpcsPage />} />
                         <Route path="/npcs/create" element={<CreateNpcPage />} />

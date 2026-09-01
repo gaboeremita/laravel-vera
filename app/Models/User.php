@@ -70,8 +70,10 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
-    public function worlds(): HasMany
+    public function worlds(): BelongsToMany
     {
-        return $this->hasMany(World::class);
+        return $this->belongsToMany(World::class, 'world_user')
+            ->using(WorldUser::class)
+            ->withTimestamps();
     }
 }
