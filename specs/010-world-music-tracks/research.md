@@ -1,16 +1,16 @@
 # Research: World Music Track
 
-## Storage shape: columns on `worlds` vs. polymorphic `Image`-style table
+## Storage shape: polymorphic `Track` model vs. columns on `worlds`
 
-**Decision**: Store the track as a set of nullable columns directly on the `worlds` table (`track_disk`, `track_path`, `track_original_name`, `track_mime_type`, `track_size`), not as a row in the polymorphic `images` table.
+**Decision**: Store the track as a row in a new polymorphic `tracks` table (`Track` model, `trackable` morph), structured identically to the existing `images` table/`Image` model — not as columns on `worlds`.
 
-**Rationale**: The spec scopes this to exactly one track per world, replaced wholesale on upload — the same cardinality as the existing `.glb` environment file, which already lives as `environment_disk`/`environment_path`/`environment_original_name` columns on `worlds`. The polymorphic `Image` model exists specifically to support multiple *roles* of image per world (`card`, `portrait`); a single always-one-or-none track doesn't need that generality.
+**Rationale**: `worlds` stays a stable, unmodified table. The polymorphic shape already proven for `Image` (`imageable`) is the established pattern in this codebase for "a world owns a media asset" — reusing it for audio via `trackable` keeps the two media concepts consistent and leaves room for other models to attach a track later without touching `worlds` again.
 
-**Alternatives considered**: A polymorphic `WorldTrack` row (or reusing `images` with a `track` role) — rejected because it introduces a relation and join for something that is always 0-or-1 and never queried by role alongside images; a direct column set matches the environment-file precedent already in this codebase and needs no new model.
+**Alternatives considered**: Columns directly on `worlds` (`track_disk`/`track_path`/...), matching the `.glb` environment file's storage — rejected per explicit product direction: tracks should follow the `Image` polymorphic pattern, not extend the `worlds` table.
 
 ## File validation and storage mechanics
 
-**Decision**: Validate uploads inline in the controller with `['track' => ['required', 'file', 'mimes:mp3,wav', 'max:20480']]` (20 MB), store via `$file->store("worlds/{$world->id}/track", 'public')`, delete the previous file only after the new one is successfully persisted — mirroring `WorldImageController::store()`.
+**Decision**: Validate uploads inline in the controller with `['track' => ['required', 'file', 'mimes:mp3,wav', 'max:20480']]` (20 MB), store via `$file->store("worlds/{$world->id}/track", 'public')`, then `$world->track()->updateOrCreate([], [...])` to create-or-replace the `Track` row, deleting the previous file only after the new one is successfully persisted — mirroring `WorldImageController::store()` exactly (same `updateOrCreate`-on-a-morph-relation shape).
 
 **Rationale**: Directly reuses a pattern already proven in this codebase (`WorldImageController`), including its failure handling (delete newly-stored file and rethrow if the DB write fails) — satisfies Constitution Principle V (Errors Fail Loudly) without inventing new mechanics.
 

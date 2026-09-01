@@ -14,7 +14,7 @@ A world's owner can upload a single audio track (MP3 or WAV, max 20 MB) for thei
 
 **Primary Dependencies**: Laravel 13 (Eloquent, Storage), React 19, existing world session/audio components (`WorldScene.jsx`, `useVoiceMode.js` audio patterns)
 
-**Storage**: Track file stored on the `public` disk under `worlds/{world}/track`; file metadata (disk, path, mime type, size, original name) stored as columns on the existing `worlds` table, mirroring how `environment_disk`/`environment_path`/`environment_original_name` already work for the `.glb` environment file
+**Storage**: Track file stored on the `public` disk under `worlds/{world}/track`; file metadata (disk, path, mime type, size, original name) stored in a new polymorphic `tracks` table (`Track` model, `trackable` morph), structured identically to the existing `images` table/`Image` model — `worlds` itself is unmodified
 
 **Testing**: Pest feature tests (backend), following existing `WorldImageControllerTest`/`WorldControllerTest` conventions
 
@@ -26,14 +26,14 @@ A world's owner can upload a single audio track (MP3 or WAV, max 20 MB) for thei
 
 **Constraints**: 20 MB max upload size; MP3/WAV only; one track per world (replace-on-upload, no playlist)
 
-**Scale/Scope**: One new nullable track field-set on `World`; one new controller for upload/replace/delete; frontend playback + volume/mute control added to the existing world session view
+**Scale/Scope**: One new `Track` model/table (polymorphic, mirroring `Image`) plus a `World::track()` relation; one new controller for upload/replace/delete; frontend playback + volume/mute control added to the existing world session view
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 - **I. Lint-Enforced Code Style**: New PHP/JSX code will be run through Pint/ESLint before the task is considered done (per project cadence rules, not per-file during development). PASS.
-- **II. Append-Only Migrations**: Track columns are added via a new migration on the existing `worlds` table; no existing migration is edited. PASS.
+- **II. Append-Only Migrations**: A new `tracks` table is created via a new migration; no existing migration is edited. PASS.
 - **III. Comments Justify Only Non-Obvious Decisions**: No speculative commenting planned. PASS.
 - **IV. Data Isolation by Ownership**: Track mutations (`store`/`destroy`) are authorized against the specific `World` model via the existing `WorldPolicy`, mirroring `WorldImageController`'s `Gate::authorize('update', $world)` — never inferred from account-level defaults. PASS.
 - **V. Errors Fail Loudly**: File store/delete failures are not swallowed; the existing `WorldImageController` pattern (delete the newly stored file and rethrow on failure) is reused. PASS.
@@ -61,13 +61,14 @@ specs/010-world-music-tracks/
 
 ```text
 app/
-├── Models/World.php                          # add track_* fillable attributes + accessor
+├── Models/Track.php                          # new: polymorphic track model, mirrors Image
+├── Models/World.php                          # add track(): MorphOne relation
 ├── Http/Controllers/Api/WorldTrackController.php   # new: store/destroy track
 └── Policies/WorldPolicy.php                  # reused as-is (update ability)
 
 database/
-├── migrations/                                # new migration adding track_* columns to worlds
-└── factories/WorldFactory.php                # optional withTrack() state for tests
+├── migrations/                                # new migration creating tracks table
+└── factories/TrackFactory.php                # new: track factory, mirrors ImageFactory conventions
 
 routes/api.php                                 # new /worlds/{world}/track routes
 

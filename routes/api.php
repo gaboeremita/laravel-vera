@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\WorldController;
 use App\Http\Controllers\Api\WorldImageController;
 use App\Http\Controllers\Api\WorldResidentController;
 use App\Http\Controllers\Api\WorldSessionController;
+use App\Http\Controllers\Api\WorldTrackController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +50,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/worlds/{world}/card-image', [WorldImageController::class, 'destroyCard'])->name('worlds.image.card.destroy');
     Route::post('/worlds/{world}/portrait-image', [WorldImageController::class, 'storePortrait'])->name('worlds.image.portrait.store');
     Route::delete('/worlds/{world}/portrait-image', [WorldImageController::class, 'destroyPortrait'])->name('worlds.image.portrait.destroy');
+    Route::post('/worlds/{world}/track', [WorldTrackController::class, 'store'])->name('worlds.track.store');
+    Route::delete('/worlds/{world}/track', [WorldTrackController::class, 'destroy'])->name('worlds.track.destroy');
     Route::put('/worlds/{world}/residents/{assistant}', [WorldResidentController::class, 'upsert'])->name('worlds.residents.upsert');
     Route::delete('/worlds/{world}/residents/{assistant}', [WorldResidentController::class, 'destroy'])->name('worlds.residents.destroy');
     Route::get('/worlds/{world}/sessions', [WorldSessionController::class, 'index'])->name('worlds.sessions.index');

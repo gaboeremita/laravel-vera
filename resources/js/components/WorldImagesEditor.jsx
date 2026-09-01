@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
+import { FIELD_LABEL } from '../utils/formFieldStyles.js';
 
 function ImageUploadField({ label, hint, previewUrl, isUploading, onUpload }) {
 	const inputRef = useRef(null);
@@ -12,7 +13,7 @@ function ImageUploadField({ label, hint, previewUrl, isUploading, onUpload }) {
 			</label>
 			<div
 				onClick={() => inputRef.current?.click()}
-				className="w-32 h-32 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
+				className="w-24 h-24 border border-dashed border-line-1 flex items-center justify-center cursor-pointer hover:border-accent/50 transition-colors overflow-hidden"
 			>
 				{previewUrl ? (
 					<img src={previewUrl} alt={label} className="w-full h-full object-cover object-top" />
@@ -63,21 +64,24 @@ export default function WorldImagesEditor({ worldId, cardImageUrl, portraitImage
 	};
 
 	return (
-		<div className="flex flex-wrap gap-6">
-			<ImageUploadField
-				label="Card Image"
-				hint="shown in the worlds menu"
-				previewUrl={cardPreview}
-				isUploading={isUploadingCard}
-				onUpload={(file) => upload('worlds.image.card.store', file, setCardPreview, setIsUploadingCard, 'Card')}
-			/>
-			<ImageUploadField
-				label="Portrait Image"
-				hint="shown while browsing this world's sessions"
-				previewUrl={portraitPreview}
-				isUploading={isUploadingPortrait}
-				onUpload={(file) => upload('worlds.image.portrait.store', file, setPortraitPreview, setIsUploadingPortrait, 'Portrait')}
-			/>
+		<div>
+			<label className={FIELD_LABEL}>Images</label>
+			<div className="flex flex-wrap gap-6 pl-4 border-l border-line-1">
+				<ImageUploadField
+					label="Card Image"
+					hint="shown in the worlds menu"
+					previewUrl={cardPreview}
+					isUploading={isUploadingCard}
+					onUpload={(file) => upload('worlds.image.card.store', file, setCardPreview, setIsUploadingCard, 'Card')}
+				/>
+				<ImageUploadField
+					label="Portrait Image"
+					hint="shown while browsing this world's sessions"
+					previewUrl={portraitPreview}
+					isUploading={isUploadingPortrait}
+					onUpload={(file) => upload('worlds.image.portrait.store', file, setPortraitPreview, setIsUploadingPortrait, 'Portrait')}
+				/>
+			</div>
 		</div>
 	);
 }

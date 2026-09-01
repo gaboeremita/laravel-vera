@@ -21,7 +21,7 @@ Sets or replaces the world's music track.
 - `403 Forbidden` — caller is not the world's owner.
 - `422 Unprocessable Entity` — file missing, wrong format, or over size limit.
 
-**Side effects**: previous track file (if any) is deleted from storage after the new file is successfully stored and the world record updated.
+**Side effects**: previous track file (if any) is deleted from storage after the new file is successfully stored and the world's `Track` row is created/updated.
 
 ---
 
@@ -40,7 +40,7 @@ Removes the world's music track, if one is set.
 - `403 Forbidden` — caller is not the world's owner.
 - `404 Not Found` — world has no track set.
 
-**Side effects**: track file deleted from storage; all `track_*` columns on the world set to null.
+**Side effects**: track file deleted from storage; the world's `Track` row is deleted.
 
 ---
 

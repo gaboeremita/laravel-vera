@@ -20,7 +20,7 @@ description: "Task list for World Music Track feature implementation"
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Create migration adding nullable `track_disk`, `track_path`, `track_original_name`, `track_mime_type`, `track_size` columns to `worlds` table, via `php artisan make:migration add_track_columns_to_worlds_table --no-interaction` and filling in the up/down per [data-model.md](data-model.md)
+- [x] T001 Create migration creating the polymorphic `tracks` table (`trackable_type`/`trackable_id`, `path`, `disk`, `mime_type`, `size`, `original_name`, timestamps), structured like the existing `images` table, via `php artisan make:model Track -m --no-interaction`
 
 ---
 
@@ -30,12 +30,12 @@ description: "Task list for World Music Track feature implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T002 Add `track_disk`, `track_path`, `track_original_name`, `track_mime_type`, `track_size` to the `#[Fillable]` attribute and add a `trackUrl(): ?string` accessor (resolves via `Storage::disk($this->track_disk)->url($this->track_path)` when `track_path` is set, else `null`) in `app/Models/World.php`
-- [ ] T003 Extend `World::booted()`'s existing `deleted` listener in `app/Models/World.php` to also delete the track file from storage when `track_path` is set (alongside the existing `environment_path` cleanup)
-- [ ] T004 [P] Add a `withTrack()` factory state to `database/factories/WorldFactory.php` that sets `track_disk`, `track_path`, `track_original_name`, `track_mime_type`, `track_size` to realistic fake values (following existing state patterns in that factory)
-- [ ] T005 Add `track_url` and `track_original_name` fields to `app/Http/Resources/WorldResource.php`, sourced from `World::trackUrl()` and `track_original_name`
+- [x] T002 Create `app/Models/Track.php` mirroring `app/Models/Image.php`: `trackable(): MorphTo`, fillable `path`/`disk`/`mime_type`/`size`/`original_name`, `getUrlAttribute()` resolving via `Storage::disk($this->disk)->url($this->path)`
+- [x] T003 Add `track(): MorphOne` to `app/Models/World.php` (`$this->morphOne(Track::class, 'trackable')`) — `worlds` table itself is unmodified, so no change needed to its `deleted` listener beyond relying on eager-loaded relation cleanup at the controller/observer level
+- [x] T004 [P] Create `database/factories/TrackFactory.php` with realistic fake `path`/`disk`/`mime_type`/`size`/`original_name` values (mirrors `ImageFactory` conventions if one exists, else follows `WorldFactory`'s style)
+- [x] T005 Add `trackUrl`/`trackOriginalName` fields to `app/Http/Resources/WorldResource.php` sourced from the `track` relation (`$this->whenLoaded('track', fn () => $this->track?->url)`), and eager-load `track` alongside `cardImage`/`portraitImage` wherever those are loaded in `app/Http/Controllers/Api/WorldController.php`
 
-**Checkpoint**: `World` model, factory, and resource are ready — user story implementation can now begin
+**Checkpoint**: `Track` model, factory, and resource are ready — user story implementation can now begin
 
 ---
 
@@ -47,20 +47,20 @@ description: "Task list for World Music Track feature implementation"
 
 ### Tests for User Story 1 ⚠️
 
-- [ ] T006 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: owner uploads a valid MP3 → `201`, `track_url` present, world's `track_*` columns populated
-- [ ] T007 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: owner uploads a valid WAV replacing an existing track (world built with `WorldFactory::withTrack()`) → `201`, new `track_url` differs from old, old file removed from storage
-- [ ] T008 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: upload rejected for unsupported format (e.g. `.flac`) → `422`
-- [ ] T009 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: upload rejected for file over 20 MB → `422`
-- [ ] T010 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: non-owner attempting upload or delete → `403`
-- [ ] T011 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: owner deletes an existing track → `200`, `track_url` null afterward, file removed from storage
-- [ ] T012 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: owner deletes when no track is set → `404`
+- [x] T006 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: owner uploads a valid MP3 → `201`, `trackUrl` present, world has a `Track` row
+- [x] T007 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: owner uploads a valid WAV replacing an existing track (world built with `Track::factory()->for($world, 'trackable')`) → `201`, new `trackUrl` differs from old, old file removed from storage, only one `Track` row exists for the world
+- [x] T008 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: upload rejected for unsupported format (e.g. `.flac`) → `422`
+- [x] T009 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: upload rejected for file over 20 MB → `422`
+- [x] T010 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: non-owner attempting upload or delete → `403`
+- [x] T011 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: owner deletes an existing track → `200`, `trackUrl` null afterward, file removed from storage, `Track` row deleted
+- [x] T012 [P] [US1] Feature test in `tests/Feature/Api/WorldTrackControllerTest.php`: owner deletes when no track is set → `404`
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Create `app/Http/Controllers/Api/WorldTrackController.php` with `store(Request $request, World $world)` and `destroy(World $world)` methods, following `app/Http/Controllers/Api/WorldImageController.php`'s pattern: `Gate::authorize('update', $world)`, inline validation (`['track' => ['required', 'file', 'mimes:mp3,wav', 'max:20480']]`), store via `$file->store("worlds/{$world->id}/track", 'public')`, update the world's `track_*` columns, delete the previous file only after a successful save, delete-newly-stored-file-and-rethrow on failure
-- [ ] T014 [US1] Add `POST /worlds/{world}/track` and `DELETE /worlds/{world}/track` routes to `routes/api.php`, named `worlds.track.store` and `worlds.track.destroy`, alongside the existing `worlds.image.*` routes
-- [ ] T015 [US1] Add an "Add/Replace/Remove track" control to `resources/js/components/WorldForm.jsx` (or a new `resources/js/components/WorldTrackEditor.jsx` used by it), following `resources/js/components/WorldImagesEditor.jsx`'s upload/replace/remove UI pattern, showing `track_original_name` when set
-- [ ] T016 [US1] Add `uploadTrack(worldId, file)` and `deleteTrack(worldId)` calls to `resources/js/hooks/useWorlds.js`, hitting the new routes and refreshing world state on success
+- [x] T013 [US1] Create `app/Http/Controllers/Api/WorldTrackController.php` with `store(Request $request, World $world)` and `destroy(World $world)` methods, following `app/Http/Controllers/Api/WorldImageController.php`'s pattern exactly: `Gate::authorize('update', $world)`, inline validation (`['track' => ['required', 'file', 'mimes:mp3,wav', 'max:20480']]`), store via `$file->store("worlds/{$world->id}/track", 'public')`, `$world->track()->updateOrCreate([], ['path' => ..., 'disk' => 'public', 'mime_type' => ..., 'size' => ..., 'original_name' => ...])`, delete the previous file only after a successful save, delete-newly-stored-file-and-rethrow on failure
+- [x] T014 [US1] Add `POST /worlds/{world}/track` and `DELETE /worlds/{world}/track` routes to `routes/api.php`, named `worlds.track.store` and `worlds.track.destroy`, alongside the existing `worlds.image.*` routes
+- [x] T015 [US1] Add an "Add/Replace/Remove track" control to `resources/js/components/WorldForm.jsx` (or a new `resources/js/components/WorldTrackEditor.jsx` used by it), following `resources/js/components/WorldImagesEditor.jsx`'s upload/replace/remove UI pattern, showing `trackOriginalName` when set
+- [x] T016 [US1] ~~Add upload/delete calls to `useWorlds.js`~~ — not needed: `WorldTrackEditor.jsx` calls the new routes directly via `api.postForm`/`api.delete`, the same pattern `WorldImagesEditor.jsx` already uses (that component also bypasses `useWorlds.js`)
 
 **Checkpoint**: User Story 1 is fully functional and testable independently — a world's track can be set, replaced, and removed via the UI and API.
 
@@ -74,11 +74,11 @@ description: "Task list for World Music Track feature implementation"
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Create `resources/js/components/world/WorldTrackPlayer.jsx`: renders a hidden `<audio>` element sourced from the active world's `track_url` (no `loop` attribute), exposes volume/mute controls, and does nothing when `track_url` is null
-- [ ] T018 [US2] In `resources/js/components/world/WorldTrackPlayer.jsx`, implement the fade-out → pause → fade-in restart cycle on the audio element's `ended` event: ramp volume down to 0 over a short interval, `setTimeout` a few seconds, reset `currentTime` to 0, play, then ramp volume back up to the user's current volume setting
-- [ ] T019 [P] [US2] In `resources/js/components/world/WorldTrackPlayer.jsx`, add a volume slider control that applies directly to the audio element's `volume` on `onChange`, and persist the chosen level in `localStorage` for the user's next session
-- [ ] T020 [US2] In `resources/js/components/world/WorldTrackPlayer.jsx`, add a `keydown` listener for the `M` key that toggles mute (storing the pre-mute volume and restoring it on unmute), scoped to the component's mount lifetime
-- [ ] T021 [US2] Mount `WorldTrackPlayer` from `resources/js/pages/WorldPage.jsx` (or `resources/js/components/world/WorldScene.jsx`, whichever renders the active session), passing the current world's `track_url`
+- [x] T017 [US2] Create `resources/js/components/world/WorldTrackPlayer.jsx`: renders a hidden `<audio>` element sourced from the active world's `trackUrl` (no `loop` attribute), exposes volume/mute controls, and does nothing when `trackUrl` is null
+- [x] T018 [US2] In `resources/js/components/world/WorldTrackPlayer.jsx`, implement the fade-out → pause → fade-in restart cycle on the audio element's `ended` event: ramp volume down to 0 over a short interval, `setTimeout` a few seconds, reset `currentTime` to 0, play, then ramp volume back up to the user's current volume setting
+- [x] T019 [P] [US2] In `resources/js/components/world/WorldTrackPlayer.jsx`, add a volume slider control that applies directly to the audio element's `volume` on `onChange`, and persist the chosen level in `localStorage` for the user's next session
+- [x] T020 [US2] In `resources/js/components/world/WorldTrackPlayer.jsx`, add a `keydown` listener for the `M` key that toggles mute (storing the pre-mute volume and restoring it on unmute), scoped to the component's mount lifetime
+- [x] T021 [US2] Mount `WorldTrackPlayer` from `resources/js/pages/WorldPage.jsx` (or `resources/js/components/world/WorldScene.jsx`, whichever renders the active session), passing the current world's `trackUrl`
 
 **Checkpoint**: All user stories are independently functional — tracks can be managed (US1) and are heard with proper fade/volume/mute behavior during sessions (US2).
 
@@ -86,8 +86,8 @@ description: "Task list for World Music Track feature implementation"
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T022 Run `vendor/bin/pint --dirty --format agent` and `npm run lint` and fix any issues surfaced across all files touched by this feature
-- [ ] T023 Run `php artisan test --compact --filter=WorldTrackControllerTest` and confirm all new tests pass
+- [x] T022 Run `vendor/bin/pint --dirty --format agent` and `npm run lint` and fix any issues surfaced across all files touched by this feature
+- [x] T023 Run `php artisan test --compact --filter=WorldTrackControllerTest` and confirm all new tests pass
 - [ ] T024 Walk through [quickstart.md](quickstart.md) manually (backend curl steps + frontend playback/volume/mute/fade checks) and confirm each step behaves as documented
 
 ---
@@ -99,7 +99,7 @@ description: "Task list for World Music Track feature implementation"
 - **Setup (Phase 1)**: No dependencies - can start immediately
 - **Foundational (Phase 2)**: Depends on Setup (T001's migration) - BLOCKS both user stories
 - **User Story 1 (Phase 3)**: Depends on Foundational completion - no dependency on User Story 2
-- **User Story 2 (Phase 4)**: Depends on Foundational completion (needs `track_url` on `WorldResource`) and functionally needs a track to exist to be observable, but its player component can be built against `WorldFactory::withTrack()`-backed data independently of US1's UI
+- **User Story 2 (Phase 4)**: Depends on Foundational completion (needs `trackUrl` on `WorldResource`) and functionally needs a track to exist to be observable, but its player component can be built against `Track::factory()->for($world, 'trackable')`-backed data independently of US1's UI
 - **Polish (Phase 5)**: Depends on both user stories being complete
 
 ### Within Each User Story

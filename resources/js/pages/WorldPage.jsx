@@ -4,6 +4,7 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import WorldScene from '../components/world/WorldScene.jsx';
 import WorldChat from '../components/world/WorldChat.jsx';
+import WorldTrackPlayer from '../components/world/WorldTrackPlayer.jsx';
 
 export default function WorldPage() {
 	const { worldId } = useParams();
@@ -103,6 +104,7 @@ export default function WorldPage() {
 				</div>
 			)}
 			<div className="relative flex-1 min-w-0">
+				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready'} />
 				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready' && !chatResident} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} />
 				<div className={`absolute inset-0 z-10 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${status !== 'ready' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
 					{world.cardImageUrl && (
