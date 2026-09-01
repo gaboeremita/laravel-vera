@@ -54,7 +54,7 @@ A user playing in a world wants the world's track to play as background music wh
 ### Functional Requirements
 
 - **FR-001**: System MUST allow a world's owner to set a music track for that world by uploading an audio file.
-- **FR-002**: System MUST reject audio uploads that are not in a supported audio format.
+- **FR-002**: System MUST reject audio uploads that are not MP3 or WAV format.
 - **FR-003**: System MUST reject audio uploads that exceed a maximum file size of 20 MB.
 - **FR-004**: System MUST allow a world's owner to replace the world's existing track with a newly uploaded one.
 - **FR-005**: System MUST allow a world's owner to remove the world's track, leaving it with none.
@@ -81,5 +81,5 @@ A user playing in a world wants the world's track to play as background music wh
 
 - Only the world's owner can manage its track; other users who visit or play in the world can only listen, and can only control their own local playback volume.
 - Background music plays for every user in a session; there is no per-user selection, only local volume/mute control.
-- Supported audio formats follow common web-playable formats (e.g. MP3, WAV, OGG); exact format list is a reasonable technical default rather than a product decision.
+- Supported audio formats are MP3 and WAV; the 20 MB maximum file size still applies to both.
 - A world holds at most one track at a time; adding a new one replaces the previous one rather than building a playlist.
