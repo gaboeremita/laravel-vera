@@ -21,5 +21,15 @@ export default function useWorlds(addToast) {
 		void load();
 	}, [addToast]);
 
-	return { worlds, isLoading };
+	const deleteWorld = async (id) => {
+		try {
+			const response = await api.delete(route('worlds.destroy', { world: id }));
+			if (!response.ok) throw new Error();
+			setWorlds((prev) => prev.filter((w) => w.id !== id));
+		} catch {
+			addToast('Failed to delete world', 'error');
+		}
+	};
+
+	return { worlds, isLoading, deleteWorld };
 }

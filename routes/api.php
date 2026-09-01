@@ -25,7 +25,9 @@ use App\Http\Controllers\Api\VoiceController;
 use App\Http\Controllers\Api\VoiceModelController;
 use App\Http\Controllers\Api\VoiceProviderController;
 use App\Http\Controllers\Api\WorldController;
+use App\Http\Controllers\Api\WorldImageController;
 use App\Http\Controllers\Api\WorldResidentController;
+use App\Http\Controllers\Api\WorldSessionController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -43,8 +45,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/assistants/{id}/image', [AssistantImageController::class, 'destroy'])->name('assistants.image.destroy');
 
     Route::apiResource('worlds', WorldController::class);
+    Route::post('/worlds/{world}/card-image', [WorldImageController::class, 'storeCard'])->name('worlds.image.card.store');
+    Route::delete('/worlds/{world}/card-image', [WorldImageController::class, 'destroyCard'])->name('worlds.image.card.destroy');
+    Route::post('/worlds/{world}/portrait-image', [WorldImageController::class, 'storePortrait'])->name('worlds.image.portrait.store');
+    Route::delete('/worlds/{world}/portrait-image', [WorldImageController::class, 'destroyPortrait'])->name('worlds.image.portrait.destroy');
     Route::put('/worlds/{world}/residents/{assistant}', [WorldResidentController::class, 'upsert'])->name('worlds.residents.upsert');
     Route::delete('/worlds/{world}/residents/{assistant}', [WorldResidentController::class, 'destroy'])->name('worlds.residents.destroy');
+    Route::get('/worlds/{world}/sessions', [WorldSessionController::class, 'index'])->name('worlds.sessions.index');
+    Route::post('/worlds/{world}/sessions', [WorldSessionController::class, 'store'])->name('worlds.sessions.store');
+    Route::patch('/worlds/{world}/sessions/{session}', [WorldSessionController::class, 'update'])->name('worlds.sessions.update');
+    Route::put('/worlds/{world}/sessions/{session}/position', [WorldSessionController::class, 'updatePosition'])->name('worlds.sessions.position.update');
+    Route::delete('/worlds/{world}/sessions/{session}', [WorldSessionController::class, 'destroy'])->name('worlds.sessions.destroy');
     Route::apiResource('npcs', NpcController::class);
 
     Route::prefix('assistants/{assistant}')->group(function () {

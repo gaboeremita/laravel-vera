@@ -20,7 +20,7 @@ class WorldPolicy
      */
     public function view(User $user, World $world): bool
     {
-        return $world->user_id === $user->id;
+        return $world->users->contains($user);
     }
 
     /**
@@ -36,7 +36,7 @@ class WorldPolicy
      */
     public function update(User $user, World $world): bool
     {
-        return $world->user_id === $user->id;
+        return $world->users->contains($user);
     }
 
     /**
@@ -44,6 +44,6 @@ class WorldPolicy
      */
     public function delete(User $user, World $world): bool
     {
-        return $world->user_id === $user->id;
+        return $world->users->contains($user);
     }
 }

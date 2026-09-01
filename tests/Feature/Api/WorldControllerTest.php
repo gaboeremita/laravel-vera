@@ -25,7 +25,7 @@ it('creates a world with required context and environment fields', function () {
     ]);
 
     $response->assertCreated()->assertJsonPath('name', 'Connection Node');
-    expect(World::where('user_id', $user->id)->first())->settings->toBe(['theme' => 'terminal']);
+    expect($user->worlds()->first())->settings->toBe(['theme' => 'terminal']);
 });
 
 it('requires a theme when creating a world', function () {
@@ -45,7 +45,7 @@ it('requires a theme when creating a world', function () {
 it('deletes the world environment without deleting resident assistants', function () {
     Storage::fake('public');
     $user = User::factory()->create();
-    $world = World::factory()->for($user)->create(['environment_path' => 'worlds/1/test.glb']);
+    $world = World::factory()->forUser($user)->create(['environment_path' => 'worlds/1/test.glb']);
     Storage::disk('public')->put($world->environment_path, 'world');
     $assistant = Assistant::factory()->create();
     AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $assistant->id]);
@@ -67,7 +67,7 @@ it('does not expose another users world', function () {
 
 it('returns a runtime-ready world with an empty resident list', function () {
     $user = User::factory()->create();
-    $world = World::factory()->for($user)->create();
+    $world = World::factory()->forUser($user)->create();
 
     $this->actingAs($user)->getJson(route('worlds.show', $world))
         ->assertSuccessful()

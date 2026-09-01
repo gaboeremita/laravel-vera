@@ -2,7 +2,7 @@ import {useState} from "react";
 import veraAvatar from "../../images/vera-avatar.png";
 import VrmAvatar from "./VrmAvatar.jsx";
 
-export default function Portrait({ emotion, authenticated, hasAssistant = true, getImageUrl, getVideoUrl, getVrmBlendshapes, poseBlendshapes = [], poseAnimationUrl = null, poseTriggerId = null, poseName = null, defaultPoseBlendshapes = [], defaultPoseAnimationUrl = null, portraitType = 'image', vrmUrl = null, assistantId = null, conversationId = null }) {
+export default function Portrait({ emotion, authenticated, hasAssistant = true, getImageUrl, getVideoUrl, getVrmBlendshapes, poseBlendshapes = [], poseAnimationUrl = null, poseTriggerId = null, poseName = null, defaultPoseBlendshapes = [], defaultPoseAnimationUrl = null, portraitType = 'image', vrmUrl = null, assistantId = null, conversationId = null, worldPortraitUrl = null }) {
 	const [playingVideo, setPlayingVideo] = useState(false);
 
 	const src = getImageUrl(emotion) || getImageUrl('default');
@@ -21,6 +21,16 @@ export default function Portrait({ emotion, authenticated, hasAssistant = true, 
 	}
 
 	if (authenticated && !hasAssistant) {
+		if (worldPortraitUrl) {
+			return (
+				<div className="relative w-full h-full overflow-hidden bg-bg-0">
+					<img key={worldPortraitUrl} src={worldPortraitUrl} alt="" className="w-full h-full object-cover object-top animate-fade-in" />
+					<div className="absolute inset-0 pointer-events-none portrait-overlay" />
+					<div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-bg-0/60 via-transparent to-transparent" />
+				</div>
+			);
+		}
+
 		return (
 			<div className="relative w-full h-full overflow-hidden bg-bg-0 flex items-center justify-center">
 				<div className="absolute inset-0 bg-gradient-to-b from-accent/5 via-bg-0 to-accent/10" />

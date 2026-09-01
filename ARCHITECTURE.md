@@ -2,7 +2,7 @@
 
 ## Overview
 
-VERA is a full-stack web application that connects users to AI assistants through a stylized, character-driven interface. Each assistant is fully configured in the database — its personality, prompt, expression set, and opening message are all data-driven with no hardcoded content. LLM providers and models are managed through the UI. A config-based fallback is used when no model is selected. Assistants and lightweight assistant-backed NPCs can also live in user-created **Worlds** — single-room 3D spaces explored in first person, where residents are approached and chatted with in place. See [Worlds](#worlds).
+VERA is a full-stack web application that connects users to AI assistants through a stylized, character-driven interface. Each assistant is fully configured in the database — its personality, prompt, expression set, and opening message are all data-driven with no hardcoded content. LLM providers and models are managed through the UI. A config-based fallback is used when no model is selected. Assistants and lightweight assistant-backed NPCs can also live in shared **Worlds** — single-room 3D spaces explored in first person, where residents are approached and chatted with in place; a user's activity in a world is organized into **sessions**, each with its own resumable position and conversations. See [Worlds](#worlds).
 
 ---
 
@@ -172,6 +172,11 @@ All routes behind `auth:sanctum` middleware:
 | DELETE | `/api/worlds/{world}` | `WorldController@destroy` |
 | PUT | `/api/worlds/{world}/residents/{assistant}` | `WorldResidentController@upsert` |
 | DELETE | `/api/worlds/{world}/residents/{assistant}` | `WorldResidentController@destroy` |
+| GET | `/api/worlds/{world}/sessions` | `WorldSessionController@index` |
+| POST | `/api/worlds/{world}/sessions` | `WorldSessionController@store` |
+| PATCH | `/api/worlds/{world}/sessions/{session}` | `WorldSessionController@update` — rename |
+| PUT | `/api/worlds/{world}/sessions/{session}/position` | `WorldSessionController@updatePosition` |
+| DELETE | `/api/worlds/{world}/sessions/{session}` | `WorldSessionController@destroy` |
 | GET | `/api/npcs` | `NpcController@index` |
 | POST | `/api/npcs` | `NpcController@store` |
 | GET | `/api/npcs/{npc}` | `NpcController@show` |
@@ -287,8 +292,8 @@ Scoped to `assistants/{assistant}/conversations/{id}/memory`. See [Conversation 
 **`AssistantMemoryPromptController`**
 Scoped to `assistants/{assistant}/memory-prompt`. `show`/`update` for the `AssistantUser.memory_prompt` JSON tree — custom instructions steering how that assistant summarizes its own conversations, validated by the same `ValidPromptStructure` rule as the assistant's main prompt.
 
-**`WorldController`** / **`WorldResidentController`** / **`NpcController`**
-Full CRUD for worlds, resident placements, and the NPC library. See [Worlds](#worlds) for the full model, validation, and runtime architecture.
+**`WorldController`** / **`WorldResidentController`** / **`WorldSessionController`** / **`NpcController`**
+Full CRUD for worlds, resident placements, per-user world sessions, and the NPC library. See [Worlds](#worlds) for the full model, validation, and runtime architecture.
 
 ### LLM Provider System
 
@@ -471,7 +476,7 @@ Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `on
 **`Image`** — polymorphic (`imageable_type/id`), disk-stored, `url` accessor
 **`Video`** — polymorphic (`videoable_type/id`), disk-stored, `url` accessor
 
-**`World`** / **`WorldResident`** — see [Worlds](#worlds) for the full model shape and behavior.
+**`World`** / **`WorldResident`** / **`WorldUser`** / **`WorldSession`** — see [Worlds](#worlds) for the full model shape and behavior.
 
 ### Jobs
 
@@ -503,7 +508,8 @@ The app uses React Router. `app.jsx` defines all routes:
 /worlds                              → WorldsPage            (authenticated)
 /worlds/create                       → CreateWorldPage       (authenticated)
 /worlds/:worldId/edit                → EditWorldPage         (authenticated)
-/worlds/:worldId                     → WorldPage             (authenticated)
+/worlds/:worldId/sessions            → WorldSessionsPage     (authenticated)
+/worlds/:worldId                     → WorldPage             (authenticated) — ?session=<id> resumes that session
 /npcs                                → NpcsPage              (authenticated)
 /npcs/create                         → CreateNpcPage         (authenticated) — CreateAssistantPage with kind="world_npc"
 /npcs/:assistantId/edit              → EditAssistantPage kind="world_npc" (authenticated)
@@ -607,13 +613,16 @@ Servers/channels the assistant's Discord bot is currently in — structurally th
 - Server and channel prompts each get their own `PromptTreeEditor`, saved independently, same as the voice provider/model prompts
 
 **`WorldsPage`**
-Lists the user's world cards (`WorldCard`, edit/enter actions) via `useWorlds`, plus an add-world card.
+Lists the accessible world cards (`WorldCard`, edit/enter actions) via `useWorlds`, plus an add-world card. `onEnter` navigates to that world's sessions page, not directly into the 3D scene.
 
 **`CreateWorldPage`** / **`EditWorldPage`**
 `WorldForm` (name, slug, description, environment GLB upload, theme select, the two context prompts) plus `WorldResidentsEditor` for resident selection/placement. `CreateWorldPage` lets residents be staged locally before the world exists, flushing them to `worlds.residents.upsert` right after creation succeeds; `EditWorldPage` additionally has a delete action with `ConfirmationModal`. See [Worlds](#worlds).
 
+**`WorldSessionsPage`**
+Lists a world's sessions via `useWorldSessions` and renders `WorldSessionList` (select/new/delete) — structurally identical to `ConversationsPage`/`ConversationList`. Selecting a session or starting a new one navigates to `WorldPage` with `?session=<id>`. See [Worlds → Sessions](#sessions).
+
 **`WorldPage`**
-Loads the world, then renders `WorldScene` (the R3F canvas) plus HUD: an initializing overlay until the environment reports ready, an "EXIT WORLD" button, a `C — CHAT WITH <name>` prompt when a resident is in range, and the `WorldChat` panel when one is open (which also disables exploration input while it's up). See [Worlds](#worlds) for the full runtime.
+Loads the world and, if a `?session=<id>` query param is present, that session's record (for its saved `position`), then renders `WorldScene` (the R3F canvas) plus HUD: an initializing overlay until the environment reports ready, an "EXIT WORLD" button, a `C — CHAT WITH <name>` prompt when a resident is in range, and the `WorldChat` panel when one is open (which also disables exploration input while it's up). While a session is active, the player's live position is persisted back to `worlds.sessions.position.update` on an interval and on exit/unmount. See [Worlds](#worlds) for the full runtime.
 
 **`NpcsPage`**
 Lists the user's NPCs with inline cards (name, description, card image, edit/delete) — no separate `NpcCard` component. `CreateNpcPage` and NPC editing reuse `CreateAssistantPage`/`EditAssistantPage` via the `kind` prop rather than dedicated pages.
@@ -660,13 +669,16 @@ Trigger-mode select (off/always/on mention/on mention-by-name) plus a `PromptTre
 A `PromptTreeEditor` over `AssistantUser.memory_prompt`, embedded in `MemoryPage`. Same editing pattern as the voice/Discord prompts — no new editor built for it.
 
 **`WorldCard`**
-Name/description card with edit/enter actions, used by `WorldsPage`.
+Name/description card with edit/enter actions, used by `WorldsPage`. Enter goes to the world's sessions page.
 
 **`WorldForm`**
 Shared create/edit form for a world's own fields: name, slug, description, environment GLB upload, theme select, and the two context prompts (labelled "Companion Assistant World Context" / "NPC World Context"). Renders its `children` (the resident editor) inline and a Save button.
 
 **`WorldResidentsEditor`**
 Lists eligible owned assistants/NPCs (avatar3d portrait type with a usable VRM), grouped by kind, each expandable into a placement form (position, stationary/roam behavior + roam radius, opening message override, custom prompt override). Works both against a saved world (`PUT`s immediately) and an unsaved one (stages changes locally, read by `CreateWorldPage` on save).
+
+**`WorldSessionList`**
+Select/new/delete for a world's sessions, used by `WorldSessionsPage` — same keyboard-navigable row layout and `ConfirmationModal`-backed delete as `ConversationList`, without the inline-rename column (rename exists at the API layer for parity but isn't exposed in this list).
 
 See [Worlds → Runtime (3D Scene)](#runtime-3d-scene) for `WorldScene`, `WorldEnvironment`, `FirstPersonController`, `ResidentController`, `InteractionSystem`, and `WorldChat`.
 
@@ -1068,23 +1080,33 @@ Excluded sections for Discord (`except(['opening_message', 'voice mode', 'emotio
 
 ## Worlds
 
-A **World** is a user-owned, single-room 3D space — a supplied environment GLB, a set of resident placements, and two editable context prompts (one for companion-assistant residents, one for NPC residents) selected by `World::contextPromptFor(AssistantKind $kind)`. Worlds, Assistants, and NPCs are sibling sections reachable from `HomePage`, not a mode of the Assistants area.
+A **World** is a shared, single-room 3D space — a supplied environment GLB, a set of resident placements, and two editable context prompts (one for companion-assistant residents, one for NPC residents) selected by `World::contextPromptFor(AssistantKind $kind)`. Worlds, Assistants, and NPCs are sibling sections reachable from `HomePage`, not a mode of the Assistants area. Access to a world is granted per user via `WorldUser`, the same pivot shape `AssistantUser` uses for assistants — a world is not owned by a single `user_id` column. Each user's activity within a world is organized into **sessions** (`WorldSession`) — see [Sessions](#sessions) below.
 
 ### Backend
 
-**`App\Models\World`** — `name`, `slug` (unique per user), `description`, `environment_disk`/`environment_path`/`environment_original_name`, `assistant_context_prompt`, `npc_context_prompt`, `settings` (JSON, currently just `{theme}` — see [World Theme](#world-theme) below). `belongsTo(User)`, `hasMany(WorldResident)`. Deleting a world deletes its environment asset from disk (`booted()`'s `deleted` hook) but never touches resident assistants/NPCs or their conversations.
+**`App\Models\World`** — `name`, `slug` (unique among the worlds a given user can access — enforced against the `world_user` join, not a `worlds.user_id` column, since worlds are shared), `description`, `environment_disk`/`environment_path`/`environment_original_name`, `assistant_context_prompt`, `npc_context_prompt`, `settings` (JSON, currently just `{theme}` — see [World Theme](#world-theme) below). `belongsToMany(User::class)->using(WorldUser::class)`, `hasMany(WorldResident)`, `hasMany(WorldUser)`. Deleting a world deletes its environment asset from disk (`booted()`'s `deleted` hook) and cascades its `world_user` rows (and, through those, every session and session-scoped conversation), but never touches resident assistants/NPCs or their non-session conversations.
+
+**`App\Models\WorldUser`** — pivot between `World` and `User`, mirroring `AssistantUser`: `world_id`, `user_id`, unique per pair. `hasMany(WorldSession)`. `WorldPolicy::view/update/delete` check membership in `$world->users` rather than an owner column.
 
 **`App\Models\WorldResident`** — one row per (world, assistant) pairing: `position`/`rotation` (JSON), `behavior` (`WorldResidentBehavior` enum: `Stationary`/`Roam`), `behavior_settings` (JSON, e.g. roam `radius`), and two per-placement overrides: `opening_message` (replaces the assistant's own opening message for conversations started in this world) and `custom_prompt` (appended on top of the world's kind-level context prompt, for this placement only). `(world_id, assistant_id)` is unique — the same assistant/NPC can be a resident of many worlds, each with its own placement.
 
 **`App\Enums\AssistantKind`** — `Assistant` (normal) | `WorldNpc`. An NPC is an `Assistant` record with `kind = WorldNpc`, not a parallel model — it keeps the full assistant feature set (prompt, archive, provider, conversations, poses) and is just filtered differently by `AssistantController`/`NpcController`.
 
-**`WorldController`** — authorized list/create/show/update/delete. `store`/`update` validate via `StoreWorldRequest`/`UpdateWorldRequest` (camelCase JSON keys — `assistantContextPrompt`, `npcContextPrompt`, `settings.theme` — mapped explicitly back to the snake_case columns before the Eloquent call, since a raw `$validated` spread would silently fail to persist renamed keys) and handle environment upload/replace/cleanup directly (no separate environment controller). `destroy` deletes the world; the model's own `deleted` hook removes the environment asset.
+**`WorldController`** — authorized list/create/show/update/delete, resolved through the `WorldUser` pivot (`$request->user()->worlds()`) rather than a direct FK. `store`/`update` validate via `StoreWorldRequest`/`UpdateWorldRequest` (camelCase JSON keys — `assistantContextPrompt`, `npcContextPrompt`, `settings.theme` — mapped explicitly back to the snake_case columns before the Eloquent call, since a raw `$validated` spread would silently fail to persist renamed keys) and handle environment upload/replace/cleanup directly (no separate environment controller). `destroy` deletes the world; the model's own `deleted` hook removes the environment asset.
 
-**`WorldResidentController`** — `upsert` (`PUT /worlds/{world}/residents/{assistant}`) authorizes world ownership, requires the assistant to be owned by the user and have a usable 3D avatar (`portrait_type === Avatar3D` and a VRM), then `updateOrCreate`s the placement. `destroy` removes only the placement row.
+**`WorldResidentController`** — `upsert` (`PUT /worlds/{world}/residents/{assistant}`) authorizes world access via `WorldPolicy`, requires the assistant to be owned by the user and have a usable 3D avatar (`portrait_type === Avatar3D` and a VRM), then `updateOrCreate`s the placement. `destroy` removes only the placement row.
 
 **`NpcController`** — CRUD scoped to `kind = WorldNpc`, delegating creation to `AssistantController::store(..., AssistantKind::WorldNpc)` so it reuses the exact same multipart upload/VRM/archive/pose pipeline as a normal assistant, just pre-filled with `mode = assistant`, `portrait_type = avatar3d`. `destroy` runs the same `DeleteAssistantAssets` action normal assistant deletion uses.
 
 **`App\Actions\AppendWorldConversationContext`** — the one place world context ever touches a conversation's prompt. Given an `Assistant` and an optional `World`: with no world, returns the assistant's prompt unchanged. With a world, requires the assistant to actually be a resident (throws `AuthorizationException` otherwise) and appends a `world_context` section built from `[$world->contextPromptFor($assistant->kind), $resident->custom_prompt]` (nulls filtered out) — never mutating the assistant's own stored prompt. `ConversationController::sendMessage` calls this on every request that carries an authorized `worldId`; `ConversationController::store` separately resolves `$resident?->opening_message ?: $assistant->opening_message` for a fresh world conversation's first message, and skips the portrait `GenerateAvatarBackground` dispatch entirely for world-context conversations, since that background is never shown in the 3D world.
+
+### Sessions
+
+A **`WorldSession`** (`title`, `position` JSON, `belongsTo(WorldUser)`) is one user's continuous thread of activity in a world — the unit `WorldSessionsPage` lists, resumes, creates, and deletes, the same way `Conversation` is the unit `ConversationsPage` manages for an assistant. `WorldSessionController` (`index`/`store`/`update`/`destroy`, plus `updatePosition`) resolves the requesting user's own `WorldUser` for the route-bound world on every action (via `ResolvesWorldUser`, mirroring `ResolvesAssistantUser`) and scopes all session queries through it — a session is never looked up by ID alone.
+
+Starting a new session (`store`) creates a bare `WorldSession` with a default `'New session'` title and a null `position` — nothing carries over from any other session. `Conversation` has a nullable `world_session_id` (cascade-deleted with its session); `ConversationController::store`/`index` accept an optional `worldSessionId` and, when present, resolve or create the conversation scoped to `(assistant_user_id, world_session_id)` instead of the assistant's single shared conversation. This is what makes a new session's chat with every resident start fresh, and a resumed session's chat pick back up — `WorldChat` passes the active session's id through on every call.
+
+`position` is an opaque JSON value (whatever shape `WorldScene`'s camera/controller already uses, currently `{x, y, z}`) — the backend stores and returns it without interpreting it. `WorldPage` writes it back via `updatePosition` on an interval and on exit, and reads it once on load to pass into `WorldScene` as the initial spawn point when resuming; a brand-new session has no `position` yet, so the environment's own default spawn point is used instead.
 
 ### World Theme
 
@@ -1104,7 +1126,7 @@ Each world has a `theme` in its `settings` JSON — one of the app's four [theme
 
 **`InteractionSystem`** — every frame, finds the nearest resident within `INTERACTION_DISTANCE` (reading positions from the shared ref map, not props) and reports it via `onResidentChange`; pressing `C` while one is in range calls `onInteract`. Movement pauses while `WorldChat` is open (`enabled={false}` passed down from `WorldPage`), so exploration and chat input never fight over the keyboard.
 
-**`WorldChat`** — resolves or creates a conversation for the resident's assistant, passing `worldId` so the backend applies world context; sends/receives through the same `useConversationChat` hook `ChatPage` uses (shared, not a second chat pipeline), triggers pose playback via `onPoseTrigger`, and applies the world's theme for as long as it's mounted (see [World Theme](#world-theme)).
+**`WorldChat`** — resolves or creates a conversation for the resident's assistant scoped to the active `worldSessionId` (see [Sessions](#sessions)), passing `worldId` too so the backend applies world context; sends/receives through the same `useConversationChat` hook `ChatPage` uses (shared, not a second chat pipeline), triggers pose playback via `onPoseTrigger`, and applies the world's theme for as long as it's mounted (see [World Theme](#world-theme)).
 
 ---
 
@@ -1337,6 +1359,7 @@ laravel-vera/
 │   │       ├── VoiceModelController.php        full CRUD; store() currently broken, see issue #63
 │   │       ├── WorldController.php             world CRUD, incl. environment upload/replace and world-owned asset cleanup
 │   │       ├── WorldResidentController.php     add/update/remove a resident placement
+│   │       ├── WorldSessionController.php      per-user world sessions: index/store/rename/destroy + position updates
 │   │       └── NpcController.php               dedicated NPC CRUD, delegates creation to AssistantController::store()
 │   ├── Jobs/
 │   │   ├── EmbedArchiveEntry.php                async vector embedding for archive entries
@@ -1345,6 +1368,7 @@ laravel-vera/
 │   │   ├── User.php
 │   │   ├── Assistant.php                       name/slug/prompt/opening_message/archive_id/mode/agent_config
 │   │   ├── AssistantUser.php                   pivot; has many Conversations, AssistantDiscordServers/Channels; memory_prompt (json)
+│   │   ├── WorldUser.php                       pivot; has many WorldSessions — worlds are shared per user, not owned by user_id
 │   │   ├── Settings.php                        data JSON (theme, ai_model_id, tts_model_id, tts_voice, image_gen_model_id) + voiceCacheKey()
 │   │   ├── AiProvider.php                      url/api_key(encrypted)/format/config_schema
 │   │   ├── AiModel.php                         name/endpoint/thinking_key/supports_tools/prompt/config/additional_config
@@ -1356,7 +1380,7 @@ laravel-vera/
 │   │   ├── DiscordChannel.php                  discord_server_id/discord_channel_id/name
 │   │   ├── AssistantDiscordServer.php          assistant_user_id/discord_server_id/prompt (json)
 │   │   ├── AssistantDiscordChannel.php         assistant_user_id/discord_channel_id/trigger_mode/prompt (json)
-│   │   ├── Conversation.php                    assistant_user_id/title/discord_channel_id/long_term_memory/memory_checkpoint_message_id/memory_summarizing_at/auto_summarize_enabled
+│   │   ├── Conversation.php                    assistant_user_id/title/discord_channel_id/world_session_id/long_term_memory/memory_checkpoint_message_id/memory_summarizing_at/auto_summarize_enabled
 │   │   ├── Message.php                         role/content/thinking/emotion/discord_message_id
 │   │   ├── Emotion.php                         name/restricted, morphOne Image/Video
 │   │   ├── Archive.php                         name/description, belongs to User
@@ -1364,9 +1388,10 @@ laravel-vera/
 │   │   ├── Tag.php
 │   │   ├── Image.php                           polymorphic, disk-stored, url accessor
 │   │   ├── Video.php                           polymorphic, disk-stored, url accessor
-│   │   ├── World.php                           name/slug/description/environment metadata/assistant+npc context prompts/settings (incl. theme)
-│   │   └── WorldResident.php                   world_id/assistant_id/position/rotation/behavior/behavior_settings/opening_message/custom_prompt
-│   ├── Policies/WorldPolicy.php                 worlds are scoped to their owning user
+│   │   ├── World.php                           name/slug/description/environment metadata/assistant+npc context prompts/settings (incl. theme); shared via WorldUser
+│   │   ├── WorldResident.php                   world_id/assistant_id/position/rotation/behavior/behavior_settings/opening_message/custom_prompt
+│   │   └── WorldSession.php                    world_user_id/title/position (json) — one user's resumable thread in a world
+│   ├── Policies/WorldPolicy.php                 worlds are scoped to users granted access via WorldUser
 │   ├── Providers/
 │   │   ├── AppServiceProvider.php              binds EmbeddingProvider, SttProvider (TtsProvider is TtsManager-resolved, not bound)
 │   │   └── Stt/WhisperSttProvider.php           posts audio to whisper-server /inference
@@ -1399,7 +1424,7 @@ laravel-vera/
 │   ├── agent.php                               tool_timeout / step_limit / tool_retry_attempts / progress_cache_ttl
 │   └── ai.php                                  default provider + embedding + stt + tts (fallback) + image_gen (fallback) + telegram + discord
 ├── database/
-│   ├── migrations/                             all tables, incl. voice_providers/voice_models + discord_servers/channels + worlds/world_residents
+│   ├── migrations/                             all tables, incl. voice_providers/voice_models + discord_servers/channels + worlds/world_residents/world_user/world_sessions
 │   └── seeders/VoiceProviderSeeder.php         seeds the TTS catalog (Orpheus, KittenTTS); re-run to add more
 ├── routes/
 │   ├── web.php                                 SPA entry + auth routes + /vendor/vad/{file}
@@ -1426,10 +1451,11 @@ laravel-vera/
 │   │   ├── ImageGenProvidersPage.jsx           image-gen provider/model CRUD, same pattern as ProvidersPage
 │   │   ├── VoicePage.jsx                       voice provider/model CRUD; select model/voice, edit prompts
 │   │   ├── DiscordPage.jsx                     servers/channels; trigger mode + prompt editor per channel
-│   │   ├── WorldsPage.jsx                      list/edit/enter worlds
+│   │   ├── WorldsPage.jsx                      list/edit worlds; enter goes to sessions page
 │   │   ├── CreateWorldPage.jsx                 world creation form + staged resident placement
 │   │   ├── EditWorldPage.jsx                   edit world + delete-with-confirmation
-│   │   ├── WorldPage.jsx                       first-person 3D exploration + in-world chat panel
+│   │   ├── WorldSessionsPage.jsx               list/resume/start/delete a world's sessions
+│   │   ├── WorldPage.jsx                       first-person 3D exploration + in-world chat panel, scoped to the active session
 │   │   ├── NpcsPage.jsx                        NPC list, inline cards
 │   │   └── CreateNpcPage.jsx                   renders CreateAssistantPage with kind="world_npc"
 │   ├── components/
@@ -1460,16 +1486,17 @@ laravel-vera/
 │   │   ├── ConversationList.jsx                sidebar list
 │   │   ├── ToastContainer.jsx                  toast display
 │   │   ├── Scanlines.jsx                       CRT overlay
-│   │   ├── WorldCard.jsx                       world card (edit/enter)
+│   │   ├── WorldCard.jsx                       world card (edit/enter → sessions page)
 │   │   ├── WorldForm.jsx                       shared create/edit world form: metadata, environment, theme, context prompts
 │   │   ├── WorldResidentsEditor.jsx            eligible assistant/NPC picker + per-resident placement, behavior, overrides
+│   │   ├── WorldSessionList.jsx                select/new/delete sessions for a world
 │   │   └── world/
-│   │       ├── WorldScene.jsx                  canvas: environment, first-person controller, residents, interaction system
+│   │       ├── WorldScene.jsx                  canvas: environment, first-person controller, residents, interaction system; restores/reports session position
 │   │       ├── WorldEnvironment.jsx            loads the GLB, builds the collision octree, resolves spawn position
 │   │       ├── FirstPersonController.jsx       keyboard/mouse movement, pointer lock, collision-resolved stepping
 │   │       ├── ResidentController.jsx          resident VRM load, pose/expression playback, stationary/roam movement
 │   │       ├── InteractionSystem.jsx           proximity detection (resident-position ref map) + C-to-chat
-│   │       ├── WorldChat.jsx                   in-world chat panel; applies the world's theme while open
+│   │       ├── WorldChat.jsx                   in-world chat panel; resolves the resident's conversation scoped to the active session
 │   │       ├── collisionCheck.js               WorldCollision: octree build, blocked-body check, stepped movement, spawn-finding
 │   │       ├── groundHeight.js                 raycast-based ground height lookup against the collision octree
 │   │       └── clampToBounds.js                clamps a position to the environment's overall bounding box
@@ -1486,6 +1513,7 @@ laravel-vera/
 │   │   ├── useVoiceProviders.js                provider/model CRUD + model/voice selection
 │   │   ├── useDiscordSettings.js               discovery data + immediate-save trigger mode changes
 │   │   ├── useWorlds.js                        world list fetching
+│   │   ├── useWorldSessions.js                 per-world session list fetching
 │   │   ├── useToast.js                         toast state
 │   │   └── useVoiceMode.js                     mic capture + VAD, wraps window.vad.MicVAD
 │   └── utils/

@@ -4,6 +4,7 @@ import { getGroundHeight } from './groundHeight.js';
 import { clampToBounds } from './clampToBounds.js';
 
 export const CHARACTER_HEIGHT = 1.8;
+export const PLAYER_EYE_HEIGHT = 1.6;
 export const MAX_MOVEMENT_DELTA = 0.1;
 const CHARACTER_RADIUS = 0.25;
 const MAX_STEP_HEIGHT = 0.25;
@@ -134,6 +135,13 @@ export class WorldCollision {
 			}
 		}
 		return null;
+	}
+
+	restorePlayerPosition(savedPosition, fallback) {
+		const coordinates = ['x', 'y', 'z'].map((axis) => savedPosition?.[axis]);
+		if (!coordinates.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate))) return fallback.clone();
+		const preferred = new Vector3(coordinates[0], coordinates[1] - PLAYER_EYE_HEIGHT, coordinates[2]);
+		return this.findSpawn(preferred) ?? fallback.clone();
 	}
 
 	dispose() {

@@ -6,7 +6,7 @@ import { useConversationChat } from '../../hooks/useConversationChat.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
 	const scrollRef = useRef(null);
@@ -28,7 +28,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 			try {
 				fetchEmotions(resident.assistant.id);
 
-				const existing = await api.get(route('conversations.index', { assistant: resident.assistant.id }));
+				const existing = await api.get(route('conversations.index', { assistant: resident.assistant.id, worldSessionId }));
 				if (existing.ok) {
 					const conversations = await existing.json();
 					if (conversations.length > 0) {
@@ -37,7 +37,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 					}
 				}
 
-				const created = await api.post(route('conversations.store', { assistant: resident.assistant.id }), { worldId: world.id });
+				const created = await api.post(route('conversations.store', { assistant: resident.assistant.id }), { worldId: world.id, worldSessionId });
 				if (!created.ok) throw new Error('Unable to start a conversation');
 				const conversation = await created.json();
 				if (active) setConversationId(conversation.id);
@@ -49,7 +49,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 
 		void resolveConversation();
 		return () => { active = false; };
-	}, [resident.assistant.id]);
+	}, [resident.assistant.id, worldSessionId]);
 
 	const { messages, isLoading, sendMessage } = useConversationChat({
 		assistantId: resident.assistant.id,

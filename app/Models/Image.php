@@ -15,6 +15,7 @@ class Image extends Model
         'mime_type',
         'size',
         'original_name',
+        'role',
     ];
 
     public function imageable(): MorphTo
