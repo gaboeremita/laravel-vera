@@ -50,7 +50,10 @@ class WorldSessionController extends Controller
         $worldUser = $this->resolveWorldUser($request, $world);
 
         $validated = $request->validate([
-            'position' => ['required'],
+            'position' => ['required', 'array:x,y,z'],
+            'position.x' => ['required', 'numeric'],
+            'position.y' => ['required', 'numeric'],
+            'position.z' => ['required', 'numeric'],
         ]);
 
         $worldSession = $worldUser->sessions()->findOrFail($session);

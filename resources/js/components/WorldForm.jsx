@@ -4,7 +4,7 @@ import Accordion from './common/Accordion.jsx';
 const FIELD_LABEL = 'text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1';
 const FIELD_INPUT = 'w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors';
 
-export default function WorldForm({ value, onChange, environmentFile, onEnvironmentChange, isSaving, submitLabel, children }) {
+export default function WorldForm({ value, onChange, environmentFile, onEnvironmentChange, isSaving, submitLabel, imagesEditor, children }) {
 	const update = (field, fieldValue) => onChange({ ...value, [field]: fieldValue });
 	const [sections, setSections] = useState({ details: false, environment: false, context: false });
 	const toggle = (section) => setSections((current) => ({ ...current, [section]: !current[section] }));
@@ -33,6 +33,7 @@ export default function WorldForm({ value, onChange, environmentFile, onEnvironm
 						<option value="grimoire">Grimoire</option>
 					</select>
 				</div>
+				{imagesEditor}
 			</Accordion>
 			<Accordion label="ENVIRONMENT" collapsed={sections.environment} onToggle={() => toggle('environment')}>
 				<div>

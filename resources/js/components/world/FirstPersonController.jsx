@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Vector3 } from 'three';
-import { MAX_MOVEMENT_DELTA } from './collisionCheck.js';
+import { MAX_MOVEMENT_DELTA, PLAYER_EYE_HEIGHT } from './collisionCheck.js';
 
 const SPEED = 3.5;
-const EYE_HEIGHT = 1.6;
 const UP = new Vector3(0, 1, 0);
 
 export default function FirstPersonController({ collisionWorld, spawnPosition, enabled, onPositionChange }) {
@@ -53,7 +52,7 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		if (spawnedWorld.current !== collisionWorld) {
 			spawnedWorld.current = collisionWorld;
 			footPosition.current.copy(spawnPosition);
-			activeCamera.position.set(spawnPosition.x, spawnPosition.y + EYE_HEIGHT, spawnPosition.z);
+			activeCamera.position.set(spawnPosition.x, spawnPosition.y + PLAYER_EYE_HEIGHT, spawnPosition.z);
 			lastReportedPosition.current.copy(activeCamera.position);
 			onPositionChange(activeCamera.position.toArray());
 		}
@@ -67,7 +66,7 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		if (direction.current.lengthSq() > 0) {
 			direction.current.normalize().applyAxisAngle(UP, yaw.current).multiplyScalar(SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));
 			collisionWorld.move(footPosition.current, direction.current.x, direction.current.z);
-			activeCamera.position.set(footPosition.current.x, footPosition.current.y + EYE_HEIGHT, footPosition.current.z);
+			activeCamera.position.set(footPosition.current.x, footPosition.current.y + PLAYER_EYE_HEIGHT, footPosition.current.z);
 		}
 
 		if (lastReportedPosition.current.distanceToSquared(activeCamera.position) > 0.05) {

@@ -69,7 +69,7 @@ it('uses a resident-specific opening message when starting a fresh world convers
     expect($conversation->messages()->first()->content)->toBe('World-specific greeting');
 });
 
-it('falls back to the assistant\'s own opening message when the resident has no override', function () {
+it('uses an empty opening message in a world when the resident has no override, never the assistant\'s own', function () {
     $user = User::factory()->create();
     $world = World::factory()->forUser($user)->create();
     $assistant = Assistant::factory()->create(['opening_message' => 'Base greeting']);
@@ -80,7 +80,7 @@ it('falls back to the assistant\'s own opening message when the resident has no 
 
     $response->assertCreated();
     $conversation = Conversation::findOrFail($response->json('id'));
-    expect($conversation->messages()->first()->content)->toBe('Base greeting');
+    expect($conversation->messages()->first()->content)->toBe('');
 });
 
 it('rejects a character that is not a resident of the requested world', function () {

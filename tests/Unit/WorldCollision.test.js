@@ -146,6 +146,38 @@ test('a blocked spawn is moved to a nearby clear floor', (context) => {
 	assert.ok(Math.abs(position.y) < 0.001);
 });
 
+test('a saved eye-level position is restored to its original floor position', (context) => {
+	const world = createWorld(context);
+	const fallback = new Vector3(0, 0, 0);
+	const position = world.restorePlayerPosition({ x: 2, y: 1.6, z: 2 }, fallback);
+	assert.ok(Math.abs(position.x - 2) < 0.001);
+	assert.ok(Math.abs(position.y) < 0.001);
+	assert.ok(Math.abs(position.z - 2) < 0.001);
+});
+
+test('a saved position inside a wall is restored to nearby safe ground', (context) => {
+	const world = createWorld(context, wall());
+	const fallback = new Vector3(4, 0, 4);
+	const position = world.restorePlayerPosition({ x: 0, y: 1.6, z: 0 }, fallback);
+	assert.ok(Math.abs(position.z) > 0.25);
+	assert.equal(world.isBodyBlocked(position), false);
+	assert.ok(Math.abs(position.y) < 0.001);
+});
+
+test('an invalid saved position falls back to the environment spawn', (context) => {
+	const world = createWorld(context);
+	const fallback = new Vector3(3, 0, 3);
+	for (const savedPosition of [
+		{ x: '3', y: 1.6, z: 3 },
+		{ x: 3, y: null, z: 3 },
+		{ x: 3, y: 1.6 },
+	]) {
+		const position = world.restorePlayerPosition(savedPosition, fallback);
+		assert.deepEqual(position.toArray(), fallback.toArray());
+		assert.notEqual(position, fallback);
+	}
+});
+
 test('a room does not need a ceiling to provide a valid floor spawn', (context) => {
 	const world = createWorld(context);
 	const position = world.findSpawn(new Vector3(0, 0, 0));

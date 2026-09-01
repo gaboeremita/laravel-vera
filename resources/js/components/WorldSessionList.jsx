@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil } from "lucide-react";
 import { route } from 'ziggy-js';
 import ConfirmationModal from "./common/ConfirmationModal.jsx";
 import { api } from "../utils/api";
@@ -15,11 +15,14 @@ function timeAgo(dateString) {
 	return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-export default function WorldSessionList({ worldId, sessions, onSelect, onNew, onDelete }) {
+export default function WorldSessionList({ worldId, sessions, onSelect, onNew, onDelete, onRename }) {
 	const [activeRow, setActiveRow] = useState(0);
 	const [activeColumn, setActiveColumn] = useState("select");
 	const [pendingDeleteId, setPendingDeleteId] = useState(null);
+	const [editingId, setEditingId] = useState(null);
+	const [editingTitle, setEditingTitle] = useState("");
 	const listRef = useRef(null);
+	const editInputRef = useRef(null);
 
 	useEffect(() => {
 		listRef.current?.focus();
@@ -48,7 +51,7 @@ export default function WorldSessionList({ worldId, sessions, onSelect, onNew, o
 		} else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
 			e.preventDefault();
 			if (activeRow < sessions.length) {
-				const columns = ["select", "delete"];
+				const columns = ["select", "edit", "delete"];
 				const dir = e.key === "ArrowRight" ? 1 : -1;
 				const currentIdx = columns.indexOf(activeColumn);
 				const nextIdx = (currentIdx + dir + columns.length) % columns.length;
@@ -59,6 +62,8 @@ export default function WorldSessionList({ worldId, sessions, onSelect, onNew, o
 			if (activeRow < sessions.length) {
 				if (activeColumn === "delete") {
 					setPendingDeleteId(sessions[activeRow].id);
+				} else if (activeColumn === "edit") {
+					startEditing(sessions[activeRow]);
 				} else {
 					onSelect(sessions[activeRow].id);
 				}
@@ -77,6 +82,32 @@ export default function WorldSessionList({ worldId, sessions, onSelect, onNew, o
 			setPendingDeleteId(null);
 		}
 	};
+
+	const startEditing = (session) => {
+		setEditingId(session.id);
+		setEditingTitle(session.title || "");
+	};
+
+	const cancelEditing = () => {
+		setEditingId(null);
+		setEditingTitle("");
+		setTimeout(() => listRef.current?.focus(), 0);
+	};
+
+	const saveEditing = () => {
+		const trimmed = editingTitle.trim();
+		if (trimmed && editingId) {
+			onRename(editingId, trimmed);
+		}
+		cancelEditing();
+	};
+
+	useEffect(() => {
+		if (editingId && editInputRef.current) {
+			editInputRef.current.focus();
+			editInputRef.current.select();
+		}
+	}, [editingId]);
 
 	const isRowActive = (i) => activeRow === i;
 
@@ -112,20 +143,60 @@ export default function WorldSessionList({ worldId, sessions, onSelect, onNew, o
 						{isRowActive(i) ? "›" : " "}
 					</span>
 
-					<button
-						onClick={() => onSelect(session.id)}
-						onMouseEnter={() => setActiveColumn("select")}
-						className="flex-1 text-left cursor-pointer min-w-0"
-					>
-						{i + 1}.{" "}
-						<span className={`pb-0.5 border-b-2 transition-all duration-150 ${
-							isRowActive(i) && activeColumn === "select"
-								? "border-accent"
-								: "border-transparent"
-						}`}>
-							{session.title || "New session"}
-						</span>
-					</button>
+					{editingId === session.id ? (
+						<input
+							ref={editInputRef}
+							type="text"
+							value={editingTitle}
+							onChange={(e) => setEditingTitle(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") {
+									e.preventDefault();
+									saveEditing();
+								} else if (e.key === "Escape") {
+									e.preventDefault();
+									cancelEditing();
+								}
+								e.stopPropagation();
+							}}
+							onBlur={saveEditing}
+							className="flex-1 bg-transparent border-b border-accent text-accent text-[0.8rem] outline-none caret-accent"
+							maxLength={100}
+						/>
+					) : (
+						<>
+							<button
+								onClick={() => onSelect(session.id)}
+								onMouseEnter={() => setActiveColumn("select")}
+								className="text-left cursor-pointer min-w-0 shrink"
+							>
+								{i + 1}.{" "}
+								<span className={`pb-0.5 border-b-2 transition-all duration-150 ${
+									isRowActive(i) && activeColumn === "select"
+										? "border-accent"
+										: "border-transparent"
+								}`}>
+									{session.title || "New session"}
+								</span>
+							</button>
+
+							<button
+								onClick={() => startEditing(session)}
+								onMouseEnter={() => setActiveColumn("edit")}
+								className={`shrink-0 cursor-pointer pb-0.5 border-b-2 transition-all duration-150 ${
+									isRowActive(i) && activeColumn === "edit"
+										? "text-accent border-accent"
+										: isRowActive(i)
+											? "text-accent/50 border-transparent"
+											: "text-accent/20 border-transparent"
+								}`}
+							>
+								<Pencil size={14} />
+							</button>
+
+							<span className="flex-1" />
+						</>
+					)}
 
 					<span className="text-[0.65rem] shrink-0 text-fg-3">
 						{timeAgo(session.updated_at)}
@@ -174,7 +245,7 @@ export default function WorldSessionList({ worldId, sessions, onSelect, onNew, o
 			</button>
 
 			<div className="text-fg-3 text-[0.65rem] mt-6 tracking-[0.1em]">
-				Enter to select · ↑↓ navigate · ←→ select/delete
+				Enter to select · ↑↓ navigate · ←→ select/rename/delete
 			</div>
 
 			{pendingDeleteId && (

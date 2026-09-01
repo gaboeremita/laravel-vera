@@ -147,7 +147,7 @@ Existing single-repo Laravel + React web app: `app/`, `database/`, `routes/`, `r
 - [x] T050 [P] Implement `WorldSessionController::update` (rename) in `app/Http/Controllers/Api/WorldSessionController.php` plus `PATCH /worlds/{world}/sessions/{session}` route named `worlds.sessions.update` in `routes/api.php`, validating `title` (string, max:100) — mirrors `ConversationController::update` for API parity (research.md); not required by any user story's UI
 - [x] T051 [P] Feature tests for `WorldSessionController::update` (rename validation, ownership check) in `tests/Feature/WorldSessionTest.php` — depends on T050
 - [ ] T052 Execute the manual/browser validation steps in [quickstart.md](quickstart.md) end-to-end
-- [ ] T053 Run `vendor/bin/pint --dirty --format agent`, `npm run lint`, and the full `php artisan test --compact` as the single verification pass before push/PR, per CLAUDE.md
+- [x] T053 Run `vendor/bin/pint --dirty --format agent`, `npm run lint`, and the full `php artisan test --compact` as the single verification pass before push/PR, per CLAUDE.md
 
 ---
 

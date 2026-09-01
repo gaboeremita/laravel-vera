@@ -353,11 +353,17 @@ A resident placement has a position, a stationary-or-roam behavior (roam takes a
 
 NPCs are lightweight, assistant-backed characters managed in their own section (reachable from Home), reusing the same model/pose/prompt/archive tooling as a normal assistant — `CreateNpcPage`/`EditAssistantPage` render the existing assistant forms with `kind="world_npc"` rather than separate NPC-specific pages. An NPC is not tied to any one world; it can be added as a resident to any number of them, and removing it from a world only removes that placement, never the NPC itself (permanent deletion happens only from the NPC section, with confirmation).
 
+### World Sessions
+
+A world is shared like an assistant is — accessible to whichever users have been granted it, rather than owned by a single creator. Each user's activity in a world is organized into **sessions**: opening a world from the Worlds list first lands on that world's sessions page, where you can resume a past session, start a new one, or delete one you no longer want. Sessions list most-recently-active first, and a world with none yet shows an empty state with a "new session" action.
+
+Starting a new session gives you a genuinely fresh start: no remembered position, and fresh conversations with every resident — talking to the same resident again in a different session does not continue an earlier session's chat history. Resuming a session instead returns you to your last recorded position in the world and reopens that session's own conversations with residents. Deleting a session permanently removes it and its conversations; other sessions are unaffected.
+
 ### Exploring a World
 
-Entering a world loads its GLB, builds a collision octree from it, and spawns you at the nearest walkable point to the room's center. Movement is keyboard + mouse first-person with pointer lock; collision is resolved against real triangle geometry (not a bounding box), so passing through an actual doorway works while walking into a wall or furnishing doesn't — but only geometry whose mesh or group name contains "collision" (case-insensitive) is collidable. A GLB without that naming has no wall/furniture collision, only the room's own outer bounds. Losing browser focus stops movement until you click back in.
+Entering a world loads its GLB, builds a collision octree from it, and spawns you either at the nearest walkable point to the room's center (a new session) or at the session's last recorded position (a resumed session, restored once loaded and then saved back periodically and on exit). Movement is keyboard + mouse first-person with pointer lock; collision is resolved against real triangle geometry (not a bounding box), so passing through an actual doorway works while walking into a wall or furnishing doesn't — but only geometry whose mesh or group name contains "collision" (case-insensitive) is collidable. A GLB without that naming has no wall/furniture collision, only the room's own outer bounds. Losing browser focus stops movement until you click back in.
 
-Approaching a resident within interaction range shows a `C — Chat` prompt; pressing `C` opens an in-world chat panel (pausing that resident's roaming) using the assistant's existing conversation, history, archive, and prompt — plus whichever world context prompt and per-resident overrides apply, and the world's own theme for as long as the panel is open. Residents far from the player skip animation/pose work entirely until back in range.
+Approaching a resident within interaction range shows a `C — Chat` prompt; pressing `C` opens an in-world chat panel (pausing that resident's roaming) using the resident's conversation for the active session, its history, archive, and prompt — plus whichever world context prompt and per-resident overrides apply, and the world's own theme for as long as the panel is open. Residents far from the player skip animation/pose work entirely until back in range.
 
 ## Project Structure
 
@@ -420,11 +426,13 @@ laravel-vera/
 │   │       ├── VoiceModelController.php      # Full CRUD + prompt-only update (store() currently broken)
 │   │       ├── WorldController.php           # CRUD for worlds, including environment upload/replace and world-owned asset cleanup
 │   │       ├── WorldResidentController.php   # Add/update/remove a resident placement (position, behavior, opening message/prompt overrides)
+│   │       ├── WorldSessionController.php    # Per-user world sessions: index/store/rename/destroy + position updates
 │   │       └── NpcController.php             # Dedicated NPC CRUD, reusing AssistantController under the hood
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions, mode, agent_config)
 │   │   ├── AssistantUser.php                 # Pivot: user ↔ assistant; memory_prompt (json)
+│   │   ├── WorldUser.php                     # Pivot: user ↔ world (worlds are shared the same way assistants are)
 │   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model, voice, image-gen model)
 │   │   ├── AiProvider.php                    # DB-managed LLM provider
 │   │   ├── AiModel.php                       # DB-managed LLM model
@@ -436,7 +444,7 @@ laravel-vera/
 │   │   ├── DiscordChannel.php                # Known Discord channel, belongs to a DiscordServer
 │   │   ├── AssistantDiscordServer.php        # Per-assistant server prompt
 │   │   ├── AssistantDiscordChannel.php       # Per-assistant channel trigger mode + prompt
-│   │   ├── Conversation.php                  # discord_channel_id ties a conversation to a Discord channel; long_term_memory/memory_checkpoint_message_id/memory_summarizing_at/auto_summarize_enabled
+│   │   ├── Conversation.php                  # discord_channel_id ties a conversation to a Discord channel; world_session_id scopes it to one world session; long_term_memory/memory_checkpoint_message_id/memory_summarizing_at/auto_summarize_enabled
 │   │   ├── Message.php                       # discord_message_id dedupes across assistants sharing a channel
 │   │   ├── Emotion.php                       # Expression name + restricted flag
 │   │   ├── Archive.php
@@ -444,10 +452,11 @@ laravel-vera/
 │   │   ├── Tag.php
 │   │   ├── Image.php                         # Polymorphic, stored on disk
 │   │   ├── Video.php                         # Polymorphic, stored on disk
-│   │   ├── World.php                         # name/slug/description, environment metadata, assistant/npc context prompts, settings (incl. theme)
-│   │   └── WorldResident.php                 # A world's placement of an assistant/NPC: position, rotation, behavior, per-placement overrides
+│   │   ├── World.php                         # name/slug/description, environment metadata, assistant/npc context prompts, settings (incl. theme); shared via WorldUser, not owned directly
+│   │   ├── WorldResident.php                 # A world's placement of an assistant/NPC: position, rotation, behavior, per-placement overrides
+│   │   └── WorldSession.php                  # One user's continuous thread in a world: title, last recorded position (json); owns its own conversations
 │   ├── Policies/
-│   │   └── WorldPolicy.php                   # Worlds are scoped to their owning user
+│   │   └── WorldPolicy.php                   # Worlds are scoped to users granted access via WorldUser
 │   ├── Jobs/
 │   │   ├── EmbedArchiveEntry.php             # Async vector embedding for archive entries
 │   │   └── SummarizeConversation.php         # Queues Actions\SummarizeConversation; manages the memory_summarizing_at lock
@@ -499,8 +508,10 @@ laravel-vera/
 │   │   ├── create_discord_channels_table.php # discord_server_id/discord_channel_id/name
 │   │   ├── create_assistant_discord_servers_table.php  # assistant_user_id/discord_server_id/prompt (json)
 │   │   ├── create_assistant_discord_channels_table.php # assistant_user_id/discord_channel_id/trigger_mode/prompt (json)
-│   │   ├── create_worlds_table.php           # user_id/name/slug/environment metadata/assistant+npc context prompts/settings (incl. theme)
-│   │   └── create_world_residents_table.php  # world_id/assistant_id/position/rotation/behavior/behavior_settings/opening_message/custom_prompt
+│   │   ├── create_worlds_table.php           # name/slug/environment metadata/assistant+npc context prompts/settings (incl. theme)
+│   │   ├── create_world_residents_table.php  # world_id/assistant_id/position/rotation/behavior/behavior_settings/opening_message/custom_prompt
+│   │   ├── create_world_user_table.php       # Pivot: world_id/user_id — worlds moved off direct user_id onto this, mirroring assistant_user
+│   │   └── create_world_sessions_table.php   # world_user_id/title/position (json); conversations gained a nullable world_session_id
 │   └── seeders/
 │       └── VoiceProviderSeeder.php           # Seeds the TTS catalog (Orpheus, KittenTTS) — re-run to add more
 ├── resources/js/
@@ -526,10 +537,11 @@ laravel-vera/
 │   │   ├── ImageGenProvidersPage.jsx          # Image-gen provider/model management (same pattern as ProvidersPage)
 │   │   ├── VoicePage.jsx                     # Voice provider/model management; select model/voice, edit prompts
 │   │   ├── DiscordPage.jsx                   # Discord servers/channels; trigger mode + prompt editor per channel
-│   │   ├── WorldsPage.jsx                    # List/edit/enter worlds
+│   │   ├── WorldsPage.jsx                    # List/edit worlds; entering a world goes to its sessions page
 │   │   ├── CreateWorldPage.jsx               # World creation form + staged resident placement
 │   │   ├── EditWorldPage.jsx                 # Edit world + delete-with-confirmation
-│   │   ├── WorldPage.jsx                     # First-person 3D exploration + in-world chat panel
+│   │   ├── WorldSessionsPage.jsx             # List/resume/start/delete a world's sessions (mirrors ConversationsPage)
+│   │   ├── WorldPage.jsx                     # First-person 3D exploration + in-world chat panel, scoped to the active session
 │   │   └── NpcsPage.jsx                      # NPC list with inline cards; CreateNpcPage renders CreateAssistantPage with kind="world_npc"
 │   ├── components/
 │   │   ├── common/
@@ -559,16 +571,17 @@ laravel-vera/
 │   │   ├── ConversationList.jsx              # Sidebar conversation list
 │   │   ├── ToastContainer.jsx                # Toast notification display
 │   │   ├── Scanlines.jsx                     # CRT scanline overlay
-│   │   ├── WorldCard.jsx                     # World card (edit/enter)
+│   │   ├── WorldCard.jsx                     # World card (edit/enter → sessions page)
 │   │   ├── WorldForm.jsx                     # Shared create/edit world form: metadata, environment, theme, context prompts
 │   │   ├── WorldResidentsEditor.jsx          # Eligible assistant/NPC picker + per-resident placement, behavior, and overrides
+│   │   ├── WorldSessionList.jsx              # Select/new/delete sessions for a world (mirrors ConversationList)
 │   │   └── world/
-│   │       ├── WorldScene.jsx                # Canvas: environment, first-person controller, residents, interaction system
+│   │       ├── WorldScene.jsx                # Canvas: environment, first-person controller, residents, interaction system; restores/reports session position
 │   │       ├── WorldEnvironment.jsx          # Loads the GLB, builds the collision octree, resolves spawn position
 │   │       ├── FirstPersonController.jsx     # Keyboard/mouse movement, pointer lock, collision-resolved stepping
 │   │       ├── ResidentController.jsx        # Resident VRM load, pose/expression playback, stationary/roam movement
 │   │       ├── InteractionSystem.jsx         # Proximity detection (via a resident-position ref map) + C-to-chat
-│   │       ├── WorldChat.jsx                 # In-world chat panel; applies the world's theme while open
+│   │       ├── WorldChat.jsx                 # In-world chat panel; resolves the resident's conversation scoped to the active session
 │   │       ├── collisionCheck.js             # WorldCollision: octree build, blocked-body check, stepped movement, spawn-finding
 │   │       ├── groundHeight.js               # Raycast-based ground height lookup against the collision octree
 │   │       └── clampToBounds.js              # Clamps a position to the environment's overall bounding box
@@ -585,6 +598,7 @@ laravel-vera/
 │   │   ├── useVoiceProviders.js              # Provider/model CRUD + model/voice selection
 │   │   ├── useDiscordSettings.js             # Discovery data + immediate-save trigger mode changes
 │   │   ├── useWorlds.js                      # World list fetching
+│   │   ├── useWorldSessions.js               # Per-world session list fetching (mirrors useWorlds)
 │   │   ├── useToast.js                       # Toast notification state
 │   │   └── useVoiceMode.js                   # Mic capture + voice activity detection
 │   └── utils/
@@ -629,7 +643,7 @@ laravel-vera/
 - **Per-provider/per-model voice prompts** — backend-specific instructions (e.g. Orpheus's inline vocal tags) live on the `VoiceProvider`/`VoiceModel` record and are injected only while that backend is active, via the same visual prompt-tree editor used for assistant prompts
 - **Agent mode** — assistants can be switched to an agentic loop that calls tools (`get_current_datetime`, `basic_calculator`, `generate_image`) across multiple steps before replying, with a step limit, per-tool timeout/retry, and a live progress indicator in the chat UI. See [Agent Mode](#agent-mode)
 - **Image generation** — DB-managed, user-editable provider/model catalog (same pattern as LLM providers); generate an image manually via `/create-image <description>` in chat, or let an agent-mode assistant call it as a tool. See [Image Generation Providers](#image-generation-providers)
-- **Configurable 3D worlds** — user-created, single-room 3D spaces you explore in first person, with assistant and NPC residents you approach and chat with in place. See [Worlds](#worlds)
+- **Configurable 3D worlds** — shared, single-room 3D spaces you explore in first person, with assistant and NPC residents you approach and chat with in place, organized into per-user sessions you can resume, start fresh, or delete. See [Worlds](#worlds)
 
 ### Planned / Nice-to-Have
 

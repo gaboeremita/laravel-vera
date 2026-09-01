@@ -19,6 +19,7 @@ export default function AuthenticatedLayout() {
 	const [activeAssistantId, setActiveAssistantId] = useState(null);
 	const [activeConversationId, setActiveConversationId] = useState(null);
 	const [hidePortrait, setHidePortrait] = useState(false);
+	const [worldPortraitUrl, setWorldPortraitUrl] = useState(null);
 
 	const { emotionNames, poses, fetchEmotions, getImageUrl, getVideoUrl, getVrmBlendshapes, getPoseBlendshapes, getPoseAnimationUrl, unlocked, portraitType, vrmUrl } = useEmotions();
 	const { toasts, addToast, removeToast } = useToast();
@@ -69,6 +70,7 @@ export default function AuthenticatedLayout() {
 						vrmUrl={vrmUrl}
 						assistantId={activeAssistantId}
 						conversationId={activeConversationId}
+						worldPortraitUrl={worldPortraitUrl}
 					/>
 				</div>
 			)}
@@ -92,6 +94,7 @@ export default function AuthenticatedLayout() {
 						setActiveAssistantId,
 						setActiveConversationId,
 						setHidePortrait,
+						setWorldPortraitUrl,
 					}} />
 				)}
 			</div>

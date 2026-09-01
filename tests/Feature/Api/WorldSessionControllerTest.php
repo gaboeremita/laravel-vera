@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Conversation;
 use App\Models\User;
 use App\Models\World;
 use App\Models\WorldSession;
@@ -79,6 +80,34 @@ it('updates and returns a sessions position', function () {
     expect($session->fresh()->position)->toBe(['x' => 1, 'y' => 2, 'z' => 3]);
 });
 
+it('rejects malformed session positions', function (array $payload) {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $worldUser = WorldUser::where('world_id', $world->id)->where('user_id', $user->id)->firstOrFail();
+    $session = WorldSession::factory()->for($worldUser)->create();
+
+    $this->actingAs($user)->putJson(route('worlds.sessions.position.update', [$world, $session]), $payload)
+        ->assertUnprocessable();
+})->with([
+    'missing position' => [[]],
+    'scalar position' => [['position' => 'wall']],
+    'missing coordinate' => [['position' => ['x' => 1, 'y' => 2]]],
+    'non-numeric coordinate' => [['position' => ['x' => 1, 'y' => 'roof', 'z' => 3]]],
+    'unexpected coordinate' => [['position' => ['x' => 1, 'y' => 2, 'z' => 3, 'rotation' => 90]]],
+]);
+
+it('returns 404 updating a session from another world owned by the requester', function () {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $otherWorld = World::factory()->forUser($user)->create();
+    $otherWorldUser = WorldUser::where('world_id', $otherWorld->id)->where('user_id', $user->id)->firstOrFail();
+    $otherSession = WorldSession::factory()->for($otherWorldUser)->create();
+
+    $this->actingAs($user)->putJson(route('worlds.sessions.position.update', [$world, $otherSession]), [
+        'position' => ['x' => 1, 'y' => 2, 'z' => 3],
+    ])->assertNotFound();
+});
+
 it('returns 404 updating position for a session the requester does not own', function () {
     $owner = User::factory()->create();
     $world = World::factory()->forUser($owner)->create();
@@ -97,12 +126,12 @@ it('permanently deletes a session and cascades its conversations', function () {
     $world = World::factory()->forUser($user)->create();
     $worldUser = WorldUser::where('world_id', $world->id)->where('user_id', $user->id)->firstOrFail();
     $session = WorldSession::factory()->for($worldUser)->create();
-    $conversation = \App\Models\Conversation::factory()->forWorldSession($session)->create();
+    $conversation = Conversation::factory()->forWorldSession($session)->create();
 
     $this->actingAs($user)->deleteJson(route('worlds.sessions.destroy', [$world, $session]))->assertNoContent();
 
     expect(WorldSession::find($session->id))->toBeNull();
-    expect(\App\Models\Conversation::find($conversation->id))->toBeNull();
+    expect(Conversation::find($conversation->id))->toBeNull();
 });
 
 it('renames a session', function () {

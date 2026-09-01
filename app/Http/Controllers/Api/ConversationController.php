@@ -132,7 +132,9 @@ class ConversationController extends Controller
 
         $conversation->messages()->create([
             'role' => 'assistant',
-            'content' => $resident?->opening_message ?: $assistantUser->assistant->opening_message ?? '',
+            'content' => $world !== null
+                ? ($resident?->opening_message ?? '')
+                : ($assistantUser->assistant->opening_message ?? ''),
         ]);
 
         if ($world === null

@@ -24,6 +24,8 @@ class WorldResource extends JsonResource
             'assistantContextPrompt' => $this->assistant_context_prompt,
             'npcContextPrompt' => $this->npc_context_prompt,
             'settings' => $this->settings,
+            'cardImageUrl' => $this->whenLoaded('cardImage', fn () => $this->cardImage?->url),
+            'portraitImageUrl' => $this->whenLoaded('portraitImage', fn () => $this->portraitImage?->url),
             'residents' => $this->relationLoaded('residents')
                 ? WorldResidentResource::collection($this->residents)
                 : [],

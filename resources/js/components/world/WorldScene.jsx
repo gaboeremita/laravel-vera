@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import FirstPersonController from './FirstPersonController.jsx';
 import InteractionSystem from './InteractionSystem.jsx';
 import ResidentController from './ResidentController.jsx';
@@ -17,9 +17,11 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 		setEnvironment(loadedEnvironment);
 		onReady();
 	}, [onReady]);
-	const spawnPosition = environment && initialPosition
-		? { x: initialPosition.x, y: initialPosition.y, z: initialPosition.z }
-		: environment?.spawnPosition;
+	const spawnPosition = useMemo(() => {
+		if (!environment) return null;
+		if (!initialPosition) return environment.spawnPosition;
+		return environment.collisionWorld.restorePlayerPosition(initialPosition, environment.spawnPosition);
+	}, [environment, initialPosition]);
 
 	return (
 		<Canvas camera={{ position: [0, 1.6, 4], fov: 70, near: 0.01, far: 100 }} className="h-full w-full bg-black">
