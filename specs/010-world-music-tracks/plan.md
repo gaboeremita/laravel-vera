@@ -6,7 +6,7 @@
 
 ## Summary
 
-A world's owner can upload a single audio track (MP3 or WAV, max 20 MB) for their world, replacing or removing it as needed. Any user in an active world session hears that track as looping background music, with a local volume slider and an M-key mute toggle that don't affect other users.
+A world's owner can upload a single audio track (MP3 or WAV, max 20 MB) for their world, replacing or removing it as needed. Any user in an active world session hears that track as background music that restarts after a short pause each time it finishes, with a local volume slider and an M-key mute toggle that don't affect other users.
 
 ## Technical Context
 
