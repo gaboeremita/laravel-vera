@@ -38,7 +38,7 @@ A user playing in a world wants the world's track to play as background music wh
 **Acceptance Scenarios**:
 
 1. **Given** a world with a track set, **When** a user enters a session in that world, **Then** the track begins playing as background music.
-2. **Given** a world's track is playing during a session, **When** it finishes, **Then** background music pauses briefly and then plays again from the start.
+2. **Given** a world's track is playing during a session, **When** it finishes, **Then** it fades out, pauses briefly, and then fades back in as it plays again from the start.
 3. **Given** a world with no track set, **When** a user enters a session in that world, **Then** no background music plays.
 4. **Given** background music is playing during a session, **When** the user mutes or adjusts the music volume, **Then** their preference is applied immediately and does not affect other users in the same session.
 5. **Given** background music is playing during a session, **When** the user presses the M key, **Then** the music mutes; **When** they press M again, **Then** it unmutes at the previous volume.
@@ -61,6 +61,7 @@ A user playing in a world wants the world's track to play as background music wh
 - **FR-006**: System MUST prevent users who do not own a world from adding, replacing, or removing that world's track.
 - **FR-007**: System MUST play a world's track as background audio for any user in an active session within that world.
 - **FR-008**: System MUST automatically restart a world's track from the beginning after a short pause (a few seconds of silence) once it finishes playing, for as long as the session continues — it MUST NOT loop back-to-back with no gap.
+- **FR-012**: System MUST fade the track's volume out as it ends and fade it back in as it restarts, rather than cutting or resuming at full volume abruptly.
 - **FR-009**: System MUST NOT play any background music during a session in a world that has no track.
 - **FR-010**: System MUST allow a user in a session to control the background music volume, including muting it, independently of other users in the same session.
 - **FR-011**: System MUST let a user toggle background music mute/unmute by pressing the M key, restoring the previous volume level on unmute.
