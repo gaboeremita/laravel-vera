@@ -3,7 +3,7 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { FIELD_LABEL } from '../utils/formFieldStyles.js';
 
-function ImageUploadField({ label, hint, previewUrl, isUploading, onUpload }) {
+export function ImageUploadField({ label, hint, previewUrl, isUploading, onUpload }) {
 	const inputRef = useRef(null);
 
 	return (
