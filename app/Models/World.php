@@ -50,6 +50,11 @@ class World extends Model
         return $this->morphOne(Image::class, 'imageable')->where('role', 'portrait');
     }
 
+    public function track(): MorphOne
+    {
+        return $this->morphOne(Track::class, 'trackable');
+    }
+
     public function contextPromptFor(AssistantKind $kind): string
     {
         return $kind === AssistantKind::WorldNpc ? $this->npc_context_prompt : $this->assistant_context_prompt;

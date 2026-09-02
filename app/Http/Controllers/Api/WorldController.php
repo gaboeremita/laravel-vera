@@ -17,7 +17,7 @@ class WorldController extends Controller
 {
     public function index(): JsonResponse
     {
-        return response()->json(WorldResource::collection(request()->user()->worlds()->with('cardImage')->latest()->get()));
+        return response()->json(WorldResource::collection(request()->user()->worlds()->with(['cardImage', 'track'])->latest()->get()));
     }
 
     public function store(StoreWorldRequest $request): JsonResponse
@@ -52,7 +52,7 @@ class WorldController extends Controller
     {
         Gate::authorize('view', $world);
 
-        return response()->json((new WorldResource($world->load(['residents.assistant.vrm', 'cardImage', 'portraitImage'])))->resolve());
+        return response()->json((new WorldResource($world->load(['residents.assistant.vrm', 'cardImage', 'portraitImage', 'track'])))->resolve());
     }
 
     public function update(UpdateWorldRequest $request, World $world): JsonResponse

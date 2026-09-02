@@ -26,6 +26,8 @@ class WorldResource extends JsonResource
             'settings' => $this->settings,
             'cardImageUrl' => $this->whenLoaded('cardImage', fn () => $this->cardImage?->url),
             'portraitImageUrl' => $this->whenLoaded('portraitImage', fn () => $this->portraitImage?->url),
+            'trackUrl' => $this->whenLoaded('track', fn () => $this->track?->url),
+            'trackOriginalName' => $this->whenLoaded('track', fn () => $this->track?->original_name),
             'residents' => $this->relationLoaded('residents')
                 ? WorldResidentResource::collection($this->residents)
                 : [],
