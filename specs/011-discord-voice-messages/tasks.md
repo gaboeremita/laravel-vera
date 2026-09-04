@@ -20,7 +20,7 @@
 
 **Purpose**: Prepare the codebase for voice message handling
 
-- [ ] T001 Fix STT filename to use actual audio content type instead of hardcoded `audio.wav` in `app/Providers/Stt/WhisperSttProvider.php` — add a `$filename` parameter to `transcribe()` and update the `SttProvider` contract in `app/Contracts/SttProvider.php`
+- [x] T001 Fix STT filename to use actual audio content type instead of hardcoded `audio.wav` in `app/Providers/Stt/WhisperSttProvider.php` — add a `$filename` parameter to `transcribe()` and update the `SttProvider` contract in `app/Contracts/SttProvider.php`
 
 **Checkpoint**: STT provider can accept audio in any format Whisper supports (OGG, MP3, WAV, WEBM)
 
@@ -42,16 +42,16 @@
 
 ### Tests for User Story 1
 
-- [ ] T002 [P] [US1] Feature test: discord-messages endpoint accepts `audio` and `audioContentType` fields, transcribes audio, and returns a text response in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T003 [P] [US1] Feature test: transcribed text is stored as message content (not raw audio) in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T004 [P] [US1] Feature test: message with both text content and audio appends transcription to content in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T005 [P] [US1] Feature test: request with `audio` but missing `audioContentType` is rejected with 422 in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T002 [P] [US1] Feature test: discord-messages endpoint accepts `audio` and `audioContentType` fields, transcribes audio, and returns a text response in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T003 [P] [US1] Feature test: transcribed text is stored as message content (not raw audio) in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T004 [P] [US1] Feature test: message with both text content and audio appends transcription to content in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T005 [P] [US1] Feature test: request with `audio` but missing `audioContentType` is rejected with 422 in `tests/Feature/DiscordVoiceMessageTest.php`
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] Extend `sendDiscordMessage` validation in `app/Http/Controllers/Api/ConversationController.php` to accept `audio` (nullable string) and `audioContentType` (nullable string, required when audio is present)
-- [ ] T007 [US1] Add audio transcription logic in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — decode base64 audio, call `SttProvider::transcribe()` with the correct filename derived from `audioContentType`, use transcribed text as (or appended to) message content
-- [ ] T008 [US1] Extend node-discord-api message handler in `index.js` to detect audio attachments (check `attachment.contentType` for `audio/` prefix), download as base64, and send in `audio` and `audioContentType` fields instead of `images`
+- [x] T006 [US1] Extend `sendDiscordMessage` validation in `app/Http/Controllers/Api/ConversationController.php` to accept `audio` (nullable string) and `audioContentType` (nullable string, required when audio is present)
+- [x] T007 [US1] Add audio transcription logic in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — decode base64 audio, call `SttProvider::transcribe()` with the correct filename derived from `audioContentType`, use transcribed text as (or appended to) message content
+- [x] T008 [US1] Extend node-discord-api message handler in `index.js` to detect audio attachments (check `attachment.contentType` for `audio/` prefix), download as base64, and send in `audio` and `audioContentType` fields instead of `images`
 
 **Checkpoint**: Voice messages sent on Discord are transcribed and Vera replies with text. Full voice-in flow works end-to-end.
 
@@ -65,13 +65,13 @@
 
 ### Tests for User Story 2
 
-- [ ] T009 [P] [US2] Feature test: when audio is present in request and voice mode is `both`, response includes `audioBase64` and `audioContentType` in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T010 [P] [US2] Feature test: when TTS synthesis fails, response falls back to text-only (no `audioBase64`) in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T009 [P] [US2] Feature test: when audio is present in request and voice mode is `both`, response includes `audioBase64` and `audioContentType` in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T010 [P] [US2] Feature test: when TTS synthesis fails, response falls back to text-only (no `audioBase64`) in `tests/Feature/DiscordVoiceMessageTest.php`
 
 ### Implementation for User Story 2
 
-- [ ] T011 [US2] Add TTS synthesis to `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — after generating the LLM response, if the request contained audio: truncate the response text to 200 characters (FR-013) before passing it to `TtsManager::forAssistantUser()` for synthesis, base64-encode the audio, and include `audioBase64` and `audioContentType` in the JSON response. The full-length text is still returned in `content`.
-- [ ] T012 [US2] Extend node-discord-api response handling in `index.js` — when `audioBase64` is present in the Laravel response: decode it, determine file extension from `audioContentType` (e.g. `audio/mpeg` → `.mp3`, `audio/wav` → `.wav`), create an `AttachmentBuilder`, and send the audio file alongside (or instead of) text
+- [x] T011 [US2] Add TTS synthesis to `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — after generating the LLM response, if the request contained audio: truncate the response text to 200 characters (FR-013) before passing it to `TtsManager::forAssistantUser()` for synthesis, base64-encode the audio, and include `audioBase64` and `audioContentType` in the JSON response. The full-length text is still returned in `content`.
+- [x] T012 [US2] Extend node-discord-api response handling in `index.js` — when `audioBase64` is present in the Laravel response: decode it, determine file extension from `audioContentType` (e.g. `audio/mpeg` → `.mp3`, `audio/wav` → `.wav`), create an `AttachmentBuilder`, and send the audio file alongside (or instead of) text
 
 **Checkpoint**: Voice-to-voice loop works end-to-end. Sending a voice message produces both a text reply and an audio attachment.
 
@@ -85,16 +85,16 @@
 
 ### Tests for User Story 3
 
-- [ ] T013 [P] [US3] Feature test: when `discordVoiceResponseMode` is `textOnly`, response has no `audioBase64` even though audio was sent in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T014 [P] [US3] Feature test: when `discordVoiceResponseMode` is `voiceOnly`, response has `audioBase64` but `content` is null in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T015 [P] [US3] Feature test: settings endpoint accepts and persists `discordVoiceResponseMode` in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T013 [P] [US3] Feature test: when `discordVoiceResponseMode` is `textOnly`, response has no `audioBase64` even though audio was sent in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T014 [P] [US3] Feature test: when `discordVoiceResponseMode` is `voiceOnly`, response has `audioBase64` but `content` is null in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T015 [P] [US3] Feature test: settings endpoint accepts and persists `discordVoiceResponseMode` in `tests/Feature/DiscordVoiceMessageTest.php`
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Add `discordVoiceResponseMode` to settings validation and persistence in `app/Http/Controllers/Api/SettingsController.php` — accept `both`, `voiceOnly`, or `textOnly`; store in `settings.data` JSON
-- [ ] T017 [US3] Read `discordVoiceResponseMode` in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — gate TTS synthesis on mode being `both` or `voiceOnly`; gate text content in response on mode being `both` or `textOnly`
-- [ ] T018 [US3] Update node-discord-api response handling in `index.js` — when `content` is null (voice-only mode), send only the audio attachment with no text; when `audioBase64` is absent (text-only mode), send only text (existing behavior)
-- [ ] T019 [US3] Add voice response mode control to the Discord settings UI in `resources/js/pages/DiscordPage.jsx` or the relevant settings component — a dropdown/radio with three options, wired to the settings endpoint
+- [x] T016 [US3] Add `discordVoiceResponseMode` to settings validation and persistence in `app/Http/Controllers/Api/SettingsController.php` — accept `both`, `voiceOnly`, or `textOnly`; store in `settings.data` JSON
+- [x] T017 [US3] Read `discordVoiceResponseMode` in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — gate TTS synthesis on mode being `both` or `voiceOnly`; gate text content in response on mode being `both` or `textOnly`
+- [x] T018 [US3] Update node-discord-api response handling in `index.js` — when `content` is null (voice-only mode), send only the audio attachment with no text; when `audioBase64` is absent (text-only mode), send only text (existing behavior)
+- [x] T019 [US3] Add voice response mode control to the Discord settings UI in `resources/js/pages/DiscordPage.jsx` or the relevant settings component — a dropdown/radio with three options, wired to the settings endpoint
 
 **Checkpoint**: All three voice response modes work correctly. The setting persists and takes effect immediately.
 
@@ -108,14 +108,14 @@
 
 ### Tests for User Story 4
 
-- [ ] T020 [P] [US4] Feature test: `/send-voice-message` prefix is detected and stripped from content, response includes `audioBase64` in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T021 [P] [US4] Feature test: `/send-voice-message` overrides `textOnly` voice response mode and still produces audio in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T022 [P] [US4] Feature test: `/send-voice-message` with no additional text produces a conversational reply with audio in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T020 [P] [US4] Feature test: `/send-voice-message` prefix is detected and stripped from content, response includes `audioBase64` in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T021 [P] [US4] Feature test: `/send-voice-message` overrides `textOnly` voice response mode and still produces audio in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T022 [P] [US4] Feature test: `/send-voice-message` with no additional text produces a conversational reply with audio in `tests/Feature/DiscordVoiceMessageTest.php`
 
 ### Implementation for User Story 4
 
-- [ ] T023 [US4] Add `/send-voice-message` command detection in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — extract command prefix (following the existing `/create-image` pattern), strip it from content, set a flag to force TTS synthesis on the response
-- [ ] T024 [US4] Wire the force-voice flag into the TTS synthesis logic in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — when the flag is set, synthesize audio regardless of `discordVoiceResponseMode`
+- [x] T023 [US4] Add `/send-voice-message` command detection in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — extract command prefix (following the existing `/create-image` pattern), strip it from content, set a flag to force TTS synthesis on the response
+- [x] T024 [US4] Wire the force-voice flag into the TTS synthesis logic in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — when the flag is set, synthesize audio regardless of `discordVoiceResponseMode`
 
 **Checkpoint**: `/send-voice-message` command works. Users can get voice replies from text input on demand.
 
@@ -123,10 +123,10 @@
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] Feature test: context continuity — a voice message followed by a text message in the same channel references the same conversation thread in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T026 [P] Feature test: STT failure (provider unavailable) returns a user-friendly error message in Discord in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T027 [P] Feature test: empty transcription result (silent/too-short audio) produces a message indicating Vera couldn't make out what was said in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T028 Handle edge cases in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — empty transcription, STT failure error messages
+- [x] T025 [P] Feature test: context continuity — a voice message followed by a text message in the same channel references the same conversation thread in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T026 [P] Feature test: STT failure (provider unavailable) returns a user-friendly error message in Discord in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T027 [P] Feature test: empty transcription result (silent/too-short audio) produces a message indicating Vera couldn't make out what was said in `tests/Feature/DiscordVoiceMessageTest.php`
+- [x] T028 Handle edge cases in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — empty transcription, STT failure error messages
 - [ ] T029 Run quickstart.md validation scenarios end-to-end against both services
 
 ---

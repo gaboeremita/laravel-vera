@@ -15,7 +15,7 @@ class WhisperSttProvider implements SttProvider
         private readonly int $timeout,
     ) {}
 
-    public function transcribe(string $audio): string
+    public function transcribe(string $audio, string $filename = 'audio.wav'): string
     {
         if (empty($this->baseUrl) || empty($this->model)) {
             throw new RuntimeException('STT is not configured (set AI_STT_URL and AI_STT_MODEL).');
@@ -24,7 +24,7 @@ class WhisperSttProvider implements SttProvider
         try {
             $response = Http::baseUrl($this->baseUrl)
                 ->timeout($this->timeout)
-                ->attach('file', $audio, 'audio.wav')
+                ->attach('file', $audio, $filename)
                 ->post('/inference', [
                     'model' => $this->model,
                 ]);
