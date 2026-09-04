@@ -100,12 +100,33 @@
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 6: User Story 4 — /send-voice-message Command (Priority: P4)
 
-- [ ] T020 [P] Feature test: STT failure (provider unavailable) returns a user-friendly error message in Discord in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T021 [P] Feature test: empty transcription result (silent/too-short audio) produces a message indicating Vera couldn't make out what was said in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T022 Handle edge cases in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — empty transcription, STT failure error messages
-- [ ] T023 Run quickstart.md validation scenarios (V1–V7) end-to-end against both services
+**Goal**: A `/send-voice-message` command prefix in a Discord text message forces Vera to reply with a voice message, regardless of the voice response mode setting and whether audio was sent.
+
+**Independent Test**: Type `/send-voice-message hello` in a Discord channel → Vera replies with an audio file attachment.
+
+### Tests for User Story 4
+
+- [ ] T020 [P] [US4] Feature test: `/send-voice-message` prefix is detected and stripped from content, response includes `audioBase64` in `tests/Feature/DiscordVoiceMessageTest.php`
+- [ ] T021 [P] [US4] Feature test: `/send-voice-message` overrides `textOnly` voice response mode and still produces audio in `tests/Feature/DiscordVoiceMessageTest.php`
+- [ ] T022 [P] [US4] Feature test: `/send-voice-message` with no additional text produces a conversational reply with audio in `tests/Feature/DiscordVoiceMessageTest.php`
+
+### Implementation for User Story 4
+
+- [ ] T023 [US4] Add `/send-voice-message` command detection in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — extract command prefix (following the existing `/create-image` pattern), strip it from content, set a flag to force TTS synthesis on the response
+- [ ] T024 [US4] Wire the force-voice flag into the TTS synthesis logic in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — when the flag is set, synthesize audio regardless of `discordVoiceResponseMode`
+
+**Checkpoint**: `/send-voice-message` command works. Users can get voice replies from text input on demand.
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
+
+- [ ] T025 [P] Feature test: STT failure (provider unavailable) returns a user-friendly error message in Discord in `tests/Feature/DiscordVoiceMessageTest.php`
+- [ ] T026 [P] Feature test: empty transcription result (silent/too-short audio) produces a message indicating Vera couldn't make out what was said in `tests/Feature/DiscordVoiceMessageTest.php`
+- [ ] T027 Handle edge cases in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — empty transcription, STT failure error messages
+- [ ] T028 Run quickstart.md validation scenarios end-to-end against both services
 
 ---
 
@@ -118,13 +139,15 @@
 - **Phase 3 (US1)**: Depends on Phase 1 (STT filename fix)
 - **Phase 4 (US2)**: Depends on Phase 3 (needs the audio-in flow working to test audio-out)
 - **Phase 5 (US3)**: Depends on Phase 4 (needs TTS synthesis in place to gate it)
-- **Phase 6 (Polish)**: Depends on Phases 3–5
+- **Phase 6 (US4)**: Depends on Phase 4 (needs TTS synthesis in place; independent of US3's mode toggle)
+- **Phase 7 (Polish)**: Depends on Phases 3–6
 
 ### User Story Dependencies
 
 - **US1 (P1)**: Independent after Phase 1 — voice-in only
 - **US2 (P2)**: Depends on US1 — adds voice-out to the voice-in flow
 - **US3 (P3)**: Depends on US2 — adds mode toggle to the voice-out behavior
+- **US4 (P4)**: Depends on US2 — reuses TTS synthesis, independent of US3
 
 ### Within Each User Story
 
@@ -137,7 +160,9 @@
 - Within US1: T002, T003, T004, T005 (all test tasks) can run in parallel
 - Within US2: T009, T010 can run in parallel
 - Within US3: T013, T014, T015 can run in parallel
-- Within Polish: T020, T021 can run in parallel
+- Within US4: T020, T021, T022 can run in parallel
+- US3 and US4 can run in parallel (both depend on US2, independent of each other)
+- Within Polish: T025, T026 can run in parallel
 - Cross-repo: laravel-vera and node-discord-api tasks within each story are sequential (API contract first)
 
 ---
@@ -172,7 +197,8 @@ T006: Extend validation → T007: Add transcription logic → T008: node-discord
 2. T002–T008 (US1) → Voice-in works → Validate
 3. T009–T012 (US2) → Voice-out works → Validate
 4. T013–T019 (US3) → Mode toggle works → Validate
-5. T020–T023 (Polish) → Edge cases handled → Final validation
+5. T020–T024 (US4) → /send-voice-message command works → Validate
+6. T025–T028 (Polish) → Edge cases handled → Final validation
 
 ---
 

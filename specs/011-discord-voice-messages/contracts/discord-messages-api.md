@@ -32,6 +32,13 @@ The existing endpoint that node-discord-api calls when a Discord message arrives
 5. If mode is `both` or `voiceOnly`: synthesize the response text via TTS and include audio in the response
 6. If mode is `textOnly` or TTS fails: return text-only response
 
+**Behavior when `content` starts with `/send-voice-message`**:
+1. Strip the `/send-voice-message` prefix from `content`
+2. Use the remaining text as the user message (if empty, treat as an empty-content message and let the LLM generate a conversational reply)
+3. After generating the LLM response, force TTS synthesis regardless of `discordVoiceResponseMode`
+4. Return `audioBase64` and `audioContentType` alongside `content`
+5. If TTS fails: fall back to text-only response
+
 ### Response (laravel-vera → node-discord-api)
 
 ```json

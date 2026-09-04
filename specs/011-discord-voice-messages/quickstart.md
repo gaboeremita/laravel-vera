@@ -84,6 +84,17 @@
 
 **Expected**: Audio files that aren't voice messages are still processed.
 
+### V8: /send-voice-message Command
+
+1. Type `/send-voice-message how are you doing today?` in a channel where the bot is active
+2. Verify: bot replies with an audio file attachment containing her spoken response
+3. Verify: text content is also present (mode is `both` by default)
+4. Set voice response mode to `textOnly`
+5. Type `/send-voice-message tell me a joke`
+6. Verify: bot still replies with an audio file attachment (command overrides the setting)
+
+**Expected**: The command forces a voice reply even from text input, overriding the mode setting.
+
 ## Automated Tests (Pest)
 
 Run the feature test suite for Discord voice messages:

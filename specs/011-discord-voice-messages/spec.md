@@ -67,6 +67,22 @@ The user (or assistant administrator) can configure whether Vera replies to voic
 
 ---
 
+### User Story 4 - /send-voice-message Command (Priority: P4)
+
+A user types `/send-voice-message` (optionally followed by a text message) in a Discord channel or DM. Vera responds with a voice message, regardless of whether the user sent audio and regardless of the voice response mode setting. This gives users an on-demand way to hear Vera speak.
+
+**Why this priority**: This is an enhancement that builds on Story 2's TTS synthesis. The core voice-to-voice flow works without it, but it provides a convenient way to get voice replies from text input.
+
+**Independent Test**: Can be fully tested by typing `/send-voice-message hello` in a Discord channel where Vera is active and verifying that she replies with an audio file attachment.
+
+**Acceptance Scenarios**:
+
+1. **Given** a Discord channel where Vera is active, **When** the user sends `/send-voice-message how are you?`, **Then** Vera responds to "how are you?" and sends her response as a voice message attachment (and optionally text, per voice response mode).
+2. **Given** a Discord DM with Vera, **When** the user sends `/send-voice-message` with no additional text, **Then** Vera generates a conversational reply and sends it as a voice message attachment.
+3. **Given** the voice response mode is set to "text only", **When** the user sends `/send-voice-message`, **Then** the command overrides the setting and Vera still replies with a voice message.
+
+---
+
 ### Edge Cases
 
 - What happens when the voice message audio is too short (under 1 second) or silent? Vera should still attempt transcription; if the result is empty, she responds with a message indicating she couldn't make out what was said.
@@ -75,6 +91,7 @@ The user (or assistant administrator) can configure whether Vera replies to voic
 - What happens when the user sends a regular audio file (music, a recording) rather than a voice message? The system should attempt transcription regardless — Discord voice messages are audio attachments with a specific flag, but the processing pipeline treats all audio attachments the same way.
 - What happens when the Discord bot lacks permission to attach files in a channel? Vera should fall back to a text-only reply.
 - What happens when a message has both text content and a voice attachment? The transcribed audio should be appended to the text content so both are included in the conversation.
+- What happens when `/send-voice-message` is used but TTS fails? Vera should fall back to a text-only reply, same as the TTS failure fallback for voice-triggered replies.
 
 ## Requirements *(mandatory)*
 
@@ -90,6 +107,8 @@ The user (or assistant administrator) can configure whether Vera replies to voic
 - **FR-008**: System MUST fall back to text-only replies when TTS synthesis fails or the bot lacks file-attachment permissions in the channel.
 - **FR-009**: System MUST respect the existing per-channel and per-server trigger modes — voice message processing only occurs in channels where Vera is already configured to respond.
 - **FR-010**: laravel-vera MUST store the transcribed text (not the raw audio) as the message content in the conversation record, consistent with how text messages are stored today.
+- **FR-011**: System MUST support a `/send-voice-message` command prefix in Discord messages. When detected, laravel-vera strips the prefix, uses the remaining text as the user message (or generates a conversational reply if empty), and forces TTS synthesis on the response regardless of the voice response mode setting.
+- **FR-012**: The `/send-voice-message` command MUST work in both server channels and DMs, following the same trigger mode rules as regular messages.
 
 ### Key Entities
 
@@ -105,6 +124,7 @@ The user (or assistant administrator) can configure whether Vera replies to voic
 - **SC-003**: Voice message conversations maintain full context continuity — a voice message followed by a text message (or vice versa) references the same conversation thread.
 - **SC-004**: The voice response mode setting successfully controls reply format with 100% consistency across all three modes.
 - **SC-005**: When TTS synthesis fails, Vera still delivers a text reply — no voice-message interaction results in zero response.
+- **SC-006**: The `/send-voice-message` command produces a voice reply from a text-only input 100% of the time (when TTS is available).
 
 ## Assumptions
 
