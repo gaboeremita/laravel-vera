@@ -45,10 +45,11 @@ export default function DiscordPage() {
 
 			<div className="flex-1 overflow-y-auto p-5 custom-scrollbar space-y-4">
 				<div className="border border-line-1 p-4">
-					<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+					<label htmlFor="voiceResponseMode" className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
 						Voice Response Mode
 					</label>
 					<select
+						id="voiceResponseMode"
 						value={voiceResponseMode}
 						onChange={(e) => updateVoiceResponseMode(e.target.value)}
 						className="bg-bg-1 border border-line-1 text-fg-1 text-[0.75rem] tracking-[0.05em] px-3 py-1.5 cursor-pointer outline-none focus:border-accent transition-colors"

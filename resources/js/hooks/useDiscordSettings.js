@@ -84,12 +84,14 @@ export default function useDiscordSettings(addToast, assistantId) {
 	};
 
 	const updateVoiceResponseMode = async (mode) => {
+		const previous = voiceResponseMode;
 		setVoiceResponseMode(mode);
 		try {
 			const res = await api.put(route('settings.update', { assistant: assistantId }), { discordVoiceResponseMode: mode });
 			if (!res.ok) throw new Error('Save failed');
 			addToast('Voice response mode updated', 'success');
 		} catch {
+			setVoiceResponseMode(previous);
 			addToast('Failed to update voice response mode', 'error');
 		}
 	};

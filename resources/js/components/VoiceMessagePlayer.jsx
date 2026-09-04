@@ -43,8 +43,7 @@ function VoiceMessagePlayer({ audioBase64, audioContentType }) {
 			audio.pause();
 			setIsPlaying(false);
 		} else {
-			audio.play();
-			setIsPlaying(true);
+			audio.play().then(() => setIsPlaying(true)).catch(() => {});
 		}
 	}, [isPlaying]);
 

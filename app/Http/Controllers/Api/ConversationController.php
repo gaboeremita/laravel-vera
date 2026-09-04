@@ -202,6 +202,15 @@ class ConversationController extends Controller
         if ($voiceCommandContent !== null) {
             $lastUserMessage['content'] = $voiceCommandContent;
             $forceVoice = true;
+
+            $messages = $validated['messages'];
+            for ($i = count($messages) - 1; $i >= 0; $i--) {
+                if ($messages[$i]['role'] === 'user') {
+                    $messages[$i]['content'] = $voiceCommandContent;
+                    break;
+                }
+            }
+            $validated['messages'] = $messages;
         }
 
         if ($lastUserMessage) {
@@ -798,7 +807,7 @@ class ConversationController extends Controller
             'message_id' => ['nullable', 'string'],
             'content' => ['nullable', 'string'],
             'images' => ['sometimes', 'array'],
-            'audio' => ['nullable', 'string'],
+            'audio' => ['nullable', 'string', 'max:2000000'],
             'audioContentType' => ['required_with:audio', 'nullable', 'string'],
             'dm_username' => ['nullable', 'string'],
         ]);
@@ -824,7 +833,12 @@ class ConversationController extends Controller
         $hasAudio = ! empty($validated['audio']);
 
         if ($hasAudio) {
-            $audioBytes = base64_decode($validated['audio']);
+            $audioBytes = base64_decode($validated['audio'], true);
+
+            if ($audioBytes === false) {
+                return response()->json(['message' => 'Invalid audio payload.'], 422);
+            }
+
             $filename = 'audio.'.$this->mimeToExtension($validated['audioContentType']);
 
             try {
