@@ -31,4 +31,4 @@
 
 ## Notes
 
-- All items pass validation. Spec is ready for `/speckit-clarify` or `/speckit-plan`.
+- All items pass validation. Spec updated to reflect the two-repo architecture (node-discord-api as Discord bridge, laravel-vera as backend). Requirements now explicitly attribute responsibilities to the correct service. Ready for `/speckit-clarify` or `/speckit-plan`.
