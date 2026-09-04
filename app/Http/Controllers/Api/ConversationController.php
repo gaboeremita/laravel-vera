@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\AppendWorldConversationContext;
+use App\Contracts\SttProvider;
 use App\Directors\PromptDirector;
 use App\DTOs\LlmResponse;
 use App\Enums\AssistantMode;
@@ -15,6 +16,7 @@ use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\DiscordChannel;
 use App\Models\Image;
+use App\Models\Settings;
 use App\Models\WorldUser;
 use App\Services\AgentLoop\AgentLoopRunner;
 use App\Services\AgentLoop\Tools\AvatarBackgroundTool;
@@ -38,6 +40,8 @@ class ConversationController extends Controller
     private const MEMORY_SUMMARY_TRIGGER_COUNT = 50;
 
     private const IMAGE_GEN_COMMAND = '/create-image ';
+
+    private const TTS_TRUNCATION_LENGTH = 200;
 
     private const BACKGROUND_TAG_INSTRUCTION = 'When the scene/setting you and the user are in has just clearly changed to a new location, prefix your reply with a tag describing the new setting: [scene: <short description of the new location>]. Only include this tag when the setting has actually changed, never when it is unchanged. Never mention the tag itself.';
 
@@ -193,6 +197,22 @@ class ConversationController extends Controller
 
         $lastUserMessage = collect($validated['messages'])->last(fn ($m) => $m['role'] === 'user');
 
+        $forceVoice = false;
+        $voiceCommandContent = $this->extractVoiceMessageCommand($lastUserMessage['content'] ?? null);
+        if ($voiceCommandContent !== null) {
+            $lastUserMessage['content'] = $voiceCommandContent;
+            $forceVoice = true;
+
+            $messages = $validated['messages'];
+            for ($i = count($messages) - 1; $i >= 0; $i--) {
+                if ($messages[$i]['role'] === 'user') {
+                    $messages[$i]['content'] = $voiceCommandContent;
+                    break;
+                }
+            }
+            $validated['messages'] = $messages;
+        }
+
         if ($lastUserMessage) {
             $message = $conversation->messages()->create([
                 'role' => 'user',
@@ -288,7 +308,7 @@ class ConversationController extends Controller
             if (empty($lastUserMessage['images'][0])) {
                 $excludedSections[] = 'image handling';
             }
-        } else {
+        } elseif (! $forceVoice) {
             $excludedSections[] = 'voice mode';
         }
 
@@ -409,12 +429,33 @@ class ConversationController extends Controller
 
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
 
+        $audioBase64 = null;
+        $audioContentType = null;
+        $audioError = null;
+
+        if ($forceVoice) {
+            try {
+                $ttsManager = app(TtsManager::class);
+                $tts = $ttsManager->forAssistantUser($assistantUser);
+                $ttsText = mb_substr($this->stripForSpeech($content), 0, self::TTS_TRUNCATION_LENGTH);
+                $audioBytes = $tts->synthesize($ttsText);
+                $audioBase64 = base64_encode($audioBytes);
+                $audioContentType = $tts->contentType();
+            } catch (\Throwable $e) {
+                report($e);
+                $audioError = 'Voice synthesis failed — sent as text instead.';
+            }
+        }
+
         return response()->json([
             'conversation_id' => $conversation->id,
             'content' => $content,
             'thinking' => $response->thinking,
             'tts_instructions' => $ttsInstructions,
             'tool_calls' => $agentToolCalls,
+            'audioBase64' => $audioBase64,
+            'audioContentType' => $audioContentType,
+            'audioError' => $audioError,
         ]);
     }
 
@@ -438,6 +479,80 @@ class ConversationController extends Controller
         }
 
         return trim(substr($content, strlen($match[0])));
+    }
+
+    private function extractVoiceMessageCommand(?string $content): ?string
+    {
+        $content = trim($content ?? '');
+
+        if (! preg_match('/^\/send-voice-message(?:\s+|$)/i', $content, $match)) {
+            return null;
+        }
+
+        return trim(substr($content, strlen($match[0])));
+    }
+
+    private function buildDiscordVoiceResponse(
+        string $content,
+        AssistantUser $assistantUser,
+        bool $hasAudio,
+        bool $forceVoice,
+    ): array {
+        $settings = Settings::where('user_id', $assistantUser->user_id)
+            ->where('assistant_id', $assistantUser->assistant_id)
+            ->first();
+
+        $voiceMode = $settings?->data['discordVoiceResponseMode'] ?? 'both';
+
+        $shouldSynthesize = $forceVoice
+            || ($hasAudio && in_array($voiceMode, ['both', 'voiceOnly'], true));
+
+        $audioBase64 = null;
+        $audioContentType = null;
+        $audioError = null;
+
+        if ($shouldSynthesize) {
+            try {
+                $ttsManager = app(TtsManager::class);
+                $tts = $ttsManager->forAssistantUser($assistantUser);
+
+                $ttsText = mb_substr($this->stripForSpeech($content), 0, self::TTS_TRUNCATION_LENGTH);
+                $audioBytes = $tts->synthesize($ttsText);
+
+                $audioBase64 = base64_encode($audioBytes);
+                $audioContentType = $tts->contentType();
+            } catch (\Throwable $e) {
+                report($e);
+                $audioError = 'Voice synthesis failed — sent as text instead.';
+            }
+        }
+
+        $returnContent = $content;
+
+        if ($voiceMode === 'voiceOnly' && $hasAudio && ! $forceVoice && $audioBase64 !== null) {
+            $returnContent = null;
+        }
+
+        return [
+            'content' => $returnContent,
+            'audioBase64' => $audioBase64,
+            'audioContentType' => $audioContentType,
+            'audioError' => $audioError,
+        ];
+    }
+
+    private function mimeToExtension(string $mimeType): string
+    {
+        $baseMime = trim(explode(';', $mimeType)[0]);
+
+        return match ($baseMime) {
+            'audio/ogg' => 'ogg',
+            'audio/mpeg', 'audio/mp3' => 'mp3',
+            'audio/wav', 'audio/x-wav' => 'wav',
+            'audio/webm' => 'webm',
+            'audio/mp4' => 'mp4',
+            default => 'wav',
+        };
     }
 
     /**
@@ -519,6 +634,16 @@ class ConversationController extends Controller
             'image_url' => $image->url,
             'enhanced_prompt' => $enhancedPrompt,
         ];
+    }
+
+    private function stripForSpeech(string $text): string
+    {
+        $text = preg_replace('/\A(?:\s*\[[^\]\r\n]+\])+\s*/u', ' ', $text);
+        $text = preg_replace('/\*+[^*]+\*+/', ' ', $text);
+        $text = preg_replace('/[ \t]+/', ' ', $text);
+        $text = preg_replace('/\n{2,}/', "\n", $text);
+
+        return trim($text);
     }
 
     /**
@@ -682,6 +807,8 @@ class ConversationController extends Controller
             'message_id' => ['nullable', 'string'],
             'content' => ['nullable', 'string'],
             'images' => ['sometimes', 'array'],
+            'audio' => ['nullable', 'string', 'max:2000000'],
+            'audioContentType' => ['required_with:audio', 'nullable', 'string'],
             'dm_username' => ['nullable', 'string'],
         ]);
 
@@ -694,6 +821,42 @@ class ConversationController extends Controller
             );
         }
 
+        $forceVoice = false;
+        $voiceCommandContent = $this->extractVoiceMessageCommand($validated['content'] ?? null);
+
+        if ($voiceCommandContent !== null) {
+            $forceVoice = true;
+            $validated['content'] = $voiceCommandContent;
+        }
+
+        $content = $validated['content'] ?? '';
+        $hasAudio = ! empty($validated['audio']);
+
+        if ($hasAudio) {
+            $audioBytes = base64_decode($validated['audio'], true);
+
+            if ($audioBytes === false) {
+                return response()->json(['message' => 'Invalid audio payload.'], 422);
+            }
+
+            $filename = 'audio.'.$this->mimeToExtension($validated['audioContentType']);
+
+            try {
+                $stt = app(SttProvider::class);
+                $transcription = $stt->transcribe($audioBytes, $filename);
+            } catch (\RuntimeException $e) {
+                return response()->json(['message' => $e->getMessage()], 502);
+            }
+
+            if (trim($transcription) === '') {
+                return response()->json(['content' => "Sorry, I couldn't make out what you said. Could you try again?"]);
+            }
+
+            $content = trim($content) !== ''
+                ? trim($content).' '.$transcription
+                : $transcription;
+        }
+
         $conversation = $assistantUser->conversations()->firstOrCreate(
             ['discord_channel_id' => $validated['channel_id']],
             ['title' => 'New conversation'],
@@ -702,7 +865,7 @@ class ConversationController extends Controller
         $message = $conversation->messages()->create([
             'role' => 'user',
             'discord_message_id' => $validated['message_id'] ?? null,
-            'content' => $validated['content'] ?? '',
+            'content' => $content,
         ]);
 
         if (! empty($validated['images'][0])) {
@@ -738,11 +901,23 @@ class ConversationController extends Controller
         $assistantModel = $assistantUser->assistant;
         $archive = $assistantModel->archive;
 
-        $director = (new PromptDirector($assistantModel->prompt))
-            ->except(['opening_message', 'voice mode', 'emotion tags']);
+        $settings = Settings::where('user_id', $assistantUser->user_id)
+            ->where('assistant_id', $assistantUser->assistant_id)
+            ->first();
+        $voiceMode = $settings?->data['discordVoiceResponseMode'] ?? 'both';
+        $willSynthesize = $forceVoice
+            || ($hasAudio && in_array($voiceMode, ['both', 'voiceOnly'], true));
 
-        if ($archive && ! empty($validated['content'])) {
-            $director->withRetrieval($validated['content'], $archive->id);
+        $excludedSections = ['opening_message', 'emotion tags'];
+        if (! $willSynthesize) {
+            $excludedSections[] = 'voice mode';
+        }
+
+        $director = (new PromptDirector($assistantModel->prompt))
+            ->except($excludedSections);
+
+        if ($archive && ! empty($content)) {
+            $director->withRetrieval($content, $archive->id);
         }
 
         $director->withLongTermMemory($conversation);
@@ -779,8 +954,6 @@ class ConversationController extends Controller
                     ]);
             });
 
-        // A message mentioning multiple bots gets saved once per bot, into each bot's own
-        // conversation — dedupe those by Discord message id so it isn't repeated in the merged view.
         $seenDiscordMessageIds = [];
 
         $history = $ownMessages
@@ -830,13 +1003,20 @@ class ConversationController extends Controller
 
         if ($conversation->title === 'New conversation') {
             $conversation->update([
-                'title' => str($validated['content'] ?? '')->limit(50)->toString(),
+                'title' => str($content)->limit(50)->toString(),
             ]);
         }
 
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
 
-        return response()->json(['content' => $parsed['content']]);
+        $responseData = $this->buildDiscordVoiceResponse(
+            $parsed['content'],
+            $assistantUser,
+            $hasAudio,
+            $forceVoice,
+        );
+
+        return response()->json($responseData);
     }
 
     private function checkpointAutoSummarize(Conversation $conversation, int $assistantMessageId): void

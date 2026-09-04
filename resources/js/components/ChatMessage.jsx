@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import ThinkingBlock from "./ThinkingBlock";
 import VoiceInstructionsBlock from "./VoiceInstructionsBlock";
 import AgentToolCallsTrace from "./AgentToolCallsTrace";
+import VoiceMessagePlayer from "./VoiceMessagePlayer";
 import veraAvatar from '../../images/vera-avatar.png';
 
 function InlineText({ text }) {
@@ -124,6 +125,7 @@ function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
             )}
             {isAssistant && msg.ttsInstructions && <VoiceInstructionsBlock content={msg.ttsInstructions} />}
             {isAssistant && msg.toolCalls && <AgentToolCallsTrace toolCalls={msg.toolCalls} />}
+            {isAssistant && msg.audioBase64 && <VoiceMessagePlayer audioBase64={msg.audioBase64} audioContentType={msg.audioContentType} />}
 
             {msg.image && (
                 <img

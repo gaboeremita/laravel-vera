@@ -49,6 +49,7 @@ class SettingsController extends Controller
             'image_gen_model_id' => $settings?->data['image_gen_model_id'] ?? null,
             'tts_model_id' => $settings?->data['tts_model_id'] ?? null,
             'tts_voice' => $settings?->data['tts_voice'] ?? null,
+            'discordVoiceResponseMode' => $settings?->data['discordVoiceResponseMode'] ?? 'both',
             'discord_channels' => $discordChannels,
         ]);
     }
@@ -195,7 +196,8 @@ class SettingsController extends Controller
     public function update(Request $request, int $assistant): JsonResponse
     {
         $validated = $request->validate([
-            'theme' => ['required', 'string', new Enum(Theme::class)],
+            'theme' => ['sometimes', 'string', new Enum(Theme::class)],
+            'discordVoiceResponseMode' => ['sometimes', 'string', 'in:both,voiceOnly,textOnly'],
         ]);
 
         $settings = $request->user()->settings()
@@ -206,7 +208,15 @@ class SettingsController extends Controller
             );
 
         $data = $settings->data ?? [];
-        $data['theme'] = $validated['theme'];
+
+        if (isset($validated['theme'])) {
+            $data['theme'] = $validated['theme'];
+        }
+
+        if (isset($validated['discordVoiceResponseMode'])) {
+            $data['discordVoiceResponseMode'] = $validated['discordVoiceResponseMode'];
+        }
+
         $settings->update(['data' => $data]);
 
         return response()->json($settings->data);

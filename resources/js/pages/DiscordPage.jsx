@@ -13,7 +13,7 @@ export default function DiscordPage() {
 	const [collapsedServers, setCollapsedServers] = useState({});
 	const [collapsedDms, setCollapsedDms] = useState({});
 
-	const { guilds, dms, isLoading, discoveryError, setChannelTrigger } = useDiscordSettings(addToast, assistantId);
+	const { guilds, dms, isLoading, discoveryError, setChannelTrigger, voiceResponseMode, updateVoiceResponseMode } = useDiscordSettings(addToast, assistantId);
 
 	if (isLoading) {
 		return (
@@ -44,6 +44,25 @@ export default function DiscordPage() {
 			</Header>
 
 			<div className="flex-1 overflow-y-auto p-5 custom-scrollbar space-y-4">
+				<div className="border border-line-1 p-4">
+					<label htmlFor="voiceResponseMode" className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+						Voice Response Mode
+					</label>
+					<select
+						id="voiceResponseMode"
+						value={voiceResponseMode}
+						onChange={(e) => updateVoiceResponseMode(e.target.value)}
+						className="bg-bg-1 border border-line-1 text-fg-1 text-[0.75rem] tracking-[0.05em] px-3 py-1.5 cursor-pointer outline-none focus:border-accent transition-colors"
+					>
+						<option value="both">BOTH (Text + Voice)</option>
+						<option value="voiceOnly">VOICE ONLY</option>
+						<option value="textOnly">TEXT ONLY</option>
+					</select>
+					<p className="text-fg-3 text-[0.65rem] mt-1">
+						Controls how Vera replies when you send a voice message on Discord
+					</p>
+				</div>
+
 				<AnimatePresence initial={false}>
 					{guilds.map((guild) => (
 						<DiscordServerAccordion

@@ -11,16 +11,22 @@ export default function useDiscordSettings(addToast, assistantId) {
 	const [dms, setDms] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [discoveryError, setDiscoveryError] = useState(null);
+	const [voiceResponseMode, setVoiceResponseMode] = useState('both');
 
 	useEffect(() => {
 		const load = async () => {
 			try {
-				const res = await api.get(route('discord.discovery', { assistant: assistantId }));
-				const data = await res.json();
+				const [discoveryRes, settingsRes] = await Promise.all([
+					api.get(route('discord.discovery', { assistant: assistantId })),
+					api.get(route('settings.show', { assistant: assistantId })),
+				]);
+				const discoveryData = await discoveryRes.json();
+				const settingsData = await settingsRes.json();
 
-				setGuilds(data.guilds ?? []);
-				setDms(data.dms ?? []);
-				setDiscoveryError(data.guilds?.length ? null : (data.message ?? null));
+				setGuilds(discoveryData.guilds ?? []);
+				setDms(discoveryData.dms ?? []);
+				setDiscoveryError(discoveryData.guilds?.length ? null : (discoveryData.message ?? null));
+				setVoiceResponseMode(settingsData.discordVoiceResponseMode ?? 'both');
 			} catch (e) {
 				addToast('Failed to load Discord settings', 'error');
 			} finally {
@@ -77,5 +83,18 @@ export default function useDiscordSettings(addToast, assistantId) {
 		}
 	};
 
-	return { guilds, dms, isLoading, discoveryError, setChannelTrigger };
+	const updateVoiceResponseMode = async (mode) => {
+		const previous = voiceResponseMode;
+		setVoiceResponseMode(mode);
+		try {
+			const res = await api.put(route('settings.update', { assistant: assistantId }), { discordVoiceResponseMode: mode });
+			if (!res.ok) throw new Error('Save failed');
+			addToast('Voice response mode updated', 'success');
+		} catch {
+			setVoiceResponseMode(previous);
+			addToast('Failed to update voice response mode', 'error');
+		}
+	};
+
+	return { guilds, dms, isLoading, discoveryError, setChannelTrigger, voiceResponseMode, updateVoiceResponseMode };
 }
