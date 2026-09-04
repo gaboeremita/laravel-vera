@@ -70,7 +70,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T011 [US2] Add TTS synthesis to `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — after generating the LLM response, if the request contained audio: use `TtsManager::forAssistantUser()` to synthesize the response text, base64-encode the audio, and include `audioBase64` and `audioContentType` in the JSON response
+- [ ] T011 [US2] Add TTS synthesis to `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — after generating the LLM response, if the request contained audio: truncate the response text to 200 characters (FR-013) before passing it to `TtsManager::forAssistantUser()` for synthesis, base64-encode the audio, and include `audioBase64` and `audioContentType` in the JSON response. The full-length text is still returned in `content`.
 - [ ] T012 [US2] Extend node-discord-api response handling in `index.js` — when `audioBase64` is present in the Laravel response: decode it, determine file extension from `audioContentType` (e.g. `audio/mpeg` → `.mp3`, `audio/wav` → `.wav`), create an `AttachmentBuilder`, and send the audio file alongside (or instead of) text
 
 **Checkpoint**: Voice-to-voice loop works end-to-end. Sending a voice message produces both a text reply and an audio attachment.
@@ -123,10 +123,11 @@
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] Feature test: STT failure (provider unavailable) returns a user-friendly error message in Discord in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T026 [P] Feature test: empty transcription result (silent/too-short audio) produces a message indicating Vera couldn't make out what was said in `tests/Feature/DiscordVoiceMessageTest.php`
-- [ ] T027 Handle edge cases in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — empty transcription, STT failure error messages
-- [ ] T028 Run quickstart.md validation scenarios end-to-end against both services
+- [ ] T025 [P] Feature test: context continuity — a voice message followed by a text message in the same channel references the same conversation thread in `tests/Feature/DiscordVoiceMessageTest.php`
+- [ ] T026 [P] Feature test: STT failure (provider unavailable) returns a user-friendly error message in Discord in `tests/Feature/DiscordVoiceMessageTest.php`
+- [ ] T027 [P] Feature test: empty transcription result (silent/too-short audio) produces a message indicating Vera couldn't make out what was said in `tests/Feature/DiscordVoiceMessageTest.php`
+- [ ] T028 Handle edge cases in `sendDiscordMessage` in `app/Http/Controllers/Api/ConversationController.php` — empty transcription, STT failure error messages
+- [ ] T029 Run quickstart.md validation scenarios end-to-end against both services
 
 ---
 
@@ -162,7 +163,7 @@
 - Within US3: T013, T014, T015 can run in parallel
 - Within US4: T020, T021, T022 can run in parallel
 - US3 and US4 can run in parallel (both depend on US2, independent of each other)
-- Within Polish: T025, T026 can run in parallel
+- Within Polish: T025, T026, T027 can run in parallel
 - Cross-repo: laravel-vera and node-discord-api tasks within each story are sequential (API contract first)
 
 ---
@@ -198,7 +199,7 @@ T006: Extend validation → T007: Add transcription logic → T008: node-discord
 3. T009–T012 (US2) → Voice-out works → Validate
 4. T013–T019 (US3) → Mode toggle works → Validate
 5. T020–T024 (US4) → /send-voice-message command works → Validate
-6. T025–T028 (Polish) → Edge cases handled → Final validation
+6. T025–T029 (Polish) → Edge cases + context continuity → Final validation
 
 ---
 

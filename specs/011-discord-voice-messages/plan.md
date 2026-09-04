@@ -41,7 +41,7 @@ Enable bidirectional voice messaging between users and Vera on Discord. When a u
 | V. Errors Fail Loudly | PASS | STT/TTS failures surface as error responses; node-discord-api falls back to text reply |
 | VI. Feature-Test-First, Factory-Backed | PASS | Feature tests for laravel-vera endpoints using factories |
 | VII. No Speculative Abstraction | PASS | Extending existing classes and endpoints, no new abstractions |
-| VIII. State Derivation During Render | N/A | No frontend React changes in this feature |
+| VIII. State Derivation During Render | PASS | Applies to the voice response mode dropdown added to the Discord settings UI; implementation must follow render-time derivation patterns |
 
 ## Project Structure
 
@@ -71,9 +71,9 @@ app/
 ├── Services/TtsProviders/
 │   └── TtsManager.php                  # already supports forAssistantUser — reused as-is
 ├── Contracts/
-│   └── SttProvider.php                 # already supports transcribe — reused as-is
+│   └── SttProvider.php                 # extend transcribe() with $filename parameter for correct audio format detection
 └── Providers/Stt/
-    └── WhisperSttProvider.php          # already supports transcribe — reused as-is
+    └── WhisperSttProvider.php          # update to use $filename parameter instead of hardcoded audio.wav
 
 tests/Feature/
 └── DiscordVoiceMessageTest.php         # new: feature tests for voice message flow
