@@ -197,6 +197,13 @@ class ConversationController extends Controller
 
         $lastUserMessage = collect($validated['messages'])->last(fn ($m) => $m['role'] === 'user');
 
+        $forceVoice = false;
+        $voiceCommandContent = $this->extractVoiceMessageCommand($lastUserMessage['content'] ?? null);
+        if ($voiceCommandContent !== null) {
+            $lastUserMessage['content'] = $voiceCommandContent;
+            $forceVoice = true;
+        }
+
         if ($lastUserMessage) {
             $message = $conversation->messages()->create([
                 'role' => 'user',
@@ -292,7 +299,7 @@ class ConversationController extends Controller
             if (empty($lastUserMessage['images'][0])) {
                 $excludedSections[] = 'image handling';
             }
-        } else {
+        } elseif (! $forceVoice) {
             $excludedSections[] = 'voice mode';
         }
 
@@ -413,12 +420,33 @@ class ConversationController extends Controller
 
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
 
+        $audioBase64 = null;
+        $audioContentType = null;
+        $audioError = null;
+
+        if ($forceVoice) {
+            try {
+                $ttsManager = app(TtsManager::class);
+                $tts = $ttsManager->forAssistantUser($assistantUser);
+                $ttsText = mb_substr($this->stripForSpeech($content), 0, self::TTS_TRUNCATION_LENGTH);
+                $audioBytes = $tts->synthesize($ttsText);
+                $audioBase64 = base64_encode($audioBytes);
+                $audioContentType = $tts->contentType();
+            } catch (\Throwable $e) {
+                report($e);
+                $audioError = 'Voice synthesis failed — sent as text instead.';
+            }
+        }
+
         return response()->json([
             'conversation_id' => $conversation->id,
             'content' => $content,
             'thinking' => $response->thinking,
             'tts_instructions' => $ttsInstructions,
             'tool_calls' => $agentToolCalls,
+            'audioBase64' => $audioBase64,
+            'audioContentType' => $audioContentType,
+            'audioError' => $audioError,
         ]);
     }
 
@@ -472,19 +500,21 @@ class ConversationController extends Controller
 
         $audioBase64 = null;
         $audioContentType = null;
+        $audioError = null;
 
         if ($shouldSynthesize) {
             try {
                 $ttsManager = app(TtsManager::class);
                 $tts = $ttsManager->forAssistantUser($assistantUser);
 
-                $ttsText = mb_substr($content, 0, self::TTS_TRUNCATION_LENGTH);
+                $ttsText = mb_substr($this->stripForSpeech($content), 0, self::TTS_TRUNCATION_LENGTH);
                 $audioBytes = $tts->synthesize($ttsText);
 
                 $audioBase64 = base64_encode($audioBytes);
                 $audioContentType = $tts->contentType();
-            } catch (\Throwable) {
-                // TTS failure falls back to text-only
+            } catch (\Throwable $e) {
+                report($e);
+                $audioError = 'Voice synthesis failed — sent as text instead.';
             }
         }
 
@@ -498,12 +528,15 @@ class ConversationController extends Controller
             'content' => $returnContent,
             'audioBase64' => $audioBase64,
             'audioContentType' => $audioContentType,
+            'audioError' => $audioError,
         ];
     }
 
     private function mimeToExtension(string $mimeType): string
     {
-        return match ($mimeType) {
+        $baseMime = trim(explode(';', $mimeType)[0]);
+
+        return match ($baseMime) {
             'audio/ogg' => 'ogg',
             'audio/mpeg', 'audio/mp3' => 'mp3',
             'audio/wav', 'audio/x-wav' => 'wav',
@@ -592,6 +625,16 @@ class ConversationController extends Controller
             'image_url' => $image->url,
             'enhanced_prompt' => $enhancedPrompt,
         ];
+    }
+
+    private function stripForSpeech(string $text): string
+    {
+        $text = preg_replace('/\A(?:\s*\[[^\]\r\n]+\])+\s*/u', ' ', $text);
+        $text = preg_replace('/\*+[^*]+\*+/', ' ', $text);
+        $text = preg_replace('/[ \t]+/', ' ', $text);
+        $text = preg_replace('/\n{2,}/', "\n", $text);
+
+        return trim($text);
     }
 
     /**
@@ -844,8 +887,20 @@ class ConversationController extends Controller
         $assistantModel = $assistantUser->assistant;
         $archive = $assistantModel->archive;
 
+        $settings = Settings::where('user_id', $assistantUser->user_id)
+            ->where('assistant_id', $assistantUser->assistant_id)
+            ->first();
+        $voiceMode = $settings?->data['discordVoiceResponseMode'] ?? 'both';
+        $willSynthesize = $forceVoice
+            || ($hasAudio && in_array($voiceMode, ['both', 'voiceOnly'], true));
+
+        $excludedSections = ['opening_message', 'emotion tags'];
+        if (! $willSynthesize) {
+            $excludedSections[] = 'voice mode';
+        }
+
         $director = (new PromptDirector($assistantModel->prompt))
-            ->except(['opening_message', 'voice mode', 'emotion tags']);
+            ->except($excludedSections);
 
         if ($archive && ! empty($content)) {
             $director->withRetrieval($content, $archive->id);

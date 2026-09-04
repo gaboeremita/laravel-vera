@@ -3,7 +3,6 @@
 use App\Contracts\SttProvider;
 use App\Contracts\TtsProvider;
 use App\Models\AssistantUser;
-use App\Models\Conversation;
 use App\Models\Settings;
 use App\Models\VoiceModel;
 use App\Models\VoiceProvider;
@@ -80,6 +79,20 @@ function mockTts(string $audioBytes = 'fake-audio-bytes', string $contentType = 
         $ttsMock = Mockery::mock(TtsProvider::class);
         $ttsMock->shouldReceive('synthesize')->andReturn($audioBytes);
         $ttsMock->shouldReceive('contentType')->andReturn($contentType);
+
+        $managerMock = Mockery::mock(TtsManager::class);
+        $managerMock->shouldReceive('forAssistantUser')->andReturn($ttsMock);
+
+        return $managerMock;
+    });
+}
+
+function mockTtsExpectingText(string $expectedText, string $audioBytes = 'fake-audio-bytes'): void
+{
+    app()->bind(TtsManager::class, function () use ($expectedText, $audioBytes) {
+        $ttsMock = Mockery::mock(TtsProvider::class);
+        $ttsMock->shouldReceive('synthesize')->once()->with($expectedText)->andReturn($audioBytes);
+        $ttsMock->shouldReceive('contentType')->andReturn('audio/mpeg');
 
         $managerMock = Mockery::mock(TtsManager::class);
         $managerMock->shouldReceive('forAssistantUser')->andReturn($ttsMock);
@@ -218,6 +231,34 @@ test('[US2] when audio is present and voice mode is both, response includes audi
     expect($response->json('audioContentType'))->toBe('audio/mpeg');
 });
 
+test('[US2] expression tags and action narration are excluded from synthesized speech', function () {
+    [$user, $assistant] = setUpDiscordAssistantWithTts(['discordVoiceResponseMode' => 'both']);
+    mockStt('Where were we?');
+
+    $reply = '[sheepish smile]  **I duck my head, a small smile tugging at my lips.**  Thank you for forgiving me. Mistakes get archived too, you know — even mine.  Now. Where were we, before my slip?';
+
+    mockTtsExpectingText('Thank you for forgiving me. Mistakes get archived too, you know — even mine. Now. Where were we, before my slip?');
+
+    Http::fake([
+        'fake-llm.test/*' => Http::response(finalAnswerResponse($reply)),
+    ]);
+
+    $response = $this->actingAs($user)->postJson(
+        route('conversations.sendDiscordMessage', $assistant),
+        [
+            'channel_id' => 'test-channel-speech-tags',
+            'content' => null,
+            'audio' => base64_encode('fake-audio-data'),
+            'audioContentType' => 'audio/ogg',
+        ],
+    );
+
+    $response->assertSuccessful();
+    expect($response->json('content'))->toBe($reply);
+    expect($response->json('audioBase64'))->toBe(base64_encode('fake-audio-bytes'));
+    expect($response->json('audioError'))->toBeNull();
+});
+
 test('[US2] when TTS synthesis fails, response falls back to text-only', function () {
     [$user, $assistant] = setUpDiscordAssistantWithTts(['discordVoiceResponseMode' => 'both']);
     mockStt('Hello');
@@ -240,6 +281,7 @@ test('[US2] when TTS synthesis fails, response falls back to text-only', functio
     $response->assertSuccessful();
     expect($response->json('content'))->toBe('Hi there!');
     expect($response->json('audioBase64'))->toBeNull();
+    expect($response->json('audioError'))->toContain('Voice synthesis failed');
 });
 
 // === US3: Voice Response Mode Tests ===
@@ -373,6 +415,56 @@ test('[US4] /send-voice-message with no additional text produces a conversationa
     $response->assertSuccessful();
     expect($response->json('content'))->toBe('Hey there!');
     expect($response->json('audioBase64'))->toBe(base64_encode('empty-cmd-audio'));
+});
+
+test('[US4] /send-voice-message works from web chat endpoint, strips prefix and synthesizes audio', function () {
+    [$user, $assistant, $conversation] = setUpAgentAssistant('assistant');
+    mockTts('web-voice-audio', 'audio/mpeg');
+
+    Http::fake([
+        'fake-llm.test/*' => Http::response(finalAnswerResponse('Voice reply from web!')),
+    ]);
+
+    $response = $this->actingAs($user)->postJson(
+        route('conversations.sendMessage', [$assistant, $conversation]),
+        [
+            'messages' => [
+                ['role' => 'user', 'content' => '/send-voice-message how are you today?'],
+            ],
+        ],
+    );
+
+    $response->assertSuccessful();
+    expect($response->json('content'))->toBe('Voice reply from web!');
+    expect($response->json('audioBase64'))->toBe(base64_encode('web-voice-audio'));
+    expect($response->json('audioContentType'))->toBe('audio/mpeg');
+    expect($response->json('audioError'))->toBeNull();
+
+    $userMessage = $conversation->messages()->where('role', 'user')->first();
+    expect($userMessage->content)->toBe('how are you today?');
+});
+
+test('[US4] /send-voice-message from web returns audioError when TTS fails', function () {
+    [$user, $assistant, $conversation] = setUpAgentAssistant('assistant');
+    mockFailingTts();
+
+    Http::fake([
+        'fake-llm.test/*' => Http::response(finalAnswerResponse('Fallback text reply')),
+    ]);
+
+    $response = $this->actingAs($user)->postJson(
+        route('conversations.sendMessage', [$assistant, $conversation]),
+        [
+            'messages' => [
+                ['role' => 'user', 'content' => '/send-voice-message hello'],
+            ],
+        ],
+    );
+
+    $response->assertSuccessful();
+    expect($response->json('content'))->toBe('Fallback text reply');
+    expect($response->json('audioBase64'))->toBeNull();
+    expect($response->json('audioError'))->toContain('Voice synthesis failed');
 });
 
 // === Polish: Cross-cutting Tests ===

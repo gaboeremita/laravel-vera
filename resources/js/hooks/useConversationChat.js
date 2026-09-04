@@ -201,8 +201,10 @@ export function useConversationChat({
 					onEmotionChange?.(emotion);
 				}
 
+				if (data.audioError) addToast?.(data.audioError, 'error');
+
 				setHasError(false);
-				setMessages([...updatedMessages, ...generatedImageMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions, toolCalls: data.tool_calls || null }]);
+				setMessages([...updatedMessages, ...generatedImageMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions, toolCalls: data.tool_calls || null, audioBase64: data.audioBase64 || null, audioContentType: data.audioContentType || null }]);
 				setIsLoading(false);
 				if (voiceMode) onVoiceReply?.(cleanText, ttsInstructions);
 				return;
