@@ -107,7 +107,8 @@ A user types `/send-voice-message` (optionally followed by a text message) in a 
 - **FR-008**: System MUST fall back to text-only replies when TTS synthesis fails or the bot lacks file-attachment permissions in the channel.
 - **FR-009**: System MUST respect the existing per-channel and per-server trigger modes — voice message processing only occurs in channels where Vera is already configured to respond.
 - **FR-010**: laravel-vera MUST store the transcribed text (not the raw audio) as the message content in the conversation record, consistent with how text messages are stored today.
-- **FR-011**: System MUST support a `/send-voice-message` command prefix in Discord messages. When detected, laravel-vera strips the prefix, uses the remaining text as the user message (or generates a conversational reply if empty), and forces TTS synthesis on the response regardless of the voice response mode setting.
+- **FR-013**: laravel-vera MUST truncate the LLM response text to 200 characters before passing it to TTS synthesis. The full-length text is still sent as the text reply (when applicable per voice response mode); only the audio is synthesized from the truncated version.
+- **FR-011**: laravel-vera MUST detect and parse the `/send-voice-message` command prefix in the `content` field of incoming Discord messages (following the same pattern as `/create-image` and `/change-background`). When detected, it strips the prefix, uses the remaining text as the user message (or generates a conversational reply if empty), and forces TTS synthesis on the response regardless of the voice response mode setting. node-discord-api forwards the raw content unchanged.
 - **FR-012**: The `/send-voice-message` command MUST work in both server channels and DMs, following the same trigger mode rules as regular messages.
 
 ### Key Entities
@@ -125,6 +126,13 @@ A user types `/send-voice-message` (optionally followed by a text message) in a 
 - **SC-004**: The voice response mode setting successfully controls reply format with 100% consistency across all three modes.
 - **SC-005**: When TTS synthesis fails, Vera still delivers a text reply — no voice-message interaction results in zero response.
 - **SC-006**: The `/send-voice-message` command produces a voice reply from a text-only input 100% of the time (when TTS is available).
+
+## Clarifications
+
+### Session 2026-09-03
+
+- Q: What is the maximum duration of a voice reply Vera should produce — should long LLM responses be truncated before TTS synthesis to stay within Discord's 8 MB file attachment limit? → A: Truncate to 200 characters max before synthesis.
+- Q: Should the `/send-voice-message` command be parsed by node-discord-api or laravel-vera? → A: laravel-vera, matching the existing `/create-image` pattern. node-discord-api stays a thin transport layer.
 
 ## Assumptions
 
