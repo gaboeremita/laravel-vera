@@ -1,9 +1,11 @@
 <?php
 
+use App\Events\AvatarBackgroundStatusUpdated;
 use App\Jobs\GenerateAvatarBackground;
 use App\Services\AvatarBackground\AvatarBackgroundService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -105,6 +107,38 @@ test('legacy queued requests stop after one successfully generates a background'
 
     expect(Cache::get(GenerateAvatarBackground::cacheKeyFor($conversation->id))['source_description'])
         ->toBe('a futuristic park');
+});
+
+test('starting and finishing a generation broadcasts a status update for the conversation', function () {
+    [, , $conversation] = setUpAgentAssistant('assistant', ['portrait_type' => 'avatar3d']);
+
+    Event::fake([AvatarBackgroundStatusUpdated::class]);
+    Queue::fake();
+
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a futuristic park');
+    $job = Queue::pushed(GenerateAvatarBackground::class)->first();
+
+    Event::assertDispatched(
+        AvatarBackgroundStatusUpdated::class,
+        fn (AvatarBackgroundStatusUpdated $event) => $event->conversationId === $conversation->id
+            && $event->inProgress === true,
+    );
+
+    $service = Mockery::mock(AvatarBackgroundService::class);
+    $service->shouldReceive('generate')->once()->andReturn([
+        'floor_url' => '/storage/park-floor.png',
+        'surroundings_url' => '/storage/park-surroundings.png',
+        'source_description' => 'a futuristic park',
+    ]);
+
+    $job->handle($service);
+
+    Event::assertDispatched(
+        AvatarBackgroundStatusUpdated::class,
+        fn (AvatarBackgroundStatusUpdated $event) => $event->conversationId === $conversation->id
+            && $event->inProgress === false
+            && $event->background['source_description'] === 'a futuristic park',
+    );
 });
 
 test('the database retry window exceeds the background job timeout', function () {

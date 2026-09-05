@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Events\AvatarBackgroundStatusUpdated;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Services\AvatarBackground\AvatarBackgroundService;
@@ -174,6 +175,8 @@ class GenerateAvatarBackground implements ShouldQueue
 
         Cache::put(self::activeRequestKeyFor($conversationId), $request, $expiresAt);
         Cache::put(self::progressKeyFor($conversationId), 'Generating scene...', $expiresAt);
+
+        AvatarBackgroundStatusUpdated::dispatch($conversationId);
     }
 
     private static function requestStateTtl(): int
@@ -276,6 +279,8 @@ class GenerateAvatarBackground implements ShouldQueue
 
                     Cache::forget(self::activeRequestKeyFor($conversation->id));
                     Cache::forget(self::progressKeyFor($conversation->id));
+
+                    AvatarBackgroundStatusUpdated::dispatch($conversation->id);
                 });
         } catch (Throwable $e) {
             Log::warning('Failed to release avatar background generation state.', [

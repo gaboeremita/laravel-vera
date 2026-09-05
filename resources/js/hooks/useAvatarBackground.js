@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
-
-const POLL_INTERVAL_MS = 2000;
+import echo from '../echo.js';
 
 export default function useAvatarBackground(assistantId, conversationId, active) {
 	const [background, setBackground] = useState(null);
 	const [inProgress, setInProgress] = useState(false);
 
-	// active turning false stops polling but keeps the last known background
+	// active turning false stops listening but keeps the last known background
 	// visible, computed here instead of in the effect below (Constitution Principle VIII).
 	const [wasActive, setWasActive] = useState(active);
 	if (active !== wasActive) {
@@ -21,29 +20,35 @@ export default function useAvatarBackground(assistantId, conversationId, active)
 
 		let cancelled = false;
 
-		const poll = async () => {
+		const applyStatus = (data) => {
+			if (cancelled) return;
+			setInProgress(data.in_progress);
+			if (data.background) setBackground(data.background);
+		};
+
+		// One-off fetch for the state as of mount (e.g. a generation already
+		// finished before this page loaded) — everything after that arrives
+		// via the broadcast below instead of polling.
+		(async () => {
 			try {
 				const res = await api.get(
 					route('conversations.avatar-background', { assistant: assistantId, id: conversationId })
 				);
 				if (!res.ok || cancelled) return;
-				const data = await res.json();
-				if (cancelled) return;
-				setInProgress(data.in_progress);
-				if (data.background) setBackground(data.background);
+				applyStatus(await res.json());
 			} catch (err) {
-				// The next tick still retries, but the failure itself must be visible —
-				// an empty catch here would hide real bugs (Constitution Principle V).
-				console.error('[useAvatarBackground] poll failed', err);
+				console.error('[useAvatarBackground] initial fetch failed', err);
 			}
-		};
+		})();
 
-		void poll();
-		const interval = setInterval(poll, POLL_INTERVAL_MS);
+		const channelName = `conversation.${conversationId}`;
+		const channel = echo.private(channelName);
+		channel.listen('.avatar-background.updated', applyStatus);
 
 		return () => {
 			cancelled = true;
-			clearInterval(interval);
+			channel.stopListening('.avatar-background.updated');
+			echo.leave(channelName);
 		};
 	}, [active, assistantId, conversationId]);
 
