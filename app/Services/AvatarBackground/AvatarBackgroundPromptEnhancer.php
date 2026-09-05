@@ -49,10 +49,15 @@ class AvatarBackgroundPromptEnhancer
             'content' => self::TASK_INSTRUCTION."\n\nSetting description: \"{$rawDescription}\"",
         ];
 
-        $response = $llm->chat(messages: [
-            ['role' => 'system', 'content' => $systemPrompt],
-            ...$history,
-        ]);
+        $response = $llm->chat(
+            messages: [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ...$history,
+            ],
+            options: [
+                'max_tokens' => config('ai.avatar_background.prompt_max_tokens'),
+            ],
+        );
 
         $prompts = $this->parsePrompts($response->content, $rawDescription);
 

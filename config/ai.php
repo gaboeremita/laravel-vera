@@ -50,6 +50,9 @@ return [
 
     'avatar_background' => [
         'cache_ttl' => (int) env('AVATAR_BACKGROUND_CACHE_TTL', 21600),
+        'failure_cooldown' => (int) env('AVATAR_BACKGROUND_FAILURE_COOLDOWN', 300),
+        'prompt_max_tokens' => (int) env('AVATAR_BACKGROUND_PROMPT_MAX_TOKENS', 4096),
+        'request_state_ttl' => (int) env('AVATAR_BACKGROUND_REQUEST_STATE_TTL', 3600),
         'storage_path' => env('AVATAR_BACKGROUND_STORAGE_PATH', 'avatar-backgrounds'),
     ],
 

@@ -16,7 +16,7 @@ test('an agent-mode 3D avatar assistant asked to change the background invokes t
     Http::fake([
         'fake-llm.test/*' => Http::sequence()
             ->push(toolCallResponse('call_1', 'change_avatar_background', ['description' => 'a futuristic park']))
-            ->push(finalAnswerResponse('Alright, changing the scene!')),
+            ->push(finalAnswerResponse('[scene: a futuristic park] Alright, changing the scene!')),
     ]);
 
     $response = $this->actingAs($user)->postJson(
@@ -32,4 +32,5 @@ test('an agent-mode 3D avatar assistant asked to change the background invokes t
     Queue::assertPushed(GenerateAvatarBackground::class, function ($job) use ($conversation) {
         return $job->conversation->is($conversation) && $job->description === 'a futuristic park';
     });
+    Queue::assertPushed(GenerateAvatarBackground::class, 1);
 });

@@ -8,6 +8,7 @@ use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\User;
 use App\Services\LlmProviders\LlmManager;
+use App\Services\LlmResponseTagParser;
 use App\Services\TelegramService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -276,13 +277,9 @@ class TelegramPollCommand extends Command
             return;
         }
 
-        $content = $response->content;
-        $emotion = 'neutral';
-
-        if (preg_match('/^\[([a-z]+)\]/', $content, $match)) {
-            $emotion = $match[1];
-            $content = trim(substr($content, strlen($match[0])));
-        }
+        $parsed = app(LlmResponseTagParser::class)->parse($response->content, $this->assistant);
+        $content = $parsed['content'];
+        $emotion = $parsed['emotion'] ?? 'neutral';
 
         $conversation->messages()->create([
             'role' => 'assistant',

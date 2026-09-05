@@ -31,9 +31,31 @@ test('the /change-background command dispatches generation and replies in charac
             && $job->assistantUser->assistant_id === $assistant->id
             && $job->description === 'a futuristic park';
     });
+    Queue::assertPushed(GenerateAvatarBackground::class, 1);
 });
 
-test('a bare pose tag in the /change-background reaction is stripped from the saved and returned content', function () {
+test('the first user message being a background command dispatches only the command request', function () {
+    [$user, $assistant, $conversation] = setUpAgentAssistant('assistant', [
+        'portrait_type' => 'avatar3d',
+        'opening_message' => '',
+    ]);
+
+    Queue::fake();
+
+    Http::fake([
+        'fake-llm.test/*' => Http::response(finalAnswerResponse('The scenery shifts around us.')),
+    ]);
+
+    $this->actingAs($user)->postJson(
+        route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
+        ['messages' => [['role' => 'user', 'content' => '/change-background a futuristic park']]],
+    )->assertSuccessful();
+
+    Queue::assertPushed(GenerateAvatarBackground::class, 1);
+    Queue::assertPushed(GenerateAvatarBackground::class, fn ($job) => $job->description === 'a futuristic park');
+});
+
+test('an identified pose tag in the /change-background reaction is stripped from the saved and returned content', function () {
     [$user, $assistant, $conversation] = setUpAgentAssistant('assistant', ['portrait_type' => 'avatar3d']);
     configureImageGenModel($user, $assistant, 'https://fake-image.test/generate');
     Pose::factory()->create(['assistant_id' => $assistant->id, 'name' => 'greeting']);
@@ -41,7 +63,7 @@ test('a bare pose tag in the /change-background reaction is stripped from the sa
     Queue::fake();
 
     Http::fake([
-        'fake-llm.test/*' => Http::response(finalAnswerResponse('[greeting] The scenery shifts around us as we arrive at the park.')),
+        'fake-llm.test/*' => Http::response(finalAnswerResponse('[pose: greeting] The scenery shifts around us as we arrive at the park.')),
     ]);
 
     $response = $this->actingAs($user)->postJson(

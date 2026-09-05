@@ -25,6 +25,7 @@ use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\AgentLoop\Tools\ImageGenerationTool;
 use App\Services\ImageGenProviders\ImageGenerationService;
 use App\Services\LlmProviders\LlmManager;
+use App\Services\LlmResponseTagParser;
 use App\Services\TtsProviders\TtsManager;
 use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
@@ -43,7 +44,7 @@ class ConversationController extends Controller
 
     private const TTS_TRUNCATION_LENGTH = 200;
 
-    private const BACKGROUND_TAG_INSTRUCTION = 'When the scene/setting you and the user are in has just clearly changed to a new location, prefix your reply with a tag describing the new setting: [scene: <short description of the new location>]. Only include this tag when the setting has actually changed, never when it is unchanged. Never mention the tag itself.';
+    private const BACKGROUND_TAG_INSTRUCTION = 'When the scene/setting you and the user are in has just clearly changed to a new location, include [scene: <short description of the new location>] in your reply. Only include this tag when the setting has actually changed, never when it is unchanged. Control tags may appear in any order. Never mention the tag itself.';
 
     public function index(Request $request, int $assistant): JsonResponse
     {
@@ -70,7 +71,8 @@ class ConversationController extends Controller
         if (! $request->has('before')
             && $assistantUser->assistant->portrait_type === AssistantPortraitType::Avatar3D
             && Cache::get(GenerateAvatarBackground::cacheKeyFor($conversation->id)) === null
-            && Cache::get(GenerateAvatarBackground::progressKeyFor($conversation->id)) === null) {
+            && Cache::get(GenerateAvatarBackground::progressKeyFor($conversation->id)) === null
+            && ! GenerateAvatarBackground::hasRecentFailureFor($conversation->id)) {
             GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, 'Infer the current setting from the conversation so far.');
         }
 
@@ -213,6 +215,8 @@ class ConversationController extends Controller
             $validated['messages'] = $messages;
         }
 
+        $shouldGenerateInitialBackground = false;
+
         if ($lastUserMessage) {
             $message = $conversation->messages()->create([
                 'role' => 'user',
@@ -226,8 +230,9 @@ class ConversationController extends Controller
 
             if ($assistantUser->assistant->portrait_type === AssistantPortraitType::Avatar3D
                 && empty($assistantUser->assistant->opening_message)
+                && $conversation->world_session_id === null
                 && $conversation->messages()->where('role', 'user')->count() === 1) {
-                GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, $lastUserMessage['content'] ?? '');
+                $shouldGenerateInitialBackground = true;
             }
         }
 
@@ -405,26 +410,44 @@ class ConversationController extends Controller
                 );
             }
         } catch (\RuntimeException $e) {
+            if ($shouldGenerateInitialBackground) {
+                GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, $lastUserMessage['content'] ?? '');
+            }
+
             return response()->json(['message' => $e->getMessage()], 502);
+        } catch (\Throwable $e) {
+            if ($shouldGenerateInitialBackground) {
+                GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, $lastUserMessage['content'] ?? '');
+            }
+
+            throw $e;
         }
 
-        [$content, $sceneDescription] = $this->extractSceneTag($response->content);
+        $parsedTags = app(LlmResponseTagParser::class)->parse($response->content, $assistantModel);
+        $content = $parsedTags['content'];
+        $sceneDescription = $parsedTags['scene'];
 
         $ttsInstructions = null;
         if ($tts) {
-            $result = $tts->parseLlmResponse($content);
-            $content = $result->content;
+            $result = $tts->parseLlmResponse($response->content);
             $ttsInstructions = $result->ttsInstructions;
         }
 
-        if ($sceneDescription !== null && $assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
+        $backgroundWasQueuedByTool = $this->backgroundWasQueuedByTool($agentToolCalls);
+
+        if ($sceneDescription !== null
+            && $assistantModel->portrait_type === AssistantPortraitType::Avatar3D
+            && ! $backgroundWasQueuedByTool) {
             GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, $sceneDescription);
+        } elseif ($shouldGenerateInitialBackground && ! $backgroundWasQueuedByTool) {
+            GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, $lastUserMessage['content'] ?? '');
         }
 
         $assistantMessage = $conversation->messages()->create([
             'role' => 'assistant',
             'content' => $content,
             'thinking' => $response->thinking,
+            'emotion' => $parsedTags['emotion'],
         ]);
 
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
@@ -451,6 +474,9 @@ class ConversationController extends Controller
             'conversation_id' => $conversation->id,
             'content' => $content,
             'thinking' => $response->thinking,
+            'emotion' => $parsedTags['emotion'],
+            'intimate' => $parsedTags['intimate'],
+            'pose' => $parsedTags['pose'],
             'tts_instructions' => $ttsInstructions,
             'tool_calls' => $agentToolCalls,
             'audioBase64' => $audioBase64,
@@ -479,6 +505,22 @@ class ConversationController extends Controller
         }
 
         return trim(substr($content, strlen($match[0])));
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>|null  $toolCalls
+     */
+    private function backgroundWasQueuedByTool(?array $toolCalls): bool
+    {
+        foreach ($toolCalls ?? [] as $toolCall) {
+            if (($toolCall['name'] ?? null) === 'change_avatar_background'
+                && ($toolCall['error'] ?? null) === null
+                && data_get($toolCall, 'result.status') === 'queued') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function extractVoiceMessageCommand(?string $content): ?string
@@ -556,21 +598,6 @@ class ConversationController extends Controller
     }
 
     /**
-     * @return array{0: string, 1: ?string} [content with the tag stripped, extracted description or null]
-     */
-    private function extractSceneTag(string $content): array
-    {
-        if (! preg_match('/^\[scene:\s*([^\]]+)\]/i', $content, $match)) {
-            return [$content, null];
-        }
-
-        $description = trim($match[1]);
-        $remaining = trim(substr($content, strlen($match[0])));
-
-        return [$remaining, $description];
-    }
-
-    /**
      * Appends the assistant's expressive-signal prompt section — pose tags
      * for 3D avatar assistants (poses are their only expression/action
      * system, so emotion tags never apply), emotion tags for image-mode
@@ -587,7 +614,10 @@ class ConversationController extends Controller
             $poses = $assistantModel->promptPoseNames();
 
             if (! empty($poses)) {
-                $director->append('pose tags', ['available poses' => $poses]);
+                $director->append('pose tags', [
+                    'format' => 'Use [pose: <exact pose name>] to select a pose. Use only a name from the available poses list. Control tags may appear in any order and are removed before the reply is shown.',
+                    'available poses' => $poses,
+                ]);
             }
 
             return;
@@ -596,7 +626,10 @@ class ConversationController extends Controller
         $excludedSections[] = 'pose tags';
 
         $emotions = $assistantModel->promptEmotionNames();
-        $director->append('emotion tags', ['available emotions' => $emotions]);
+        $director->append('emotion tags', [
+            'format' => 'Use [emotion: <exact emotion name>] to select an emotion. Use only a name from the available emotions list. Control tags may appear in any order and are removed before the reply is shown.',
+            'available emotions' => $emotions,
+        ]);
     }
 
     /**
@@ -647,59 +680,22 @@ class ConversationController extends Controller
     }
 
     /**
-     * Strips the assistant's leading expression tag from content — a bare
-     * [name] tag means a pose for 3D avatar assistants, or an emotion
-     * (optionally followed by [intimate]) for image-mode assistants. Only
-     * one format is ever attempted per assistant: the two are mutually
-     * exclusive by portrait type, so there's no ambiguity to resolve and
-     * nothing for the model to disambiguate — used by the server-side-parsed
-     * reply flows (image-gen reaction, background-change reaction, Discord),
-     * which don't go through the frontend's client-side parsers.
+     * Extracts response metadata for flows that do not use the normal chat
+     * response payload, such as image reactions, background-change reactions,
+     * and Discord.
      *
      * @return array{content: string, emotion: ?string, intimate: bool, pose: ?string}
      */
     private function extractExpressionTag(string $content, Assistant $assistantModel): array
     {
-        if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
-            $pose = null;
+        $parsed = app(LlmResponseTagParser::class)->parse($content, $assistantModel);
 
-            // Unlike emotion names, pose names aren't restricted to a single
-            // letters-only word (e.g. "deer_dance", "happy hands") — match
-            // anything up to the closing ], not [a-zA-Z]+. Only strip it when
-            // it actually matches one of the assistant's configured poses —
-            // otherwise a reply that happens to start with an unrelated
-            // bracketed aside (e.g. "[Note] ...") would have that content
-            // silently eaten. Matched case-insensitively but resolved to the
-            // pose's actual stored name, since the frontend looks it up with
-            // an exact match.
-            if (preg_match('/^\[([^\]]+)\]/', $content, $match)) {
-                $matchedText = trim($match[1]);
-                $canonical = collect($assistantModel->promptPoseNames())
-                    ->first(fn (string $name) => strcasecmp($name, $matchedText) === 0);
-
-                if ($canonical !== null) {
-                    $pose = $canonical;
-                    $content = trim(substr($content, strlen($match[0])));
-                }
-            }
-
-            return ['content' => $content, 'emotion' => null, 'intimate' => false, 'pose' => $pose];
-        }
-
-        $emotion = null;
-        $intimate = false;
-
-        if (preg_match('/^\[([a-zA-Z]+)\]/', $content, $match)) {
-            $emotion = $match[1];
-            $content = trim(substr($content, strlen($match[0])));
-        }
-
-        if (preg_match('/^\[intimate\]/i', $content, $match)) {
-            $intimate = true;
-            $content = trim(substr($content, strlen($match[0])));
-        }
-
-        return ['content' => $content, 'emotion' => $emotion, 'intimate' => $intimate, 'pose' => null];
+        return [
+            'content' => $parsed['content'],
+            'emotion' => $parsed['emotion'],
+            'intimate' => $parsed['intimate'],
+            'pose' => $parsed['pose'],
+        ];
     }
 
     /**

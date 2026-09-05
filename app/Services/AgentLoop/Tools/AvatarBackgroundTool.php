@@ -21,7 +21,7 @@ class AvatarBackgroundTool implements AgentTool
 
     public function description(): string
     {
-        return "Changes the visible background scene behind your 3D avatar. Use when the user asks to change, set, or update the background/scene/setting, or when the conversation's setting has clearly moved somewhere new.";
+        return 'Changes the visible background scene behind your 3D avatar. Use only when the user explicitly asks to change, set, or update the background, scene, or setting. Do not call it merely because the narrative moves to a new location; automatic scene changes are handled separately.';
     }
 
     public function parameters(): array
