@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
-test('reopening a conversation with no cached background regenerates automatically', function () {
+test('reopening a conversation with no cached background never regenerates on its own', function () {
     [$user, $assistant, $conversation] = setUpAgentAssistant('assistant', ['portrait_type' => 'avatar3d']);
 
     Queue::fake();
@@ -16,9 +16,7 @@ test('reopening a conversation with no cached background regenerates automatical
         route('conversations.show', ['assistant' => $assistant->id, 'id' => $conversation->id])
     )->assertSuccessful();
 
-    Queue::assertPushed(GenerateAvatarBackground::class, function ($job) use ($conversation) {
-        return $job->conversation->is($conversation);
-    });
+    Queue::assertNotPushed(GenerateAvatarBackground::class);
 });
 
 test('reopening a conversation with an already-cached background does not regenerate', function () {
