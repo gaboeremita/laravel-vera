@@ -176,7 +176,25 @@ class GenerateAvatarBackground implements ShouldQueue
         Cache::put(self::activeRequestKeyFor($conversationId), $request, $expiresAt);
         Cache::put(self::progressKeyFor($conversationId), 'Generating scene...', $expiresAt);
 
-        AvatarBackgroundStatusUpdated::dispatch($conversationId);
+        self::broadcastStatus($conversationId);
+    }
+
+    /**
+     * Broadcasting is a best-effort notification, not part of the actual
+     * coordination logic — a Reverb outage or misconfiguration must never
+     * be able to block generation itself, so failures here are swallowed
+     * rather than bubbling up into the Cache::lock callers above.
+     */
+    private static function broadcastStatus(int $conversationId): void
+    {
+        try {
+            AvatarBackgroundStatusUpdated::dispatch($conversationId);
+        } catch (Throwable $e) {
+            Log::warning('Failed to broadcast avatar background status.', [
+                'conversation_id' => $conversationId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private static function requestStateTtl(): int
@@ -280,7 +298,7 @@ class GenerateAvatarBackground implements ShouldQueue
                     Cache::forget(self::activeRequestKeyFor($conversation->id));
                     Cache::forget(self::progressKeyFor($conversation->id));
 
-                    AvatarBackgroundStatusUpdated::dispatch($conversation->id);
+                    self::broadcastStatus($conversation->id);
                 });
         } catch (Throwable $e) {
             Log::warning('Failed to release avatar background generation state.', [

@@ -6,6 +6,7 @@ use App\Services\AvatarBackground\AvatarBackgroundService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -139,6 +140,40 @@ test('starting and finishing a generation broadcasts a status update for the con
             && $event->inProgress === false
             && $event->background['source_description'] === 'a futuristic park',
     );
+});
+
+test('a broadcast failure is logged and does not block generation from starting or completing', function () {
+    [, , $conversation] = setUpAgentAssistant('assistant', ['portrait_type' => 'avatar3d']);
+
+    Event::listen(AvatarBackgroundStatusUpdated::class, function () {
+        throw new Exception('reverb is down');
+    });
+    Queue::fake();
+    Log::spy();
+
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a futuristic park');
+    $job = Queue::pushed(GenerateAvatarBackground::class)->first();
+
+    expect(Cache::get(GenerateAvatarBackground::activeRequestKeyFor($conversation->id))['description'])
+        ->toBe('a futuristic park');
+
+    $service = Mockery::mock(AvatarBackgroundService::class);
+    $service->shouldReceive('generate')->once()->andReturn([
+        'floor_url' => '/storage/park-floor.png',
+        'surroundings_url' => '/storage/park-surroundings.png',
+        'source_description' => 'a futuristic park',
+    ]);
+
+    $job->handle($service);
+
+    expect(Cache::get(GenerateAvatarBackground::cacheKeyFor($conversation->id))['source_description'])
+        ->toBe('a futuristic park')
+        ->and(Cache::get(GenerateAvatarBackground::activeRequestKeyFor($conversation->id)))
+        ->toBeNull();
+
+    Log::shouldHaveReceived('warning')->withArgs(function ($message) {
+        return str_contains($message, 'Failed to broadcast avatar background status.');
+    })->times(3);
 });
 
 test('the database retry window exceeds the background job timeout', function () {
