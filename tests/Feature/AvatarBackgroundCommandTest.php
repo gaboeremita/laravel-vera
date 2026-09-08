@@ -33,7 +33,7 @@ test('the /change-background command dispatches generation and replies in charac
     });
 });
 
-test('a bare pose tag in the /change-background reaction is stripped from the saved and returned content', function () {
+test('a pose tag in the /change-background reaction is stripped from the saved and returned content', function () {
     [$user, $assistant, $conversation] = setUpAgentAssistant('assistant', ['portrait_type' => 'avatar3d']);
     configureImageGenModel($user, $assistant, 'https://fake-image.test/generate');
     Pose::factory()->create(['assistant_id' => $assistant->id, 'name' => 'greeting']);
@@ -41,7 +41,7 @@ test('a bare pose tag in the /change-background reaction is stripped from the sa
     Queue::fake();
 
     Http::fake([
-        'fake-llm.test/*' => Http::response(finalAnswerResponse('[greeting] The scenery shifts around us as we arrive at the park.')),
+        'fake-llm.test/*' => Http::response(finalAnswerResponse('[pose: greeting] The scenery shifts around us as we arrive at the park.')),
     ]);
 
     $response = $this->actingAs($user)->postJson(
