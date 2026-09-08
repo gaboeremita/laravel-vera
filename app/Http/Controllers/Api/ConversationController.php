@@ -19,7 +19,6 @@ use App\Models\Image;
 use App\Models\Settings;
 use App\Models\WorldUser;
 use App\Services\AgentLoop\AgentLoopRunner;
-use App\Services\AgentLoop\Tools\AvatarBackgroundTool;
 use App\Services\AgentLoop\Tools\BasicCalculatorTool;
 use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\AgentLoop\Tools\ImageGenerationTool;
@@ -29,7 +28,6 @@ use App\Services\TtsProviders\TtsManager;
 use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 
 class ConversationController extends Controller
 {
@@ -42,8 +40,6 @@ class ConversationController extends Controller
     private const IMAGE_GEN_COMMAND = '/create-image ';
 
     private const TTS_TRUNCATION_LENGTH = 200;
-
-    private const BACKGROUND_TAG_INSTRUCTION = 'When the scene/setting you and the user are in has just clearly changed to a new location, prefix your reply with a tag describing the new setting: [scene: <short description of the new location>]. Only include this tag when the setting has actually changed, never when it is unchanged. Never mention the tag itself.';
 
     public function index(Request $request, int $assistant): JsonResponse
     {
@@ -66,13 +62,6 @@ class ConversationController extends Controller
         $conversation = $assistantUser
             ->conversations()
             ->findOrFail($id);
-
-        if (! $request->has('before')
-            && $assistantUser->assistant->portrait_type === AssistantPortraitType::Avatar3D
-            && Cache::get(GenerateAvatarBackground::cacheKeyFor($conversation->id)) === null
-            && Cache::get(GenerateAvatarBackground::progressKeyFor($conversation->id)) === null) {
-            GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, 'Infer the current setting from the conversation so far.');
-        }
 
         $limit = self::MESSAGES_PER_PAGE;
 
@@ -140,12 +129,6 @@ class ConversationController extends Controller
                 ? ($resident?->opening_message ?? '')
                 : ($assistantUser->assistant->opening_message ?? ''),
         ]);
-
-        if ($world === null
-            && $assistantUser->assistant->portrait_type === AssistantPortraitType::Avatar3D
-            && ! empty($assistantUser->assistant->opening_message)) {
-            GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, $assistantUser->assistant->opening_message);
-        }
 
         return response()->json($conversation, 201);
     }
@@ -222,12 +205,6 @@ class ConversationController extends Controller
             if (! empty($lastUserMessage['images'][0])) {
                 $storagePath = "messages/{$request->user()->id}/{$conversation->id}";
                 Image::storeFromBase64($lastUserMessage['images'][0], $message, $storagePath);
-            }
-
-            if ($assistantUser->assistant->portrait_type === AssistantPortraitType::Avatar3D
-                && empty($assistantUser->assistant->opening_message)
-                && $conversation->messages()->where('role', 'user')->count() === 1) {
-                GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, $lastUserMessage['content'] ?? '');
             }
         }
 
@@ -319,10 +296,6 @@ class ConversationController extends Controller
         $director = new PromptDirector($prompt);
         $this->appendExpressionTags($director, $assistantModel, $excludedSections);
 
-        if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
-            $director->append('background tags', self::BACKGROUND_TAG_INSTRUCTION);
-        }
-
         $director->except($excludedSections);
 
         $voiceModel = null;
@@ -378,10 +351,6 @@ class ConversationController extends Controller
                     $tools[] = new ImageGenerationTool($imageGenerationService, $assistantUser, $conversation);
                 }
 
-                if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D && $imageGenerationService->isAvailableFor($assistantUser)) {
-                    $tools[] = new AvatarBackgroundTool($assistantUser, $conversation);
-                }
-
                 $runner = new AgentLoopRunner($llm, $tools);
 
                 $agentResult = $runner->run(
@@ -408,17 +377,13 @@ class ConversationController extends Controller
             return response()->json(['message' => $e->getMessage()], 502);
         }
 
-        [$content, $sceneDescription] = $this->extractSceneTag($response->content);
+        $content = $response->content;
 
         $ttsInstructions = null;
         if ($tts) {
             $result = $tts->parseLlmResponse($content);
             $content = $result->content;
             $ttsInstructions = $result->ttsInstructions;
-        }
-
-        if ($sceneDescription !== null && $assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
-            GenerateAvatarBackground::dispatchFor($assistantUser, $conversation, $sceneDescription);
         }
 
         $assistantMessage = $conversation->messages()->create([
@@ -553,21 +518,6 @@ class ConversationController extends Controller
             'audio/mp4' => 'mp4',
             default => 'wav',
         };
-    }
-
-    /**
-     * @return array{0: string, 1: ?string} [content with the tag stripped, extracted description or null]
-     */
-    private function extractSceneTag(string $content): array
-    {
-        if (! preg_match('/^\[scene:\s*([^\]]+)\]/i', $content, $match)) {
-            return [$content, null];
-        }
-
-        $description = trim($match[1]);
-        $remaining = trim(substr($content, strlen($match[0])));
-
-        return [$remaining, $description];
     }
 
     /**
