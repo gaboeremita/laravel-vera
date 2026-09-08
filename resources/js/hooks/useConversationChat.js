@@ -165,7 +165,7 @@ export function useConversationChat({
 					return;
 				}
 
-				const rawReply = data.content || '[default]\n...signal lost. Try again.';
+				const rawReply = data.content || (portraitType === 'avatar3d' ? '[pose: default]\n...signal lost. Try again.' : '[emotion: default]\n...signal lost. Try again.');
 				const thinking = data.thinking || null;
 
 				// Poses and emotions are mutually exclusive by portrait type (a 3D

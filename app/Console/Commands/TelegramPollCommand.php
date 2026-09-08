@@ -279,7 +279,7 @@ class TelegramPollCommand extends Command
         $content = $response->content;
         $emotion = 'neutral';
 
-        if (preg_match('/^\[([a-z]+)\]/', $content, $match)) {
+        if (preg_match('/^\[emotion:\s*([a-z]+)\]/i', $content, $match)) {
             $emotion = $match[1];
             $content = trim(substr($content, strlen($match[0])));
         }

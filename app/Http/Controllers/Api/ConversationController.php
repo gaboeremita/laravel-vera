@@ -597,14 +597,15 @@ class ConversationController extends Controller
     }
 
     /**
-     * Strips the assistant's leading expression tag from content — a bare
-     * [name] tag means a pose for 3D avatar assistants, or an emotion
-     * (optionally followed by [intimate]) for image-mode assistants. Only
-     * one format is ever attempted per assistant: the two are mutually
-     * exclusive by portrait type, so there's no ambiguity to resolve and
-     * nothing for the model to disambiguate — used by the server-side-parsed
-     * reply flows (image-gen reaction, background-change reaction, Discord),
-     * which don't go through the frontend's client-side parsers.
+     * Strips the assistant's leading expression tag from content — a
+     * qualified [pose: name] tag for 3D avatar assistants, or a qualified
+     * [emotion: name] tag (optionally followed by [intimate]) for image-mode
+     * assistants. Only one format is ever attempted per assistant: the two
+     * are mutually exclusive by portrait type, so there's no ambiguity to
+     * resolve and nothing for the model to disambiguate — used by the
+     * server-side-parsed reply flows (image-gen reaction, background-change
+     * reaction, Discord), which don't go through the frontend's client-side
+     * parsers.
      *
      * @return array{content: string, emotion: ?string, intimate: bool, pose: ?string}
      */
@@ -622,7 +623,7 @@ class ConversationController extends Controller
             // silently eaten. Matched case-insensitively but resolved to the
             // pose's actual stored name, since the frontend looks it up with
             // an exact match.
-            if (preg_match('/^\[([^\]]+)\]/', $content, $match)) {
+            if (preg_match('/^\[pose:\s*([^\]]+)\]/i', $content, $match)) {
                 $matchedText = trim($match[1]);
                 $canonical = collect($assistantModel->promptPoseNames())
                     ->first(fn (string $name) => strcasecmp($name, $matchedText) === 0);
@@ -639,7 +640,7 @@ class ConversationController extends Controller
         $emotion = null;
         $intimate = false;
 
-        if (preg_match('/^\[([a-zA-Z]+)\]/', $content, $match)) {
+        if (preg_match('/^\[emotion:\s*([a-zA-Z]+)\]/i', $content, $match)) {
             $emotion = $match[1];
             $content = trim(substr($content, strlen($match[0])));
         }

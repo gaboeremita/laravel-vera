@@ -7,7 +7,7 @@ export function parseEmotionFromResponse(text, validEmotions = []) {
     let emotion = null;
 
     // Grab the emotion tag first
-    const emotionMatch = remaining.match(/^\[([a-zA-Z]+)\]/);
+    const emotionMatch = remaining.match(/^\[emotion:\s*([a-zA-Z]+)\]/i);
     if (emotionMatch) {
         remaining = remaining.slice(emotionMatch[0].length);
         const matchedEmotion = emotionMatch[1].toLowerCase();
@@ -36,23 +36,22 @@ export function parseEmotionFromResponse(text, validEmotions = []) {
 }
 
 /**
- * Parses a pose tag (e.g. "[spin] ...") from the start of text — same bare
- * bracket format as an emotion tag. There's no separate "pose:" syntax:
- * poses are the only expression/action signal a 3D avatar assistant emits
- * (it has no emotion tags to disambiguate against), so a plain [name] is
- * unambiguous. Unlike parseEmotionFromResponse, an unmatched/unrecognized
- * tag leaves `pose` as null rather than falling back to a default name —
- * a pose is a one-off trigger, not an ongoing state to default into.
+ * Parses a pose tag (e.g. "[pose: spin] ...") from the start of text.
+ * Poses are the only expression/action signal a 3D avatar assistant emits.
+ * Unlike parseEmotionFromResponse, an unmatched/unrecognized tag leaves
+ * `pose` as null rather than falling back to a default name — a pose is a
+ * one-off trigger, not an ongoing state to default into.
  *
  * Pose names aren't restricted to a single letters-only word the way
  * emotion names are (e.g. "deer_dance", "happy hands") — the bracket
- * content is matched as anything up to the closing `]`, not [a-zA-Z]+.
+ * content after the "pose:" prefix is matched as anything up to the
+ * closing `]`, not [a-zA-Z]+.
  */
 export function parsePoseFromResponse(text, validPoseNames = []) {
     let remaining = text;
     let pose = null;
 
-    const poseMatch = remaining.match(/^\[([^\]]+)\]/);
+    const poseMatch = remaining.match(/^\[pose:\s*([^\]]+)\]/i);
     if (poseMatch) {
         const matchedText = poseMatch[1].trim().toLowerCase();
         const canonical = validPoseNames.find((p) => p.toLowerCase() === matchedText);
