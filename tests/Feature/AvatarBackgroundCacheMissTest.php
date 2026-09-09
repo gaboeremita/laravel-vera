@@ -39,6 +39,20 @@ test('reopening a conversation with an already-cached background does not regene
     Queue::assertNotPushed(GenerateAvatarBackground::class);
 });
 
+test('reopening a conversation during the failure cooldown does not regenerate', function () {
+    [$user, $assistant, $conversation] = setUpAgentAssistant('assistant', ['portrait_type' => 'avatar3d']);
+
+    Cache::put(GenerateAvatarBackground::failureKeyFor($conversation->id), true, now()->addMinutes(5));
+
+    Queue::fake();
+
+    $this->actingAs($user)->getJson(
+        route('conversations.show', ['assistant' => $assistant->id, 'id' => $conversation->id])
+    )->assertSuccessful();
+
+    Queue::assertNotPushed(GenerateAvatarBackground::class);
+});
+
 test('loading an older page of messages does not trigger background generation', function () {
     [$user, $assistant, $conversation] = setUpAgentAssistant('assistant', ['portrait_type' => 'avatar3d']);
     $message = $conversation->messages()->create(['role' => 'user', 'content' => 'hi']);

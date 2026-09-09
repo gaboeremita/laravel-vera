@@ -168,18 +168,16 @@ export function useConversationChat({
 				const rawReply = data.content || (portraitType === 'avatar3d' ? '[pose: default]\n...signal lost. Try again.' : '[emotion: default]\n...signal lost. Try again.');
 				const thinking = data.thinking || null;
 
-				// Poses and emotions are mutually exclusive by portrait type (a 3D
-				// avatar has no emotion tags to disambiguate against), so only the
-				// applicable parser ever runs on a given reply. A background-change
-				// reply already has its tag stripped and its pose parsed server-side
-				// (data.pose is present, unlike a normal reply) — use that directly
-				// instead of re-parsing content that no longer has a tag to find.
-				let emotion = 'default';
-				let intimate = false;
-				let pose = data.pose !== undefined ? data.pose : null;
+				// The API now extracts identified response metadata server-side. Keep
+				// the client parsers as a compatibility path for older saved messages
+				// and responses that predate the identified-tag contract.
+				const hasServerParsedTags = data.emotion !== undefined || data.intimate !== undefined || data.pose !== undefined;
+				let emotion = data.emotion ?? 'default';
+				let intimate = data.intimate ?? false;
+				let pose = data.pose ?? null;
 				let cleanText = rawReply;
 
-				if (data.pose === undefined) {
+				if (!hasServerParsedTags) {
 					if (portraitType === 'avatar3d') {
 						({ pose, text: cleanText } = parsePoseFromResponse(rawReply, poseNames));
 					} else {

@@ -28,6 +28,11 @@ test('a multi-line, multi-paragraph LLM response is parsed into full floor and s
     GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a ballroom');
 
     Http::assertSent(function ($request) {
+        return $request->url() === 'https://fake-llm.test/chat/completions'
+            && $request['max_tokens'] === config('ai.avatar_background.prompt_max_tokens');
+    });
+
+    Http::assertSent(function ($request) {
         return $request->url() === 'https://fake-image.test/generate'
             && str_contains($request['prompt'] ?? '', 'marble tile')
             && str_contains($request['prompt'] ?? '', 'Photographed straight down');

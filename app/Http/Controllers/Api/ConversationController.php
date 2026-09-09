@@ -24,6 +24,7 @@ use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\AgentLoop\Tools\ImageGenerationTool;
 use App\Services\ImageGenProviders\ImageGenerationService;
 use App\Services\LlmProviders\LlmManager;
+use App\Services\LlmResponseTagParser;
 use App\Services\TtsProviders\TtsManager;
 use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
@@ -537,7 +538,10 @@ class ConversationController extends Controller
             $poses = $assistantModel->promptPoseNames();
 
             if (! empty($poses)) {
-                $director->append('pose tags', ['available poses' => $poses]);
+                $director->append('pose tags', [
+                    'format' => 'Use [pose: <exact pose name>] to select a pose. Use only a name from the available poses list. Control tags may appear in any order and are removed before the reply is shown.',
+                    'available poses' => $poses,
+                ]);
             }
 
             return;
@@ -546,7 +550,10 @@ class ConversationController extends Controller
         $excludedSections[] = 'pose tags';
 
         $emotions = $assistantModel->promptEmotionNames();
-        $director->append('emotion tags', ['available emotions' => $emotions]);
+        $director->append('emotion tags', [
+            'format' => 'Use [emotion: <exact emotion name>] to select an emotion. Use only a name from the available emotions list. Control tags may appear in any order and are removed before the reply is shown.',
+            'available emotions' => $emotions,
+        ]);
     }
 
     /**
@@ -597,60 +604,22 @@ class ConversationController extends Controller
     }
 
     /**
-     * Strips the assistant's leading expression tag from content — a
-     * qualified [pose: name] tag for 3D avatar assistants, or a qualified
-     * [emotion: name] tag (optionally followed by [intimate]) for image-mode
-     * assistants. Only one format is ever attempted per assistant: the two
-     * are mutually exclusive by portrait type, so there's no ambiguity to
-     * resolve and nothing for the model to disambiguate — used by the
-     * server-side-parsed reply flows (image-gen reaction, background-change
-     * reaction, Discord), which don't go through the frontend's client-side
-     * parsers.
+     * Extracts response metadata for flows that do not use the normal chat
+     * response payload, such as image reactions, background-change reactions,
+     * and Discord.
      *
      * @return array{content: string, emotion: ?string, intimate: bool, pose: ?string}
      */
     private function extractExpressionTag(string $content, Assistant $assistantModel): array
     {
-        if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
-            $pose = null;
+        $parsed = app(LlmResponseTagParser::class)->parse($content, $assistantModel);
 
-            // Unlike emotion names, pose names aren't restricted to a single
-            // letters-only word (e.g. "deer_dance", "happy hands") — match
-            // anything up to the closing ], not [a-zA-Z]+. Only strip it when
-            // it actually matches one of the assistant's configured poses —
-            // otherwise a reply that happens to start with an unrelated
-            // bracketed aside (e.g. "[Note] ...") would have that content
-            // silently eaten. Matched case-insensitively but resolved to the
-            // pose's actual stored name, since the frontend looks it up with
-            // an exact match.
-            if (preg_match('/^\[pose:\s*([^\]]+)\]/i', $content, $match)) {
-                $matchedText = trim($match[1]);
-                $canonical = collect($assistantModel->promptPoseNames())
-                    ->first(fn (string $name) => strcasecmp($name, $matchedText) === 0);
-
-                if ($canonical !== null) {
-                    $pose = $canonical;
-                    $content = trim(substr($content, strlen($match[0])));
-                }
-            }
-
-            return ['content' => $content, 'emotion' => null, 'intimate' => false, 'pose' => $pose];
-        }
-
-        $emotion = null;
-        $intimate = false;
-
-        if (preg_match('/^\[emotion:\s*([a-zA-Z]+)\]/i', $content, $match)) {
-            $emotion = $match[1];
-            $content = trim(substr($content, strlen($match[0])));
-        }
-
-        if (preg_match('/^\[intimate\]/i', $content, $match)) {
-            $intimate = true;
-            $content = trim(substr($content, strlen($match[0])));
-        }
-
-        return ['content' => $content, 'emotion' => $emotion, 'intimate' => $intimate, 'pose' => null];
+        return [
+            'content' => $parsed['content'],
+            'emotion' => $parsed['emotion'],
+            'intimate' => $parsed['intimate'],
+            'pose' => $parsed['pose'],
+        ];
     }
 
     /**

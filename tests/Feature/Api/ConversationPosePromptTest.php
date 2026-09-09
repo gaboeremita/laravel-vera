@@ -25,7 +25,8 @@ test('pose names are added to the system prompt under a pose tags section when p
 
         return str_contains($systemContent, 'Pose tags')
             && str_contains($systemContent, 'spin')
-            && str_contains($systemContent, 'dance');
+            && str_contains($systemContent, 'dance')
+            && str_contains($systemContent, '[pose: <exact pose name>]');
     });
 });
 
@@ -65,5 +66,24 @@ test('the pose-tags section is omitted for an image-portrait assistant even with
         $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
 
         return ! str_contains($systemContent, 'Pose tags');
+    });
+});
+
+test('the emotion-tags section documents identified emotion tags', function () {
+    [$user, $assistant, $conversation] = setUpAgentAssistant('assistant', ['portrait_type' => 'image']);
+
+    Http::fake([
+        'fake-llm.test/*' => Http::response(finalAnswerResponse('Just a normal reply.')),
+    ]);
+
+    $this->actingAs($user)->postJson(
+        route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
+        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+    );
+
+    Http::assertSent(function ($request) {
+        $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
+
+        return str_contains($systemContent, '[emotion: <exact emotion name>]');
     });
 });
