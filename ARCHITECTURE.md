@@ -1,5 +1,7 @@
 # VERA — Architecture Analysis
 
+> **Visual map:** The maintained diagram suite is available at [docs/architecture](./docs/architecture/README.md), covering system context, containers, conversation sequences, ERDs, RAG and memory, provider resolution, avatar/World lifecycles, deployment, and failure flows.
+
 ## Overview
 
 VERA is a full-stack web application that connects users to AI assistants through a stylized, character-driven interface. Each assistant is fully configured in the database — its personality, prompt, expression set, and opening message are all data-driven with no hardcoded content. LLM providers and models are managed through the UI. A config-based fallback is used when no model is selected. Assistants and lightweight assistant-backed NPCs can also live in shared **Worlds** — single-room 3D spaces explored in first person, where residents are approached and chatted with in place; a user's activity in a world is organized into **sessions**, each with its own resumable position and conversations. See [Worlds](#worlds).

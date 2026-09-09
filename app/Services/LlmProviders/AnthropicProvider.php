@@ -19,6 +19,7 @@ class AnthropicProvider implements LlmProvider
         private readonly string $key,
         private readonly string $version,
         private readonly array $params = [],
+        private readonly int $timeout = 120,
     ) {}
 
     public static function fromModel(AiModel $aiModel): static
@@ -35,12 +36,16 @@ class AnthropicProvider implements LlmProvider
             $params = array_merge($params, $aiModel->additional_config);
         }
 
+        $timeout = $params['timeout'] ?? config('ai.default.config.timeout', 120);
+        unset($params['timeout']);
+
         return new static(
             url: $provider->url,
             model: $aiModel->endpoint,
             key: $provider->api_key,
             version: $config['version'] ?? self::DEFAULT_VERSION,
             params: $params,
+            timeout: (int) $timeout,
         );
     }
 
@@ -76,7 +81,7 @@ class AnthropicProvider implements LlmProvider
             ], $tools);
         }
 
-        $response = Http::timeout(config('ai.default.config.timeout', 120))
+        $response = Http::timeout($this->timeout)
             ->withHeaders([
                 'x-api-key' => $this->key,
                 'anthropic-version' => $this->version,

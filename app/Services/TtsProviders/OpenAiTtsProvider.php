@@ -74,7 +74,7 @@ class OpenAiTtsProvider implements TtsProvider
     public function parseLlmResponse(string $content): VoiceModeResult
     {
         $emotion = null;
-        if (preg_match('/\[emotion:\s*[\'\"]?([^\]\'\"]+)[\'\"]?\]/i', $content, $matches)) {
+        if (preg_match('/^\[(?:emotion|pose):\s*[\'\"]?([^\]\'\"]+)[\'\"]?\]/i', $content, $matches)) {
             $emotion = trim($matches[1]);
         }
 

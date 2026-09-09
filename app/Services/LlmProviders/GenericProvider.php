@@ -19,6 +19,7 @@ class GenericProvider implements LlmProvider
         private readonly bool $stream = false,
         private readonly array $params = [],
         private readonly ?string $thinkingKey = null,
+        private readonly int $timeout = 600,
     ) {}
 
     public static function fromModel(AiModel $aiModel): static
@@ -34,6 +35,9 @@ class GenericProvider implements LlmProvider
             $params = array_merge($params, $aiModel->additional_config);
         }
 
+        $timeout = $params['timeout'] ?? config('ai.default.config.timeout', 600);
+        unset($params['timeout']);
+
         return new static(
             url: $provider->url,
             model: $aiModel->endpoint,
@@ -41,6 +45,7 @@ class GenericProvider implements LlmProvider
             stream: config('ai.stream', false),
             params: $params,
             thinkingKey: $aiModel->thinking_key,
+            timeout: (int) $timeout,
         );
     }
 
@@ -70,7 +75,7 @@ class GenericProvider implements LlmProvider
             $headers['Authorization'] = "Bearer {$this->apiKey}";
         }
 
-        $response = Http::timeout(config('ai.default.config.timeout', 600))
+        $response = Http::timeout($this->timeout)
             ->withHeaders($headers)
             ->post($this->url, $payload);
 
