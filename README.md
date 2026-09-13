@@ -266,17 +266,19 @@ Voice mode needs two things answering over HTTP: an STT endpoint and one or more
 
 STT is a single fixed backend, pointed at via `AI_STT_URL` in `.env` — the app only depends on `WhisperSttProvider` talking to it. TTS is pluggable and DB-managed (see [Voice Providers](#voice-providers) above): each backend gets a `VoiceProvider` row via `VoiceProviderSeeder`, and any backend speaking the OpenAI-compatible `/v1/audio/speech` shape works with zero new PHP code — only a new seed entry.
 
+`whisper-server` only decodes WAV natively. Run it with `--convert` (shown below) so it ffmpeg-transcodes any other input format — e.g. the OGG/Opus files Discord voice messages arrive as — to WAV before decoding; without it, non-WAV audio fails with a plain `400 Invalid request` response.
+
 Two backends are confirmed working and seeded by default: **Orpheus** (3B, expressive, includes inline vocal tags) and **KittenTTS** (much smaller, CPU-only, no GPU/llama.cpp needed, no vocal tags). Orpheus specifically needs to run behind **llama.cpp**, not Ollama — Ollama's `/v1/completions` doesn't reliably honor the special tokens Orpheus-FastAPI's prompt format depends on to stay in "generate audio" mode (see [ARCHITECTURE.md](./ARCHITECTURE.md#infrastructure-stack) for details). That part is a real requirement, not a preference.
 
 **Example setup: Orpheus (macOS, via Homebrew)** — substitute your own package manager / process manager on other platforms:
 
 ```bash
 # 1. STT — whisper.cpp
-brew install whisper-cpp
+brew install whisper-cpp ffmpeg
 mkdir -p ~/whisper-models
 curl -L -o ~/whisper-models/ggml-medium.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin
-whisper-server -m ~/whisper-models/ggml-medium.bin --host 127.0.0.1 --port 8080
+whisper-server -m ~/whisper-models/ggml-medium.bin --host 127.0.0.1 --port 8080 --convert
 
 # 2. TTS inference — llama.cpp, serving the Orpheus 3B model
 brew install llama.cpp
