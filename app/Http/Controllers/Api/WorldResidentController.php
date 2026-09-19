@@ -30,7 +30,7 @@ class WorldResidentController extends Controller
             'custom_prompt' => $validated['customPrompt'] ?? null,
         ]);
 
-        $resident->load('assistant.vrm');
+        $resident->load(['assistant.vrm', 'assistant.poses.animationFile']);
 
         return response()->json((new WorldResidentResource($resident))->resolve());
     }

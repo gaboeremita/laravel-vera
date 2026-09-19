@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { AnimationMixer, LoopOnce } from 'three';
+import { AnimationMixer, LoopOnce, LoopRepeat } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { applyBoneQuaternions, captureBoneQuaternions, loadPoseClip } from '../VrmAvatar.jsx';
 import { MAX_MOVEMENT_DELTA } from './collisionCheck.js';
+import { makeClipInPlace, turnTowardsAngle } from './residentMotion.js';
+import { findWorldMotionPose } from './worldMotionPoses.js';
 
-const ROAM_SPEED = 0.9;
+const WALK_SPEED = 0.3;
+const WALK_ACCELERATION = 0.18;
+const WALK_DECELERATION_SECONDS = 1.2;
+const MIN_WALK_SECONDS = 4;
+const MAX_WALK_SECONDS = 7;
+const MIN_IDLE_SECONDS = 2;
+const MAX_IDLE_SECONDS = 4;
+const TURN_SPEED = Math.PI * 4;
+const LOCOMOTION_BLEND_SECONDS = 0.2;
 
 // Slower than the portrait's own POSE_BLEND_SECONDS (0.25s) — a resident
 // has no idle animation to blend back into, so a snappy return read as
@@ -16,7 +26,7 @@ const POSE_RETURN_SECONDS = 0.6;
 // pose (no body animation to ride along with) holds before decaying.
 const POSE_EXPRESSION_HOLD_SECONDS = 3.5;
 
-export default function ResidentController({ resident, playerPosition, paused, activePose, collisionWorld, residentPositions }) {
+export default function ResidentController({ resident, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions }) {
 	const { scene } = useThree();
 	const vrm = useRef(null);
 	const mixer = useRef(null);
@@ -28,10 +38,22 @@ export default function ResidentController({ resident, playerPosition, paused, a
 	const poseExpressionHoldRef = useRef(0);
 	const activeBlendshapesRef = useRef([]);
 	const currentWeightsRef = useRef({});
+	const walkActionRef = useRef(null);
+	const walkStartActionRef = useRef(null);
+	const walkStopActionRef = useRef(null);
+	const defaultActionRef = useRef(null);
+	const locomotionActionRef = useRef(null);
+	const walkingRef = useRef(false);
+	const locomotionPhaseRef = useRef({ name: 'idle', endsAt: 0, velocity: 0, heading: null });
 	const [loaded, setLoaded] = useState(false);
 	const { x = 0, y = 0, z = 0 } = resident.position ?? {};
 	const position = useMemo(() => collisionWorld.findSpawn({ x, y, z }), [collisionWorld, x, y, z]);
 	const distance = position ? Math.hypot(playerPosition[0] - position.x, playerPosition[1] - position.y, playerPosition[2] - position.z) : Infinity;
+	const walkAnimationUrl = findWorldMotionPose(resident.assistant.poses, 'walk')?.animationUrl ?? null;
+	const walkStartAnimationUrl = findWorldMotionPose(resident.assistant.poses, 'walkStart')?.animationUrl ?? null;
+	const walkStopAnimationUrl = findWorldMotionPose(resident.assistant.poses, 'walkStop')?.animationUrl ?? null;
+	const defaultAnimationUrl = resident.assistant.poses?.find(({ name }) => name?.trim().toLowerCase() === 'default')?.animationUrl ?? null;
+	const greetingPose = findWorldMotionPose(resident.assistant.poses, 'greeting');
 
 	useEffect(() => {
 		if (!position) console.warn(`No walkable spawn was found for resident ${resident.id}.`);
@@ -75,6 +97,70 @@ export default function ResidentController({ resident, playerPosition, paused, a
 		mixer.current?.stopAllAction();
 	}, [resident.id, residentPositions, scene]);
 
+	// Preload an explicitly named walk pose, but leave it stopped until the
+	// resident actually moves. It shares the resident mixer with conversational
+	// poses, so a greeting or other one-shot pose remains the higher priority.
+	useEffect(() => {
+		if (!loaded || !vrm.current || !walkAnimationUrl) return undefined;
+		let cancelled = false;
+
+		void (async () => {
+			try {
+				const loadedClip = await loadPoseClip(walkAnimationUrl, vrm.current);
+				const clip = loadedClip ? makeClipInPlace(loadedClip) : null;
+				if (cancelled || !clip || !vrm.current) return;
+
+				const activeMixer = mixer.current ?? new AnimationMixer(vrm.current.scene);
+				mixer.current = activeMixer;
+				const action = activeMixer.clipAction(clip);
+				action.setLoop(LoopRepeat, Infinity);
+				walkActionRef.current = action;
+
+				if (walkingRef.current && !posePlayingRef.current && !returnBlendRef.current.active) {
+					action.reset().play();
+				}
+			} catch (error) {
+				console.error('[ResidentController] walk animation load error:', error);
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+			walkActionRef.current?.stop();
+			walkActionRef.current = null;
+		};
+	}, [loaded, walkAnimationUrl]);
+
+	useEffect(() => {
+		if (!loaded || !vrm.current) return undefined;
+		let cancelled = false;
+		const loadTransition = async (url, actionRef, loop = false) => {
+			if (!url) return;
+			try {
+				const loadedClip = await loadPoseClip(url, vrm.current);
+				const clip = loadedClip ? makeClipInPlace(loadedClip) : null;
+				if (cancelled || !clip || !vrm.current) return;
+				const activeMixer = mixer.current ?? new AnimationMixer(vrm.current.scene);
+				mixer.current = activeMixer;
+				const action = activeMixer.clipAction(clip);
+				action.setLoop(loop ? LoopRepeat : LoopOnce, loop ? Infinity : 1);
+				actionRef.current = action;
+				if (loop && !locomotionActionRef.current) {
+					action.play();
+					locomotionActionRef.current = action;
+				}
+			} catch (error) {
+				console.error('[ResidentController] walk transition animation load error:', error);
+			}
+		};
+		void Promise.all([
+			loadTransition(walkStartAnimationUrl, walkStartActionRef),
+			loadTransition(walkStopAnimationUrl, walkStopActionRef),
+			loadTransition(defaultAnimationUrl, defaultActionRef, true),
+		]);
+		return () => { cancelled = true; };
+	}, [defaultAnimationUrl, loaded, walkStartAnimationUrl, walkStopAnimationUrl]);
+
 	// A resident's pose is a one-shot trigger (e.g. a greeting wave), not an
 	// ongoing state — its body animation (if any) plays once and eases back
 	// to rest (see the 'finished' handler below and the blend loop in
@@ -82,15 +168,19 @@ export default function ResidentController({ resident, playerPosition, paused, a
 	// same window — see the expression handling in useFrame.
 	useEffect(() => {
 		if (!loaded || !vrm.current) return;
-		if (!activePose || activePose.residentId !== resident.id) return;
-		if (activePose.triggerId === lastPoseTriggerRef.current) return;
-		lastPoseTriggerRef.current = activePose.triggerId;
+		const triggeredPose = activePose?.residentId === resident.id
+			? activePose
+			: interaction?.residentId === resident.id
+				? { triggerId: interaction.triggerId, animationUrl: greetingPose?.animationUrl, blendshapes: greetingPose?.vrm_blendshapes ?? [] }
+				: null;
+		if (!triggeredPose || triggeredPose.triggerId === lastPoseTriggerRef.current) return;
+		lastPoseTriggerRef.current = triggeredPose.triggerId;
 
-		activeBlendshapesRef.current = activePose.blendshapes ?? [];
+		activeBlendshapesRef.current = triggeredPose.blendshapes ?? [];
 		poseExpressionHoldRef.current = 0;
-		poseHasAnimationRef.current = !!activePose.animationUrl;
+		poseHasAnimationRef.current = !!triggeredPose.animationUrl;
 
-		if (!activePose.animationUrl) {
+		if (!triggeredPose.animationUrl) {
 			// Blendshapes-only pose — no body clip to key the expression's
 			// active window off of, so useFrame falls back to a fixed hold.
 			posePlayingRef.current = false;
@@ -98,9 +188,10 @@ export default function ResidentController({ resident, playerPosition, paused, a
 		}
 
 		posePlayingRef.current = true;
+		walkActionRef.current?.stop();
 		let cancelled = false;
 		(async () => {
-			const clip = await loadPoseClip(activePose.animationUrl, vrm.current);
+			const clip = await loadPoseClip(triggeredPose.animationUrl, vrm.current);
 			if (cancelled || !clip || !vrm.current) { posePlayingRef.current = false; return; }
 			if (!mixer.current) mixer.current = new AnimationMixer(vrm.current.scene);
 
@@ -128,21 +219,79 @@ export default function ResidentController({ resident, playerPosition, paused, a
 			mixer.current.addEventListener('finished', onFinished);
 		})();
 		return () => { cancelled = true; };
-	}, [loaded, activePose, resident.id]);
+	}, [loaded, activePose, greetingPose, interaction, resident.id]);
 
 	useFrame((state, delta) => {
 		if (!vrm.current) return;
 		const currentPosition = vrm.current.scene.position;
 		const currentDistance = Math.hypot(playerPosition[0] - currentPosition.x, playerPosition[1] - currentPosition.y, playerPosition[2] - currentPosition.z);
-		if (resident.behavior === 'roam' && !paused && currentDistance < 30) {
-			const radius = Math.min(Number(resident.behaviorSettings?.radius ?? 1.2), 3);
-			const dx = position.x + Math.sin(state.clock.elapsedTime * 0.55) * radius - currentPosition.x;
-			const dz = position.z + Math.cos(state.clock.elapsedTime * 0.55) * radius - currentPosition.z;
-			const targetDistance = Math.hypot(dx, dz);
-			if (targetDistance > 0) {
-				const fraction = Math.min(1, ROAM_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA) / targetDistance);
-				collisionWorld.move(currentPosition, dx * fraction, dz * fraction);
+		let didMove = false;
+		const wantsToRoam = resident.behavior === 'roam' && !paused && currentDistance < 30;
+		const locomotion = locomotionPhaseRef.current;
+		const activateLocomotionAction = (action) => {
+			if (!action || locomotionActionRef.current === action) return;
+			const previousAction = locomotionActionRef.current;
+			action.reset().play();
+			if (previousAction) action.crossFadeFrom(previousAction, LOCOMOTION_BLEND_SECONDS, false);
+			locomotionActionRef.current = action;
+		};
+		const playTransition = (actionRef, name) => {
+			const action = actionRef.current;
+			if (!action) {
+				locomotion.name = name === 'starting' ? 'walking' : 'idle';
+				if (name === 'stopping') activateLocomotionAction(defaultActionRef.current);
+				return;
 			}
+			activateLocomotionAction(action);
+			locomotion.name = name;
+			locomotion.endsAt = state.clock.elapsedTime + action.getClip().duration;
+		};
+
+		const beginIdle = () => {
+			locomotion.name = 'idle';
+			locomotion.velocity = 0;
+			locomotion.endsAt = state.clock.elapsedTime + MIN_IDLE_SECONDS + Math.random() * (MAX_IDLE_SECONDS - MIN_IDLE_SECONDS);
+			activateLocomotionAction(defaultActionRef.current);
+		};
+		if (!wantsToRoam && ['walking', 'starting', 'turning'].includes(locomotion.name)) {
+			playTransition(walkStopActionRef, 'stopping');
+			locomotion.velocity = 0;
+		}
+		if (locomotion.name === 'stopping' && state.clock.elapsedTime >= locomotion.endsAt) beginIdle();
+		if (locomotion.name === 'idle') {
+			if (locomotion.endsAt === 0) beginIdle();
+			if (wantsToRoam && state.clock.elapsedTime >= locomotion.endsAt) {
+				locomotion.name = 'turning';
+				locomotion.heading = vrm.current.scene.rotation.y + (Math.random() - 0.5) * 1.4;
+			}
+		}
+		if (locomotion.name === 'turning') {
+			vrm.current.scene.rotation.y = turnTowardsAngle(vrm.current.scene.rotation.y, locomotion.heading, TURN_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));
+			if (Math.abs(Math.sin(locomotion.heading - vrm.current.scene.rotation.y)) < 0.05) playTransition(walkStartActionRef, 'starting');
+		}
+		if (locomotion.name === 'starting' && state.clock.elapsedTime >= locomotion.endsAt) {
+			locomotion.name = 'walking';
+			locomotion.velocity = 0;
+			locomotion.endsAt = state.clock.elapsedTime + MIN_WALK_SECONDS + Math.random() * (MAX_WALK_SECONDS - MIN_WALK_SECONDS);
+			activateLocomotionAction(walkActionRef.current);
+		}
+		if (wantsToRoam && locomotion.name === 'walking') {
+			const remaining = locomotion.endsAt - state.clock.elapsedTime;
+			const targetVelocity = remaining <= WALK_DECELERATION_SECONDS ? WALK_SPEED * Math.max(remaining / WALK_DECELERATION_SECONDS, 0) : WALK_SPEED;
+			const velocityChange = WALK_ACCELERATION * Math.min(delta, MAX_MOVEMENT_DELTA);
+			locomotion.velocity += Math.sign(targetVelocity - locomotion.velocity) * Math.min(Math.abs(targetVelocity - locomotion.velocity), velocityChange);
+			const step = locomotion.velocity * Math.min(delta, MAX_MOVEMENT_DELTA);
+			const previousX = currentPosition.x;
+			const previousZ = currentPosition.z;
+			collisionWorld.move(currentPosition, -Math.sin(vrm.current.scene.rotation.y) * step, -Math.cos(vrm.current.scene.rotation.y) * step);
+			const movedX = currentPosition.x - previousX;
+			const movedZ = currentPosition.z - previousZ;
+			didMove = Math.hypot(movedX, movedZ) > 0.0001;
+			if (!didMove || remaining <= 0) playTransition(walkStopActionRef, 'stopping');
+		}
+		walkingRef.current = didMove;
+		if (didMove && !posePlayingRef.current && !returnBlendRef.current.active) {
+			activateLocomotionAction(walkActionRef.current);
 		}
 		if (currentDistance < 30) {
 			mixer.current?.update(delta);

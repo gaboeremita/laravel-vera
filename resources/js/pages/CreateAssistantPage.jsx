@@ -7,6 +7,8 @@ import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
 import PoseEditor from '../components/PoseEditor.jsx';
 import DefaultPoseEditor from '../components/DefaultPoseEditor.jsx';
+import WorldMotionPoseEditor from '../components/WorldMotionPoseEditor.jsx';
+import { isWorldMotionPose } from '../components/world/worldMotionPoses.js';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
 export default function CreateAssistantPage({ kind = 'assistant' }) {
@@ -479,8 +481,16 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 							onDeleteAnimation={handleDeleteDefaultPoseAnimation}
 						/>
 
+						<WorldMotionPoseEditor
+							poses={stagedPoses}
+							onAdd={handleAddPose}
+							onUpdateBlendshapes={handleUpdatePoseBlendshapes}
+							onUploadAnimation={handleUploadPoseAnimation}
+							onDeleteAnimation={handleDeletePoseAnimation}
+						/>
+
 						<PoseEditor
-							poses={stagedPoses.filter((p) => p.name !== 'default')}
+							poses={stagedPoses.filter((p) => p.name !== 'default' && !isWorldMotionPose(p))}
 							onAdd={handleAddPose}
 							onDelete={handleDeletePose}
 							onUpdateBlendshapes={handleUpdatePoseBlendshapes}

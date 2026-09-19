@@ -9,6 +9,7 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 	const [environment, setEnvironment] = useState(null);
 	const residentPositions = useRef(new Map());
 	const [playerPosition, setPlayerPosition] = useState([0, 1.6, 4]);
+	const [interaction, setInteraction] = useState(null);
 	const handlePositionChange = useCallback((position) => {
 		setPlayerPosition(position);
 		onPlayerPositionChange?.(position);
@@ -32,8 +33,8 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 			{environment && (
 				<>
 					<FirstPersonController collisionWorld={environment.collisionWorld} spawnPosition={spawnPosition} enabled={explorationEnabled} onPositionChange={handlePositionChange} />
-					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} />)}
-					<InteractionSystem residents={world.residents} residentPositions={residentPositions} onResidentChange={onResidentChange} onInteract={onInteract} enabled={explorationEnabled} />
+					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} interaction={interaction} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} />)}
+					<InteractionSystem residents={world.residents} residentPositions={residentPositions} onResidentChange={onResidentChange} onInteract={(resident) => { setInteraction({ residentId: resident.id, triggerId: crypto.randomUUID() }); onInteract(resident); }} enabled={explorationEnabled} />
 				</>
 			)}
 		</Canvas>

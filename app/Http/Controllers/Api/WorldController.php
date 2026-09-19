@@ -52,7 +52,7 @@ class WorldController extends Controller
     {
         Gate::authorize('view', $world);
 
-        return response()->json((new WorldResource($world->load(['residents.assistant.vrm', 'cardImage', 'portraitImage', 'track'])))->resolve());
+        return response()->json((new WorldResource($world->load(['residents.assistant.vrm', 'residents.assistant.poses.animationFile', 'cardImage', 'portraitImage', 'track'])))->resolve());
     }
 
     public function update(UpdateWorldRequest $request, World $world): JsonResponse
