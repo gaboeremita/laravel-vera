@@ -730,6 +730,7 @@ class ConversationController extends Controller
             'audio' => ['nullable', 'string', 'max:2000000'],
             'audioContentType' => ['required_with:audio', 'nullable', 'string'],
             'dm_username' => ['nullable', 'string'],
+            'author_username' => ['nullable', 'string'],
         ]);
 
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
@@ -781,6 +782,10 @@ class ConversationController extends Controller
             ['discord_channel_id' => $validated['channel_id']],
             ['title' => 'New conversation'],
         );
+
+        if (empty($validated['dm_username']) && ! empty($validated['author_username']) && trim($content) !== '') {
+            $content = "{$validated['author_username']}: {$content}";
+        }
 
         $message = $conversation->messages()->create([
             'role' => 'user',
