@@ -51,7 +51,27 @@ Talking to a resident no longer freezes the world. The conversation stays on scr
 
 ---
 
-### User Story 3 - The resident goes where she means to go (Priority: P3)
+### User Story 3 - Find residents with name tags and a map (Priority: P3)
+
+Residents are easy to find, even in a large world with many of them. Every resident shows a floating name tag above her head that stays readable at any distance and remains visible through walls and furniture. The resident the user is talking to has a highlighted tag. When she is off-screen, an indicator at the edge of the screen points toward her. The user can also open a map of the world: a small corner minimap while moving, and a full-screen map on demand. The map shows the world from above (the uploaded blueprint when there is one), zone names, the user's position and facing, and every resident with her name. The resident being talked to is highlighted.
+
+**Why this priority**: Residents already get lost in large worlds today, and conversations that follow the user around make it more important to know where she is. The map reuses the top-down view the editor needs, so building it here also lays groundwork for the editor.
+
+**Independent Test**: In the penthouse with three residents, open the full-screen map and find each of them by name. Start a conversation with one, walk into another room, and follow the off-screen indicator and the highlighted map marker back to her.
+
+**Acceptance Scenarios**:
+
+1. **Given** several residents in a world, **When** the user looks around, **Then** each resident shows her name above her head, including residents behind walls.
+2. **Given** a conversation is open, **When** the user looks at the residents, **Then** the tag of the resident being talked to is visibly highlighted and distinct from the others.
+3. **Given** a conversation is open and the resident is off-screen, **When** the user looks elsewhere, **Then** an indicator at the screen edge points toward her.
+4. **Given** the user opens the full-screen map, **When** it is shown, **Then** it displays the world from above with zone names, the user's position and facing, and every resident's position and name.
+5. **Given** a conversation is open, **When** the user views the map, **Then** that resident's marker is highlighted.
+6. **Given** the owner uploaded and aligned a blueprint, **When** the user opens the map, **Then** the blueprint is shown with markers placed correctly on it.
+7. **Given** the user and residents move, **When** the map or minimap is open, **Then** the markers follow their positions continuously.
+
+---
+
+### User Story 4 - The resident goes where she means to go (Priority: P4)
 
 When the resident decides to go somewhere, either because the user asked ("meet me at the bar", "follow me") or because she said she wants to, she walks there along a valid route: through doorways, up and down steps, and around furniture. She can go to a zone, go to a specific object, follow the user, or stop. When she arrives, fails to arrive, or is interrupted, she learns the outcome, so what she says afterwards matches what actually happened.
 
@@ -69,11 +89,11 @@ When the resident decides to go somewhere, either because the user asked ("meet 
 
 ---
 
-### User Story 4 - The resident uses things in the world (Priority: P4)
+### User Story 5 - The resident uses things in the world (Priority: P5)
 
 Objects offer interaction spots with an activity: sit on the piano bench, lie down on the bed, recline on a pool lounger, get a drink at the bar, play the Rhodes. When the resident uses one, she walks to that exact spot, faces the right way, and holds the matching pose until she moves on. Some activities give her something to hold, like a glass after getting a drink, and that state is part of what she knows about herself.
 
-**Why this priority**: This is the payoff that makes the world feel inhabited, but it needs the resident to know the world (P1) and reach the spot (P3) first.
+**Why this priority**: This is the payoff that makes the world feel inhabited, but it needs the resident to know the world (P1) and reach the spot (P4) first.
 
 **Independent Test**: Ask the resident to lie down on a pool lounger. She walks to it, lies down aligned with it, and stays reclined until asked to get up or until she chooses another activity.
 
@@ -87,7 +107,7 @@ Objects offer interaction spots with an activity: sit on the piano bench, lie do
 
 ---
 
-### User Story 5 - The resident chooses what to do when left alone (Priority: P5)
+### User Story 6 - The resident chooses what to do when left alone (Priority: P6)
 
 While the user is in the world but not in conversation with her, the resident periodically decides for herself whether to do something and what. While the user is talking with her, she makes no self-chosen actions; she gives the user her attention and only acts when the user asks her to. Her choice comes from her personality, her mood, what she has done recently and what the world offers. She is not picked at random from a list. An extroverted resident may go get a drink; one who loves music may wander into the studio; one who just had a drink will choose something else. She can carry out a multi-step activity ("get a drink, take it to the pool, lie on a lounger"). She adjusts the plan when a step fails, and drops it when the user speaks to her. Staying where she is counts as a real choice.
 
@@ -110,11 +130,11 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 ---
 
-### User Story 6 - World owners mark zones and objects in an intuitive editor (Priority: P6)
+### User Story 7 - World owners mark zones and objects in an intuitive editor (Priority: P7)
 
 A world owner marks up a world without technical knowledge. The editor shows a top-down map of the world, generated from the environment itself. The owner can optionally lay an uploaded blueprint image over it and align it to the map. On the map, the owner draws zones as rectangles or free outlines and names and describes them. The owner places objects on the map or directly in the 3D view and adds interaction spots with a facing direction and activities. A preview of the resident standing, sitting or lying at each spot shows whether it lines up. The editor warns about mistakes the owner cannot easily see: a spot the resident cannot walk to, a zone with no entry point, or overlapping zones that are not nested. Markers already contained in an uploaded environment are imported automatically and can be edited like hand-made ones.
 
-**Why this priority**: Stories 1–5 can be demonstrated on the penthouse, which ships its own markers. The editor is what extends the feature to every other world, like the renaissance faire. It is also the largest single piece of work, so it comes after the behavior it configures has been proven.
+**Why this priority**: Stories 1–6 can be demonstrated on the penthouse, which ships its own markers. The editor is what extends the feature to every other world, like the renaissance faire. It is also the largest single piece of work, so it comes after the behavior it configures has been proven.
 
 **Independent Test**: In an unmarked world, draw a "Jousting field" zone on the map and add a "Grandstand bench" object with a sit spot. The spot preview shows the resident seated on the bench. Entering the world, the resident knows the jousting field exists and can sit on the bench.
 
@@ -145,6 +165,8 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - The user walks far away from the resident in the middle of a conversation.
 - Several residents stand close together when the user starts a conversation, or while one is in progress.
 - The resident being talked to walks away from the user on her own (following a request) until they are beyond the distance limit.
+- A world with several floors, where the map must show which floor each resident is on.
+- Many residents crowded into a small area, with their name tags and map markers overlapping.
 - In voice mode, the resident's own spoken reply or background sound is picked up by the microphone.
 - The user denies microphone access, or it becomes unavailable while walking in voice mode.
 
@@ -232,6 +254,16 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - **FR-048**: A conversation MUST end automatically when the user and the resident are farther apart than a set distance. The user MUST be warned before that distance is reached.
 - **FR-049**: The user MUST be able to end a conversation deliberately with a control that is separate from leaving the message box.
 
+**Finding residents**
+
+- **FR-050**: Every resident MUST show a name tag above her that stays readable at any distance and is visible through walls and furniture.
+- **FR-051**: The name tag of the resident in the open conversation MUST be highlighted distinctly from all others.
+- **FR-052**: When the resident in the open conversation is off-screen, an indicator at the screen edge MUST point toward her.
+- **FR-053**: The user MUST be able to show a corner minimap while moving and open a full-screen map on demand.
+- **FR-054**: The map MUST show the world's top-down view (the aligned blueprint when one exists), zone names, the user's position and facing, and every resident's position and name, updating continuously.
+- **FR-055**: The map marker of the resident in the open conversation MUST be highlighted.
+- **FR-056**: Overlapping name tags and map markers MUST remain individually readable.
+
 **Direct commands**
 
 - **FR-036**: The user MUST be able to ask the resident in conversation to follow or stop, and she decides how to respond in character.
@@ -245,7 +277,7 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - **Activity**: Something a resident can do at a spot or in a zone, with an optional pose and an optional held item.
 - **Resident state**: A resident's current position, zone, current activity, held item and occupied spot within a world session.
 - **Activity history entry**: A record of what a resident did, where, when, the outcome, and the stated reason.
-- **World map**: The top-down view of a world's environment used for authoring, with an optional uploaded blueprint image and its alignment.
+- **World map**: The top-down view of a world's environment, used both for authoring and for the in-world map, with an optional uploaded blueprint image and its alignment.
 
 ## Success Criteria *(mandatory)*
 
@@ -259,6 +291,7 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - **SC-006**: Zero resident decisions or actions happen while the user is not in the world.
 - **SC-007**: A world owner can mark a new zone with one sittable object and see the resident use it in under 5 minutes.
 - **SC-008**: A first-time owner can mark all rooms of a ten-room world in under 20 minutes without instructions.
+- **SC-010**: In a world with five residents, a user can locate any named resident within 10 seconds using the name tags or the map.
 - **SC-009**: For every self-chosen step, the user can tell from the thought bubble alone both what the resident is doing and why.
 
 ## Assumptions
