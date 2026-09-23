@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\AssistantPortraitType;
 use App\Models\Assistant;
+use App\Models\World;
 
 class LlmResponseTagParser
 {
@@ -152,5 +153,72 @@ class LlmResponseTagParser
         $content = preg_replace('/(?:\r?\n){3,}/', "\n\n", $content);
 
         return trim($content);
+    }
+
+    /**
+     * The first [action: …] tag in a reply, checked against the world's layout.
+     *
+     * @return ?array{verb: string, target?: ?string, activity?: ?string, reason?: string}
+     */
+    public function parseAction(string $content, World $world): ?array
+    {
+        if (preg_match('/\[action:\s*([^\]\r\n]*)\]/iu', $content, $match) !== 1) {
+            return null;
+        }
+
+        $tokens = preg_split('/\s+/u', trim($match[1]), -1, PREG_SPLIT_NO_EMPTY);
+        $verb = mb_strtolower($tokens[0] ?? '');
+        $layout = $world->layout ?? [];
+        $invalid = fn (string $reason) => ['verb' => 'invalid', 'reason' => $reason];
+
+        return match ($verb) {
+            'follow', 'stop', 'stay' => ['verb' => $verb, 'target' => null, 'activity' => null],
+            'go_to' => $this->parseGoTo($tokens[1] ?? null, $layout, $invalid),
+            'use' => $this->parseUse($tokens[1] ?? null, $tokens[2] ?? null, $layout, $invalid),
+            'zone' => $this->parseZoneActivity($tokens[1] ?? null, $layout, $invalid),
+            default => $invalid(sprintf('"%s" is not an action you can take', $verb)),
+        };
+    }
+
+    private function parseGoTo(?string $target, array $layout, \Closure $invalid): array
+    {
+        if ($target === null) {
+            return $invalid('go_to needs a place or thing to go to');
+        }
+
+        $known = collect($layout['zones'] ?? [])->pluck('id')->merge(collect($layout['objects'] ?? [])->pluck('id'));
+
+        return $known->contains($target)
+            ? ['verb' => 'go_to', 'target' => $target, 'activity' => null]
+            : $invalid(sprintf('there is no place or thing called "%s" here', $target));
+    }
+
+    private function parseUse(?string $spotId, ?string $activityId, array $layout, \Closure $invalid): array
+    {
+        if ($spotId === null || $activityId === null) {
+            return $invalid('use needs a spot and an activity');
+        }
+
+        $spot = collect($layout['objects'] ?? [])->flatMap(fn (array $object) => $object['spots'])->firstWhere('id', $spotId);
+        if ($spot === null) {
+            return $invalid(sprintf('there is no spot called "%s" here', $spotId));
+        }
+
+        return collect($spot['activities'])->contains('id', $activityId)
+            ? ['verb' => 'use', 'target' => $spotId, 'activity' => $activityId]
+            : $invalid(sprintf('"%s" cannot be done at "%s"', $activityId, $spotId));
+    }
+
+    private function parseZoneActivity(?string $activityId, array $layout, \Closure $invalid): array
+    {
+        if ($activityId === null) {
+            return $invalid('zone needs an activity');
+        }
+
+        $exists = collect($layout['zones'] ?? [])->flatMap(fn (array $zone) => $zone['activities'])->contains('id', $activityId);
+
+        return $exists
+            ? ['verb' => 'zone', 'target' => null, 'activity' => $activityId]
+            : $invalid(sprintf('there is no activity called "%s" here', $activityId));
     }
 }

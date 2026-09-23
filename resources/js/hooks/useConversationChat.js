@@ -34,6 +34,7 @@ export function useConversationChat({
 	onPoseChange,
 	onEmotionChange,
 	onVoiceReply,
+	onAction,
 	onLoadError,
 	addToast,
 	fetchEmotions,
@@ -205,6 +206,7 @@ export function useConversationChat({
 				setMessages([...updatedMessages, ...generatedImageMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions, toolCalls: data.tool_calls || null, audioBase64: data.audioBase64 || null, audioContentType: data.audioContentType || null }]);
 				setIsLoading(false);
 				if (voiceMode) onVoiceReply?.(cleanText, ttsInstructions);
+				if (data.action) onAction?.(data.action);
 				return;
 			} catch (error) {
 				lastError = error;
@@ -225,7 +227,7 @@ export function useConversationChat({
 		addToast?.(lastError?.message || 'Connection to The Bridge failed', 'error');
 		setMessages([...updatedMessages]);
 		setIsLoading(false);
-	}, [messages, isLoading, assistantId, conversationId, portraitType, poseNames, emotionNames, unlocked, extraParams, fetchEmotions, onPoseChange, onEmotionChange, onVoiceReply, addToast]);
+	}, [messages, isLoading, assistantId, conversationId, portraitType, poseNames, emotionNames, unlocked, extraParams, fetchEmotions, onPoseChange, onEmotionChange, onVoiceReply, onAction, addToast]);
 
 	return { messages, setMessages, isLoading, hasError, hasMore, isLoadingMore, sendMessage, loadOlderMessages };
 }

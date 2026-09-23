@@ -5,7 +5,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { applyBoneQuaternions, captureBoneQuaternions, loadPoseClip } from '../VrmAvatar.jsx';
 import { MAX_MOVEMENT_DELTA } from './collisionCheck.js';
-import { makeClipInPlace, turnTowardsAngle } from './residentMotion.js';
+import { facingAngleForMovement, makeClipInPlace, turnTowardsAngle } from './residentMotion.js';
 import { findWorldMotionPose } from './worldMotionPoses.js';
 
 const WALK_SPEED = 0.3;
@@ -25,11 +25,21 @@ const POSE_RETURN_SECONDS = 0.6;
 // Matches VrmAvatar's EXPRESSION_HOLD_SECONDS — how long a blendshapes-only
 // pose (no body animation to ride along with) holds before decaying.
 const POSE_EXPRESSION_HOLD_SECONDS = 3.5;
+const ROUTE_WALK_SPEED = 1.0;
+const ROUTE_ACCELERATION = 2.0;
+const ROUTE_TURN_SPEED = Math.PI * 2;
+const ROUTE_ARRIVAL_SLOWDOWN = 0.8;
+const WAYPOINT_REACHED = 0.35;
+const FOLLOW_REPLAN_SECONDS = 0.5;
+const FOLLOW_STOP_DISTANCE = 1.4;
+const FOLLOW_RESUME_DISTANCE = 2.0;
+const STUCK_SECONDS = 2;
+const STUCK_MIN_PROGRESS = 0.05;
 const VOICE_HEIGHT = 1.5;
 const VOICE_REF_DISTANCE = 2;
 const VOICE_ROLLOFF = 1.2;
 
-export default function ResidentController({ resident, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions, residentVoices, audioListener, inConversation = false }) {
+export default function ResidentController({ resident, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions, residentVoices, audioListener, inConversation = false, navigation, residentCommands }) {
 	const { scene } = useThree();
 	const vrm = useRef(null);
 	const mixer = useRef(null);
@@ -49,6 +59,7 @@ export default function ResidentController({ resident, playerPosition, paused, a
 	const walkingRef = useRef(false);
 	const locomotionPhaseRef = useRef({ name: 'idle', endsAt: 0, velocity: 0, heading: null });
 	const [loaded, setLoaded] = useState(false);
+	const routeRef = useRef(null);
 	const { x = 0, y = 0, z = 0 } = resident.position ?? {};
 	const position = useMemo(() => collisionWorld.findSpawn({ x, y, z }), [collisionWorld, x, y, z]);
 	const distance = position ? Math.hypot(playerPosition[0] - position.x, playerPosition[1] - position.y, playerPosition[2] - position.z) : Infinity;
@@ -126,6 +137,47 @@ export default function ResidentController({ resident, playerPosition, paused, a
 			}
 		};
 	}, [loaded, resident.id, residentVoices, audioListener]);
+
+	useEffect(() => {
+		if (!loaded || !residentCommands || !navigation) return undefined;
+		const settle = (outcome, reason = null) => {
+			const route = routeRef.current;
+			if (!route) return;
+			routeRef.current = null;
+			route.resolve({ outcome, reason });
+		};
+		const planTo = (target) => {
+			const grid = navigation.current;
+			if (!grid) return { reason: 'you are still getting to know this place' };
+			const path = grid.findPath(vrm.current.scene.position, target);
+			return path ? { path } : { reason: 'there is no way to get there from here' };
+		};
+		const commands = {
+			goTo: (target) => new Promise((resolve) => {
+				settle('interrupted', 'a new action replaced it');
+				const plan = planTo(target);
+				if (!plan.path) {
+					resolve({ outcome: 'failed', reason: plan.reason });
+					return;
+				}
+				routeRef.current = { mode: 'goto', target, waypoints: plan.path, index: Math.min(1, plan.path.length - 1), moving: true, heading: null, replanned: false, progressAt: null, bestDistance: Infinity, resolve };
+			}),
+			follow: (getTarget) => new Promise((resolve) => {
+				settle('interrupted', 'a new action replaced it');
+				routeRef.current = { mode: 'follow', getTarget, waypoints: [], index: 0, moving: false, heading: null, replanAt: 0, progressAt: null, bestDistance: Infinity, resolve };
+			}),
+			stop: () => {
+				settle('interrupted', 'you were told to stop');
+				return Promise.resolve({ outcome: 'completed', reason: null });
+			},
+		};
+		const registry = residentCommands.current;
+		registry.set(resident.id, commands);
+		return () => {
+			registry.delete(resident.id);
+			settle('interrupted', 'the user left');
+		};
+	}, [loaded, navigation, resident.id, residentCommands]);
 
 	useEffect(() => () => {
 		residentPositions.current.delete(resident.id);
@@ -265,7 +317,69 @@ export default function ResidentController({ resident, playerPosition, paused, a
 		const currentPosition = vrm.current.scene.position;
 		const currentDistance = Math.hypot(playerPosition[0] - currentPosition.x, playerPosition[1] - currentPosition.y, playerPosition[2] - currentPosition.z);
 		let didMove = false;
-		const wantsToRoam = resident.behavior === 'roam' && !paused && !inConversation && currentDistance < 30;
+		const elapsed = state.clock.elapsedTime;
+		const route = routeRef.current;
+		if (route) {
+			if (route.mode === 'follow' && elapsed >= route.replanAt) {
+				route.replanAt = elapsed + FOLLOW_REPLAN_SECONDS;
+				const target = route.getTarget();
+				if (target) {
+					const gap = Math.hypot(target.x - currentPosition.x, target.z - currentPosition.z);
+					if (gap <= FOLLOW_STOP_DISTANCE) route.moving = false;
+					else if (route.moving || gap >= FOLLOW_RESUME_DISTANCE) {
+						const path = navigation?.current?.findPath(currentPosition, target);
+						if (path && path.length > 1) {
+							route.waypoints = path;
+							route.index = 1;
+							route.moving = true;
+							route.bestDistance = Infinity;
+							route.progressAt = elapsed;
+						}
+					}
+				}
+			}
+			if (route.moving) {
+				let waypoint = route.waypoints[route.index];
+				while (waypoint && Math.hypot(waypoint.x - currentPosition.x, waypoint.z - currentPosition.z) < WAYPOINT_REACHED) {
+					route.index++;
+					route.bestDistance = Infinity;
+					route.progressAt = elapsed;
+					waypoint = route.waypoints[route.index];
+				}
+				if (!waypoint) {
+					route.moving = false;
+					if (route.mode === 'goto') {
+						routeRef.current = null;
+						route.resolve({ outcome: 'completed', reason: null });
+					}
+				} else {
+					const toWaypoint = Math.hypot(waypoint.x - currentPosition.x, waypoint.z - currentPosition.z);
+					route.heading = facingAngleForMovement(waypoint.x - currentPosition.x, waypoint.z - currentPosition.z);
+					if (route.progressAt === null || toWaypoint < route.bestDistance - STUCK_MIN_PROGRESS) {
+						route.bestDistance = toWaypoint;
+						route.progressAt = elapsed;
+					}
+					if (locomotionPhaseRef.current.name === 'walking' && elapsed - route.progressAt > STUCK_SECONDS) {
+						const path = route.mode === 'goto' && !route.replanned ? navigation?.current?.findPath(currentPosition, route.target) : null;
+						if (path && path.length > 1) {
+							route.waypoints = path;
+							route.index = 1;
+							route.replanned = true;
+							route.bestDistance = Infinity;
+							route.progressAt = elapsed;
+						} else if (route.mode === 'goto') {
+							routeRef.current = null;
+							route.resolve({ outcome: 'failed', reason: 'you got stuck on the way' });
+						} else {
+							route.moving = false;
+						}
+					}
+				}
+			}
+		}
+		const routeMoving = Boolean(routeRef.current?.moving);
+		const wantsToRoam = !routeRef.current && resident.behavior === 'roam' && !paused && !inConversation && currentDistance < 30;
+		const wantsToMove = routeMoving || wantsToRoam;
 		const locomotion = locomotionPhaseRef.current;
 		const activateLocomotionAction = (action) => {
 			if (!action || locomotionActionRef.current === action) return;
@@ -292,21 +406,26 @@ export default function ResidentController({ resident, playerPosition, paused, a
 			locomotion.endsAt = state.clock.elapsedTime + MIN_IDLE_SECONDS + Math.random() * (MAX_IDLE_SECONDS - MIN_IDLE_SECONDS);
 			activateLocomotionAction(defaultActionRef.current);
 		};
-		if (!wantsToRoam && ['walking', 'starting', 'turning'].includes(locomotion.name)) {
+		if (!wantsToMove && ['walking', 'starting', 'turning'].includes(locomotion.name)) {
 			playTransition(walkStopActionRef, 'stopping');
 			locomotion.velocity = 0;
 		}
 		if (locomotion.name === 'stopping' && state.clock.elapsedTime >= locomotion.endsAt) beginIdle();
 		if (locomotion.name === 'idle') {
 			if (locomotion.endsAt === 0) beginIdle();
-			if (wantsToRoam && state.clock.elapsedTime >= locomotion.endsAt) {
+			if (routeMoving && routeRef.current.heading !== null) {
+				locomotion.name = 'turning';
+				locomotion.heading = routeRef.current.heading;
+			} else if (wantsToRoam && state.clock.elapsedTime >= locomotion.endsAt) {
 				locomotion.name = 'turning';
 				locomotion.heading = vrm.current.scene.rotation.y + (Math.random() - 0.5) * 1.4;
 			}
 		}
+		if (locomotion.name === 'turning' && routeMoving && routeRef.current.heading !== null) locomotion.heading = routeRef.current.heading;
 		if (locomotion.name === 'turning') {
 			vrm.current.scene.rotation.y = turnTowardsAngle(vrm.current.scene.rotation.y, locomotion.heading, TURN_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));
-			if (Math.abs(Math.sin(locomotion.heading - vrm.current.scene.rotation.y)) < 0.05) playTransition(walkStartActionRef, 'starting');
+			const headingError = locomotion.heading - vrm.current.scene.rotation.y;
+			if (Math.abs(Math.sin(headingError)) < 0.05 && Math.cos(headingError) > 0) playTransition(walkStartActionRef, 'starting');
 		}
 		if (locomotion.name === 'starting' && state.clock.elapsedTime >= locomotion.endsAt) {
 			locomotion.name = 'walking';
@@ -327,6 +446,20 @@ export default function ResidentController({ resident, playerPosition, paused, a
 			const movedZ = currentPosition.z - previousZ;
 			didMove = Math.hypot(movedX, movedZ) > 0.0001;
 			if (!didMove || remaining <= 0) playTransition(walkStopActionRef, 'stopping');
+		}
+		if (routeMoving && locomotion.name === 'walking') {
+			const activeRoute = routeRef.current;
+			const step = Math.min(delta, MAX_MOVEMENT_DELTA);
+			if (activeRoute.heading !== null) vrm.current.scene.rotation.y = turnTowardsAngle(vrm.current.scene.rotation.y, activeRoute.heading, ROUTE_TURN_SPEED * step);
+			const finalWaypoint = activeRoute.waypoints[activeRoute.waypoints.length - 1];
+			const toEnd = activeRoute.mode === 'goto' ? Math.hypot(finalWaypoint.x - currentPosition.x, finalWaypoint.z - currentPosition.z) : Infinity;
+			const targetVelocity = ROUTE_WALK_SPEED * Math.min(1, Math.max(0.3, toEnd / ROUTE_ARRIVAL_SLOWDOWN));
+			locomotion.velocity += Math.sign(targetVelocity - locomotion.velocity) * Math.min(Math.abs(targetVelocity - locomotion.velocity), ROUTE_ACCELERATION * step);
+			const distance = locomotion.velocity * step;
+			const previousX = currentPosition.x;
+			const previousZ = currentPosition.z;
+			collisionWorld.move(currentPosition, -Math.sin(vrm.current.scene.rotation.y) * distance, -Math.cos(vrm.current.scene.rotation.y) * distance);
+			didMove = Math.hypot(currentPosition.x - previousX, currentPosition.z - previousZ) > 0.0001;
 		}
 		walkingRef.current = didMove;
 		if (didMove && !posePlayingRef.current && !returnBlendRef.current.active) {

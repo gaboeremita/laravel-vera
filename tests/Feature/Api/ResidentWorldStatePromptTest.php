@@ -1,57 +1,9 @@
 <?php
 
-use App\Models\User;
-use App\Models\World;
 use App\Models\WorldSession;
-use App\Models\WorldUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
-
-/**
- * @return array{0: User, 1: \App\Models\Assistant, 2: \App\Models\Conversation, 3: World, 4: \App\Models\WorldResident, 5: WorldSession}
- */
-function worldStateScenario(array $worldAttributes = []): array
-{
-    [$user, $assistant, $conversation] = setUpAgentAssistant('assistant');
-    $world = World::factory()->forUser($user)->withLayout()->create($worldAttributes);
-    $resident = $world->residents()->create([
-        'assistant_id' => $assistant->id,
-        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
-        'behavior' => 'stationary',
-    ]);
-    $worldUser = WorldUser::where('world_id', $world->id)->where('user_id', $user->id)->firstOrFail();
-    $session = WorldSession::factory()->create(['world_user_id' => $worldUser->id]);
-
-    Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Right here.'))]);
-
-    return [$user, $assistant, $conversation, $world, $resident, $session];
-}
-
-function sendWorldMessage($test, array $scenario, array $positions): Illuminate\Testing\TestResponse
-{
-    [$user, $assistant, $conversation, $world, , $session] = $scenario;
-
-    return $test->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]), [
-        'messages' => [['role' => 'user', 'content' => 'Where are you, and where am I?']],
-        'worldId' => $world->id,
-        'worldSessionId' => $session->id,
-        'positions' => $positions,
-    ]);
-}
-
-function sentSystemPrompt(): string
-{
-    $prompt = '';
-    Http::assertSent(function ($request) use (&$prompt) {
-        $prompt = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
-
-        return true;
-    });
-
-    return $prompt;
-}
 
 it('tells the resident her zone, the user\'s zone and their distance', function () {
     $scenario = worldStateScenario();
@@ -140,4 +92,39 @@ it('rejects a world session that does not belong to the user', function () {
     $scenario[5] = $otherSession;
 
     sendWorldMessage($this, $scenario, ['user' => ['x' => 0, 'y' => 0, 'z' => 0]])->assertNotFound();
+});
+
+it('includes her recent activity, newest first, limited to the last eight', function () {
+    $scenario = worldStateScenario();
+    [, , , , $resident, $session] = $scenario;
+    foreach (range(1, 9) as $minutesAgo) {
+        App\Models\ResidentActivity::factory()->finished()->create([
+            'world_session_id' => $session->id,
+            'world_resident_id' => $resident->id,
+            'target' => "place-{$minutesAgo}",
+            'created_at' => now()->subMinutes($minutesAgo),
+        ]);
+    }
+    App\Models\ResidentActivity::factory()->failed('there is no way to get there')->create([
+        'world_session_id' => $session->id,
+        'world_resident_id' => $resident->id,
+        'target' => 'pool-terrace',
+        'zone_id' => 'studio',
+        'created_at' => now(),
+    ]);
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -3],
+        'residents' => [$resident->id => ['x' => -5, 'y' => 0, 'z' => 2]],
+    ])->assertSuccessful();
+
+    $prompt = sentSystemPrompt();
+    expect($prompt)
+        ->toContain('Your recent activity, newest first:')
+        ->toContain('- walked toward pool-terrace, from Music studio: failed (there is no way to get there), just now')
+        ->toContain('- walked toward place-1: completed, 1 min ago')
+        ->toContain('place-7')
+        ->not->toContain('place-8')
+        ->not->toContain('place-9');
+    expect(strpos($prompt, 'pool-terrace, from'))->toBeLessThan(strpos($prompt, 'place-1:'));
 });

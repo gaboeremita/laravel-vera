@@ -305,12 +305,13 @@ class ConversationController extends Controller
             ? $request->user()->worlds()->findOrFail($validated['worldId'])
             : null;
 
+        $worldSession = null;
         if ($world !== null && isset($validated['worldSessionId'])) {
-            WorldUser::where('world_id', $world->id)->where('user_id', $request->user()->id)->firstOrFail()
+            $worldSession = WorldUser::where('world_id', $world->id)->where('user_id', $request->user()->id)->firstOrFail()
                 ->sessions()->findOrFail($validated['worldSessionId']);
         }
 
-        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world, $validated['positions'] ?? null);
+        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world, $validated['positions'] ?? null, $worldSession);
         $director = new PromptDirector($prompt);
         $this->appendExpressionTags($director, $assistantModel, $excludedSections);
 
@@ -410,6 +411,8 @@ class ConversationController extends Controller
             'thinking' => $response->thinking,
         ]);
 
+        $action = $world !== null ? app(LlmResponseTagParser::class)->parseAction($content, $world) : null;
+
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
 
         $audioBase64 = null;
@@ -436,6 +439,7 @@ class ConversationController extends Controller
             'thinking' => $response->thinking,
             'tts_instructions' => $ttsInstructions,
             'tool_calls' => $agentToolCalls,
+            'action' => $action,
             'audioBase64' => $audioBase64,
             'audioContentType' => $audioContentType,
             'audioError' => $audioError,

@@ -10,7 +10,7 @@ import { isTypingTarget } from './keyboardFocus.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, onVoiceAudio }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, onVoiceAudio, onAction }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
 	const [isTranscribing, setIsTranscribing] = useState(false);
@@ -92,6 +92,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		addToast,
 		fetchEmotions,
 		onVoiceReply: (text, ttsInstructions) => { void speakReply(text, ttsInstructions); },
+		onAction,
 		extraParams: worldSessionId && getPositions
 			? { worldId: world.id, worldSessionId, get positions() { return getPositions(); } }
 			: { worldId: world.id },

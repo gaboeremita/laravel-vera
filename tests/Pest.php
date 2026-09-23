@@ -10,7 +10,11 @@ use App\Models\ImageGenModel;
 use App\Models\ImageGenProvider;
 use App\Models\Settings;
 use App\Models\User;
+use App\Models\World;
+use App\Models\WorldSession;
+use App\Models\WorldUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /*
@@ -190,4 +194,49 @@ function toolCallResponse(string $callId, string $toolName, array $arguments): a
             'finish_reason' => 'tool_calls',
         ]],
     ];
+}
+
+/**
+ * @return array{0: User, 1: Assistant, 2: Conversation, 3: World, 4: \App\Models\WorldResident, 5: WorldSession}
+ */
+function worldStateScenario(array $worldAttributes = []): array
+{
+    [$user, $assistant, $conversation] = setUpAgentAssistant('assistant');
+    $world = World::factory()->forUser($user)->withLayout()->create($worldAttributes);
+    $resident = $world->residents()->create([
+        'assistant_id' => $assistant->id,
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'behavior' => 'stationary',
+    ]);
+    $worldUser = WorldUser::where('world_id', $world->id)->where('user_id', $user->id)->firstOrFail();
+    $session = WorldSession::factory()->create(['world_user_id' => $worldUser->id]);
+
+    Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Right here.'))]);
+
+    return [$user, $assistant, $conversation, $world, $resident, $session];
+}
+
+function sendWorldMessage($test, array $scenario, array $positions, array $extra = []): Illuminate\Testing\TestResponse
+{
+    [$user, $assistant, $conversation, $world, , $session] = $scenario;
+
+    return $test->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]), [
+        'messages' => [['role' => 'user', 'content' => 'Where are you, and where am I?']],
+        'worldId' => $world->id,
+        'worldSessionId' => $session->id,
+        'positions' => $positions,
+        ...$extra,
+    ]);
+}
+
+function sentSystemPrompt(): string
+{
+    $prompt = '';
+    Http::assertSent(function ($request) use (&$prompt) {
+        $prompt = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
+
+        return true;
+    });
+
+    return $prompt;
 }

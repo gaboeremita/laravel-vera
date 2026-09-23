@@ -2,7 +2,9 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AudioListener } from 'three';
 import { PLAYER_EYE_HEIGHT } from './collisionCheck.js';
-import { renderFloorMaps } from './floorMaps.js';
+import { environmentBounds, renderFloorMaps } from './floorMaps.js';
+import { createNavigationGrid } from './worldNavigation.js';
+import { floorBounds } from './worldMapProjection.js';
 import FirstPersonController from './FirstPersonController.jsx';
 import NameTags from './NameTags.jsx';
 import { OffscreenIndicatorTracker } from './OffscreenIndicator.jsx';
@@ -68,7 +70,46 @@ function FloorMapRenderer({ layout, environment, onRendered }) {
 	return null;
 }
 
-export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps }) {
+const NAVIGATION_BUILD_BUDGET_MS = 4;
+
+function navigationOptions(layout, environment) {
+	const bounds = floorBounds(layout, null) ?? environmentBounds(environment.root);
+	if (!bounds) return null;
+	const floors = layout?.floors ?? [];
+	const zones = layout?.zones ?? [];
+	const ranges = floors.length ? floors : zones;
+	return {
+		bounds,
+		minY: ranges.length ? Math.min(...ranges.map((range) => range.minY)) : environment.spawnPosition.y - 5,
+		maxY: ranges.length ? Math.max(...ranges.map((range) => range.maxY)) : environment.spawnPosition.y + 10,
+	};
+}
+
+/** Builds the walkable grid a few milliseconds per frame so loading never stalls. */
+function NavigationBuilder({ layout, environment, navigationRef }) {
+	useEffect(() => {
+		const options = navigationOptions(layout, environment);
+		if (!options) return undefined;
+		const grid = createNavigationGrid(environment.collisionWorld, options);
+		let frame = null;
+		const step = () => {
+			if (grid.build(NAVIGATION_BUILD_BUDGET_MS)) {
+				navigationRef.current = grid;
+				return;
+			}
+			frame = requestAnimationFrame(step);
+		};
+		frame = requestAnimationFrame(step);
+		return () => {
+			cancelAnimationFrame(frame);
+			navigationRef.current = null;
+		};
+	}, [layout, environment, navigationRef]);
+
+	return null;
+}
+
+export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands }) {
 	const [environment, setEnvironment] = useState(null);
 	const audioListener = useRef(null);
 	const [playerPosition, setPlayerPosition] = useState([0, 1.6, 4]);
@@ -97,10 +138,11 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 			{environment && (
 				<>
 					<FirstPersonController collisionWorld={environment.collisionWorld} spawnPosition={spawnPosition} enabled={explorationEnabled} onPositionChange={handlePositionChange} />
-					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} interaction={interaction} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} residentVoices={residentVoices} audioListener={audioListener} inConversation={resident.id === activeResidentId} />)}
+					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} interaction={interaction} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} residentVoices={residentVoices} audioListener={audioListener} inConversation={resident.id === activeResidentId} navigation={navigation} residentCommands={residentCommands} />)}
 					<PlayerViewTracker viewRef={playerView} />
 					<NameTags residents={world.residents} residentPositions={residentPositions} activeResidentId={activeResidentId} />
 					<OffscreenIndicatorTracker residentPositions={residentPositions} activeResidentId={activeResidentId} indicatorRef={offscreenIndicator} />
+					<NavigationBuilder layout={world.layout} environment={environment} navigationRef={navigation} />
 					<FloorMapRenderer layout={world.layout} environment={environment} onRendered={onFloorMaps} />
 					<InteractionSystem residents={world.residents} residentPositions={residentPositions} onResidentChange={onResidentChange} onInteract={(resident) => { setInteraction({ residentId: resident.id, triggerId: crypto.randomUUID() }); onInteract(resident); }} onEndConversation={onEndConversation} activeResidentId={activeResidentId} enabled={explorationEnabled} />
 				</>
