@@ -117,7 +117,7 @@ export function useConversationChat({
 
 		const userMsg = { id: `temp-${Date.now()}`, role: 'user', content: trimmed, image: image || null };
 		const updatedMessages = [...messages, userMsg];
-		setMessages([...updatedMessages, { role: 'assistant', content: '', loading: true, generatingImage: isImageGen }]);
+		setMessages([...updatedMessages, { id: `pending-${userMsg.id}`, role: 'assistant', content: '', loading: true, generatingImage: isImageGen }]);
 		setIsLoading(true);
 
 		const apiMessages = updatedMessages.map((m) => {

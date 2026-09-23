@@ -1,7 +1,7 @@
-import { Box3, OrthographicCamera, Plane, SRGBColorSpace, Vector3, WebGLRenderTarget } from 'three';
+import { Box3, OrthographicCamera, SRGBColorSpace, Vector3, WebGLRenderTarget } from 'three';
 import { PLAN_CUT_HEIGHT, floorBounds, floorGroundHeight } from './worldMapProjection.js';
 
-const MAP_RESOLUTION = 1024;
+const MAP_RESOLUTION = 640;
 const MAX_ENVIRONMENT_SPAN = 150;
 
 /**
@@ -30,8 +30,10 @@ function renderPlan(renderer, scene, bounds, cutHeight) {
 	const pixelWidth = Math.max(1, Math.round(width * scale));
 	const pixelHeight = Math.max(1, Math.round(depth * scale));
 
-	const camera = new OrthographicCamera(-width / 2, width / 2, depth / 2, -depth / 2, 0.1, 20);
-	camera.position.set((bounds.minX + bounds.maxX) / 2, cutHeight + 1, (bounds.minZ + bounds.maxZ) / 2);
+	// The near plane at the cut height removes everything above it, without
+	// renderer clipping planes, which would recompile every material's shader.
+	const camera = new OrthographicCamera(-width / 2, width / 2, depth / 2, -depth / 2, 0.001, 20);
+	camera.position.set((bounds.minX + bounds.maxX) / 2, cutHeight, (bounds.minZ + bounds.maxZ) / 2);
 	camera.up.set(0, 0, -1);
 	camera.lookAt(camera.position.x, cutHeight - 10, camera.position.z);
 	camera.updateMatrixWorld();
@@ -39,14 +41,11 @@ function renderPlan(renderer, scene, bounds, cutHeight) {
 	const target = new WebGLRenderTarget(pixelWidth, pixelHeight);
 	target.texture.colorSpace = SRGBColorSpace;
 	const previousTarget = renderer.getRenderTarget();
-	const previousPlanes = renderer.clippingPlanes;
-	renderer.clippingPlanes = [new Plane(new Vector3(0, -1, 0), cutHeight)];
 	renderer.setRenderTarget(target);
 	renderer.render(scene, camera);
 	const pixels = new Uint8Array(pixelWidth * pixelHeight * 4);
 	renderer.readRenderTargetPixels(target, 0, 0, pixelWidth, pixelHeight, pixels);
 	renderer.setRenderTarget(previousTarget);
-	renderer.clippingPlanes = previousPlanes;
 	target.dispose();
 
 	const canvas = document.createElement('canvas');
@@ -59,21 +58,25 @@ function renderPlan(renderer, scene, bounds, cutHeight) {
 		image.data.set(pixels.subarray(source, source + pixelWidth * 4), row * pixelWidth * 4);
 	}
 	context.putImageData(image, 0, 0);
-	return canvas.toDataURL('image/png');
+	return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : null), 'image/jpeg', 0.85));
 }
 
 /**
  * One top-down image per floor, cut just above head height so walls read
  * like a floor plan and the floors above are removed.
  */
-export function renderFloorMaps({ renderer, scene, layout, environmentRoot, fallbackGroundY }) {
+export async function renderFloorMaps({ renderer, scene, layout, environmentRoot, fallbackGroundY }) {
 	const floors = layout?.floors?.length ? layout.floors : [{ id: null, name: null }];
-	const fallback = environmentRoot ? environmentBounds(environmentRoot) : null;
+	const fallback = floors.some((floor) => !floorBounds(layout, floor.id)) && environmentRoot ? environmentBounds(environmentRoot) : null;
+	const maps = [];
 
-	return floors.flatMap((floor) => {
+	for (const floor of floors) {
 		const bounds = floorBounds(layout, floor.id) ?? fallback;
-		if (!bounds) return [];
+		if (!bounds) continue;
 		const cutHeight = floorGroundHeight(layout, floor.id, fallbackGroundY) + PLAN_CUT_HEIGHT;
-		return [{ floorId: floor.id, name: floor.name, bounds, url: renderPlan(renderer, scene, bounds, cutHeight) }];
-	});
+		const url = await renderPlan(renderer, scene, bounds, cutHeight);
+		if (url) maps.push({ floorId: floor.id, name: floor.name, bounds, url });
+	}
+
+	return maps;
 }

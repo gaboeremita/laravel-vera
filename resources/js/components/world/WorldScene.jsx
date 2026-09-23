@@ -47,13 +47,21 @@ function FloorMapRenderer({ layout, environment, onRendered }) {
 
 	useEffect(() => {
 		let cancelled = false;
-		const frame = requestAnimationFrame(() => {
-			if (cancelled) return;
-			onRendered(renderFloorMaps({ renderer: gl, scene, layout, environmentRoot: environment.root, fallbackGroundY: environment.spawnPosition.y }));
-		});
+		let urls = [];
+		const render = async () => {
+			const maps = await renderFloorMaps({ renderer: gl, scene, layout, environmentRoot: environment.root, fallbackGroundY: environment.spawnPosition.y });
+			urls = maps.map((map) => map.url);
+			if (cancelled) urls.forEach((url) => URL.revokeObjectURL(url));
+			else onRendered(maps);
+		};
+		const idle = window.requestIdleCallback
+			? window.requestIdleCallback(() => { void render(); }, { timeout: 8000 })
+			: window.setTimeout(() => { void render(); }, 3000);
 		return () => {
 			cancelled = true;
-			cancelAnimationFrame(frame);
+			if (window.cancelIdleCallback) window.cancelIdleCallback(idle);
+			else window.clearTimeout(idle);
+			urls.forEach((url) => URL.revokeObjectURL(url));
 		};
 	}, [environment, gl, scene, layout, onRendered]);
 
