@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\WorldSession;
+use App\Models\WorldSessionResident;
 use App\Traits\ResolvesWorldUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,8 +18,23 @@ class WorldSessionController extends Controller
         $worldUser = $this->resolveWorldUser($request, $world);
 
         $sessions = $worldUser->sessions()
+            ->with('residentStates')
             ->orderByDesc('updated_at')
-            ->get(['id', 'title', 'position', 'updated_at']);
+            ->get(['id', 'title', 'position', 'updated_at'])
+            ->map(fn (WorldSession $session) => [
+                'id' => $session->id,
+                'title' => $session->title,
+                'position' => $session->position,
+                'updated_at' => $session->updated_at,
+                'residentStates' => $session->residentStates->mapWithKeys(fn (WorldSessionResident $state) => [$state->world_resident_id => [
+                    'position' => $state->position,
+                    'rotation' => $state->rotation,
+                    'spotId' => $state->spot_id,
+                    'activityId' => $state->activity_id,
+                    'posture' => $state->posture->value,
+                    'exitPosition' => $state->exit_position,
+                ]]),
+            ]);
 
         return response()->json($sessions);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\ParseEnvironmentLayout;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreWorldRequest;
 use App\Http\Requests\UpdateWorldRequest;
@@ -20,10 +21,11 @@ class WorldController extends Controller
         return response()->json(WorldResource::collection(request()->user()->worlds()->with(['cardImage', 'track'])->latest()->get()));
     }
 
-    public function store(StoreWorldRequest $request): JsonResponse
+    public function store(StoreWorldRequest $request, ParseEnvironmentLayout $parseEnvironmentLayout): JsonResponse
     {
         $validated = $request->validated();
         $environment = $validated['environment'];
+        $parsed = $parseEnvironmentLayout->handle($environment->get());
 
         $path = $environment->store("worlds/{$request->user()->id}", 'public');
 
@@ -38,6 +40,7 @@ class WorldController extends Controller
                 'environment_disk' => 'public',
                 'environment_path' => $path,
                 'environment_original_name' => $environment->getClientOriginalName(),
+                'layout' => $parsed['layout'],
             ]));
         } catch (\Throwable $exception) {
             Storage::disk('public')->delete($path);
@@ -45,7 +48,7 @@ class WorldController extends Controller
             throw $exception;
         }
 
-        return response()->json(new WorldResource($world), 201);
+        return response()->json([...(new WorldResource($world))->resolve(), 'layoutWarnings' => $parsed['warnings']], 201);
     }
 
     public function show(World $world): JsonResponse
@@ -55,7 +58,7 @@ class WorldController extends Controller
         return response()->json((new WorldResource($world->load(['residents.assistant.vrm', 'residents.assistant.poses.animationFile', 'cardImage', 'portraitImage', 'track'])))->resolve());
     }
 
-    public function update(UpdateWorldRequest $request, World $world): JsonResponse
+    public function update(UpdateWorldRequest $request, World $world, ParseEnvironmentLayout $parseEnvironmentLayout): JsonResponse
     {
         Gate::authorize('update', $world);
         $validated = $request->validated();
@@ -70,6 +73,7 @@ class WorldController extends Controller
         ];
 
         $previousEnvironment = null;
+        $layoutWarnings = [];
 
         if (($validated['environment'] ?? null) instanceof UploadedFile) {
             $environment = $validated['environment'];
@@ -82,6 +86,10 @@ class WorldController extends Controller
             $attributes['environment_disk'] = 'public';
             $attributes['environment_path'] = $path;
             $attributes['environment_original_name'] = $environment->getClientOriginalName();
+
+            $parsed = $parseEnvironmentLayout->handle($environment->get());
+            $attributes['layout'] = $parsed['layout'];
+            $layoutWarnings = $parsed['warnings'];
         }
 
         try {
@@ -98,7 +106,7 @@ class WorldController extends Controller
             Storage::disk($previousEnvironment['disk'])->delete($previousEnvironment['path']);
         }
 
-        return response()->json((new WorldResource($world->fresh()))->resolve());
+        return response()->json([...(new WorldResource($world->fresh()))->resolve(), 'layoutWarnings' => $layoutWarnings]);
     }
 
     public function destroy(World $world): JsonResponse

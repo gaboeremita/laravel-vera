@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Posture;
 use App\Models\Concerns\HasNormalizedBlendshapes;
 use Database\Factories\PoseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,12 +17,21 @@ class Pose extends Model
 
     protected $fillable = [
         'name',
+        'posture',
         'vrm_blendshapes',
+    ];
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'posture' => 'standing',
     ];
 
     protected function casts(): array
     {
         return [
+            'posture' => Posture::class,
             'vrm_blendshapes' => 'array',
         ];
     }

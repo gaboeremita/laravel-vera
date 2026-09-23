@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\AppendWorldConversationContext;
+use App\Actions\ResolveWorldState;
 use App\Contracts\SttProvider;
 use App\Directors\PromptDirector;
 use App\DTOs\LlmResponse;
+use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
+use App\Enums\Posture;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAvatarBackground;
 use App\Jobs\SummarizeConversation;
@@ -22,6 +25,7 @@ use App\Services\AgentLoop\AgentLoopRunner;
 use App\Services\AgentLoop\Tools\BasicCalculatorTool;
 use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\AgentLoop\Tools\ImageGenerationTool;
+use App\Services\AgentLoop\Tools\World\WorldToolbox;
 use App\Services\ImageGenProviders\ImageGenerationService;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\LlmResponseTagParser;
@@ -29,6 +33,7 @@ use App\Services\TtsProviders\TtsManager;
 use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ConversationController extends Controller
 {
@@ -171,6 +176,18 @@ class ConversationController extends Controller
             'messages.*.images' => ['sometimes', 'array'],
             'voice_mode' => ['sometimes', 'boolean'],
             'worldId' => ['nullable', 'integer', 'exists:worlds,id'],
+            'worldSessionId' => ['nullable', 'integer', 'required_with:positions'],
+            'positions' => ['nullable', 'array'],
+            'positions.user' => ['sometimes', 'array:x,y,z'],
+            'positions.user.x' => ['required_with:positions.user', 'numeric'],
+            'positions.user.y' => ['required_with:positions.user', 'numeric'],
+            'positions.user.z' => ['required_with:positions.user', 'numeric'],
+            'positions.residents' => ['sometimes', 'array'],
+            'positions.residents.*' => ['array:x,y,z'],
+            'positions.residents.*.x' => ['required', 'numeric'],
+            'positions.residents.*.y' => ['required', 'numeric'],
+            'positions.residents.*.z' => ['required', 'numeric'],
+            'residentPosture' => ['nullable', Rule::enum(Posture::class)],
         ]);
 
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
@@ -293,9 +310,16 @@ class ConversationController extends Controller
         $world = isset($validated['worldId'])
             ? $request->user()->worlds()->findOrFail($validated['worldId'])
             : null;
-        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world);
+
+        $worldSession = null;
+        if ($world !== null && isset($validated['worldSessionId'])) {
+            $worldSession = WorldUser::where('world_id', $world->id)->where('user_id', $request->user()->id)->firstOrFail()
+                ->sessions()->findOrFail($validated['worldSessionId']);
+        }
+
+        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world, $validated['positions'] ?? null, $worldSession);
         $director = new PromptDirector($prompt);
-        $this->appendExpressionTags($director, $assistantModel, $excludedSections);
+        $this->appendExpressionTags($director, $assistantModel, $excludedSections, Posture::from($validated['residentPosture'] ?? Posture::Standing->value));
 
         $director->except($excludedSections);
 
@@ -333,6 +357,8 @@ class ConversationController extends Controller
             $aiModel = $llmManager->resolveModelForAssistantUser($assistantUser);
             $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
 
+            $tools = [];
+
             if ($assistantModel->mode === AssistantMode::Agent) {
                 if (! $aiModel) {
                     return response()->json(['message' => 'This assistant is in agent mode and requires an explicitly selected AI model that supports tool-calling.'], 422);
@@ -351,7 +377,25 @@ class ConversationController extends Controller
                 if ($imageGenerationService->isAvailableFor($assistantUser)) {
                     $tools[] = new ImageGenerationTool($imageGenerationService, $assistantUser, $conversation);
                 }
+            }
 
+            $worldToolbox = null;
+            if ($world !== null && ! empty($world->layout['zones'])) {
+                if ($assistantModel->kind !== AssistantKind::WorldNpc && ! $aiModel?->supports_tools) {
+                    return response()->json(['message' => 'Assistants living in a world need a model that supports tool calling. Choose one in this assistant\'s settings.'], 422);
+                }
+
+                $resident = $world->residents()->where('assistant_id', $assistantModel->id)->firstOrFail();
+                $residentPoint = $validated['positions']['residents'][$resident->id] ?? null;
+                $worldToolbox = new WorldToolbox(
+                    $world,
+                    $residentPoint !== null ? app(ResolveWorldState::class)->locate($world->layout, $residentPoint)['zoneChain'] : [],
+                    poseNames: $assistantModel->poseNames(),
+                );
+                $tools = [...$tools, ...$worldToolbox->tools()];
+            }
+
+            if ($tools !== []) {
                 $runner = new AgentLoopRunner($llm, $tools);
 
                 $agentResult = $runner->run(
@@ -393,6 +437,8 @@ class ConversationController extends Controller
             'thinking' => $response->thinking,
         ]);
 
+        $action = $worldToolbox?->chosenAction();
+
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
 
         $audioBase64 = null;
@@ -419,6 +465,7 @@ class ConversationController extends Controller
             'thinking' => $response->thinking,
             'tts_instructions' => $ttsInstructions,
             'tool_calls' => $agentToolCalls,
+            'action' => $action,
             'audioBase64' => $audioBase64,
             'audioContentType' => $audioContentType,
             'audioError' => $audioError,
@@ -530,18 +577,25 @@ class ConversationController extends Controller
      * stored prompt (e.g. from before it was in this mode) never renders
      * alongside it and confuses the model with two competing tag formats.
      */
-    private function appendExpressionTags(PromptDirector $director, Assistant $assistantModel, array &$excludedSections): void
+    private function appendExpressionTags(PromptDirector $director, Assistant $assistantModel, array &$excludedSections, Posture $posture = Posture::Standing): void
     {
         if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
             $excludedSections[] = 'emotion tags';
 
-            $poses = $assistantModel->promptPoseNames();
+            $poses = $assistantModel->promptPoseNames($posture);
 
-            if (! empty($poses)) {
-                $director->append('pose tags', [
+            if ($poses['available'] !== [] || $poses['standingOnly'] !== []) {
+                $section = [
                     'format' => 'Use [pose: <exact pose name>] to select a pose. Use only a name from the available poses list. Control tags may appear in any order and are removed before the reply is shown.',
-                    'available poses' => $poses,
-                ]);
+                    'available poses' => $poses['available'],
+                ];
+                if ($posture === Posture::Swimming) {
+                    $section['format'] = 'You are swimming. Use [pose: <exact pose name>] to select a pose, from the available poses, which are the ones that fit while you swim. Control tags may appear in any order and are removed before the reply is shown.';
+                } elseif ($posture !== Posture::Standing && $poses['standingOnly'] !== []) {
+                    $section['format'] = "You are {$posture->value}. Use [pose: <exact pose name>] to select a pose. Poses under available poses fit how you are right now; poses under poses that make you stand up get you up on your feet first, and you stay standing afterwards. Control tags may appear in any order and are removed before the reply is shown.";
+                    $section['poses that make you stand up'] = $poses['standingOnly'];
+                }
+                $director->append('pose tags', $section);
             }
 
             return;

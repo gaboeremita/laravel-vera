@@ -49,7 +49,7 @@ function MotionPoseCard({ definition, pose, onAdd, onUpdateBlendshapes, onUpload
  * in a world. The standard pose editor remains available for conversation
  * actions and facial expressions.
  */
-export default function WorldMotionPoseEditor({ poses, onAdd, onUpdateBlendshapes, onUploadAnimation, onDeleteAnimation }) {
+export default function WorldMotionPoseEditor({ posture = 'standing', poses, onAdd, onUpdateBlendshapes, onUploadAnimation, onDeleteAnimation }) {
 	const datalistId = useId();
 	return (
 		<div className="space-y-3">
@@ -61,7 +61,7 @@ export default function WorldMotionPoseEditor({ poses, onAdd, onUpdateBlendshape
 				{EXPRESSION_SUGGESTIONS.map((name) => <option key={name} value={name} />)}
 			</datalist>
 			<div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-				{WORLD_MOTION_POSES.map((definition) => {
+				{WORLD_MOTION_POSES.filter((definition) => definition.posture === posture).map((definition) => {
 					const pose = findWorldMotionPose(poses, definition.key);
 
 					return (

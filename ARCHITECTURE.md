@@ -178,6 +178,10 @@ All routes behind `auth:sanctum` middleware:
 | POST | `/api/worlds/{world}/sessions` | `WorldSessionController@store` |
 | PATCH | `/api/worlds/{world}/sessions/{session}` | `WorldSessionController@update` — rename |
 | PUT | `/api/worlds/{world}/sessions/{session}/position` | `WorldSessionController@updatePosition` |
+| POST | `/api/worlds/{world}/sessions/{session}/residents/{resident}/activities` | `ResidentActivityController@store` — record an action a resident started |
+| PATCH | `/api/worlds/{world}/sessions/{session}/residents/{resident}/activities/{activity}` | `ResidentActivityController@update` — its outcome |
+| PUT | `/api/worlds/{world}/sessions/{session}/residents/{resident}/state` | `ResidentStateController@update` — her position, spot and posture in this session |
+| POST | `/api/worlds/{world}/sessions/{session}/residents/{resident}/decisions` | `ResidentDecisionController@store` — an autonomous resident's next step |
 | DELETE | `/api/worlds/{world}/sessions/{session}` | `WorldSessionController@destroy` |
 | GET | `/api/npcs` | `NpcController@index` |
 | POST | `/api/npcs` | `NpcController@store` |
@@ -478,7 +482,7 @@ Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `on
 **`Image`** — polymorphic (`imageable_type/id`), disk-stored, `url` accessor
 **`Video`** — polymorphic (`videoable_type/id`), disk-stored, `url` accessor
 
-**`World`** / **`WorldResident`** / **`WorldUser`** / **`WorldSession`** — see [Worlds](#worlds) for the full model shape and behavior.
+**`World`** / **`WorldResident`** / **`WorldUser`** / **`WorldSession`** / **`ResidentActivity`** / **`WorldSessionResident`** — see [Worlds](#worlds) for the full model shape and behavior. `World.layout` holds the parsed environment markers; `ResidentActivity` is a resident's recorded actions and outcomes per session; `WorldSessionResident` is her saved state per session.
 
 ### Jobs
 
@@ -624,7 +628,7 @@ Lists the accessible world cards (`WorldCard`, edit/enter actions) via `useWorld
 Lists a world's sessions via `useWorldSessions` and renders `WorldSessionList` (select/new/delete) — structurally identical to `ConversationsPage`/`ConversationList`. Selecting a session or starting a new one navigates to `WorldPage` with `?session=<id>`. See [Worlds → Sessions](#sessions).
 
 **`WorldPage`**
-Loads the world and, if a `?session=<id>` query param is present, that session's record (for its saved `position`), then renders `WorldScene` (the R3F canvas) plus HUD: an initializing overlay until the environment reports ready, an "EXIT WORLD" button, a `C — CHAT WITH <name>` prompt when a resident is in range, and the `WorldChat` panel when one is open (which also disables exploration input while it's up). While a session is active, the player's live position is persisted back to `worlds.sessions.position.update` on an interval and on exit/unmount. See [Worlds](#worlds) for the full runtime.
+Loads the world and, if a `?session=<id>` query param is present, that session's record (for its saved `position`), then renders `WorldScene` (the R3F canvas) plus HUD: an initializing overlay until the environment reports ready, an "EXIT WORLD" button, a `C — CHAT WITH <name>` prompt when a resident is in range, the `WorldChat` panel when one is open (which also disables exploration input while it's up), F/X follow and stop controls during a conversation, name tags, an off-screen pointer, the per-floor map, and thought bubbles for autonomous residents' self-chosen steps (driven by `useResidentAgency`). It carries out residents' actions with `executeAction`, recording them and their outcomes, and tracks which spots are taken. While a session is active, the player's live position and each resident's state are persisted on an interval and on exit/unmount. See [Worlds](#worlds) for the full runtime.
 
 **`NpcsPage`**
 Lists the user's NPCs with inline cards (name, description, card image, edit/delete) — no separate `NpcCard` component. `CreateNpcPage` and NPC editing reuse `CreateAssistantPage`/`EditAssistantPage` via the `kind` prop rather than dedicated pages.
@@ -1090,17 +1094,17 @@ A **World** is a shared, single-room 3D space — a supplied environment GLB, a 
 
 **`App\Models\WorldUser`** — pivot between `World` and `User`, mirroring `AssistantUser`: `world_id`, `user_id`, unique per pair. `hasMany(WorldSession)`. `WorldPolicy::view/update/delete` check membership in `$world->users` rather than an owner column.
 
-**`App\Models\WorldResident`** — one row per (world, assistant) pairing: `position`/`rotation` (JSON), `behavior` (`WorldResidentBehavior` enum: `Stationary`/`Roam`), `behavior_settings` (JSON, e.g. roam `radius`), and two per-placement overrides: `opening_message` (replaces the assistant's own opening message for conversations started in this world) and `custom_prompt` (appended on top of the world's kind-level context prompt, for this placement only). `(world_id, assistant_id)` is unique — the same assistant/NPC can be a resident of many worlds, each with its own placement.
+**`App\Models\WorldResident`** — one row per (world, assistant) pairing: `position`/`rotation` (JSON), `behavior` (`WorldResidentBehavior` enum: `Stationary`/`Roam`/`Autonomous`; autonomous residents choose their own activities, see [Self-chosen activities](#self-chosen-activities)), `behavior_settings` (JSON, e.g. roam `radius`), and two per-placement overrides: `opening_message` (replaces the assistant's own opening message for conversations started in this world) and `custom_prompt` (appended on top of the world's kind-level context prompt, for this placement only). `(world_id, assistant_id)` is unique — the same assistant/NPC can be a resident of many worlds, each with its own placement.
 
 **`App\Enums\AssistantKind`** — `Assistant` (normal) | `WorldNpc`. An NPC is an `Assistant` record with `kind = WorldNpc`, not a parallel model — it keeps the full assistant feature set (prompt, archive, provider, conversations, poses) and is just filtered differently by `AssistantController`/`NpcController`.
 
 **`WorldController`** — authorized list/create/show/update/delete, resolved through the `WorldUser` pivot (`$request->user()->worlds()`) rather than a direct FK. `store`/`update` validate via `StoreWorldRequest`/`UpdateWorldRequest` (camelCase JSON keys — `assistantContextPrompt`, `npcContextPrompt`, `settings.theme` — mapped explicitly back to the snake_case columns before the Eloquent call, since a raw `$validated` spread would silently fail to persist renamed keys) and handle environment upload/replace/cleanup directly (no separate environment controller). `destroy` deletes the world; the model's own `deleted` hook removes the environment asset.
 
-**`WorldResidentController`** — `upsert` (`PUT /worlds/{world}/residents/{assistant}`) authorizes world access via `WorldPolicy`, requires the assistant to be owned by the user and have a usable 3D avatar (`portrait_type === Avatar3D` and a VRM), then `updateOrCreate`s the placement. `destroy` removes only the placement row.
+**`WorldResidentController`** — `upsert` (`PUT /worlds/{world}/residents/{assistant}`) authorizes world access via `WorldPolicy`, requires the assistant to be owned by the user and have a usable 3D avatar (`portrait_type === Avatar3D` and a VRM), and, for anything but an NPC, a selected model with `supports_tools` (residents act through tool calls, see [World tools](#world-tools)), then `updateOrCreate`s the placement. `destroy` removes only the placement row.
 
 **`NpcController`** — CRUD scoped to `kind = WorldNpc`, delegating creation to `AssistantController::store(..., AssistantKind::WorldNpc)` so it reuses the exact same multipart upload/VRM/archive/pose pipeline as a normal assistant, just pre-filled with `mode = assistant`, `portrait_type = avatar3d`. `destroy` runs the same `DeleteAssistantAssets` action normal assistant deletion uses.
 
-**`App\Actions\AppendWorldConversationContext`** — the one place world context ever touches a conversation's prompt. Given an `Assistant` and an optional `World`: with no world, returns the assistant's prompt unchanged. With a world, requires the assistant to actually be a resident (throws `AuthorizationException` otherwise) and appends a `world_context` section built from `[$world->contextPromptFor($assistant->kind), $resident->custom_prompt]` (nulls filtered out) — never mutating the assistant's own stored prompt. `ConversationController::sendMessage` calls this on every request that carries an authorized `worldId`; `ConversationController::store` separately resolves `$resident?->opening_message ?: $assistant->opening_message` for a fresh world conversation's first message, and skips the portrait `GenerateAvatarBackground` dispatch entirely for world-context conversations, since that background is never shown in the 3D world.
+**`App\Actions\AppendWorldConversationContext`** — the one place world context ever touches a conversation's prompt. Given an `Assistant` and an optional `World`: with no world, returns the assistant's prompt unchanged. With a world, requires the assistant to actually be a resident (throws `AuthorizationException` otherwise) and appends a `world_context` section built from `[$world->contextPromptFor($assistant->kind), $resident->custom_prompt]` (nulls filtered out) — never mutating the assistant's own stored prompt. In a world with a layout (see [Layout markers](#layout-markers)) it also appends the resident's `world_state` (her zone and floor, what is there, where the user is and how far, and every place by id), a `world_awareness` reminder of her world tools, plans, narrated steps and exact postures, and, with a session, her `recent_activity`. `ConversationController::sendMessage` calls this on every request that carries an authorized `worldId`; `ConversationController::store` separately resolves `$resident?->opening_message ?: $assistant->opening_message` for a fresh world conversation's first message, and skips the portrait `GenerateAvatarBackground` dispatch entirely for world-context conversations, since that background is never shown in the 3D world.
 
 ### Sessions
 
@@ -1114,6 +1118,47 @@ Starting a new session (`store`) creates a bare `WorldSession` with a default `'
 
 Each world has a `theme` in its `settings` JSON — one of the app's four [themes](#theme-system), required at creation (no "inherit" option; a world's theme is an explicit, independent choice from any assistant's own theme setting). It currently affects only the in-world chat panel: `WorldChat` reads `theme`/`setTheme` from the same global `ThemeContext` used app-wide, switches to the world's theme on mount (remembering whatever was active), and restores it when the panel closes. The exploration HUD and 3D scene itself are theme-independent for now.
 
+### Layout markers
+
+An environment GLB can carry markers: glTF nodes whose `extras.vera` describe floors (height ranges), zones (an outline, a height range, an entry point, optional parent, privacy and zone activities), objects, and their interaction spots (a surface position, a facing, and activities with an optional posture and pose). `ParseEnvironmentLayout` reads them from the GLB's JSON chunk on upload into `worlds.layout`, skipping and reporting invalid markers as `layoutWarnings`; spots also get an approach point 0.6 m in front. There is no in-app marker editor; markers come only from the environment file. `ResolveWorldState` places a point on a floor and in the innermost zone containing it. Worlds with no markers keep plain chat behavior.
+
+### World tools
+
+In a marked world, `ConversationController::sendMessage` runs the resident's turn through `AgentLoopRunner` with `WorldToolbox`'s tools (plus the agent-mode tools for agent-mode assistants). NPCs run on the default model; other residents need a tool-capable model (422 otherwise). The tools (`app/Services/AgentLoop/Tools/World/`) are:
+
+| Tool | Purpose |
+|------|---------|
+| `where_can_i`, `what_is_in`, `describe` | Answer from the layout: where an activity is offered, what a place holds, what a place or thing is |
+| `go_to` | Walk to a zone or thing, or to the user (`target: user`; in the water, to the side of the pool nearest them) |
+| `follow`, `stop` | Follow the user, or stop |
+| `use` | Take a spot's activity: walk there, take the activity's posture, play its pose |
+| `zone` | Do an activity of the zone she is in |
+| `swim_to_edge` | Swim to the nearest side of the pool and rest there |
+| `wander` | Roam for 30–60 s around a zone or around where she is; in the water, swim around |
+| `plan` | Up to 5 ordered steps (`go_to`, `use`, `zone`, `pose`, `do`, `stay`, `swim_to_edge`, `wander`), each checked before anything starts |
+
+Arguments naming places, things, spots and activities are enums of the layout's ids, matched loosely (case, `_`, `-`). A bad argument throws inside the tool and is returned to her within the same turn. Only one action tool counts per turn; the chosen action is returned in the response as `action`. `use`, `zone` and plan steps take an optional `pose` from her own library for activities whose pose is named differently. A `do` step is anything with no spot or pose behind it; she holds where she is while her narration carries it.
+
+### Actions and activities
+
+`WorldPage` carries out the returned action with `executeAction` (`residentActions.js`) and records it through `ResidentActivityController` (`resident_activities`: verb, target, activity, reason, zone, outcome, outcome reason, finish time); plan steps are recorded one by one. Outcomes are `completed`, `failed` with a reason, or `interrupted`, and the last eight feed her prompt as recent activity. Failures show a toast. Steps wait for their pose to play through (or hold 6 s without one), and a new action or the X control interrupts them.
+
+### Navigation
+
+`buildNavigationGrid` (`worldNavigation.js`) samples the collision world into 0.4 m cells with up to three levels, built a few milliseconds per frame. A* routes respect the player's step and drop limits, take steps straight on and only where no drop falls away beside them, prefer cells away from walls, and are smoothed along lines that keep the same wall margin. Things and spots are approached on the floor nearest their approach point (`findPathNear`). A resident who makes no progress for 2 s steps back and re-approaches, then rules the failed cell out and re-plans, up to three times.
+
+### Postures and spots
+
+A resident is always standing, sitting, lying, reclining or swimming. Poses carry a `posture` (unique per assistant, name and posture), each posture has its own `default` pose, and the assistant editor groups poses in one tab per posture (`PosturePoseSections`). A triggered pose plays her posture's version; with only a standing version she stands up first, except in the water, where it waits. On a spot, her hips are fitted to the marked surface using the posture clip's hip height, and one resident uses a spot at a time. Her prompt lists which poses fit her current posture.
+
+### Swimming
+
+`WorldCollision` indexes passable meshes as water. A resident is swimming where the water is deeper than 1.1 m (until it is shallower than 0.9 m): she floats with the swimming clip's hips just under the surface, holds her swimming default pose when still, moves with her Swim motion pose, and on stopping at the side plays Swim To Edge once and rests there until she moves.
+
+### Self-chosen activities
+
+For autonomous residents, `useResidentAgency` asks `ResidentDecisionController` for a decision 10–30 s after each step ends, staggered between residents, while the user is in the world, not talking to her, the page is visible, and there has been input in the last 5 minutes. The server builds her prompt with her persona, world state, recent activity, the poses and spots available (free or taken), and a short instruction; her own model answers with a `(reason) *action*` line and optionally a tool call or pose tag. The line is stored in her session conversation and shown in a thought bubble (`ThoughtBubble`) while the step runs. Decisions are at least 8 s apart per resident (429). `ResidentStateController` saves each resident's position, spot, activity and posture per session (`world_session_residents`) so she is where the user left her on return.
+
 ### Runtime (3D Scene)
 
 **`WorldEnvironment`** loads the environment GLB, builds a `WorldCollision` (`collisionCheck.js`) from it, resolves a spawn position near the room's center, and adds the scene graph — errors (a failed load, or a GLB with no collision geometry at all) surface via `onError` rather than leaving the scene half-initialized.
@@ -1124,11 +1169,13 @@ Each world has a `theme` in its `settings` JSON — one of the app's four [theme
 
 **`FirstPersonController`** — keyboard (WASD) + mouse-look (pointer lock) movement, calling `collisionWorld.move()` every frame and re-spawning once when a new `collisionWorld` instance appears (i.e. on entering a world). Losing focus clears held keys; releasing pointer lock stops look input without stopping movement input.
 
-**`ResidentController`** — one per resident. Resolves its actual spawn via `collisionWorld.findSpawn()`, lazy-loads its VRM only once within 30 units of the player, and publishes its live position into a shared `residentPositions` ref (a `Map`, owned by `WorldScene`) that `InteractionSystem` reads every frame — avoiding a re-render on every resident's every frame of movement. Reuses `VrmAvatar.jsx`'s exported `loadPoseClip`/`captureBoneQuaternions`/`applyBoneQuaternions` for pose playback: a triggered pose (from `WorldChat`'s `onPoseTrigger`) plays once and blends back to a captured rest pose over `POSE_RETURN_SECONDS`, with a blendshapes-only pose falling back to a fixed hold duration — same rules `VrmAvatar` applies to the assistant portrait, since a resident has no idle-animation loop of its own to blend into. `Roam` behavior steps the resident in a slow circle (`collisionWorld.move`, wall-aware) around its spawn point at up to `behavior_settings.radius`; both roaming and pose/expression updates skip entirely beyond 30 units from the player.
+**`ResidentController`** — one per resident. Resolves its actual spawn via `collisionWorld.findSpawn()` (or its saved session state), lazy-loads its VRM only once within 30 units of the player, and publishes its live position into a shared `residentPositions` ref (a `Map`, owned by `WorldScene`) that `InteractionSystem`, name tags and the map read every frame — avoiding a re-render on every resident's every frame of movement. It registers commands in the shared `residentCommands` map (`goTo`, `follow`, `stop`, `use`, `zone`, `pose`, `hold`, `swimToEdge`, `wander`, `standUp`, plus `posture()` and `state()`) that `executeAction` drives. Locomotion runs idle → turning → starting → walking → stopping with the Walk Start/Walk/Walk Stop motion poses (Swim in the water), holding the current posture's default pose when idle; she turns toward her next waypoint before picking up speed. Reuses `VrmAvatar.jsx`'s exported `loadPoseClip`/`captureBoneQuaternions`/`applyBoneQuaternions` for triggered poses, which play once in her posture's version and ease back over `POSE_RETURN_SECONDS`. `Roam` behavior steps the resident in a slow circle around its spawn point at up to `behavior_settings.radius`; roaming and pose/expression updates skip entirely beyond 30 units from the player.
 
-**`InteractionSystem`** — every frame, finds the nearest resident within `INTERACTION_DISTANCE` (reading positions from the shared ref map, not props) and reports it via `onResidentChange`; pressing `C` while one is in range calls `onInteract`. Movement pauses while `WorldChat` is open (`enabled={false}` passed down from `WorldPage`), so exploration and chat input never fight over the keyboard.
+**`InteractionSystem`** — every frame, finds the nearest resident within `INTERACTION_DISTANCE` (4 m along the floor, with feet within 2.5 m vertically; reading positions from the shared ref map, not props) and reports it via `onResidentChange`; pressing `C` while one is in range calls `onInteract`. Movement pauses while `WorldChat` is open (`enabled={false}` passed down from `WorldPage`), so exploration and chat input never fight over the keyboard.
 
-**`WorldChat`** — resolves or creates a conversation for the resident's assistant scoped to the active `worldSessionId` (see [Sessions](#sessions)), passing `worldId` too so the backend applies world context; sends/receives through the same `useConversationChat` hook `ChatPage` uses (shared, not a second chat pipeline), triggers pose playback via `onPoseTrigger`, and applies the world's theme for as long as it's mounted (see [World Theme](#world-theme)).
+**`WorldChat`** — resolves or creates a conversation for the resident's assistant scoped to the active `worldSessionId` (see [Sessions](#sessions)), passing `worldId`, positions and her current posture so the backend applies world context; sends/receives through the same `useConversationChat` hook `ChatPage` uses (shared, not a second chat pipeline), triggers pose playback via `onPoseTrigger`, and applies the world's theme for as long as it's mounted (see [World Theme](#world-theme)). Voice mode (the mic icon or V) speaks and listens with the resident's voice positioned in the world; transcripts that are only sound descriptions are dropped. A conversation's panel closes when the user and resident are more than 12 m apart (a warning shows from 8 m); the conversation itself continues next time. While it is open, F and X make her follow or stop.
+
+**`NameTags`**, **`OffscreenIndicator`** and **`WorldMap`** show residents' names above them, point toward the conversation partner when off screen, and draw a per-floor map (M expands it).
 
 ---
 

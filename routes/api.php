@@ -20,6 +20,9 @@ use App\Http\Controllers\Api\EmotionController;
 use App\Http\Controllers\Api\ImageGenModelController;
 use App\Http\Controllers\Api\ImageGenProviderController;
 use App\Http\Controllers\Api\NpcController;
+use App\Http\Controllers\Api\ResidentActivityController;
+use App\Http\Controllers\Api\ResidentDecisionController;
+use App\Http\Controllers\Api\ResidentStateController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\VoiceController;
 use App\Http\Controllers\Api\VoiceModelController;
@@ -59,6 +62,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/worlds/{world}/sessions/{session}', [WorldSessionController::class, 'update'])->name('worlds.sessions.update');
     Route::put('/worlds/{world}/sessions/{session}/position', [WorldSessionController::class, 'updatePosition'])->name('worlds.sessions.position.update');
     Route::delete('/worlds/{world}/sessions/{session}', [WorldSessionController::class, 'destroy'])->name('worlds.sessions.destroy');
+    Route::post('/worlds/{world}/sessions/{session}/residents/{resident}/activities', [ResidentActivityController::class, 'store'])->name('worlds.sessions.residents.activities.store');
+    Route::patch('/worlds/{world}/sessions/{session}/residents/{resident}/activities/{activity}', [ResidentActivityController::class, 'update'])->name('worlds.sessions.residents.activities.update');
+    Route::put('/worlds/{world}/sessions/{session}/residents/{resident}/state', [ResidentStateController::class, 'update'])->name('worlds.sessions.residents.state.update');
+    Route::post('/worlds/{world}/sessions/{session}/residents/{resident}/decisions', [ResidentDecisionController::class, 'store'])->name('worlds.sessions.residents.decisions.store');
     Route::apiResource('npcs', NpcController::class);
 
     Route::prefix('assistants/{assistant}')->group(function () {

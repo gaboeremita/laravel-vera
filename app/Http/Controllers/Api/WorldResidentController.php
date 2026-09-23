@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AssistantKind;
 use App\Enums\AssistantPortraitType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpsertWorldResidentRequest;
 use App\Http\Resources\WorldResidentResource;
 use App\Models\Assistant;
+use App\Models\AssistantUser;
 use App\Models\World;
+use App\Services\LlmProviders\LlmManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 
@@ -18,6 +21,15 @@ class WorldResidentController extends Controller
         Gate::authorize('update', $world);
         abort_unless($assistant->users()->whereKey($request->user())->exists(), 404);
         abort_unless($assistant->portrait_type === AssistantPortraitType::Avatar3D && $assistant->vrm()->exists(), 422);
+
+        if ($assistant->kind !== AssistantKind::WorldNpc) {
+            $assistantUser = AssistantUser::where('assistant_id', $assistant->id)->where('user_id', $request->user()->id)->firstOrFail();
+            abort_unless(
+                (new LlmManager)->resolveModelForAssistantUser($assistantUser)?->supports_tools,
+                422,
+                'Assistants living in a world need a model that supports tool calling. Choose one in this assistant\'s settings.',
+            );
+        }
 
         $validated = $request->validated();
 

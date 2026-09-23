@@ -1,0 +1,142 @@
+<?php
+
+use App\Models\ResidentActivity;
+use App\Models\WorldSession;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('tells the resident her zone, the user\'s zone and their distance', function () {
+    $scenario = worldStateScenario();
+    $residentId = $scenario[4]->id;
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -3],
+        'residents' => [$residentId => ['x' => -2, 'y' => 0, 'z' => 9]],
+    ])->assertSuccessful();
+
+    $prompt = sentSystemPrompt();
+    expect($prompt)
+        ->toContain('World state:')
+        ->toContain('You are in: Vocal booth, inside Music studio, on the Ground floor')
+        ->toContain('The user is: in Pool terrace, on the Ground floor, about 14 m away from you');
+});
+
+it('describes her own zone in detail and other zones only by name and floor', function () {
+    $scenario = worldStateScenario();
+    $residentId = $scenario[4]->id;
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => -5, 'y' => 0, 'z' => 2],
+        'residents' => [$residentId => ['x' => 5, 'y' => 0, 'z' => -3]],
+    ])->assertSuccessful();
+
+    $prompt = sentSystemPrompt();
+    expect($prompt)
+        ->toContain('An open terrace with an infinity pool.')
+        ->toContain('Things to do here: Swim [swim]')
+        ->toContain('Pool lounger [pool-lounger-1]: A white lounger by the pool. Spots: pool-lounger-1-seat (Recline [recline], reclining)')
+        ->toContain('Here: An open terrace with an infinity pool.')
+        ->toContain('Available places: Music studio [studio] (Ground floor), Vocal booth [vocal-booth] (Ground floor), Pool terrace [pool-terrace] (Ground floor), Gallery [gallery] (Upper floor)')
+        ->not->toContain('A studio full of keyboards.')
+        ->not->toContain('An upper gallery overlooking the city.');
+});
+
+it('says when the user is on another floor', function () {
+    $scenario = worldStateScenario();
+    $residentId = $scenario[4]->id;
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 0, 'y' => 5, 'z' => 5],
+        'residents' => [$residentId => ['x' => -5, 'y' => 0, 'z' => 2]],
+    ])->assertSuccessful();
+
+    expect(sentSystemPrompt())->toContain('The user is: upstairs, in Gallery, on the Upper floor');
+});
+
+it('keeps today\'s prompt for a world without markers', function () {
+    $scenario = worldStateScenario(['layout' => null]);
+    $residentId = $scenario[4]->id;
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'residents' => [$residentId => ['x' => 1, 'y' => 0, 'z' => 1]],
+    ])->assertSuccessful();
+
+    expect(sentSystemPrompt())->not->toContain('World state:');
+});
+
+it('keeps the world state under 2,000 characters for a world with 40 zones', function () {
+    $zones = collect(range(1, 40))->map(fn (int $n) => [
+        'id' => "room-{$n}", 'name' => "Guest room number {$n}", 'description' => str_repeat('A long description of this room. ', 10),
+        'floorId' => null, 'parentId' => null, 'private' => false,
+        'outline' => [[$n * 10, 0], [$n * 10 + 9, 0], [$n * 10 + 9, 9], [$n * 10, 9]], 'minY' => -1, 'maxY' => 4,
+        'entry' => ['x' => $n * 10 + 1, 'y' => 0, 'z' => 1], 'activities' => [],
+    ])->all();
+    $scenario = worldStateScenario(['layout' => ['floors' => [], 'zones' => $zones, 'objects' => []]]);
+    $residentId = $scenario[4]->id;
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 15, 'y' => 0, 'z' => 5],
+        'residents' => [$residentId => ['x' => 25, 'y' => 0, 'z' => 5]],
+    ])->assertSuccessful();
+
+    $prompt = sentSystemPrompt();
+    $section = substr($prompt, strpos($prompt, 'World state:'));
+    $section = explode("\n\n", $section)[0];
+    expect($section)->toContain('Guest room number 40')
+        ->and(strlen($section))->toBeLessThan(2000);
+});
+
+it('rejects a world session that does not belong to the user', function () {
+    $scenario = worldStateScenario();
+    $otherSession = WorldSession::factory()->create();
+    $scenario[5] = $otherSession;
+
+    sendWorldMessage($this, $scenario, ['user' => ['x' => 0, 'y' => 0, 'z' => 0]])->assertNotFound();
+});
+
+it('includes her recent activity, newest first, limited to the last eight', function () {
+    $scenario = worldStateScenario();
+    [, , , , $resident, $session] = $scenario;
+    foreach (range(1, 9) as $minutesAgo) {
+        ResidentActivity::factory()->finished()->create([
+            'world_session_id' => $session->id,
+            'world_resident_id' => $resident->id,
+            'target' => "place-{$minutesAgo}",
+            'created_at' => now()->subMinutes($minutesAgo),
+        ]);
+    }
+    ResidentActivity::factory()->failed('there is no way to get there')->create([
+        'world_session_id' => $session->id,
+        'world_resident_id' => $resident->id,
+        'target' => 'pool-terrace',
+        'zone_id' => 'studio',
+        'created_at' => now(),
+    ]);
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -3],
+        'residents' => [$resident->id => ['x' => -5, 'y' => 0, 'z' => 2]],
+    ])->assertSuccessful();
+
+    $prompt = sentSystemPrompt();
+    expect($prompt)
+        ->toContain('Your recent activity, newest first:')
+        ->toContain('- walked toward pool-terrace, from Music studio: failed (there is no way to get there), just now')
+        ->toContain('- walked toward place-1: completed, 1 min ago')
+        ->toContain('place-7')
+        ->not->toContain('place-8')
+        ->not->toContain('place-9');
+    expect(strpos($prompt, 'pool-terrace, from'))->toBeLessThan(strpos($prompt, 'place-1:'));
+});
+
+it('reminds the resident she can use her world tools on her own initiative', function () {
+    $scenario = worldStateScenario();
+
+    sendWorldMessage($this, $scenario, [])->assertSuccessful();
+
+    expect(sentSystemPrompt())
+        ->toContain('World awareness:')
+        ->toContain('your tools are yours to use whenever you feel like it, on your own initiative');
+});

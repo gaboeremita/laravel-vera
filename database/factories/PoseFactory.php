@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Posture;
 use App\Models\Assistant;
 use App\Models\Pose;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -22,5 +23,10 @@ class PoseFactory extends Factory
             'assistant_id' => Assistant::factory(),
             'name' => $this->faker->unique()->word(),
         ];
+    }
+
+    public function posture(Posture $posture): static
+    {
+        return $this->state(fn () => ['posture' => $posture]);
     }
 }

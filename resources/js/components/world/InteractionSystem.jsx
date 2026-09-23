@@ -1,9 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { isTypingTarget } from './keyboardFocus.js';
+import { PLAYER_EYE_HEIGHT } from './collisionCheck.js';
 
-const INTERACTION_DISTANCE = 2.2;
+const INTERACTION_DISTANCE = 4;
+const INTERACTION_HEIGHT_DIFFERENCE = 2.5;
 
-export default function InteractionSystem({ residents, residentPositions, onResidentChange, onInteract, enabled = true }) {
+export default function InteractionSystem({ residents, residentPositions, onResidentChange, onInteract, onEndConversation, activeResidentId = null, enabled = true }) {
 	const { camera } = useThree();
 	const nearest = useRef(null);
 
@@ -14,7 +17,9 @@ export default function InteractionSystem({ residents, residentPositions, onResi
 			for (const resident of residents) {
 				const position = residentPositions.current.get(resident.id);
 				if (!position) continue;
-				const distance = camera.position.distanceTo(position);
+				const heightDifference = Math.abs(camera.position.y - PLAYER_EYE_HEIGHT - position.y);
+				if (heightDifference > INTERACTION_HEIGHT_DIFFERENCE) continue;
+				const distance = Math.hypot(camera.position.x - position.x, camera.position.z - position.z);
 				if (distance > nearestDistance) continue;
 				nearestDistance = distance;
 				nextResident = resident;
@@ -29,11 +34,13 @@ export default function InteractionSystem({ residents, residentPositions, onResi
 	useEffect(() => {
 		if (!enabled) return;
 		const keyDown = (event) => {
-			if (event.code === 'KeyC' && nearest.current) { event.preventDefault(); onInteract(nearest.current); }
+			if (event.code !== 'KeyC' || isTypingTarget(event.target)) return;
+			if (activeResidentId !== null) { event.preventDefault(); onEndConversation?.(); return; }
+			if (nearest.current) { event.preventDefault(); onInteract(nearest.current); }
 		};
 		window.addEventListener('keydown', keyDown);
 		return () => window.removeEventListener('keydown', keyDown);
-	}, [onInteract, enabled]);
+	}, [onInteract, onEndConversation, activeResidentId, enabled]);
 
 	return null;
 }

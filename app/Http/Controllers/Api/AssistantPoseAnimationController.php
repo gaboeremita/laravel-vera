@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\AssistantPortraitType;
+use App\Enums\Posture;
 use App\Http\Controllers\Controller;
 use App\Models\Pose;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class AssistantPoseAnimationController extends Controller
 {
@@ -45,7 +47,7 @@ class AssistantPoseAnimationController extends Controller
             ], 422);
         }
 
-        $pose = $assistant->poses()->firstOrCreate(['name' => 'default']);
+        $pose = $assistant->poses()->firstOrCreate(['name' => 'default', 'posture' => $this->requestedPosture($request)]);
 
         return $this->storeAnimation($request, $pose);
     }
@@ -67,13 +69,18 @@ class AssistantPoseAnimationController extends Controller
             ->assistants()
             ->findOrFail($assistantId);
 
-        $pose = $assistant->poses()->where('name', 'default')->first();
+        $pose = $assistant->poses()->where('name', 'default')->where('posture', $this->requestedPosture($request))->first();
 
         if (! $pose) {
             return response()->json(['message' => 'No pose animation file found.'], 404);
         }
 
         return $this->destroyAnimation($pose);
+    }
+
+    private function requestedPosture(Request $request): string
+    {
+        return $request->validate(['posture' => ['sometimes', Rule::enum(Posture::class)]])['posture'] ?? Posture::Standing->value;
     }
 
     private function storeAnimation(Request $request, Pose $pose): JsonResponse
@@ -113,6 +120,7 @@ class AssistantPoseAnimationController extends Controller
 
         return response()->json([
             'id' => $pose->id,
+            'posture' => $pose->posture->value,
             'animation_url' => $animationFile->url,
             'animation_original_name' => $animationFile->original_name,
         ], 201);

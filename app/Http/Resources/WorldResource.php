@@ -24,6 +24,7 @@ class WorldResource extends JsonResource
             'assistantContextPrompt' => $this->assistant_context_prompt,
             'npcContextPrompt' => $this->npc_context_prompt,
             'settings' => $this->settings,
+            'layout' => $this->layout ?? ['floors' => [], 'zones' => [], 'objects' => []],
             'cardImageUrl' => $this->whenLoaded('cardImage', fn () => $this->cardImage?->url),
             'portraitImageUrl' => $this->whenLoaded('portraitImage', fn () => $this->portraitImage?->url),
             'trackUrl' => $this->whenLoaded('track', fn () => $this->track?->url),

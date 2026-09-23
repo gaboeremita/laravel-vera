@@ -6,4 +6,5 @@ enum WorldResidentBehavior: string
 {
     case Stationary = 'stationary';
     case Roam = 'roam';
+    case Autonomous = 'autonomous';
 }

@@ -365,7 +365,15 @@ Starting a new session gives you a genuinely fresh start: no remembered position
 
 Entering a world loads its GLB, builds a collision octree from it, and spawns you either at the nearest walkable point to the room's center (a new session) or at the session's last recorded position (a resumed session, restored once loaded and then saved back periodically and on exit). Movement is keyboard + mouse first-person with pointer lock; collision is resolved against real triangle geometry (not a bounding box), so passing through an actual doorway works while walking into a wall or furnishing doesn't — but only geometry whose mesh or group name contains "collision" (case-insensitive) is collidable. A GLB without that naming has no wall/furniture collision, only the room's own outer bounds. Losing browser focus stops movement until you click back in.
 
-Approaching a resident within interaction range shows a `C — Chat` prompt; pressing `C` opens an in-world chat panel (pausing that resident's roaming) using the resident's conversation for the active session, its history, archive, and prompt — plus whichever world context prompt and per-resident overrides apply, and the world's own theme for as long as the panel is open. Residents far from the player skip animation/pose work entirely until back in range.
+Approaching a resident within 4 m shows a `C — Chat` prompt; pressing `C` opens an in-world chat panel (pausing that resident's roaming) using the resident's conversation for the active session, its history, archive, and prompt — plus whichever world context prompt and per-resident overrides apply, and the world's own theme for as long as the panel is open. You can keep walking while you talk; the panel closes when you are more than 12 m apart (with a warning from 8 m), and the conversation picks up again next time. Voice mode (the mic icon or `V`) listens and answers with the resident's voice coming from where she stands; background noise the transcriber reports as sounds is ignored. Residents far from the player skip animation/pose work entirely until back in range. Name tags float over residents, an arrow points to your conversation partner when she is off screen, and `M` expands a per-floor map.
+
+### Residents in a Marked World
+
+An environment GLB can mark floors, zones, objects and interaction spots with custom properties on empties (`extras.vera`); they are read on upload, and invalid ones are reported as warnings. There is no in-app marker editor. In a marked world, residents know where they are, where you are, and what is around them, and they act through tools during conversation: they can look up where to do something or what a place holds, go somewhere or come to you, follow you or stop (also `F`/`X` during a conversation), sit, lie, recline or do an activity at a spot, do an activity of the place they are in, wander around, swim and rest at the pool's edge, and plan several steps at once, including narrated steps with no marked spot behind them (singing at the mic, making tea). A resident needs a model that supports tool calling (NPCs use the default model).
+
+Poses belong to a posture — standing, sitting, lying, reclining or swimming — with one default pose each, edited in one tab per posture on the assistant page. The standing tab also holds the Walk Start/Walk/Walk Stop/Greeting motion poses, and the swimming tab Swim and Swim To Edge.
+
+A resident set to **Autonomous** chooses what to do on her own while you are in the world and not talking to her: 10–30 seconds after each step she decides her next one with her own model, shown in a thought bubble as `(reason) *action*` and saved in her conversation. Decisions pause after 5 minutes without any input from you. Where each resident is, and in which posture, is saved per session.
 
 ## Project Structure
 
@@ -373,7 +381,10 @@ Approaching a resident within interaction range shows a `C — Chat` prompt; pre
 laravel-vera/
 ├── app/
 │   ├── Actions/
-│   │   ├── AppendWorldConversationContext.php # Appends the world's context prompt + resident custom_prompt override to an in-world conversation
+│   │   ├── AppendWorldConversationContext.php # Appends the world's context prompt, resident custom_prompt, world state, world awareness and recent activity to an in-world conversation
+│   │   ├── BuildResidentWorldPrompt.php       # Resident world state, awareness reminder, recent activity, and idle decision prompt sections
+│   │   ├── ParseEnvironmentLayout.php         # Reads floor/zone/object/spot markers from an environment GLB into worlds.layout
+│   │   ├── ResolveWorldState.php              # Places a point on a floor and in the innermost zone containing it
 │   │   ├── BuildArchiveFile.php               # Renders an archive + entries to Markdown via FileBuilder
 │   │   ├── SearchArchiveEntries.php           # Hybrid (full-text + vector) archive entry search, merged via Reciprocal Rank Fusion
 │   │   └── SummarizeConversation.php          # Long-term memory summarization logic (wrapped by the queued job)
@@ -400,7 +411,8 @@ laravel-vera/
 │   │   ├── AiProviderFormat.php              # generic | anthropic
 │   │   ├── AssistantMode.php                 # assistant | agent
 │   │   ├── AssistantKind.php                 # assistant | world_npc
-│   │   ├── WorldResidentBehavior.php         # stationary | roam
+│   │   ├── WorldResidentBehavior.php         # stationary | roam | autonomous
+│   │   ├── Posture.php                       # standing | sitting | lying | reclining | swimming
 │   │   ├── ImageGenProviderFormat.php        # openrouter | openai_compatible
 │   │   └── VoiceProviderFormat.php           # openai_compatible | openai_tts | deepgram | elevenlabs
 │   ├── Http/Controllers/
@@ -428,7 +440,10 @@ laravel-vera/
 │   │       ├── VoiceModelController.php      # Full CRUD + prompt-only update (store() currently broken)
 │   │       ├── WorldController.php           # CRUD for worlds, including environment upload/replace and world-owned asset cleanup
 │   │       ├── WorldResidentController.php   # Add/update/remove a resident placement (position, behavior, opening message/prompt overrides)
-│   │       ├── WorldSessionController.php    # Per-user world sessions: index/store/rename/destroy + position updates
+│   │       ├── WorldSessionController.php    # Per-user world sessions: index/store/rename/destroy + position updates, with each resident's saved state
+│   │       ├── ResidentActivityController.php # Records a resident's actions and their outcomes per session
+│   │       ├── ResidentDecisionController.php # An autonomous resident's next self-chosen step
+│   │       ├── ResidentStateController.php   # Saves a resident's position, spot and posture per session
 │   │       └── NpcController.php             # Dedicated NPC CRUD, reusing AssistantController under the hood
 │   ├── Models/
 │   │   ├── User.php
@@ -456,7 +471,9 @@ laravel-vera/
 │   │   ├── Video.php                         # Polymorphic, stored on disk
 │   │   ├── World.php                         # name/slug/description, environment metadata, assistant/npc context prompts, settings (incl. theme); shared via WorldUser, not owned directly
 │   │   ├── WorldResident.php                 # A world's placement of an assistant/NPC: position, rotation, behavior, per-placement overrides
-│   │   └── WorldSession.php                  # One user's continuous thread in a world: title, last recorded position (json); owns its own conversations
+│   │   ├── WorldSession.php                  # One user's continuous thread in a world: title, last recorded position (json); owns its own conversations
+│   │   ├── ResidentActivity.php              # A resident's action in a session: verb, target, reason, outcome
+│   │   └── WorldSessionResident.php          # A resident's saved position, spot and posture in a session
 │   ├── Policies/
 │   │   └── WorldPolicy.php                   # Worlds are scoped to users granted access via WorldUser
 │   ├── Jobs/
@@ -471,7 +488,8 @@ laravel-vera/
 │       │   └── Tools/
 │       │       ├── BasicCalculatorTool.php   # basic_calculator tool
 │       │       ├── GetCurrentDatetimeTool.php# get_current_datetime tool
-│       │       └── ImageGenerationTool.php   # generate_image tool
+│       │       ├── ImageGenerationTool.php   # generate_image tool
+│       │       └── World/                    # Resident world tools: where_can_i, what_is_in, describe, go_to, follow, stop, use, zone, swim_to_edge, wander, plan
 │       ├── ImageGenProviders/
 │       │   ├── ImageGenManager.php           # Resolves provider: DB model → config fallback (mirrors LlmManager)
 │       │   ├── ImageGenerationService.php    # Shared generate() used by /create-image and the agent tool
@@ -513,7 +531,11 @@ laravel-vera/
 │   │   ├── create_worlds_table.php           # name/slug/environment metadata/assistant+npc context prompts/settings (incl. theme)
 │   │   ├── create_world_residents_table.php  # world_id/assistant_id/position/rotation/behavior/behavior_settings/opening_message/custom_prompt
 │   │   ├── create_world_user_table.php       # Pivot: world_id/user_id — worlds moved off direct user_id onto this, mirroring assistant_user
-│   │   └── create_world_sessions_table.php   # world_user_id/title/position (json); conversations gained a nullable world_session_id
+│   │   ├── create_world_sessions_table.php   # world_user_id/title/position (json); conversations gained a nullable world_session_id
+│   │   ├── add_layout_to_worlds_table.php    # worlds.layout: parsed environment markers
+│   │   ├── create_resident_activities_table.php # A resident's actions and outcomes per session
+│   │   ├── add_posture_to_poses_table.php    # poses.posture; uniqueness per assistant, name and posture
+│   │   └── create_world_session_residents_table.php # A resident's saved position, spot and posture per session
 │   └── seeders/
 │       └── VoiceProviderSeeder.php           # Seeds the TTS catalog (Orpheus, KittenTTS) — re-run to add more
 ├── resources/js/
@@ -581,7 +603,13 @@ laravel-vera/
 │   │       ├── WorldScene.jsx                # Canvas: environment, first-person controller, residents, interaction system; restores/reports session position
 │   │       ├── WorldEnvironment.jsx          # Loads the GLB, builds the collision octree, resolves spawn position
 │   │       ├── FirstPersonController.jsx     # Keyboard/mouse movement, pointer lock, collision-resolved stepping
-│   │       ├── ResidentController.jsx        # Resident VRM load, pose/expression playback, stationary/roam movement
+│   │       ├── ResidentController.jsx        # Resident VRM load, postures, poses, routes, spots, swimming, and the commands actions drive
+│   │       ├── residentActions.js            # Carries out a resident's action or plan through her commands
+│   │       ├── worldNavigation.js            # Navigation grid and routes (steps, walls, approaches, stuck recovery)
+│   │       ├── worldMotionPoses.js           # Postures, motion pose slots, and per-posture pose resolution
+│   │       ├── ThoughtBubble.jsx             # Reason-and-action line above an autonomous resident's head
+│   │       ├── NameTags.jsx                  # Resident names above their heads
+│   │       ├── WorldMap.jsx                  # Per-floor map with resident markers
 │   │       ├── InteractionSystem.jsx         # Proximity detection (via a resident-position ref map) + C-to-chat
 │   │       ├── WorldChat.jsx                 # In-world chat panel; resolves the resident's conversation scoped to the active session
 │   │       ├── collisionCheck.js             # WorldCollision: octree build, blocked-body check, stepped movement, spawn-finding
@@ -597,6 +625,7 @@ laravel-vera/
 │   │   ├── useImageGenProviders.js           # Image-gen provider/model CRUD + active model state
 │   │   ├── useConversationMemory.js          # Memory show/save/summarize/unlock, polls while summarizing
 │   │   ├── useConversationChat.js            # Shared message send/receive + pose-tag parsing, used by ChatPage and WorldChat
+│   │   ├── useResidentAgency.js              # Autonomous residents' decide-act-report loop while the user is in the world
 │   │   ├── useVoiceProviders.js              # Provider/model CRUD + model/voice selection
 │   │   ├── useDiscordSettings.js             # Discovery data + immediate-save trigger mode changes
 │   │   ├── useWorlds.js                      # World list fetching

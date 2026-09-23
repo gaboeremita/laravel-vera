@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Vector3 } from 'three';
 import { MAX_MOVEMENT_DELTA, PLAYER_EYE_HEIGHT } from './collisionCheck.js';
+import { isTypingTarget } from './keyboardFocus.js';
 
 const SPEED = 3.5;
 const UP = new Vector3(0, 1, 0);
@@ -20,7 +21,7 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		const canvas = gl.domElement;
 		const pressedKeys = keys.current;
 		const keyDown = (event) => {
-			if (enabled && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(event.code)) pressedKeys.add(event.code);
+			if (enabled && !isTypingTarget(event.target) && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(event.code)) pressedKeys.add(event.code);
 		};
 		const keyUp = (event) => pressedKeys.delete(event.code);
 		const mouseMove = (event) => {
@@ -30,11 +31,13 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 			camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
 		};
 		const blur = () => pressedKeys.clear();
+		const focusIn = (event) => { if (isTypingTarget(event.target)) pressedKeys.clear(); };
 		const requestPointerLock = () => { if (enabled) canvas.requestPointerLock(); };
 		canvas.addEventListener('click', requestPointerLock);
 		window.addEventListener('keydown', keyDown);
 		window.addEventListener('keyup', keyUp);
 		window.addEventListener('blur', blur);
+		document.addEventListener('focusin', focusIn);
 		document.addEventListener('mousemove', mouseMove);
 		return () => {
 			pressedKeys.clear();
@@ -42,6 +45,7 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 			window.removeEventListener('keydown', keyDown);
 			window.removeEventListener('keyup', keyUp);
 			window.removeEventListener('blur', blur);
+			document.removeEventListener('focusin', focusIn);
 			document.removeEventListener('mousemove', mouseMove);
 			if (document.pointerLockElement === canvas) document.exitPointerLock();
 		};

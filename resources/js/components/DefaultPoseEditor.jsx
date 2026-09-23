@@ -11,11 +11,12 @@ import { AnimationFileControl } from './PoseEditor.jsx';
  * the avatar falls back to its existing hardcoded idle/neutral state.
  *
  * @param {{name: string, vrm_blendshapes: Array, animation_url: ?string, animation_original_name: ?string}} pose
+ * @param {string} hint - shown next to the label
  * @param {function} onUpdateBlendshapes - (blendshapes) => void
  * @param {function} onUploadAnimation - (file) => void
  * @param {function} onDeleteAnimation - () => void
  */
-export default function DefaultPoseEditor({ pose, onUpdateBlendshapes, onUploadAnimation, onDeleteAnimation }) {
+export default function DefaultPoseEditor({ pose, hint = 'used when nothing else is triggered — optional', onUpdateBlendshapes, onUploadAnimation, onDeleteAnimation }) {
 	const datalistId = useId();
 	const [expanded, setExpanded] = useState(false);
 	const [draft, setDraft] = useState(() => (pose.vrm_blendshapes || []).map((b) => (b.weight <= 1 ? { ...b, weight: Math.round(b.weight * 100) } : b)));
@@ -39,7 +40,7 @@ export default function DefaultPoseEditor({ pose, onUpdateBlendshapes, onUploadA
 	return (
 		<div className="space-y-2">
 			<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
-				Default Pose <span className="text-fg-3 normal-case">(used when nothing else is triggered — optional)</span>
+				Default Pose <span className="text-fg-3 normal-case">({hint})</span>
 			</label>
 
 			<datalist id={datalistId}>

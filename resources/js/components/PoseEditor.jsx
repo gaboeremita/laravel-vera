@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
 import { BlendshapeRows, EXPRESSION_SUGGESTIONS } from './VrmEmotionEditor.jsx';
+import { POSTURES } from './world/worldMotionPoses.js';
 
 export function AnimationFileControl({ pose, onUploadAnimation, onDeleteAnimation }) {
 	const inputRef = useRef(null);
@@ -79,6 +80,7 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
 	const [expanded, setExpanded] = useState(false);
 	const [draft, setDraft] = useState(() => (pose.vrm_blendshapes || []).map((b) => (b.weight <= 1 ? { ...b, weight: Math.round(b.weight * 100) } : b)));
 	const [nameDraft, setNameDraft] = useState(pose.name);
+	const [postureDraft, setPostureDraft] = useState(pose.posture ?? 'standing');
 	const [syncedPose, setSyncedPose] = useState(pose);
 	const [isSaving, setIsSaving] = useState(false);
 
@@ -86,6 +88,7 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
 		setSyncedPose(pose);
 		setDraft((pose.vrm_blendshapes || []).map((b) => (b.weight <= 1 ? { ...b, weight: Math.round(b.weight * 100) } : b)));
 		setNameDraft(pose.name);
+		setPostureDraft(pose.posture ?? 'standing');
 	}
 
 	const handleSave = async () => {
@@ -94,7 +97,7 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
 
 		setIsSaving(true);
 		try {
-			await onSave(trimmedName, draft.filter((b) => b.expression.trim()));
+			await onSave(trimmedName, draft.filter((b) => b.expression.trim()), postureDraft);
 		} finally {
 			setIsSaving(false);
 		}
@@ -123,12 +126,24 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
 
 			{expanded && (
 				<div className="p-3 pt-0 space-y-2">
-					<input
-						type="text"
-						value={nameDraft}
-						onChange={(e) => setNameDraft(e.target.value)}
-						className="w-full bg-bg-0 border border-line-1 text-accent text-[0.7rem] tracking-[0.05em] px-2 py-1 outline-none focus:border-accent/50 transition-colors"
-					/>
+					<div className="flex gap-2">
+						<input
+							type="text"
+							value={nameDraft}
+							onChange={(e) => setNameDraft(e.target.value)}
+							className="flex-1 min-w-0 bg-bg-0 border border-line-1 text-accent text-[0.7rem] tracking-[0.05em] px-2 py-1 outline-none focus:border-accent/50 transition-colors"
+						/>
+						<select
+							value={postureDraft}
+							onChange={(e) => setPostureDraft(e.target.value)}
+							aria-label="Posture"
+							className="bg-bg-0 border border-line-1 text-fg-2 text-[0.7rem] tracking-[0.05em] px-2 py-1 outline-none focus:border-accent/50 transition-colors cursor-pointer"
+						>
+							{POSTURES.map(({ key, label }) => (
+								<option key={key} value={key}>{label}</option>
+							))}
+						</select>
+					</div>
 					<BlendshapeRows blendshapes={draft} onChange={setDraft} datalistId={datalistId} />
 					<div className="flex justify-end">
 						<button
@@ -157,7 +172,7 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
  * @param {Array} poses - [{id, name, vrm_blendshapes, animation_url}]
  * @param {function} onAdd - (name, blendshapes) => void
  * @param {function} onDelete - (pose) => void
- * @param {function} onUpdateBlendshapes - (pose, name, blendshapes) => void
+ * @param {function} onUpdateBlendshapes - (pose, name, blendshapes, posture) => void
  * @param {function} onUploadAnimation - (pose, file) => void
  * @param {function} onDeleteAnimation - (pose) => void
  */
@@ -218,7 +233,7 @@ export default function PoseEditor({ poses, onAdd, onDelete, onUpdateBlendshapes
 					<PoseRow
 						key={pose.id}
 						pose={pose}
-						onSave={(name, blendshapes) => onUpdateBlendshapes(pose, name, blendshapes)}
+						onSave={(name, blendshapes, posture) => onUpdateBlendshapes(pose, name, blendshapes, posture)}
 						onDelete={() => setDeleteTarget(pose)}
 						onUploadAnimation={onUploadAnimation}
 						onDeleteAnimation={onDeleteAnimation}

@@ -7,6 +7,7 @@ import Header from '../components/Header.jsx';
 import WorldForm from '../components/WorldForm.jsx';
 import WorldResidentsEditor from '../components/WorldResidentsEditor.jsx';
 import { ImageUploadField } from '../components/WorldImagesEditor.jsx';
+import { reportLayoutWarnings } from '../utils/layoutWarnings.js';
 
 export default function CreateWorldPage() {
 	const navigate = useNavigate();
@@ -41,11 +42,12 @@ export default function CreateWorldPage() {
 			const response = await api.postForm(route('worlds.store'), form);
 			if (!response.ok) throw new Error((await response.json()).message);
 			const world = await response.json();
+			reportLayoutWarnings(world.layoutWarnings, addToast);
 
 			const failures = [];
 			for (const resident of value.residents) {
 				const residentResponse = await api.put(route('worlds.residents.upsert', { world: world.id, assistant: resident.assistant.id }), { position: resident.position, rotation: resident.rotation, behavior: resident.behavior, openingMessage: resident.openingMessage, customPrompt: resident.customPrompt });
-				if (!residentResponse.ok) failures.push(resident.assistant.name);
+				if (!residentResponse.ok) failures.push(`${resident.assistant.name} (${(await residentResponse.json().catch(() => ({}))).message || `HTTP ${residentResponse.status}`})`);
 			}
 			if (cardImageFile && !(await uploadStagedFile('worlds.image.card.store', world.id, 'image', cardImageFile))) failures.push('card image');
 			if (portraitImageFile && !(await uploadStagedFile('worlds.image.portrait.store', world.id, 'image', portraitImageFile))) failures.push('portrait image');

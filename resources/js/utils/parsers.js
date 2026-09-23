@@ -119,3 +119,17 @@ export function stripForSpeech(text) {
         .replace(/\n{2,}/g, '\n')
         .trim();
 }
+
+/**
+ * What the user actually said in a voice transcript, with the sound
+ * descriptions speech-to-text adds for noise removed: "(water splashing)",
+ * "[Music]", "*coughs*", "♪". Empty when the transcript is only sounds.
+ */
+export function spokenWords(transcript) {
+    const words = (transcript ?? '')
+        .replace(/\([^)]*\)|\[[^\]]*\]|\*[^*]*\*|[♪♫]/gu, ' ')
+        .replace(/\s+/gu, ' ')
+        .trim();
+
+    return /[\p{L}\p{N}]/u.test(words) ? words : '';
+}
