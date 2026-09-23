@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { AnimationMixer, LoopOnce, LoopRepeat } from 'three';
+import { AnimationMixer, LoopOnce, LoopRepeat, PositionalAudio } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { applyBoneQuaternions, captureBoneQuaternions, loadPoseClip } from '../VrmAvatar.jsx';
@@ -25,8 +25,11 @@ const POSE_RETURN_SECONDS = 0.6;
 // Matches VrmAvatar's EXPRESSION_HOLD_SECONDS — how long a blendshapes-only
 // pose (no body animation to ride along with) holds before decaying.
 const POSE_EXPRESSION_HOLD_SECONDS = 3.5;
+const VOICE_HEIGHT = 1.5;
+const VOICE_REF_DISTANCE = 2;
+const VOICE_ROLLOFF = 1.2;
 
-export default function ResidentController({ resident, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions }) {
+export default function ResidentController({ resident, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions, residentVoices, audioListener, inConversation = false }) {
 	const { scene } = useThree();
 	const vrm = useRef(null);
 	const mixer = useRef(null);
@@ -87,6 +90,37 @@ export default function ResidentController({ resident, playerPosition, paused, a
 		});
 		return () => { cancelled = true; };
 	}, [distance, loaded, position, resident.id, resident.assistant.vrmUrl, resident.rotation?.y, residentPositions, scene]);
+
+	useEffect(() => {
+		if (!loaded || !residentVoices || !audioListener) return undefined;
+		let voice = null;
+		const playVoice = async (audioBlob) => {
+			const listener = audioListener.current;
+			if (!listener || !vrm.current) return null;
+			if (listener.context.state === 'suspended') await listener.context.resume();
+			const buffer = await listener.context.decodeAudioData(await audioBlob.arrayBuffer());
+			if (!voice) {
+				voice = new PositionalAudio(listener);
+				voice.setRefDistance(VOICE_REF_DISTANCE);
+				voice.setRolloffFactor(VOICE_ROLLOFF);
+				voice.position.set(0, VOICE_HEIGHT, 0);
+				vrm.current.scene.add(voice);
+			}
+			if (voice.isPlaying) voice.stop();
+			voice.setBuffer(buffer);
+			voice.play();
+			return buffer.duration;
+		};
+		const voices = residentVoices.current;
+		voices.set(resident.id, playVoice);
+		return () => {
+			voices.delete(resident.id);
+			if (voice) {
+				if (voice.isPlaying) voice.stop();
+				voice.removeFromParent();
+			}
+		};
+	}, [loaded, resident.id, residentVoices, audioListener]);
 
 	useEffect(() => () => {
 		residentPositions.current.delete(resident.id);
@@ -226,7 +260,7 @@ export default function ResidentController({ resident, playerPosition, paused, a
 		const currentPosition = vrm.current.scene.position;
 		const currentDistance = Math.hypot(playerPosition[0] - currentPosition.x, playerPosition[1] - currentPosition.y, playerPosition[2] - currentPosition.z);
 		let didMove = false;
-		const wantsToRoam = resident.behavior === 'roam' && !paused && currentDistance < 30;
+		const wantsToRoam = resident.behavior === 'roam' && !paused && !inConversation && currentDistance < 30;
 		const locomotion = locomotionPhaseRef.current;
 		const activateLocomotionAction = (action) => {
 			if (!action || locomotionActionRef.current === action) return;

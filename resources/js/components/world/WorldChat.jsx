@@ -1,15 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
+import { Mic, MicOff } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { api } from '../../utils/api.js';
 import { useEmotions } from '../../hooks/useEmotions.js';
 import { useConversationChat } from '../../hooks/useConversationChat.js';
+import { useVoiceMode } from '../../hooks/useVoiceMode.js';
+import { stripForSpeech } from '../../utils/parsers.js';
+import { isTypingTarget } from './keyboardFocus.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, onVoiceAudio }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
+	const [isTranscribing, setIsTranscribing] = useState(false);
+	const [isResidentSpeaking, setIsResidentSpeaking] = useState(false);
 	const scrollRef = useRef(null);
+	const inputRef = useRef(null);
+	const speakingTimeoutRef = useRef(null);
 	const { poses, portraitType, fetchEmotions } = useEmotions();
 	const { theme, setTheme } = useTheme();
 
@@ -51,6 +59,26 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		return () => { active = false; };
 	}, [resident.assistant.id, worldSessionId]);
 
+	const speakReply = async (rawText, ttsInstructions) => {
+		const text = stripForSpeech(rawText);
+		if (!text) return;
+		try {
+			const payload = { text };
+			if (ttsInstructions) payload.instructions = ttsInstructions;
+			const response = await api.post(route('voice.synthesize', { assistant: resident.assistant.id }), payload);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.message || 'Synthesis failed');
+			}
+			const duration = await onVoiceAudio(await response.blob());
+			clearTimeout(speakingTimeoutRef.current);
+			setIsResidentSpeaking(true);
+			speakingTimeoutRef.current = setTimeout(() => setIsResidentSpeaking(false), (duration ?? 0) * 1000);
+		} catch (error) {
+			addToast(error.message || 'Failed to play voice response', 'error');
+		}
+	};
+
 	const { messages, isLoading, sendMessage } = useConversationChat({
 		assistantId: resident.assistant.id,
 		conversationId,
@@ -63,6 +91,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		onLoadError: () => { addToast('Unable to load this conversation', 'error'); onClose(); },
 		addToast,
 		fetchEmotions,
+		onVoiceReply: (text, ttsInstructions) => { void speakReply(text, ttsInstructions); },
 		extraParams: worldSessionId && getPositions
 			? { worldId: world.id, worldSessionId, get positions() { return getPositions(); } }
 			: { worldId: world.id },
@@ -72,22 +101,75 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
 	}, [messages]);
 
+	const handleSpeechEnd = async (audioBlob) => {
+		const formData = new FormData();
+		formData.append('audio', audioBlob, 'speech.wav');
+		setIsTranscribing(true);
+		try {
+			const response = await api.postForm(route('voice.transcribe', { assistant: resident.assistant.id }), formData);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.message || 'Transcription failed');
+			}
+			const { text } = await response.json();
+			if (text?.trim() && conversationId) sendMessage(text, { voiceMode: true });
+		} catch (error) {
+			addToast(error.message || 'Failed to transcribe audio', 'error');
+		} finally {
+			setIsTranscribing(false);
+		}
+	};
+
+	const { isListening, isSpeaking, error: voiceError, start: startVoiceMode, stop: stopVoiceMode } = useVoiceMode({ onSpeechEnd: handleSpeechEnd });
+
+	useEffect(() => {
+		if (voiceError) addToast(voiceError, 'error');
+	}, [voiceError, addToast]);
+
+	useEffect(() => () => {
+		stopVoiceMode();
+		clearTimeout(speakingTimeoutRef.current);
+	}, [stopVoiceMode]);
+
+	useEffect(() => {
+		const keyDown = (event) => {
+			if (event.key !== 'Enter' || isTypingTarget(event.target)) return;
+			event.preventDefault();
+			inputRef.current?.focus();
+		};
+		window.addEventListener('keydown', keyDown);
+		return () => window.removeEventListener('keydown', keyDown);
+	}, []);
+
+	const voiceStatus = !isListening ? null
+		: isSpeaking ? 'HEARING YOU'
+			: isTranscribing || isLoading ? 'PROCESSING'
+				: isResidentSpeaking ? 'SPEAKING'
+					: 'LISTENING';
+
 	const handleSend = (event) => {
 		event.preventDefault();
 		const text = input.trim();
 		if (!text || !conversationId || isLoading) return;
 		setInput('');
 		sendMessage(text);
+		inputRef.current?.blur();
 	};
 
 	return (
-		<div className="flex h-full flex-col border-r border-line-1 bg-bg-0">
-			<header className="flex items-center justify-between border-b border-line-1 px-4 py-3">
-				<div>
-					<p className="text-accent text-sm tracking-[0.05em]">{resident.assistant.name}</p>
-					<p className="text-fg-3 text-[0.65rem] tracking-[0.1em]">IN {world.name.toUpperCase()}</p>
+		<div className="flex h-full flex-col border border-line-1 bg-bg-0/90 backdrop-blur-sm">
+			<header className="flex items-center justify-between gap-3 border-b border-line-1 px-4 py-3">
+				<div className="min-w-0">
+					<p className="text-fg-3 text-[0.6rem] tracking-[0.12em]">TALKING WITH</p>
+					<p className="flex items-center gap-2 text-accent text-sm tracking-[0.05em]"><span className="h-2 w-2 shrink-0 rounded-full bg-accent" />{resident.assistant.name}</p>
 				</div>
-				<button type="button" onClick={onClose} className="text-fg-3 text-xs hover:text-fg-1 cursor-pointer">CLOSE</button>
+				<div className="flex items-center gap-3">
+					{voiceStatus && <span className="text-accent text-[0.6rem] tracking-[0.12em]">{voiceStatus}</span>}
+					<button type="button" onClick={isListening ? stopVoiceMode : startVoiceMode} title={isListening ? 'Turn voice mode off' : 'Turn voice mode on'} className={`cursor-pointer ${isListening ? 'text-accent' : 'text-fg-3 hover:text-fg-1'}`}>
+						{isListening ? <Mic size={16} /> : <MicOff size={16} />}
+					</button>
+					<button type="button" onClick={onClose} className="text-fg-3 text-xs hover:text-fg-1 cursor-pointer">END (C)</button>
+				</div>
 			</header>
 			<div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4 custom-scrollbar">
 				{messages.map((msg) => (
@@ -96,12 +178,13 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 			</div>
 			<form onSubmit={handleSend} className="flex gap-2 border-t border-line-1 p-3">
 				<input
+					ref={inputRef}
 					value={input}
+					onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.blur(); }}
 					onChange={(event) => setInput(event.target.value)}
-					placeholder="Write a message..."
+					placeholder="Enter to type, Esc to keep walking"
 					disabled={!conversationId || isLoading}
 					className="min-w-0 flex-1 bg-bg-1 px-3 py-2 text-sm text-fg-1 outline-none"
-					autoFocus
 				/>
 				<button disabled={!conversationId || isLoading || !input.trim()} className="button-primary text-[0.7rem]">
 					{isLoading ? '...' : 'SEND'}

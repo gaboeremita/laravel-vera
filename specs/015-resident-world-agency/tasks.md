@@ -82,20 +82,20 @@ description: "Task list for Resident World Agency"
 
 ### Tests for User Story 2
 
-- [ ] T017 [P] [US2] Write `tests/Unit/ConversationRange.test.js` for `resources/js/components/world/conversationRange.js`: `conversationRangeState(distance)` returns `ok` below the warning distance (8 m), `warning` between warning and end (12 m), and `ended` beyond
+- [X] T017 [P] [US2] Write `tests/Unit/ConversationRange.test.js` for `resources/js/components/world/conversationRange.js`: `conversationRangeState(distance)` returns `ok` below the warning distance (8 m), `warning` between warning and end (12 m), and `ended` beyond
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Create `resources/js/components/world/conversationRange.js` exporting the warning and end distances and `conversationRangeState(distance)`
-- [ ] T019 [US2] In `resources/js/pages/WorldPage.jsx`, stop disabling exploration while a conversation is open (`explorationEnabled` depends only on `status === 'ready'`), render `WorldChat` as an overlay panel on top of the scene instead of a side column, and stop pausing residents because of an open chat
-- [ ] T020 [US2] In `resources/js/components/world/FirstPersonController.jsx`, ignore movement keys while a text input or textarea has focus, and keep pointer lock behavior unchanged otherwise
-- [ ] T021 [US2] In `resources/js/components/world/WorldChat.jsx`, focus the message box on `Enter` when it is not focused, blur it after sending and on `Esc`, and show a close button (FR-040, FR-049)
-- [ ] T022 [US2] In `resources/js/components/world/InteractionSystem.jsx` and `resources/js/pages/WorldPage.jsx`, make `C` start a conversation only when none is open and close the open one otherwise, and move the `Esc`-closes-chat handler to only blur the input (FR-045, FR-049)
-- [ ] T023 [US2] In `resources/js/pages/WorldPage.jsx`, compute the distance between the player and the conversation resident every frame via `conversationRangeState`, show a warning banner in the `warning` state, and close the conversation in the `ended` state (FR-048); keep the per-frame distance in a ref and derive the banner state during render, per constitution Principle VIII
-- [ ] T024 [US2] Add voice mode to `resources/js/components/world/WorldChat.jsx` reusing `resources/js/hooks/useVoiceMode.js`, the `voice.transcribe` route and the `voice.synthesize` route as `resources/js/pages/ChatPage.jsx` does, sending messages with `voice_mode: true`, with a toggle and a listening/processing/speaking indicator (FR-041, FR-042)
-- [ ] T025 [US2] Add an `AudioListener` to the camera in `resources/js/components/world/WorldScene.jsx` and a `playVoice(audioArrayBuffer)` method per resident in `resources/js/components/world/ResidentController.jsx` that decodes the audio and plays it through a `PositionalAudio` attached to her VRM scene; route voice replies from `WorldChat` to the conversation resident through `WorldPage` (FR-043)
-- [ ] T026 [US2] Stop voice listening when the conversation closes, voice mode is turned off, the distance limit ends it, or the world page unmounts, in `resources/js/components/world/WorldChat.jsx` (FR-044)
-- [ ] T027 [US2] Mark the conversation resident in the conversation panel header (name and avatar) in `resources/js/components/world/WorldChat.jsx` (FR-047; the in-world highlight is T031)
+- [X] T018 [US2] Create `resources/js/components/world/conversationRange.js` exporting the warning and end distances and `conversationRangeState(distance)`
+- [X] T019 [US2] In `resources/js/pages/WorldPage.jsx`, stop disabling exploration while a conversation is open (`explorationEnabled` depends only on `status === 'ready'`), render `WorldChat` as an overlay panel on top of the scene instead of a side column, and stop pausing residents because of an open chat
+- [X] T020 [US2] In `resources/js/components/world/FirstPersonController.jsx`, ignore movement keys while a text input or textarea has focus, and keep pointer lock behavior unchanged otherwise
+- [X] T021 [US2] In `resources/js/components/world/WorldChat.jsx`, focus the message box on `Enter` when it is not focused, blur it after sending and on `Esc`, and show a close button (FR-040, FR-049)
+- [X] T022 [US2] In `resources/js/components/world/InteractionSystem.jsx` and `resources/js/pages/WorldPage.jsx`, make `C` start a conversation only when none is open and close the open one otherwise, and move the `Esc`-closes-chat handler to only blur the input (FR-045, FR-049)
+- [X] T023 [US2] In `resources/js/pages/WorldPage.jsx`, compute the distance between the player and the conversation resident every frame via `conversationRangeState`, show a warning banner in the `warning` state, and close the conversation in the `ended` state (FR-048); keep the per-frame distance in a ref and derive the banner state during render, per constitution Principle VIII
+- [X] T024 [US2] Add voice mode to `resources/js/components/world/WorldChat.jsx` reusing `resources/js/hooks/useVoiceMode.js`, the `voice.transcribe` route and the `voice.synthesize` route as `resources/js/pages/ChatPage.jsx` does, sending messages with `voice_mode: true`, with a toggle and a listening/processing/speaking indicator (FR-041, FR-042)
+- [X] T025 [US2] Add an `AudioListener` to the camera in `resources/js/components/world/WorldScene.jsx` and a `playVoice(audioArrayBuffer)` method per resident in `resources/js/components/world/ResidentController.jsx` that decodes the audio and plays it through a `PositionalAudio` attached to her VRM scene; route voice replies from `WorldChat` to the conversation resident through `WorldPage` (FR-043)
+- [X] T026 [US2] Stop voice listening when the conversation closes, voice mode is turned off, the distance limit ends it, or the world page unmounts, in `resources/js/components/world/WorldChat.jsx` (FR-044)
+- [X] T027 [US2] Mark the conversation resident in the conversation panel header (name and avatar) in `resources/js/components/world/WorldChat.jsx` (FR-047; the in-world highlight is T031)
 
 **Checkpoint**: Story 2 works on its own on top of Story 1.
 
