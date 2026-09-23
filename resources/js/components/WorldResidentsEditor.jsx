@@ -116,6 +116,7 @@ function ResidentRow({ candidate, resident, onAdd, onRemove, onUpdate }) {
 				>
 					<option value="stationary">Stationary</option>
 					<option value="roam">Roam</option>
+					<option value="autonomous">Autonomous</option>
 				</select>
 			</div>
 			<div>

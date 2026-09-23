@@ -45,6 +45,7 @@ A resident's saved state within one world session (FR-032).
 | `spot_id` | string, nullable | Layout spot id she occupies. |
 | `activity_id` | string, nullable | Layout activity id she is holding. |
 | `posture` | string | `standing`, `sitting`, `lying` or `reclining`; restored on return. |
+| `exit_position` | json, nullable | `{x, y, z}`, the floor point she stands up to when she leaves the spot. |
 | timestamps | | |
 
 Ownership: reached only through `WorldUser → WorldSession`, and the resident must belong to the session's world (Principle IV).

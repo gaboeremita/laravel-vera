@@ -242,3 +242,25 @@ function sentSystemPrompt(): string
 
     return $prompt;
 }
+
+/**
+ * Fakes one agent turn: each response answers the next request to the fake LLM.
+ */
+function fakeTurn(array ...$responses): void
+{
+    $sequence = Http::sequence();
+    foreach ($responses as $response) {
+        $sequence->push($response);
+    }
+    Http::fake(['fake-llm.test/*' => $sequence]);
+}
+
+/**
+ * The content of the tool result she was given back, from the request that followed her tool call.
+ */
+function toolResultSentBack(int $requestIndex = 1): string
+{
+    $request = Http::recorded()[$requestIndex][0];
+
+    return collect($request['messages'])->where('role', 'tool')->last()['content'] ?? '';
+}

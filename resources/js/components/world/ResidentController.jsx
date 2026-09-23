@@ -39,11 +39,12 @@ const FOLLOW_RESUME_DISTANCE = 2.0;
 const STUCK_SECONDS = 2;
 const STUCK_MIN_PROGRESS = 0.05;
 const MAX_REPLANS = 3;
+const BACK_OFF_DISTANCE = 0.6;
 const VOICE_HEIGHT = 1.5;
 const VOICE_REF_DISTANCE = 2;
 const VOICE_ROLLOFF = 1.2;
 
-export default function ResidentController({ resident, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions, residentVoices, audioListener, inConversation = false, navigation, residentCommands }) {
+export default function ResidentController({ resident, savedState = null, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions, residentVoices, audioListener, inConversation = false, navigation, residentCommands, occupiedSpots }) {
 	const { scene } = useThree();
 	const vrm = useRef(null);
 	const mixer = useRef(null);
@@ -103,8 +104,22 @@ export default function ResidentController({ resident, playerPosition, paused, a
 			if (cancelled) { VRMUtils.deepDispose(gltf.scene); return; }
 			vrm.current = gltf.userData.vrm;
 			VRMUtils.rotateVRM0(vrm.current);
-			vrm.current.scene.position.set(position.x, position.y, position.z);
-			vrm.current.scene.rotation.y = resident.rotation?.y ?? 0;
+			const start = savedState?.position ?? position;
+			vrm.current.scene.position.set(start.x, start.y, start.z);
+			vrm.current.scene.rotation.y = savedState?.rotation?.y ?? resident.rotation?.y ?? 0;
+			if (savedState?.spotId && savedState.posture !== 'standing') {
+				const spotId = savedState.spotId;
+				occupiedSpots?.current.set(spotId, resident.id);
+				postureRef.current = savedState.posture;
+				spotRef.current = {
+					spotId,
+					activityId: savedState.activityId ?? null,
+					approach: savedState.exitPosition ?? null,
+					onLeave: () => {
+						if (occupiedSpots?.current.get(spotId) === resident.id) occupiedSpots.current.delete(spotId);
+					},
+				};
+			}
 			scene.add(vrm.current.scene);
 			residentPositions.current.set(resident.id, vrm.current.scene.position);
 
@@ -121,7 +136,7 @@ export default function ResidentController({ resident, playerPosition, paused, a
 			setLoaded(true);
 		});
 		return () => { cancelled = true; };
-	}, [distance, loaded, position, resident.id, resident.assistant.vrmUrl, resident.rotation?.y, residentPositions, scene]);
+	}, [distance, loaded, position, resident.id, resident.assistant.vrmUrl, resident.rotation?.y, residentPositions, scene, savedState, occupiedSpots]);
 
 	useEffect(() => {
 		if (!loaded || !residentVoices || !audioListener) return undefined;
@@ -156,7 +171,13 @@ export default function ResidentController({ resident, playerPosition, paused, a
 
 	useEffect(() => {
 		if (!loaded || !residentCommands || !navigation) return undefined;
+		let hold = null;
 		const settle = (outcome, reason = null) => {
+			if (hold) {
+				clearTimeout(hold.timer);
+				hold.resolve({ outcome, reason });
+				hold = null;
+			}
 			const route = routeRef.current;
 			if (!route) return;
 			routeRef.current = null;
@@ -205,7 +226,7 @@ export default function ResidentController({ resident, playerPosition, paused, a
 				settle('interrupted', 'told to stop');
 				return Promise.resolve({ outcome: 'completed', reason: null });
 			},
-			use: async ({ spotId, position: spotPosition, approach, facing, posture, poseName, onLeave }) => {
+			use: async ({ spotId, activityId, position: spotPosition, approach, facing, posture, poseName, onLeave }) => {
 				settle('interrupted', 'a new action replaced it');
 				if (spotRef.current?.spotId !== spotId) {
 					await leaveSpot();
@@ -217,9 +238,10 @@ export default function ResidentController({ resident, playerPosition, paused, a
 					const hipsHeight = posture === 'standing' ? undefined : postureHipsHeightRef.current.get(posture);
 					const placement = hipsHeight === undefined ? ground : { x: spotPosition.x, y: spotPosition.y + SEAT_CLEARANCE - hipsHeight, z: spotPosition.z };
 					await placeAt(placement, facingAngleForMovement(Math.sin(facing), Math.cos(facing)) ?? vrm.current.scene.rotation.y);
-					spotRef.current = { spotId, approach: ground, onLeave };
+					spotRef.current = { spotId, activityId, approach: ground, onLeave };
 				}
 				postureRef.current = posture;
+				spotRef.current.activityId = activityId;
 				if (poseName) playPoseRef.current?.(poseName);
 				return { outcome: 'completed', reason: null };
 			},
@@ -228,15 +250,42 @@ export default function ResidentController({ resident, playerPosition, paused, a
 				if (posture !== postureRef.current) {
 					await leaveSpot();
 					if (posture !== 'standing') {
-						spotRef.current = { spotId: null, approach: null, onLeave: null };
+						spotRef.current = { spotId: null, activityId: null, approach: vrm.current.scene.position.clone(), onLeave: null };
 						postureRef.current = posture;
 					}
 				}
 				if (poseName) playPoseRef.current?.(poseName);
 				return { outcome: 'completed', reason: null };
 			},
+			hold: (milliseconds) => new Promise((resolve) => {
+				settle('interrupted', 'a new action replaced it');
+				hold = {
+					resolve,
+					timer: setTimeout(() => {
+						hold = null;
+						resolve({ outcome: 'completed', reason: null });
+					}, milliseconds),
+				};
+			}),
+			pose: async (name) => {
+				await playPoseRef.current?.(name);
+				return { outcome: 'completed', reason: null };
+			},
 			standUp: leaveSpot,
 			posture: () => postureRef.current,
+			state: () => {
+				const scene = vrm.current.scene;
+				const spot = spotRef.current;
+				const point = (vector) => (vector ? { x: vector.x, y: vector.y, z: vector.z } : null);
+				return {
+					position: point(scene.position),
+					rotation: { y: scene.rotation.y },
+					spotId: spot?.spotId ?? null,
+					activityId: spot?.activityId ?? null,
+					posture: postureRef.current,
+					exitPosition: point(spot?.approach),
+				};
+			},
 		};
 		const registry = residentCommands.current;
 		registry.set(resident.id, commands);
@@ -492,9 +541,24 @@ export default function ResidentController({ resident, playerPosition, paused, a
 						route.progressAt = elapsed;
 					}
 					if (locomotionPhaseRef.current.name === 'walking' && elapsed - route.progressAt > STUCK_SECONDS) {
+						// First she steps back and lines up with the opening again;
+						// if she sticks at the same place, that spot is ruled out
+						// and she looks for another way.
 						const grid = navigation?.current;
-						grid?.blockStep(currentPosition, waypoint);
-						const path = route.mode === 'goto' && route.replans < MAX_REPLANS && grid ? (route.near ? grid.findPathNear(currentPosition, route.target) : grid.findPath(currentPosition, route.target)) : null;
+						const plan = (from) => (route.near ? grid.findPathNear(from, route.target) : grid.findPath(from, route.target));
+						let path = null;
+						if (route.mode === 'goto' && grid && route.replans < MAX_REPLANS) {
+							if (route.replans === 0) {
+								const facing = vrm.current.scene.rotation.y;
+								const backOff = grid.nearestPoint({ x: currentPosition.x + Math.sin(facing) * BACK_OFF_DISTANCE, y: currentPosition.y, z: currentPosition.z + Math.cos(facing) * BACK_OFF_DISTANCE });
+								const onward = backOff ? plan(backOff) : null;
+								if (onward) path = [{ x: currentPosition.x, y: currentPosition.y, z: currentPosition.z }, backOff, ...onward.slice(1)];
+							}
+							if (!path) {
+								grid.blockStep(currentPosition, waypoint);
+								path = plan(currentPosition);
+							}
+						}
 						if (path && path.length > 1) {
 							route.waypoints = path;
 							route.index = 1;
@@ -589,7 +653,11 @@ export default function ResidentController({ resident, playerPosition, paused, a
 			if (activeRoute.heading !== null) vrm.current.scene.rotation.y = turnTowardsAngle(vrm.current.scene.rotation.y, activeRoute.heading, ROUTE_TURN_SPEED * step);
 			const finalWaypoint = activeRoute.waypoints[activeRoute.waypoints.length - 1];
 			const toEnd = activeRoute.mode === 'goto' ? Math.hypot(finalWaypoint.x - currentPosition.x, finalWaypoint.z - currentPosition.z) : Infinity;
-			const targetVelocity = ROUTE_WALK_SPEED * Math.min(1, Math.max(0.3, toEnd / ROUTE_ARRIVAL_SLOWDOWN));
+			// She turns toward the next point before walking, so she does not
+			// swing wide into door frames at corners.
+			const headingError = activeRoute.heading === null ? 0 : activeRoute.heading - vrm.current.scene.rotation.y;
+			const alignment = Math.max(0, Math.cos(headingError)) ** 2;
+			const targetVelocity = ROUTE_WALK_SPEED * alignment * Math.min(1, Math.max(0.3, toEnd / ROUTE_ARRIVAL_SLOWDOWN));
 			locomotion.velocity += Math.sign(targetVelocity - locomotion.velocity) * Math.min(Math.abs(targetVelocity - locomotion.velocity), ROUTE_ACCELERATION * step);
 			const distance = locomotion.velocity * step;
 			const previousX = currentPosition.x;

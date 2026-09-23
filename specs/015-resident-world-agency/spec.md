@@ -14,7 +14,7 @@
 
 - Q: For worlds without built-in markers, how should spots be placed and oriented? → A: No manual authoring. Zones, objects and interaction spots come only from markers embedded in the environment file; worlds without markers have no zones or objects.
 - Q: When does the resident count as "in conversation" for holding off self-chosen actions? → A: Exactly while a conversation with her is open; she may resume self-chosen actions as soon as it closes.
-- Q: How long does the resident wait between self-chosen activity decisions? → A: A random 10 seconds to 1 minute after her previous activity (or decision to stay put) finishes.
+- Q: How long does the resident wait between self-chosen activity decisions? → A: A random 10 to 30 seconds after her previous activity (or decision to stay put) finishes.
 - Q: What happens to items she picks up, like a drink? → A: Residents do not pick up or carry objects. Activities such as getting a drink are performed as poses at the spot, with no held item.
 - Q: Which model makes the resident's self-chosen activity decisions? → A: Always her own conversation model.
 - Q: Can self-chosen activities be poses from her own library, without using the world? → A: Yes. Any pose in her library (check phone, stretch, dance) is a self-chosen activity she can perform wherever she is.
@@ -139,12 +139,12 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 **Acceptance Scenarios**:
 
-1. **Given** the user is in the world, no conversation with her is open, and her previous activity finished between 10 seconds and 1 minute ago, **When** her idle wait ends, **Then** she decides on an activity, or on staying put, based on her personality and recent history.
+1. **Given** the user is in the world, no conversation with her is open, and her previous activity finished between 10 and 30 seconds ago, **When** her idle wait ends, **Then** she decides on an activity, or on staying put, based on her personality and recent history.
 2. **Given** the resident had a drink a few minutes ago, **When** she next decides what to do, **Then** her choice takes that recent activity into account.
 3. **Given** the resident is partway through a multi-step activity, **When** the user speaks to her, **Then** she stops the activity and gives the user her attention.
 4. **Given** a step of her plan fails (the lounger is taken), **When** she learns the outcome, **Then** she adapts the plan or picks something else.
 5. **Given** the user leaves the world, **When** the resident is mid-activity or idle, **Then** she makes no further decisions and takes no further actions.
-6. **Given** the user comes back to the world, **When** the world loads, **Then** the resident is where the user left her, and her first decision can respond to the user's arrival.
+6. **Given** the user comes back to the world, **When** the world loads, **Then** the resident is where the user left her, and her first decision follows her usual idle wait.
 7. **Given** the resident decides to get a drink because she wants to forget her day, **When** she starts, **Then** the conversation shows a line like `(I want to forget about today for a while) *walks to the bar to get a drink*`, and a thought bubble above her shows the same line.
 8. **Given** a conversation with the resident is open, **When** her idle period would otherwise end, **Then** she makes no self-chosen action.
 9. **Given** the resident has a "check phone" pose in her library, **When** she decides on an activity, **Then** she can choose to check her phone where she is, without walking anywhere, and the conversation shows a line like `(I wonder if anyone texted me) *checks her phone*`.
@@ -224,14 +224,17 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 **Idle autonomy**
 
-- **FR-023**: While the user is in the world and no conversation with her is open, the resident MUST decide whether to do something and what at a random moment between 10 seconds and 1 minute after her previous activity, or her decision to stay put, finishes.
+- **FR-023**: While the user is in the world and no conversation with her is open, the resident MUST decide whether to do something and what at a random moment between 10 and 30 seconds after her previous activity, or her decision to stay put, finishes.
 - **FR-024**: Idle decisions MUST be made by the resident's own conversation model, using her personality, her current state, her recent-activity history and the activities available. They MUST NOT be random selection among options.
 - **FR-025**: Staying put MUST be a valid idle decision.
-- **FR-025a**: The activities offered to her MUST include every pose in her own pose library, which she can perform wherever she currently is, alongside zone activities and object interaction spots.
-- **FR-026**: The resident MUST be able to carry out multi-step activities, deciding each next step after learning the previous step's outcome.
+- **FR-025a**: The activities offered to her MUST include every pose in her own pose library except the world motion poses (walking and greeting), which she can perform wherever she currently is, alongside zone activities and object interaction spots.
+- **FR-026**: The resident MUST be able to plan an activity of several steps at once, stating them in order (for example: go to the bar, mix a drink at the back bar, then drink it on a stool), with each step checked before the plan starts. The steps run one after another, each is recorded with its outcome, and a failed step stops the plan and lets her decide again right away.
+- **FR-026a**: A step MUST be able to be something with no marked spot, activity or pose behind it, described in a few words (singing at the microphone, making tea); she stays where she is while her narration carries it.
+- **FR-026b**: Postures MUST be described to her exactly: sitting is upright on a seat, reclining is leaning far back on a lounger, a bed or in a bath, and lying is flat on a bed. Seats offer reclining only where it fits the furniture.
 - **FR-027**: Anything the user says to the resident MUST interrupt her current self-chosen activity. Activities the user asked for continue while the conversation goes on.
-- **FR-028**: The user arriving in the world MUST be available to the resident as a moment she can respond to.
+- **FR-028**: The user entering the world is not an event the resident reacts to; her first decision after the user enters follows the same idle wait as any other.
 - **FR-029**: Idle decisions MUST be rate-limited per resident, and when several residents share a world their decisions MUST NOT all happen at the same moment.
+- **FR-029a**: When the user gives no input (keyboard, mouse or touch) for 5 minutes, residents MUST stop making idle decisions until the user's next input.
 - **FR-030**: Each self-chosen step MUST be added to the conversation as her reason in parentheses followed by the action in asterisks, stating both the intention and the concrete action (for example `(I want to forget about today for a while) *walks to the bar to get a drink*`).
 - **FR-030a**: The same reason-and-action line MUST appear in a thought bubble above the resident in the world while that step is in progress.
 - **FR-030b**: While a conversation with the resident is open, she MUST NOT take self-chosen actions. Actions the user asks for during conversation are still carried out. She MAY resume self-chosen actions as soon as the conversation closes.
@@ -316,7 +319,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - Residents interacting with each other (conversation or shared activities) is out of scope; residents only avoid sharing a spot.
 - Swimming, as floating or diving, is out of scope; residents in the pool wade on the pool floor like the user.
 - Per-activity poses reuse the existing pose library. Activities whose pose is not yet in an assistant's library fall back to the default stance.
-- Idle decisions use the resident's own conversation model; at one decision every 10 seconds to 1 minute this is roughly 100 model calls per hour per idle resident, which is accepted.
+- Idle decisions use the resident's own conversation model; at one decision every 10 to 30 seconds this is roughly 180 model calls per hour per idle resident while the user is active, which is accepted; decisions pause after 5 minutes without user input (FR-029a).
 - Only the world owner's own world sessions drive resident behavior; worlds visited by multiple users at once are out of scope.
 - Voice mode in the world reuses the existing transcription and speech settings of the resident's assistant; no new voice providers are needed.
 - "In the world" means the world page is open and its browser tab is visible; a hidden tab counts as the user being away.

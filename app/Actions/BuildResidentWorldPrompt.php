@@ -2,6 +2,8 @@
 
 namespace App\Actions;
 
+use App\Enums\Posture;
+use App\Models\Assistant;
 use App\Models\ResidentActivity;
 use App\Models\World;
 use App\Models\WorldResident;
@@ -10,6 +12,11 @@ use App\Models\WorldSession;
 class BuildResidentWorldPrompt
 {
     private const RECENT_ACTIVITY_LIMIT = 8;
+
+    /**
+     * Poses the world plays for her (walking, greeting someone who starts a conversation), which are never hers to choose.
+     */
+    private const WORLD_MOTION_POSE_NAMES = ['walk', 'walking', 'walk-cycle', 'walk_cycle', 'walk cycle', 'walk-start', 'walk_start', 'walk start', 'walk-stop', 'walk_stop', 'walk stop', 'greeting', 'greet'];
 
     /**
      * @param  array{floor: ?array, zone: ?array, zoneChain: array<int, array>, distanceToUser?: ?float}  $resident
@@ -51,7 +58,57 @@ class BuildResidentWorldPrompt
 
     public function worldAwareness(): string
     {
-        return "World awareness:\nRemember that your tools are yours to use whenever you feel like it, on your own initiative, whether or not the user asks: what_is_in shows what a place holds and what you can do there, where_can_i finds where you could do something, describe tells you more about a place or thing, go_to, follow and stop move you, use sits, lies or reclines you on a spot for an activity, and zone does an activity of the place you are in. Reach for them whenever a thought, a mood, a craving or the conversation brings the space to mind, the way anyone glances around a room.";
+        return "World awareness:\nRemember that your tools are yours to use whenever you feel like it, on your own initiative, whether or not the user asks: what_is_in shows what a place holds and what you can do there, where_can_i finds where you could do something, describe tells you more about a place or thing, go_to, follow and stop move you, use sits, lies or reclines you on a spot for an activity, zone does an activity of the place you are in, and plan does something that takes several steps, in order. Reach for them whenever a thought, a mood, a craving or the conversation brings the space to mind, the way anyone glances around a room.\nThink in steps: getting a drink is going to the bar, mixing it at the back bar, then sitting on a stool to drink it, so call plan with those steps. Anything you want to do works even with no marked spot or pose for it, such as singing at the microphone or making tea at the counter: go there, then add a do step describing it, and your narration carries it.\nPostures are exact: sitting is upright on a seat, reclining is leaning far back on a lounger, a bed or in a bath, and lying is flat on your back or side on a bed.";
+    }
+
+    /**
+     * What she could do right now, for an idle decision: her poses by posture,
+     * the activities of the place she is in, and its spots marked free or taken.
+     *
+     * @param  array{floor: ?array, zone: ?array, zoneChain: array<int, array>}  $location
+     * @param  array<int, string>  $occupiedSpots
+     * @return array<string, string|array<int, string>>
+     */
+    public function availableActivities(World $world, Assistant $assistant, array $location, array $occupiedSpots, Posture $posture): array
+    {
+        $available = ['you are' => $posture->value];
+
+        $poses = $assistant->poses()->get(['name', 'posture'])
+            ->reject(fn ($pose) => $pose->name === 'default' || in_array(mb_strtolower(trim($pose->name)), self::WORLD_MOTION_POSE_NAMES, true))
+            ->groupBy('name')
+            ->map(fn ($versions, string $name) => sprintf('%s (%s)', $name, $versions->map(fn ($pose) => $pose->posture->value)->implode(', ')));
+        if ($poses->isNotEmpty()) {
+            $available['poses'] = $poses->values()->all();
+        }
+
+        $zoneActivities = collect($location['zoneChain'])->flatMap(fn (array $zone) => collect($zone['activities'])->map(fn (array $activity) => "{$activity['name']} [{$activity['id']}] in {$zone['name']}"));
+        if ($zoneActivities->isNotEmpty()) {
+            $available['things to do in this place'] = $zoneActivities->values()->all();
+        }
+
+        $zoneIds = collect($location['zoneChain'])->pluck('id');
+        $spots = collect($world->layout['objects'] ?? [])
+            ->filter(fn (array $object) => $zoneIds->contains($object['zoneId']))
+            ->flatMap(fn (array $object) => collect($object['spots'])->map(fn (array $spot) => sprintf(
+                '%s [%s] at the %s: %s (%s)',
+                $spot['id'],
+                $object['id'],
+                $object['name'],
+                collect($spot['activities'])->map(fn (array $activity) => "{$activity['name']} [{$activity['id']}]")->implode(', '),
+                in_array($spot['id'], $occupiedSpots, true) ? 'taken' : 'free',
+            )));
+        if ($spots->isNotEmpty()) {
+            $available['spots in this place'] = $spots->values()->all();
+        }
+
+        $available['elsewhere'] = 'where_can_i and what_is_in tell you what other places offer.';
+
+        return $available;
+    }
+
+    public function idleInstruction(): string
+    {
+        return "Your next step:\nThe user is somewhere in the world and leaves you to yourself right now. Decide what you do next, the way you would on your own: call one action tool (go_to, use, zone, follow or stop), call plan for something that takes several steps, use one pose tag, or stay where you are. Choose what fits your mood, your personality and what you did recently, and vary your activities; when you repeat your previous one, give a reason for doing it again. Reply with exactly one short line of at most 20 words: a brief reason as a thought in parentheses, followed by what you do as a brief action in asterisks, for example (I want to forget about today) *walks to the bar for a drink*.";
     }
 
     public function recentActivity(World $world, WorldSession $session, WorldResident $resident): ?string
@@ -101,6 +158,8 @@ class BuildResidentWorldPrompt
             'zone' => (string) $activity->activity,
             'stay' => 'stayed put',
             'pose' => "posed: {$activity->target}",
+            'plan' => "planned to {$activity->target}",
+            'do' => (string) $activity->target,
             default => $activity->verb,
         };
     }

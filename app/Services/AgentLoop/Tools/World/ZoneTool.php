@@ -20,6 +20,7 @@ class ZoneTool extends WorldTool
             'type' => 'object',
             'properties' => [
                 'activity' => ['type' => 'string', 'enum' => $this->toolbox->zoneActivityIds(), 'description' => 'The id of an activity the place you are in offers.'],
+                'pose' => $this->toolbox->poseParameter(),
             ],
             'required' => ['activity'],
         ];
@@ -43,7 +44,8 @@ class ZoneTool extends WorldTool
             ));
         }
 
-        $this->toolbox->choose(['verb' => 'zone', 'target' => null, 'activity' => $activity['id']]);
+        $pose = $this->toolbox->poseForActivity($activity, trim((string) ($arguments['pose'] ?? '')));
+        $this->toolbox->choose(['verb' => 'zone', 'target' => null, 'activity' => $activity['id'], 'pose' => $pose]);
 
         return ['status' => 'started', 'note' => "You start to {$activity['name']}."];
     }

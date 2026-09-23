@@ -25,6 +25,7 @@ class UseTool extends WorldTool
                     'enum' => collect($this->toolbox->spots())->flatMap(fn (array $spot) => collect($spot['activities'])->pluck('id'))->unique()->values()->all(),
                     'description' => 'The id of an activity that spot offers.',
                 ],
+                'pose' => $this->toolbox->poseParameter(),
             ],
             'required' => ['spot', 'activity'],
         ];
@@ -50,7 +51,12 @@ class UseTool extends WorldTool
             ));
         }
 
-        $this->toolbox->choose(['verb' => 'use', 'target' => $spot['id'], 'activity' => $activity['id']]);
+        if (in_array($spot['id'], $this->toolbox->occupiedSpots, true)) {
+            throw new \RuntimeException(sprintf('%s is taken by someone else right now. Choose a free spot.', $spot['id']));
+        }
+
+        $pose = $this->toolbox->poseForActivity($activity, trim((string) ($arguments['pose'] ?? '')));
+        $this->toolbox->choose(['verb' => 'use', 'target' => $spot['id'], 'activity' => $activity['id'], 'pose' => $pose]);
 
         return ['status' => 'started', 'note' => "You are heading to the {$spot['objectName']} to {$activity['name']}."];
     }

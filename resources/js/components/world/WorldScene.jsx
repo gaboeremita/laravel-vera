@@ -7,6 +7,7 @@ import { createNavigationGrid } from './worldNavigation.js';
 import { floorBounds } from './worldMapProjection.js';
 import FirstPersonController from './FirstPersonController.jsx';
 import NameTags from './NameTags.jsx';
+import ThoughtBubble from './ThoughtBubble.jsx';
 import { OffscreenIndicatorTracker } from './OffscreenIndicator.jsx';
 import InteractionSystem from './InteractionSystem.jsx';
 import ResidentController from './ResidentController.jsx';
@@ -109,7 +110,7 @@ function NavigationBuilder({ layout, environment, navigationRef }) {
 	return null;
 }
 
-export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands }) {
+export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands, occupiedSpots, residentStates = {}, thoughts = {} }) {
 	const [environment, setEnvironment] = useState(null);
 	const audioListener = useRef(null);
 	const [playerPosition, setPlayerPosition] = useState([0, 1.6, 4]);
@@ -138,9 +139,10 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 			{environment && (
 				<>
 					<FirstPersonController collisionWorld={environment.collisionWorld} spawnPosition={spawnPosition} enabled={explorationEnabled} onPositionChange={handlePositionChange} />
-					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} interaction={interaction} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} residentVoices={residentVoices} audioListener={audioListener} inConversation={resident.id === activeResidentId} navigation={navigation} residentCommands={residentCommands} />)}
+					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} savedState={residentStates[resident.id] ?? null} occupiedSpots={occupiedSpots} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} interaction={interaction} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} residentVoices={residentVoices} audioListener={audioListener} inConversation={resident.id === activeResidentId} navigation={navigation} residentCommands={residentCommands} />)}
 					<PlayerViewTracker viewRef={playerView} />
 					<NameTags residents={world.residents} residentPositions={residentPositions} activeResidentId={activeResidentId} />
+					<ThoughtBubble thoughts={thoughts} residentPositions={residentPositions} />
 					<OffscreenIndicatorTracker residentPositions={residentPositions} activeResidentId={activeResidentId} indicatorRef={offscreenIndicator} />
 					<NavigationBuilder layout={world.layout} environment={environment} navigationRef={navigation} />
 					<FloorMapRenderer layout={world.layout} environment={environment} onRendered={onFloorMaps} />

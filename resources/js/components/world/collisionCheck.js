@@ -68,16 +68,16 @@ export class WorldCollision {
 		}
 	}
 
-	isBodyBlocked(from, to = from) {
+	isBodyBlocked(from, to = from, radius = CHARACTER_RADIUS) {
 		this.bodyBounds.min.set(
-			Math.min(from.x, to.x) - CHARACTER_RADIUS,
+			Math.min(from.x, to.x) - radius,
 			Math.min(from.y, to.y) + MAX_STEP_HEIGHT + CONTACT_MARGIN,
-			Math.min(from.z, to.z) - CHARACTER_RADIUS,
+			Math.min(from.z, to.z) - radius,
 		);
 		this.bodyBounds.max.set(
-			Math.max(from.x, to.x) + CHARACTER_RADIUS,
+			Math.max(from.x, to.x) + radius,
 			Math.max(from.y, to.y) + CHARACTER_HEIGHT,
-			Math.max(from.z, to.z) + CHARACTER_RADIUS,
+			Math.max(from.z, to.z) + radius,
 		);
 		this.candidates.length = 0;
 		this.octree.getBoxTriangles(this.bodyBounds, this.candidates);

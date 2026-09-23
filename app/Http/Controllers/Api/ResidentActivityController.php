@@ -15,7 +15,7 @@ class ResidentActivityController extends Controller
 {
     use ResolvesWorldUser;
 
-    public const VERBS = ['go_to', 'use', 'zone', 'follow', 'stop', 'stay', 'pose'];
+    public const VERBS = ['go_to', 'use', 'zone', 'follow', 'stop', 'stay', 'pose', 'plan', 'do'];
 
     public const OUTCOMES = ['completed', 'failed', 'interrupted'];
 
@@ -27,7 +27,7 @@ class ResidentActivityController extends Controller
 
         $validated = $request->validate([
             'verb' => ['required', Rule::in(self::VERBS)],
-            'target' => ['nullable', 'string', 'max:100'],
+            'target' => ['nullable', 'string', 'max:255'],
             'activity' => ['nullable', 'string', 'max:100'],
             'reason' => ['nullable', 'string', 'max:500'],
             'source' => ['sometimes', Rule::in(['requested', 'idle'])],

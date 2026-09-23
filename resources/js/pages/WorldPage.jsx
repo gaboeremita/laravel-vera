@@ -9,6 +9,8 @@ import { PLAYER_EYE_HEIGHT } from '../components/world/collisionCheck.js';
 import { conversationRangeState } from '../components/world/conversationRange.js';
 import { isTypingTarget } from '../components/world/keyboardFocus.js';
 import { executeAction } from '../components/world/residentActions.js';
+import { useResidentAgency } from '../hooks/useResidentAgency.js';
+import { finishActivity, startActivity } from '../components/world/activityLog.js';
 import OffscreenIndicator from '../components/world/OffscreenIndicator.jsx';
 import WorldMap from '../components/world/WorldMap.jsx';
 
@@ -24,6 +26,7 @@ export default function WorldPage() {
 	const [nearbyResident, setNearbyResident] = useState(null);
 	const [chatResident, setChatResident] = useState(null);
 	const [activePose, setActivePose] = useState(null);
+	const [thoughts, setThoughts] = useState({});
 	const latestPosition = useRef(null);
 	const residentPositions = useRef(new Map());
 	const residentVoices = useRef(new Map());
@@ -86,10 +89,32 @@ export default function WorldPage() {
 		};
 	}, [sessionId, persistPosition]);
 
+	const persistResidentStates = useCallback(async () => {
+		if (!sessionId) return;
+		await Promise.all([...residentCommands.current].map(async ([residentId, commands]) => {
+			try {
+				const response = await api.put(route('worlds.sessions.residents.state.update', { world: worldId, session: sessionId, resident: residentId }), commands.state());
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			} catch (error) {
+				console.error(`[WorldPage] could not save resident ${residentId}'s state`, error);
+			}
+		}));
+	}, [worldId, sessionId]);
+
+	useEffect(() => {
+		if (!sessionId) return undefined;
+		const interval = setInterval(persistResidentStates, 10000);
+		return () => {
+			clearInterval(interval);
+			void persistResidentStates();
+		};
+	}, [sessionId, persistResidentStates]);
+
 	const exit = useCallback(() => {
 		persistPosition();
+		void persistResidentStates();
 		navigate(`/worlds/${worldId}/sessions`);
-	}, [navigate, persistPosition, worldId]);
+	}, [navigate, persistPosition, persistResidentStates, worldId]);
 	const openChat = useCallback((resident) => setChatResident(resident), []);
 	const closeChat = useCallback(() => setChatResident(null), []);
 	const handlePlayerPositionChange = useCallback((position) => { latestPosition.current = position; }, []);
@@ -149,42 +174,45 @@ export default function WorldPage() {
 	}, []);
 
 	const runResidentAction = useCallback(async (resident, action, { reason = null, fromUser = true } = {}) => {
-		const activityRoute = { world: worldId, session: sessionId, resident: resident.id };
-		let activityId = null;
-		if (sessionId) {
+		const log = { worldId, sessionId, residentId: resident.id };
+		const name = resident.assistant.name;
+		const record = async (entry) => {
+			if (!sessionId) return null;
 			try {
-				const position = residentPositions.current.get(resident.id);
-				const response = await api.post(route('worlds.sessions.residents.activities.store', activityRoute), {
-					verb: action.verb,
-					target: action.target ?? null,
-					activity: action.activity ?? null,
-					reason,
-					position: position ? { x: position.x, y: position.y, z: position.z } : null,
-				});
-				if (!response.ok) throw new Error(`HTTP ${response.status}`);
-				activityId = (await response.json()).id;
+				return await startActivity(log, { ...entry, position: residentPositions.current.get(resident.id) });
 			} catch (error) {
-				console.error(`[WorldPage] could not record ${resident.assistant.name}'s ${action.verb} action`, error);
-				addToast(`Could not record ${resident.assistant.name}'s action (${error.message}), so she won't remember it`, 'error');
+				console.error(`[WorldPage] could not record ${name}'s ${entry.verb} action`, error);
+				addToast(`Could not record ${name}'s action (${error.message}), so she won't remember it`, 'error');
+				return null;
 			}
-		}
+		};
+		const report = async (activityId, result) => {
+			if (!activityId) return;
+			try {
+				await finishActivity(log, activityId, result);
+			} catch (error) {
+				console.error(`[WorldPage] could not report the outcome of ${name}'s action`, error);
+				addToast(`Could not save how ${name}'s action went (${error.message})`, 'error');
+			}
+		};
 
-		const result = await executeAction(action, { commands: residentCommands.current.get(resident.id), layout: world?.layout, getFollowTarget, fromUser, residentId: resident.id, occupiedSpots: occupiedSpots.current });
+		const activityId = await record({ verb: action.verb, target: action.target ?? null, activity: action.activity ?? null, reason });
+		const result = await executeAction(action, {
+			commands: residentCommands.current.get(resident.id),
+			layout: world?.layout,
+			getFollowTarget,
+			fromUser,
+			residentId: resident.id,
+			occupiedSpots: occupiedSpots.current,
+			onStepStart: (step, index, total) => record({ verb: step.verb, target: step.verb === 'do' ? step.description : step.target, activity: step.activity, reason: `step ${index + 1} of ${total} of ${action.target}` }),
+			onStepEnd: (step, index, stepResult, stepActivityId) => report(stepActivityId, stepResult),
+		});
 		if (result.outcome === 'failed') {
-			const attempted = action.target ? `${action.verb.replace('_', ' ')} ${action.target}` : action.verb;
-			console.error(`[WorldPage] ${resident.assistant.name} could not ${attempted}: ${result.reason}`);
-			addToast(`${resident.assistant.name} couldn't ${attempted}: ${result.reason}`, 'error');
+			const attempted = action.verb === 'plan' ? action.target : action.target ? `${action.verb.replace('_', ' ')} ${action.target}` : action.verb;
+			console.error(`[WorldPage] ${name} could not ${attempted}: ${result.reason}`);
+			addToast(`${name} couldn't ${attempted}: ${result.reason}`, 'error');
 		}
-
-		if (activityId) {
-			try {
-				const response = await api.patch(route('worlds.sessions.residents.activities.update', { ...activityRoute, activity: activityId }), { outcome: result.outcome, reason: result.reason });
-				if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			} catch (error) {
-				console.error(`[WorldPage] could not report the outcome of ${resident.assistant.name}'s ${action.verb} action`, error);
-				addToast(`Could not save how ${resident.assistant.name}'s action went (${error.message})`, 'error');
-			}
-		}
+		await report(activityId, result);
 	}, [worldId, sessionId, world, getFollowTarget, addToast]);
 
 	const handleChatAction = useCallback((action) => {
@@ -214,6 +242,21 @@ export default function WorldPage() {
 	}, [chatResident]);
 
 	const activeSession = sessionId && String(session?.id) === String(sessionId) ? session : null;
+	const handleThought = useCallback((residentId, line) => setThoughts((current) => ({ ...current, [residentId]: line })), []);
+	useResidentAgency({
+		enabled: status === 'ready',
+		worldId,
+		sessionId,
+		residents: world?.residents,
+		layout: world?.layout,
+		chatResidentId: chatResident?.id ?? null,
+		residentCommands,
+		occupiedSpots,
+		getPositions,
+		getFollowTarget,
+		onThought: handleThought,
+		addToast,
+	});
 	const isRequestedSessionLoaded = sessionId ? activeSession !== null : session === null;
 
 	if (status === 'error') return <div className="flex h-full items-center justify-center bg-bg-0"><button className="button-primary" onClick={exit}>RETURN TO WORLDS</button></div>;
@@ -233,7 +276,7 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready'} />
-				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready'} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} />
+				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready'} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} />
 				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} />}
 				{chatResident && <OffscreenIndicator ref={offscreenIndicator} name={chatResident.assistant.name} />}
 				<div className={`absolute inset-0 z-10 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${status !== 'ready' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>

@@ -9,14 +9,21 @@ use RuntimeException;
 class WorldToolbox
 {
     /**
-     * @var ?array{verb: string, target: ?string, activity: ?string}
+     * @var ?array{verb: string, target: ?string, activity: ?string, steps?: array<int, array<string, ?string>>}
      */
     private ?array $chosenAction = null;
 
     /**
      * @param  array<int, array<string, mixed>>  $residentZoneChain  the zone she stands in and the zones around it; empty when her position is unknown
+     * @param  array<int, string>  $occupiedSpots  spot ids other residents are using
+     * @param  array<int, string>  $poseNames  names of the poses in her library, in any posture
      */
-    public function __construct(public readonly World $world, public readonly array $residentZoneChain = []) {}
+    public function __construct(
+        public readonly World $world,
+        public readonly array $residentZoneChain = [],
+        public readonly array $occupiedSpots = [],
+        public readonly array $poseNames = [],
+    ) {}
 
     /**
      * @return AgentTool[]
@@ -40,11 +47,13 @@ class WorldToolbox
             $tools[] = new ZoneTool($this);
         }
 
+        $tools[] = new PlanTool($this);
+
         return $tools;
     }
 
     /**
-     * @return ?array{verb: string, target: ?string, activity: ?string}
+     * @return ?array{verb: string, target: ?string, activity: ?string, steps?: array<int, array<string, ?string>>}
      */
     public function chosenAction(): ?array
     {
@@ -52,7 +61,7 @@ class WorldToolbox
     }
 
     /**
-     * @param  array{verb: string, target: ?string, activity: ?string}  $action
+     * @param  array{verb: string, target: ?string, activity: ?string, steps?: array<int, array<string, ?string>>}  $action
      */
     public function choose(array $action): void
     {
@@ -106,9 +115,57 @@ class WorldToolbox
         return collect($this->zones())->flatMap(fn (array $zone) => collect($zone['activities'])->pluck('id'))->unique()->values()->all();
     }
 
+    /**
+     * The pose she plays for an activity: the one she chose from her own
+     * library, else the activity's own pose when she has one by that name.
+     *
+     * @param  array<string, mixed>  $activity
+     */
+    public function poseForActivity(array $activity, string $chosen): ?string
+    {
+        if ($chosen !== '') {
+            $pose = collect($this->poseNames)->first(fn (string $name) => $this->sameName($name, $chosen));
+            if ($pose === null) {
+                throw new RuntimeException(sprintf('You have no pose called "%s". Your poses: %s.', $chosen, implode(', ', $this->poseNames)));
+            }
+
+            return $pose;
+        }
+
+        $own = $activity['pose'] ?? null;
+
+        return $own === null ? null : collect($this->poseNames)->first(fn (string $name) => $this->sameName($name, $own));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function poseParameter(): array
+    {
+        $parameter = ['type' => 'string', 'description' => 'The pose of yours that fits this activity best, when its own pose is named differently from yours. Leave it out to use the activity\'s own pose.'];
+
+        return $this->poseNames === [] ? $parameter : [...$parameter, 'enum' => $this->poseNames];
+    }
+
     public function findSpot(string $written): ?array
     {
         return collect($this->spots())->first(fn (array $spot) => $this->sameName($spot['id'], $written));
+    }
+
+    /**
+     * The zones a place or thing is in, from the innermost out.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function zoneChainOf(?string $zoneId): array
+    {
+        $chain = [];
+        while ($zoneId !== null && ($zone = collect($this->zones())->firstWhere('id', $zoneId)) !== null) {
+            $chain[] = $zone;
+            $zoneId = $zone['parentId'];
+        }
+
+        return $chain;
     }
 
     public function findZone(string $written): ?array

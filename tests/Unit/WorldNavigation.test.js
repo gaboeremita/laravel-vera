@@ -131,3 +131,17 @@ test('a step a resident failed to make is avoided on the next plan', (context) =
 	assert.ok(detour);
 	assert.ok(detour.length > 2);
 });
+
+test('a route through a wide doorway keeps to its middle', (context) => {
+	const grid = navigate(context, [
+		box(6.8, 3, 0.2, -4.6, 1.5, 0),
+		box(6.8, 3, 0.2, 4.6, 1.5, 0),
+	]);
+	const path = grid.findPath({ x: -3, y: 0, z: 4 }, { x: -3, y: 0, z: -4 });
+	assert.ok(path);
+	const crossing = path.find((point, index) => index > 0 && Math.sign(point.z) !== Math.sign(path[index - 1].z));
+	const previous = path[path.indexOf(crossing) - 1];
+	const t = previous.z / (previous.z - crossing.z);
+	const crossingX = previous.x + (crossing.x - previous.x) * t;
+	assert.ok(crossingX >= -0.8, `crossed the doorway at x=${crossingX}, next to its frame at x=-1.2`);
+});

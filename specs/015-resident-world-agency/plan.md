@@ -10,7 +10,7 @@ Residents gain knowledge of the world, purposeful movement, held poses at furnit
 
 - **World knowledge**: environment files carry floor, zone, object and spot markers in glTF node `extras`. They are parsed on upload into a `layout` JSON column on `worlds`. The server resolves positions sent by the world page into floors and zones, and adds a world-state block and a recent-activity block to the resident's prompt.
 - **Actions**: residents act through native tool calls in the existing agent loop: query tools (`where_can_i`, `what_is_in`, `describe`) answer from the layout, and action tools (`go_to`, `follow`, `stop`) take enum arguments limited to the world's real ids. The world page executes the chosen action with A* route-finding over a walkable grid built from the existing collision system, plays the assistant's existing walk and default poses, and holds poses at spots. Every action's outcome is recorded as a resident activity. Assistants living in a world need a tool-capable model; NPCs always get the tools.
-- **Self-chosen activities**: the world page drives them one step at a time: after a random 10–60 second wait it asks the server for one decision, executes it, and reports the outcome with the next request. The loop exists only while the world page is open and visible, which satisfies "nothing happens while the user is away" without server-side presence tracking.
+- **Self-chosen activities**: the world page drives them one step at a time: after a random 10–30 second wait it asks the server for one decision, executes it, and reports the outcome with the next request. The loop exists only while the world page is open and visible, which satisfies "nothing happens while the user is away" without server-side presence tracking.
 - **Talking and finding residents**: conversations stop pausing the world, voice mode is reused from the web chat with positional playback, and name tags plus a top-down map rendered per floor make residents easy to find.
 
 ## Technical Context
@@ -29,7 +29,7 @@ Residents gain knowledge of the world, purposeful movement, held poses at furnit
 
 **Performance Goals**: Walkable grid built during the existing loading screen in under 2 s for the penthouse; route queries under 20 ms; residents start moving within 2 s of agreeing (SC-003); 60 fps with five residents, name tags and minimap.
 
-**Constraints**: Nothing runs while the world page is closed or hidden (FR-031). Idle decisions use the resident's own model at one call per 10–60 s per autonomous resident, with an 8-second server floor. Markers come only from environment files.
+**Constraints**: Nothing runs while the world page is closed or hidden (FR-031). Idle decisions use the resident's own model at one call per 10–30 s per autonomous resident while the user is active, with an 8-second server floor. Markers come only from environment files.
 
 **Scale/Scope**: Worlds up to roughly 50 × 50 m per floor, a handful of floors, up to about ten residents. About 20 backend files (actions, controllers, requests, resources, migrations, factories, tests) and about 15 frontend modules.
 

@@ -1,5 +1,5 @@
 import { Ray, Vector3 } from 'three';
-import { MAX_DROP_HEIGHT, MAX_STEP_HEIGHT } from './collisionCheck.js';
+import { CHARACTER_RADIUS, MAX_DROP_HEIGHT, MAX_STEP_HEIGHT } from './collisionCheck.js';
 
 const CELL_SIZE = 0.4;
 const LEVELS = 3;
@@ -10,6 +10,9 @@ const NEAREST_SEARCH_RINGS = 3;
 const NEAREST_MAX_HEIGHT_DIFFERENCE = 1;
 const APPROACH_RADIUS = 1.2;
 const LEVEL_TOLERANCE = 0.05;
+const WALL_MARGIN = 0.2;
+const WALL_PENALTY = 0.8;
+const SMOOTHING_MARGIN = WALL_MARGIN;
 const MAX_EXPANSIONS = 40000;
 const SMOOTHING_LOOKAHEAD = 25;
 const SIGHT_SAMPLE_SPACING = 0.25;
@@ -39,6 +42,7 @@ class NavigationGrid {
 		this.heights = new Float32Array(nodeCount).fill(Number.NaN);
 		this.edges = new Uint8Array(nodeCount * DIRECTIONS.length);
 		this.failedNodes = new Set();
+		this.wallPenalty = new Float32Array(nodeCount).fill(Number.NaN);
 		this.cost = new Float32Array(nodeCount).fill(Number.POSITIVE_INFINITY);
 		this.cameFrom = new Int32Array(nodeCount).fill(-1);
 		this.closed = new Uint8Array(nodeCount);
@@ -172,6 +176,7 @@ class NavigationGrid {
 	}
 
 	edgeOpen(node, direction) {
+		if (this.failedNodes.size > 0 && this.failedNodes.has(this.neighbour(node, direction))) return false;
 		const slot = node * DIRECTIONS.length + direction;
 		if (this.edges[slot] !== EDGE_UNKNOWN) return this.edges[slot] === EDGE_OPEN;
 		const target = this.neighbour(node, direction);
@@ -234,11 +239,19 @@ class NavigationGrid {
 	}
 
 	/** Body sweep between two points, taken at the higher of the two so a step's riser does not count as a wall. */
-	sweepBlocked(a, b) {
+	sweepBlocked(a, b, radius = CHARACTER_RADIUS) {
 		const y = Math.max(a.y, b.y);
 		this.from.set(a.x, y, a.z);
 		this.to.set(b.x, y, b.z);
-		return this.collisionWorld.isBodyBlocked(this.from, this.to);
+		return this.collisionWorld.isBodyBlocked(this.from, this.to, radius);
+	}
+
+	/** Extra cost of standing on a node close to a wall, so routes keep to the middle of doors and corridors. */
+	penaltyAt(node) {
+		if (Number.isNaN(this.wallPenalty[node])) {
+			this.wallPenalty[node] = this.collisionWorld.isBodyBlocked(this.nodePosition(node, this.probe), this.probe, CHARACTER_RADIUS + WALL_MARGIN) ? WALL_PENALTY : 0;
+		}
+		return this.wallPenalty[node];
 	}
 
 	resetSearch() {
@@ -319,7 +332,7 @@ class NavigationGrid {
 				if (!this.edgeOpen(node, direction)) continue;
 				const next = this.neighbour(node, direction);
 				if (this.closed[next]) continue;
-				const step = (direction >= 4 ? Math.SQRT2 : 1) * this.cellSize + Math.abs(this.heights[next] - this.heights[node]);
+				const step = (direction >= 4 ? Math.SQRT2 : 1) * this.cellSize + Math.abs(this.heights[next] - this.heights[node]) + this.penaltyAt(next);
 				const candidate = this.cost[node] + step;
 				if (candidate >= this.cost[next]) continue;
 				if (this.cost[next] === Number.POSITIVE_INFINITY) this.touched.push(next);
@@ -370,7 +383,7 @@ class NavigationGrid {
 				if (!this.edgeOpen(node, direction)) continue;
 				const next = this.neighbour(node, direction);
 				if (this.closed[next]) continue;
-				const step = (direction >= 4 ? Math.SQRT2 : 1) * this.cellSize + Math.abs(this.heights[next] - this.heights[node]);
+				const step = (direction >= 4 ? Math.SQRT2 : 1) * this.cellSize + Math.abs(this.heights[next] - this.heights[node]) + this.penaltyAt(next);
 				const candidate = this.cost[node] + step;
 				if (candidate >= this.cost[next]) continue;
 				if (this.cost[next] === Number.POSITIVE_INFINITY) this.touched.push(next);
@@ -406,7 +419,7 @@ class NavigationGrid {
 			}
 			if (Number.isNaN(height) || Math.abs(height - previous.y) > LEVEL_TOLERANCE) return false;
 			const point = { x, y: height, z };
-			if (this.sweepBlocked(previous, point)) return false;
+			if (this.sweepBlocked(previous, point, CHARACTER_RADIUS + SMOOTHING_MARGIN)) return false;
 			previous = point;
 		}
 		return true;

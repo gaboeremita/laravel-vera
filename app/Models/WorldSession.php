@@ -29,4 +29,9 @@ class WorldSession extends Model
     {
         return $this->hasMany(Conversation::class);
     }
+
+    public function residentStates(): HasMany
+    {
+        return $this->hasMany(WorldSessionResident::class);
+    }
 }

@@ -137,3 +137,14 @@ it('places an NPC on the default model', function () {
         'behavior' => 'stationary',
     ])->assertSuccessful();
 });
+
+it('accepts an autonomous resident', function () {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $assistant = residentAssistantFor($user);
+
+    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), [
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'behavior' => 'autonomous',
+    ])->assertSuccessful()->assertJsonPath('behavior', 'autonomous');
+});

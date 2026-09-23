@@ -31,7 +31,7 @@ Used by several endpoints below.
 { "action": { "verb": "go_to", "target": "bar", "activity": null } }
 ```
 
-`action` is `null` when the reply has no action tag. Invalid actions return `{ "verb": "invalid", "reason": "…" }` so the page can report the failure.
+`action` is the action tool she called this turn, or `null` when she called none. Tool calls naming things that do not exist are returned to her as errors within the turn and never reach the page.
 
 ## New: request an idle decision
 
@@ -65,4 +65,4 @@ Actions the user requested in conversation are recorded too: the page creates th
 
 `PUT /worlds/{world}/sessions/{session}/residents/{resident}/state`
 
-Request: `{ "position": {x,y,z}, "rotation": {y}, "spotId": "pool-lounger-2-seat" | null, "activityId": "recline" | null }`. Stored so she is where the user left her on return (FR-032). The page saves on the same 10-second cadence as the user's position and on exit. `GET /worlds/{world}/sessions` (existing) includes `residentStates` for each session, keyed by resident id.
+Request: `{ "position": {x,y,z}, "rotation": {y}, "spotId": "pool-lounger-2-seat" | null, "activityId": "recline" | null, "posture": "reclining", "exitPosition": {x,y,z} | null }`. Stored so she is where the user left her on return (FR-032). The page saves on the same 10-second cadence as the user's position and on exit. `GET /worlds/{world}/sessions` (existing) includes `residentStates` for each session, keyed by resident id.
