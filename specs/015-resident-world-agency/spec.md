@@ -45,6 +45,9 @@ Talking to a resident no longer freezes the world. The conversation stays on scr
 5. **Given** the resident is walking to the bar because the user asked her to, **When** the user keeps talking to her, **Then** she keeps walking and replies along the way.
 6. **Given** voice mode is on, **When** the resident is farther away, **Then** her spoken reply sounds farther away than when she is close.
 7. **Given** voice mode is on, **When** the user leaves the world or ends the conversation, **Then** the microphone stops listening.
+8. **Given** a conversation with one resident is open, **When** the user walks up to another resident and tries to start a conversation, **Then** no second conversation starts, and every typed or spoken message still goes only to the first resident.
+9. **Given** a conversation is open, **When** the user walks toward the distance limit, **Then** the user is warned, and past the limit the conversation ends and voice mode stops listening.
+10. **Given** a conversation is open, **When** the user looks around the world, **Then** the resident being talked to is clearly marked.
 
 ---
 
@@ -140,6 +143,8 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - The user leaves the world while the resident is in the middle of a held pose.
 - Nobody talks to the resident for a long time, and she keeps choosing activities indefinitely.
 - The user walks far away from the resident in the middle of a conversation.
+- Several residents stand close together when the user starts a conversation, or while one is in progress.
+- The resident being talked to walks away from the user on her own (following a request) until they are beyond the distance limit.
 - In voice mode, the resident's own spoken reply or background sound is picked up by the microphone.
 - The user denies microphone access, or it becomes unavailable while walking in voice mode.
 
@@ -221,6 +226,11 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - **FR-042**: The world MUST show whether voice mode is listening, processing or speaking.
 - **FR-043**: The resident's spoken replies MUST sound from her position in the world, with loudness depending on her distance from the user.
 - **FR-044**: The microphone MUST stop listening when the user ends the conversation, turns voice mode off, or leaves the world.
+- **FR-045**: The user MUST have at most one open conversation at a time, with exactly one resident. While it is open, starting a conversation with another resident MUST NOT be possible until the current one ends.
+- **FR-046**: Every typed and spoken message MUST go only to the resident of the open conversation, regardless of which residents are nearby.
+- **FR-047**: The resident of the open conversation MUST be clearly identified, both in the conversation view and in the world.
+- **FR-048**: A conversation MUST end automatically when the user and the resident are farther apart than a set distance. The user MUST be warned before that distance is reached.
+- **FR-049**: The user MUST be able to end a conversation deliberately with a control that is separate from leaving the message box.
 
 **Direct commands**
 
@@ -260,5 +270,5 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - Idle decisions use the resident's own configured model, and the idle period and rate limits have sensible defaults the owner can change later.
 - Only the world owner's own world sessions drive resident behavior; worlds visited by multiple users at once are out of scope.
 - Voice mode in the world reuses the existing transcription and speech settings of the resident's assistant; no new voice providers are needed.
-- A conversation continues regardless of distance until the user ends it; walking away does not end it.
+- The distance at which a conversation ends has a sensible default, well beyond the distance needed to start one, that the owner can change later.
 - "In conversation" means the user has messaged the resident recently; the length of that window has a sensible default the owner can change later.
