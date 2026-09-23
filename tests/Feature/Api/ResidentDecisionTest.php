@@ -1,17 +1,23 @@
 <?php
 
 use App\Enums\Posture;
+use App\Models\Assistant;
 use App\Models\Conversation;
 use App\Models\Pose;
 use App\Models\ResidentActivity;
+use App\Models\User;
+use App\Models\World;
+use App\Models\WorldResident;
+use App\Models\WorldSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
 
 /**
- * @return array{0: \App\Models\User, 1: \App\Models\Assistant, 2: Conversation, 3: \App\Models\World, 4: \App\Models\WorldResident, 5: \App\Models\WorldSession}
+ * @return array{0: User, 1: Assistant, 2: Conversation, 3: World, 4: WorldResident, 5: WorldSession}
  */
 function autonomousScenario(): array
 {
@@ -21,7 +27,7 @@ function autonomousScenario(): array
     return $scenario;
 }
 
-function requestDecision($test, array $scenario, array $payload = []): Illuminate\Testing\TestResponse
+function requestDecision($test, array $scenario, array $payload = []): TestResponse
 {
     [$user, , , $world, $resident, $session] = $scenario;
 

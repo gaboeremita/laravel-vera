@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Posture;
 use App\Http\Controllers\Controller;
 use App\Models\Emotion;
-use App\Enums\Posture;
 use App\Models\Pose;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

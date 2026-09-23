@@ -34,12 +34,7 @@ function PlayerViewTracker({ viewRef }) {
 	const { camera } = useThree();
 
 	useFrame(() => {
-		const view = viewRef.current ?? {};
-		view.x = camera.position.x;
-		view.y = camera.position.y - PLAYER_EYE_HEIGHT;
-		view.z = camera.position.z;
-		view.yaw = camera.rotation.y;
-		viewRef.current = view;
+		viewRef.current = { x: camera.position.x, y: camera.position.y - PLAYER_EYE_HEIGHT, z: camera.position.z, yaw: camera.rotation.y };
 	});
 
 	return null;

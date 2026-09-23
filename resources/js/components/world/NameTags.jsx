@@ -49,27 +49,6 @@ export default function NameTags({ residents, residentPositions, activeResidentI
 	const worldPoint = useRef(new Vector3());
 	const screenPoint = useRef(new Vector3());
 
-	useEffect(() => {
-		const created = new Map();
-		for (const resident of residents) {
-			const textures = { normal: makeTagTexture(resident.assistant.name, false), highlighted: makeTagTexture(resident.assistant.name, true) };
-			const sprite = new Sprite(new SpriteMaterial({ map: textures.normal, depthTest: false, depthWrite: false, transparent: true }));
-			sprite.renderOrder = 1000;
-			sprite.visible = false;
-			scene.add(sprite);
-			created.set(resident.id, { sprite, textures });
-		}
-		tags.current = created;
-		return () => {
-			for (const { sprite, textures } of created.values()) {
-				scene.remove(sprite);
-				sprite.material.dispose();
-				textures.normal.dispose();
-				textures.highlighted.dispose();
-			}
-		};
-	}, [residents, scene]);
-
 	useFrame(() => {
 		const visible = [];
 		for (const [residentId, tag] of tags.current) {
@@ -103,6 +82,27 @@ export default function NameTags({ residents, residentPositions, activeResidentI
 			entry.tag.sprite.position.copy(offset);
 		}
 	});
+
+	useEffect(() => {
+		const created = new Map();
+		for (const resident of residents) {
+			const textures = { normal: makeTagTexture(resident.assistant.name, false), highlighted: makeTagTexture(resident.assistant.name, true) };
+			const sprite = new Sprite(new SpriteMaterial({ map: textures.normal, depthTest: false, depthWrite: false, transparent: true }));
+			sprite.renderOrder = 1000;
+			sprite.visible = false;
+			scene.add(sprite);
+			created.set(resident.id, { sprite, textures });
+		}
+		tags.current = created;
+		return () => {
+			for (const { sprite, textures } of created.values()) {
+				scene.remove(sprite);
+				sprite.material.dispose();
+				textures.normal.dispose();
+				textures.highlighted.dispose();
+			}
+		};
+	}, [residents, scene]);
 
 	return null;
 }

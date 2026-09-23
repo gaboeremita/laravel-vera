@@ -43,6 +43,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, layo
 		let cancelled = false;
 		const timers = new Set();
 		const running = runningRef.current;
+		const commandsByResident = residentCommands.current;
 		let lastInputAt = Date.now();
 		const noteInput = () => { lastInputAt = Date.now(); };
 		for (const type of USER_INPUT_EVENTS) window.addEventListener(type, noteInput, { passive: true });
@@ -171,7 +172,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, layo
 			document.removeEventListener('visibilitychange', pauseWhenHidden);
 			for (const type of USER_INPUT_EVENTS) window.removeEventListener(type, noteInput);
 			for (const timer of timers) clearTimeout(timer);
-			for (const residentId of running.keys()) void residentCommands.current.get(residentId)?.stop();
+			for (const residentId of running.keys()) void commandsByResident.get(residentId)?.stop();
 		};
 	}, [enabled, worldId, sessionId, autonomousIds, residentCommands, occupiedSpots]);
 }

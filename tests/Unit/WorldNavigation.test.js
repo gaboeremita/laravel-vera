@@ -89,7 +89,7 @@ test('an open route is smoothed to a straight line', (context) => {
 test('a seat is approached from the floor beside it', (context) => {
 	const bed = box(2, 0.6, 2.2, 0, 0.3, 0);
 	const grid = navigate(context, [bed]);
-	const seat = { x: 0, y: 0.7, z: 1.4 };
+	const seat = { x: 0, y: 0.7, z: 0.8 };
 	assert.equal(grid.findPath({ x: 0, y: 0, z: 6 }, seat), null);
 	const path = grid.findPathNear({ x: 0, y: 0, z: 6 }, seat);
 	assert.ok(path);

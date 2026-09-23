@@ -85,7 +85,7 @@ class Assistant extends Model
      */
     public function promptPoseNames(Posture $posture = Posture::Standing): array
     {
-        $poses = $this->poses()->get(['name', 'posture']);
+        $poses = $this->poses()->orderBy('id')->get(['name', 'posture']);
         $available = $poses->filter(fn (Pose $pose) => $pose->posture === $posture)->pluck('name');
         $standingOnly = $poses->filter(fn (Pose $pose) => $pose->posture === Posture::Standing)->pluck('name')->diff($available);
 
@@ -97,6 +97,6 @@ class Assistant extends Model
      */
     public function poseNames(): array
     {
-        return $this->poses()->distinct()->pluck('name')->all();
+        return $this->poses()->orderBy('id')->pluck('name')->unique()->values()->all();
     }
 }

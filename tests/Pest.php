@@ -11,10 +11,12 @@ use App\Models\ImageGenProvider;
 use App\Models\Settings;
 use App\Models\User;
 use App\Models\World;
+use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Models\WorldUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /*
@@ -197,7 +199,7 @@ function toolCallResponse(string $callId, string $toolName, array $arguments): a
 }
 
 /**
- * @return array{0: User, 1: Assistant, 2: Conversation, 3: World, 4: \App\Models\WorldResident, 5: WorldSession}
+ * @return array{0: User, 1: Assistant, 2: Conversation, 3: World, 4: WorldResident, 5: WorldSession}
  */
 function worldStateScenario(array $worldAttributes = [], bool $fakeReply = true): array
 {
@@ -218,7 +220,7 @@ function worldStateScenario(array $worldAttributes = [], bool $fakeReply = true)
     return [$user, $assistant, $conversation, $world, $resident, $session];
 }
 
-function sendWorldMessage($test, array $scenario, array $positions, array $extra = []): Illuminate\Testing\TestResponse
+function sendWorldMessage($test, array $scenario, array $positions, array $extra = []): TestResponse
 {
     [$user, $assistant, $conversation, $world, , $session] = $scenario;
 

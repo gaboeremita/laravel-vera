@@ -1,5 +1,6 @@
 import { Ray, Vector3 } from 'three';
 import { CHARACTER_RADIUS, MAX_DROP_HEIGHT, MAX_STEP_HEIGHT } from './collisionCheck.js';
+import { getGroundHeight } from './groundHeight.js';
 
 const CELL_SIZE = 0.4;
 const LEVELS = 3;
@@ -10,6 +11,7 @@ const NEAREST_SEARCH_RINGS = 3;
 const NEAREST_MAX_HEIGHT_DIFFERENCE = 1;
 const APPROACH_RADIUS = 1.2;
 const LEVEL_TOLERANCE = 0.05;
+const DROP_SEARCH_DEPTH = 3;
 const WALL_MARGIN = 0.2;
 const WALL_PENALTY = 0.8;
 const SMOOTHING_MARGIN = WALL_MARGIN;
@@ -196,23 +198,18 @@ class NavigationGrid {
 		return open;
 	}
 
-	/** Whether either side of a node, across the direction of travel, falls away below it. */
+	/**
+	 * Whether either side of a node, across the direction of travel, falls
+	 * away below it. It reads the ground itself, since the cell beside a step
+	 * is often too close to the step for her body and records no surface.
+	 */
 	dropBeside(node, direction) {
-		const column = Math.floor(node / LEVELS);
-		const height = this.heights[node];
+		const position = this.nodePosition(node, this.from);
 		for (const side of direction < 2 ? [2, 3] : [0, 1]) {
-			const i = (column % this.columns) + DIRECTIONS[side][0];
-			const j = Math.floor(column / this.columns) + DIRECTIONS[side][1];
-			if (i < 0 || j < 0 || i >= this.columns || j >= this.rows) continue;
-			let level = false;
-			let lower = false;
-			for (let index = 0; index < LEVELS; index++) {
-				const candidate = this.heights[(j * this.columns + i) * LEVELS + index];
-				if (Number.isNaN(candidate)) break;
-				if (Math.abs(candidate - height) <= LEVEL_TOLERANCE) level = true;
-				else if (candidate < height) lower = true;
-			}
-			if (lower && !level) return true;
+			const x = position.x + DIRECTIONS[side][0] * this.cellSize;
+			const z = position.z + DIRECTIONS[side][1] * this.cellSize;
+			const ground = getGroundHeight(x, z, this.collisionWorld.octree, position.y - DROP_SEARCH_DEPTH, position.y + MAX_STEP_HEIGHT);
+			if (ground !== null && ground < position.y - LEVEL_TOLERANCE) return true;
 		}
 		return false;
 	}

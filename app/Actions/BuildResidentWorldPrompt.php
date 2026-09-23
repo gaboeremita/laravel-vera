@@ -73,7 +73,7 @@ class BuildResidentWorldPrompt
     {
         $available = ['you are' => $posture->value];
 
-        $poses = $assistant->poses()->get(['name', 'posture'])
+        $poses = $assistant->poses()->orderBy('id')->get(['name', 'posture'])
             ->reject(fn ($pose) => $pose->name === 'default' || in_array(mb_strtolower(trim($pose->name)), self::WORLD_MOTION_POSE_NAMES, true))
             ->groupBy('name')
             ->map(fn ($versions, string $name) => sprintf('%s (%s)', $name, $versions->map(fn ($pose) => $pose->posture->value)->implode(', ')));

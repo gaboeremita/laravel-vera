@@ -131,6 +131,7 @@ class PlanTool extends WorldTool
                 if ($normalized['description'] === null) {
                     throw new RuntimeException('A do step needs a description of what you do.');
                 }
+
                 return [[...$normalized, 'pose' => $this->toolbox->poseForActivity([], $pose)], $location];
             case 'stay':
                 return [$normalized, $location];

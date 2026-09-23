@@ -11,10 +11,11 @@ use App\Models\World;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
 
-function sendToolWorldMessage($test, array $scenario): Illuminate\Testing\TestResponse
+function sendToolWorldMessage($test, array $scenario): TestResponse
 {
     return sendWorldMessage($test, $scenario, [
         'user' => ['x' => 5, 'y' => 0, 'z' => -3],

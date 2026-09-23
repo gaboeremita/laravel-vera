@@ -235,9 +235,9 @@ description: "Task list for Resident World Agency"
 ## Phase 9: Polish & Cross-Cutting Concerns
 
 - [ ] T082 [P] Export markers for the connection node environment (floors for both levels, zones per area, entries) and upload it; confirm no `layoutWarnings`
-- [ ] T083 [P] Log every action outcome of `failed` with its reason via `console.error` in `resources/js/components/world/residentActions.js`, and every decision request failure in `useResidentAgency.js` (Principle V)
+- [X] T083 [P] Log every action outcome of `failed` with its reason via `console.error` in `resources/js/components/world/residentActions.js`, and every decision request failure in `useResidentAgency.js` (Principle V)
 - [ ] T084 Run every scenario in [quickstart.md](quickstart.md) in the penthouse and the connection node, and fix what fails
-- [ ] T085 Before each pull request, run the gates once per CLAUDE.md: `vendor/bin/pint`, `npm run lint`, `php artisan test`, and `node --test tests/Unit/`; fix what surfaces
+- [X] T085 Before each pull request, run the gates once per CLAUDE.md: `vendor/bin/pint`, `npm run lint`, `php artisan test`, and `node --test tests/Unit/*.test.js`; fix what surfaces
 
 ---
 

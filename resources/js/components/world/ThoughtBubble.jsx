@@ -69,6 +69,19 @@ export default function ThoughtBubble({ thoughts, residentPositions }) {
 	const bubbles = useRef(new Map());
 	const worldPoint = useRef(new Vector3());
 
+	useFrame(() => {
+		for (const [residentId, bubble] of bubbles.current) {
+			const position = residentPositions.current.get(residentId);
+			bubble.sprite.visible = Boolean(position);
+			if (!position) continue;
+			worldPoint.current.set(position.x, position.y + BUBBLE_HEIGHT_ABOVE_FEET, position.z);
+			const worldWidth = Math.max(camera.position.distanceTo(worldPoint.current) * SCREEN_SCALE, MIN_WORLD_HEIGHT) * 2;
+			const worldHeight = worldWidth / bubble.aspect;
+			bubble.sprite.scale.set(worldWidth, worldHeight, 1);
+			bubble.sprite.position.set(worldPoint.current.x, worldPoint.current.y + worldHeight / 2, worldPoint.current.z);
+		}
+	});
+
 	useEffect(() => {
 		const created = new Map();
 		for (const [residentId, line] of Object.entries(thoughts)) {
@@ -89,19 +102,6 @@ export default function ThoughtBubble({ thoughts, residentPositions }) {
 			}
 		};
 	}, [thoughts, scene]);
-
-	useFrame(() => {
-		for (const [residentId, bubble] of bubbles.current) {
-			const position = residentPositions.current.get(residentId);
-			bubble.sprite.visible = Boolean(position);
-			if (!position) continue;
-			worldPoint.current.set(position.x, position.y + BUBBLE_HEIGHT_ABOVE_FEET, position.z);
-			const worldWidth = Math.max(camera.position.distanceTo(worldPoint.current) * SCREEN_SCALE, MIN_WORLD_HEIGHT) * 2;
-			const worldHeight = worldWidth / bubble.aspect;
-			bubble.sprite.scale.set(worldWidth, worldHeight, 1);
-			bubble.sprite.position.set(worldPoint.current.x, worldPoint.current.y + worldHeight / 2, worldPoint.current.z);
-		}
-	});
 
 	return null;
 }

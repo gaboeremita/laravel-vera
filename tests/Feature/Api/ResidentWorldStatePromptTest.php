@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ResidentActivity;
 use App\Models\WorldSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -99,14 +100,14 @@ it('includes her recent activity, newest first, limited to the last eight', func
     $scenario = worldStateScenario();
     [, , , , $resident, $session] = $scenario;
     foreach (range(1, 9) as $minutesAgo) {
-        App\Models\ResidentActivity::factory()->finished()->create([
+        ResidentActivity::factory()->finished()->create([
             'world_session_id' => $session->id,
             'world_resident_id' => $resident->id,
             'target' => "place-{$minutesAgo}",
             'created_at' => now()->subMinutes($minutesAgo),
         ]);
     }
-    App\Models\ResidentActivity::factory()->failed('there is no way to get there')->create([
+    ResidentActivity::factory()->failed('there is no way to get there')->create([
         'world_session_id' => $session->id,
         'world_resident_id' => $resident->id,
         'target' => 'pool-terrace',
