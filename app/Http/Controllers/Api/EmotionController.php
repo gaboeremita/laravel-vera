@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Emotion;
+use App\Enums\Posture;
 use App\Models\Pose;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,6 +30,7 @@ class EmotionController extends Controller
 
         $poses = Pose::with('animationFile')
             ->where('assistant_id', $assistant)
+            ->where('posture', Posture::Standing)
             ->get()
             ->map(fn (Pose $pose) => [
                 'id' => $pose->id,

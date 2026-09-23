@@ -175,22 +175,24 @@ description: "Task list for Resident World Agency"
 
 ### Tests for User Story 5
 
-- [ ] T053 [P] [US5] Extend `tests/Feature/Api/AssistantPoseTest.php`: poses accept `posture` (`standing` default, `sitting`, `lying`, `reclining`); the same name is allowed once per posture and rejected twice in the same posture
-- [ ] T054 [P] [US5] Write feature tests in `tests/Feature/Api/ResidentPosturePromptTest.php`: with `residentPosture: sitting` in the message request, the pose list marks sitting poses as available and standing-only poses as "requires standing up" (FR-019f); without it, standing is assumed
-- [ ] T055 [P] [US5] Write `tests/Unit/PosturePoses.test.js` for `resources/js/components/world/worldMotionPoses.js`: `resolvePose(poses, name, posture)` returns the posture's version, or the standing version with `standUp: true` when none exists; `defaultPoseFor(poses, posture)` falls back to the standing `default`
+- [X] T053 [P] [US5] Extend `tests/Feature/Api/AssistantPoseTest.php`: poses accept `posture` (`standing` default, `sitting`, `lying`, `reclining`); the same name is allowed once per posture and rejected twice in the same posture
+- [X] T054 [P] [US5] Write feature tests in `tests/Feature/Api/ResidentPosturePromptTest.php`: with `residentPosture: sitting` in the message request, the pose list marks sitting poses as available and standing-only poses as "requires standing up" (FR-019f); without it, standing is assumed
+- [X] T055 [P] [US5] Write `tests/Unit/PosturePoses.test.js` for `resources/js/components/world/worldMotionPoses.js`: `resolvePose(poses, name, posture)` returns the posture's version, or the standing version with `standUp: true` when none exists; `defaultPoseFor(poses, posture)` falls back to the standing `default`
 
 ### Implementation for User Story 5
 
-- [ ] T056 [US5] Create migration adding string `posture` (default `standing`) to `poses` and replacing the unique index (`assistant_id`, `name`) with (`assistant_id`, `name`, `posture`), in `database/migrations/`
-- [ ] T057 [P] [US5] Add `posture` to `app/Models/Pose.php` and a `posture()` state to `database/factories/PoseFactory.php`
-- [ ] T058 [US5] Accept and validate `posture` in `app/Http/Controllers/Api/AssistantPoseController.php` (with a unique rule scoped to assistant and posture) and return it wherever poses are serialized, including `app/Http/Resources/WorldResidentResource.php`
-- [ ] T059 [US5] Make `promptPoseNames()` in `app/Models/Assistant.php` return names with postures, and have `appendExpressionTags()` in `app/Http/Controllers/Api/ConversationController.php` list poses by the request's `residentPosture` per T054
-- [ ] T060 [US5] Group poses into standing, sitting, lying and reclining sections, each with its own `default`, in `resources/js/components/PoseEditor.jsx`, `resources/js/components/DefaultPoseEditor.jsx` and `resources/js/pages/EditAssistantPage.jsx` / `CreateAssistantPage.jsx`
-- [ ] T061 [US5] Add `resolvePose(poses, name, posture)` and `defaultPoseFor(poses, posture)` to `resources/js/components/world/worldMotionPoses.js`
-- [ ] T062 [US5] In `resources/js/components/world/ResidentController.jsx`, track `posture`, hold the posture's default pose as the idle clip, blend between defaults when posture changes (existing return blend), and on a triggered pose use `resolvePose` so a standing-only pose blends her back to standing, plays, and leaves her standing (FR-019c, FR-019d); keep posture in refs read by `useFrame`, not state set from effects (Principle VIII)
-- [ ] T063 [US5] Add `use` and `zone` to `resources/js/components/world/residentActions.js`: walk to the spot's `approach`, blend over 0.4 s to the spot position and facing, enter the activity's posture, play its pose once, and hold until she leaves; `zone` performs a zone activity where she stands
-- [ ] T064 [US5] Track spot occupancy for all residents in `resources/js/pages/WorldPage.jsx`, fail `use` on a taken spot with reason "spot taken", and free the spot when she leaves (FR-017)
-- [ ] T065 [US5] Send the conversation resident's current posture as `residentPosture` with every message from `resources/js/components/world/WorldChat.jsx`
+- [X] T056 [US5] Create migration adding string `posture` (default `standing`) to `poses` and replacing the unique index (`assistant_id`, `name`) with (`assistant_id`, `name`, `posture`), in `database/migrations/`
+- [X] T057 [P] [US5] Add `posture` to `app/Models/Pose.php` and a `posture()` state to `database/factories/PoseFactory.php`
+- [X] T058 [US5] Accept and validate `posture` in `app/Http/Controllers/Api/AssistantPoseController.php` (with a unique rule scoped to assistant and posture) and return it wherever poses are serialized, including `app/Http/Resources/WorldResidentResource.php`
+- [X] T059 [US5] Make `promptPoseNames()` in `app/Models/Assistant.php` return names with postures, and have `appendExpressionTags()` in `app/Http/Controllers/Api/ConversationController.php` list poses by the request's `residentPosture` per T054
+- [X] T060 [US5] Group poses into standing, sitting, lying and reclining sections, each with its own `default`, in `resources/js/components/PoseEditor.jsx`, `resources/js/components/DefaultPoseEditor.jsx` and `resources/js/pages/EditAssistantPage.jsx` / `CreateAssistantPage.jsx`
+- [X] T061 [US5] Add `resolvePose(poses, name, posture)` and `defaultPoseFor(poses, posture)` to `resources/js/components/world/worldMotionPoses.js`
+- [X] T062 [US5] In `resources/js/components/world/ResidentController.jsx`, track `posture`, hold the posture's default pose as the idle clip, blend between defaults when posture changes (existing return blend), and on a triggered pose use `resolvePose` so a standing-only pose blends her back to standing, plays, and leaves her standing (FR-019c, FR-019d); keep posture in refs read by `useFrame`, not state set from effects (Principle VIII)
+- [X] T063 [US5] Add `use` and `zone` to `resources/js/components/world/residentActions.js`: walk to the spot's `approach`, blend over 0.4 s to the spot position and facing, enter the activity's posture, play its pose once, and hold until she leaves; `zone` performs a zone activity where she stands
+- [X] T064 [US5] Track spot occupancy for all residents in `resources/js/pages/WorldPage.jsx`, fail `use` on a taken spot with reason "spot taken", and free the spot when she leaves (FR-017)
+- [X] T065 [US5] Send the conversation resident's current posture as `residentPosture` with every message from `resources/js/components/world/WorldChat.jsx`
+
+- [X] T092 [US5] Add the `use` (spot and activity) and `zone` (activity of the zone she stands in) tools to `app/Services/AgentLoop/Tools/World/` per [contracts/world-tools.md](contracts/world-tools.md), with tests in `tests/Feature/Api/ResidentWorldToolsTest.php`
 
 **Checkpoint**: Story 5 works; she sits, lies and reclines on marked furniture and reacts in the right posture.
 

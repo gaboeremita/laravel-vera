@@ -5,10 +5,7 @@ import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
-import PoseEditor from '../components/PoseEditor.jsx';
-import DefaultPoseEditor from '../components/DefaultPoseEditor.jsx';
-import WorldMotionPoseEditor from '../components/WorldMotionPoseEditor.jsx';
-import { isWorldMotionPose } from '../components/world/worldMotionPoses.js';
+import PosturePoseSections from '../components/PosturePoseSections.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
@@ -273,10 +270,11 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 
 	/* ── Pose handlers ── */
 
-	const handleAddPose = async (poseName, blendshapes, animationFile) => {
+	const handleAddPose = async (poseName, blendshapes, animationFile, posture = 'standing') => {
 		try {
 			const res = await api.post(route('assistants.poses.store', { assistant: id }), {
 				name: poseName,
+				posture,
 				vrm_blendshapes: blendshapes,
 			});
 			if (!res.ok) {
@@ -305,10 +303,11 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 		}
 	};
 
-	const handleUpdatePoseBlendshapes = async (pose, name, blendshapes) => {
+	const handleUpdatePose = async (pose, name, blendshapes, posture = pose.posture) => {
 		try {
 			const res = await api.post(route('assistants.poses.update', { assistant: id, pose: pose.id }), {
 				name,
+				posture,
 				vrm_blendshapes: blendshapes,
 			});
 			if (!res.ok) {
@@ -365,23 +364,27 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 
 	/* ── Default pose handlers ── */
 
-	const handleUpdateDefaultPoseBlendshapes = async (blendshapes) => {
+	const isDefaultPoseFor = (posture) => (pose) => pose.name === 'default' && (pose.posture ?? 'standing') === posture;
+
+	const handleUpdateDefaultPoseBlendshapes = async (blendshapes, posture) => {
 		try {
 			const res = await api.post(route('assistants.poses.default.update', { assistant: id }), {
+				posture,
 				vrm_blendshapes: blendshapes,
 			});
 			if (!res.ok) throw new Error('Update failed');
 			const data = await res.json();
-			setPoses((prev) => (prev.some((p) => p.name === 'default') ? prev.map((p) => (p.name === 'default' ? data : p)) : [...prev, data]));
+			setPoses((prev) => (prev.some(isDefaultPoseFor(posture)) ? prev.map((p) => (isDefaultPoseFor(posture)(p) ? data : p)) : [...prev, data]));
 			addToast('Default pose saved', 'success');
 		} catch {
 			addToast('Failed to save default pose', 'error');
 		}
 	};
 
-	const handleUploadDefaultPoseAnimation = async (file) => {
+	const handleUploadDefaultPoseAnimation = async (file, posture) => {
 		const formData = new FormData();
 		formData.append('animation', file);
+		formData.append('posture', posture);
 
 		try {
 			const res = await api.postForm(route('assistants.poses.default.animation.store', { assistant: id }), formData);
@@ -392,9 +395,9 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 			const data = await res.json();
 			setPoses((prev) => {
 				const patch = { animation_url: data.animation_url, animation_original_name: data.animation_original_name };
-				return prev.some((p) => p.name === 'default')
-					? prev.map((p) => (p.name === 'default' ? { ...p, ...patch } : p))
-					: [...prev, { id: data.id, name: 'default', vrm_blendshapes: null, ...patch }];
+				return prev.some(isDefaultPoseFor(posture))
+					? prev.map((p) => (isDefaultPoseFor(posture)(p) ? { ...p, ...patch } : p))
+					: [...prev, { id: data.id, name: 'default', posture, vrm_blendshapes: null, ...patch }];
 			});
 			addToast('Default pose animation uploaded', 'success');
 		} catch (e) {
@@ -402,11 +405,11 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 		}
 	};
 
-	const handleDeleteDefaultPoseAnimation = async () => {
+	const handleDeleteDefaultPoseAnimation = async (posture) => {
 		try {
-			const res = await api.delete(route('assistants.poses.default.animation.destroy', { assistant: id }));
+			const res = await api.delete(route('assistants.poses.default.animation.destroy', { assistant: id, posture }));
 			if (!res.ok) throw new Error('Delete failed');
-			setPoses((prev) => prev.map((p) => (p.name === 'default' ? { ...p, animation_url: null, animation_original_name: null } : p)));
+			setPoses((prev) => prev.map((p) => (isDefaultPoseFor(posture)(p) ? { ...p, animation_url: null, animation_original_name: null } : p)));
 			addToast('Default pose animation deleted', 'success');
 		} catch {
 			addToast('Failed to delete default pose animation', 'error');
@@ -671,28 +674,16 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 					<>
 						<div className="border-t border-line-1" />
 
-						<DefaultPoseEditor
-							pose={poses.find((p) => p.name === 'default') || { name: 'default', vrm_blendshapes: null, animation_url: null, animation_original_name: null }}
-							onUpdateBlendshapes={handleUpdateDefaultPoseBlendshapes}
-							onUploadAnimation={handleUploadDefaultPoseAnimation}
-							onDeleteAnimation={handleDeleteDefaultPoseAnimation}
-						/>
-
-						<WorldMotionPoseEditor
+						<PosturePoseSections
 							poses={poses}
 							onAdd={handleAddPose}
-							onUpdateBlendshapes={handleUpdatePoseBlendshapes}
-							onUploadAnimation={handleUploadPoseAnimation}
-							onDeleteAnimation={handleDeletePoseAnimation}
-						/>
-
-						<PoseEditor
-							poses={poses.filter((p) => p.name !== 'default' && !isWorldMotionPose(p))}
-							onAdd={handleAddPose}
 							onDelete={handleDeletePose}
-							onUpdateBlendshapes={handleUpdatePoseBlendshapes}
+							onUpdatePose={handleUpdatePose}
 							onUploadAnimation={handleUploadPoseAnimation}
 							onDeleteAnimation={handleDeletePoseAnimation}
+							onUpdateDefaultBlendshapes={handleUpdateDefaultPoseBlendshapes}
+							onUploadDefaultAnimation={handleUploadDefaultPoseAnimation}
+							onDeleteDefaultAnimation={handleDeleteDefaultPoseAnimation}
 						/>
 					</>
 				)}

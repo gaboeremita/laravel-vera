@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\AssistantPortraitType;
+use App\Enums\Posture;
 use App\Http\Controllers\Controller;
 use App\Models\Pose;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class AssistantPoseController extends Controller
 {
@@ -25,6 +27,7 @@ class AssistantPoseController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'posture' => ['sometimes', Rule::enum(Posture::class)],
             'vrm_blendshapes' => ['sometimes', 'array'],
             'vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -37,25 +40,19 @@ class AssistantPoseController extends Controller
             ], 422);
         }
 
-        if ($assistant->poses()->where('name', $validated['name'])->exists()) {
-            return response()->json([
-                'message' => 'This pose name already exists.',
-                'errors' => ['name' => ['This pose name already exists.']],
-            ], 422);
+        $posture = $validated['posture'] ?? Posture::Standing->value;
+
+        if ($assistant->poses()->where('name', $validated['name'])->where('posture', $posture)->exists()) {
+            return $this->duplicateNameResponse($posture);
         }
 
         $pose = $assistant->poses()->create([
             'name' => $validated['name'],
+            'posture' => $posture,
             'vrm_blendshapes' => Pose::normalizeBlendshapes($validated['vrm_blendshapes'] ?? null),
         ]);
 
-        return response()->json([
-            'id' => $pose->id,
-            'name' => $pose->name,
-            'vrm_blendshapes' => $pose->vrm_blendshapes,
-            'animation_url' => null,
-            'animation_original_name' => null,
-        ], 201);
+        return response()->json($this->poseJson($pose), 201);
     }
 
     public function update(Request $request, int $assistantId, int $poseId): JsonResponse
@@ -74,42 +71,35 @@ class AssistantPoseController extends Controller
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
+            'posture' => ['sometimes', Rule::enum(Posture::class)],
             'vrm_blendshapes' => ['sometimes', 'array'],
             'vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
 
-        if (isset($validated['name']) && $validated['name'] !== $pose->name) {
-            if (strtolower($validated['name']) === 'default') {
+        $name = $validated['name'] ?? $pose->name;
+        $posture = $validated['posture'] ?? $pose->posture->value;
+
+        if ($name !== $pose->name || $posture !== $pose->posture->value) {
+            if (strtolower($name) === 'default') {
                 return response()->json([
                     'message' => 'This name is reserved for the default pose.',
                     'errors' => ['name' => ['This name is reserved for the default pose.']],
                 ], 422);
             }
 
-            if ($assistant->poses()->where('name', $validated['name'])->exists()) {
-                return response()->json([
-                    'message' => 'This pose name already exists.',
-                    'errors' => ['name' => ['This pose name already exists.']],
-                ], 422);
+            if ($assistant->poses()->where('name', $name)->where('posture', $posture)->exists()) {
+                return $this->duplicateNameResponse($posture);
             }
 
-            $pose->update(['name' => $validated['name']]);
+            $pose->update(['name' => $name, 'posture' => $posture]);
         }
 
         if (array_key_exists('vrm_blendshapes', $validated)) {
             $pose->update(['vrm_blendshapes' => Pose::normalizeBlendshapes($validated['vrm_blendshapes'])]);
         }
 
-        $pose->load('animationFile');
-
-        return response()->json([
-            'id' => $pose->id,
-            'name' => $pose->name,
-            'vrm_blendshapes' => $pose->vrm_blendshapes,
-            'animation_url' => $pose->animationFile?->url,
-            'animation_original_name' => $pose->animationFile?->original_name,
-        ]);
+        return response()->json($this->poseJson($pose));
     }
 
     public function destroy(Request $request, int $assistantId, int $poseId): JsonResponse
@@ -137,10 +127,10 @@ class AssistantPoseController extends Controller
 
     /**
      * Updates (creating first if it doesn't exist yet) the assistant's
-     * default pose — a name-locked, undeletable pose always named "default",
-     * mirroring how the image-mode "default" emotion works. Left unconfigured
-     * (no blendshapes, no animation), the avatar simply falls back to its
-     * existing hardcoded idle/neutral state.
+     * default pose for a posture — a name-locked, undeletable pose always
+     * named "default", mirroring how the image-mode "default" emotion works.
+     * Left unconfigured (no blendshapes, no animation), the avatar simply
+     * falls back to its existing hardcoded idle/neutral state.
      */
     public function updateDefault(Request $request, int $assistantId): JsonResponse
     {
@@ -155,24 +145,41 @@ class AssistantPoseController extends Controller
         }
 
         $validated = $request->validate([
+            'posture' => ['sometimes', Rule::enum(Posture::class)],
             'vrm_blendshapes' => ['sometimes', 'array'],
             'vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
 
         $pose = $assistant->poses()->updateOrCreate(
-            ['name' => 'default'],
+            ['name' => 'default', 'posture' => $validated['posture'] ?? Posture::Standing->value],
             ['vrm_blendshapes' => Pose::normalizeBlendshapes($validated['vrm_blendshapes'] ?? null)]
         );
 
+        return response()->json($this->poseJson($pose));
+    }
+
+    /**
+     * @return array{id: int, name: string, posture: string, vrm_blendshapes: ?array, animation_url: ?string, animation_original_name: ?string}
+     */
+    private function poseJson(Pose $pose): array
+    {
         $pose->load('animationFile');
 
-        return response()->json([
+        return [
             'id' => $pose->id,
             'name' => $pose->name,
+            'posture' => $pose->posture->value,
             'vrm_blendshapes' => $pose->vrm_blendshapes,
             'animation_url' => $pose->animationFile?->url,
             'animation_original_name' => $pose->animationFile?->original_name,
-        ]);
+        ];
+    }
+
+    private function duplicateNameResponse(string $posture): JsonResponse
+    {
+        $message = "A {$posture} pose with this name already exists.";
+
+        return response()->json(['message' => $message, 'errors' => ['name' => [$message]]], 422);
     }
 }

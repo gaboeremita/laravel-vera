@@ -50,12 +50,47 @@ it('offers the world tools, with go_to limited to the world\'s real ids', functi
     /** @var Request $request */
     $request = Http::recorded()[0][0];
     $tools = collect($request['tools'])->keyBy('function.name');
-    expect($tools->keys()->sort()->values()->all())->toBe(['describe', 'follow', 'go_to', 'stop', 'what_is_in', 'where_can_i']);
+    expect($tools->keys()->sort()->values()->all())->toBe(['describe', 'follow', 'go_to', 'stop', 'use', 'what_is_in', 'where_can_i', 'zone']);
     expect($tools['go_to']['function']['parameters']['properties']['target']['enum'])
         ->toContain('pool-terrace')
         ->toContain('studio')
         ->toContain('pool-lounger-1');
     expect($tools['what_is_in']['function']['parameters']['properties']['place']['enum'])->toContain('gallery');
+});
+
+it('returns a use action for a spot activity', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline']), finalAnswerResponse('Time to relax.'));
+
+    sendToolWorldMessage($this, $scenario)
+        ->assertSuccessful()
+        ->assertJsonPath('action', ['verb' => 'use', 'target' => 'pool-lounger-1-seat', 'activity' => 'recline']);
+});
+
+it('rejects an activity the spot does not offer', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'swim']), finalAnswerResponse('Hm.'));
+
+    sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', null);
+    expect(toolResultSentBack())->toContain('\"swim\" cannot be done at pool-lounger-1-seat')->toContain('recline');
+});
+
+it('returns a zone action for an activity of the place she is in', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    fakeTurn(toolCallResponse('call_1', 'zone', ['activity' => 'swim']), finalAnswerResponse('Into the water.'));
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -3],
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -3]],
+    ])->assertSuccessful()->assertJsonPath('action', ['verb' => 'zone', 'target' => null, 'activity' => 'swim']);
+});
+
+it('rejects a zone activity offered somewhere else', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    fakeTurn(toolCallResponse('call_1', 'zone', ['activity' => 'swim']), finalAnswerResponse('Not here.'));
+
+    sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', null);
+    expect(toolResultSentBack())->toContain('\"swim\" is not something you can do where you are');
 });
 
 it('returns the action she chose with a tool', function () {

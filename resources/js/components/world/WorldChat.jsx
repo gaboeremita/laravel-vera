@@ -10,7 +10,7 @@ import { isTypingTarget } from './keyboardFocus.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, onVoiceAudio, onAction }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, onVoiceAudio, onAction }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
 	const [isTranscribing, setIsTranscribing] = useState(false);
@@ -18,7 +18,8 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 	const scrollRef = useRef(null);
 	const inputRef = useRef(null);
 	const speakingTimeoutRef = useRef(null);
-	const { poses, portraitType, fetchEmotions } = useEmotions();
+	const { portraitType, fetchEmotions } = useEmotions();
+	const poseNames = [...new Set((resident.assistant.poses ?? []).map((pose) => pose.name))];
 	const { theme, setTheme } = useTheme();
 
 	useEffect(() => {
@@ -83,10 +84,9 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		assistantId: resident.assistant.id,
 		conversationId,
 		portraitType,
-		poseNames: poses.map((p) => p.name),
+		poseNames,
 		onPoseChange: ({ name, triggerId }) => {
-			const pose = poses.find((p) => p.name === name);
-			onPoseTrigger?.({ residentId: resident.id, animationUrl: pose?.animation_url ?? null, blendshapes: pose?.vrm_blendshapes ?? [], triggerId });
+			onPoseTrigger?.({ residentId: resident.id, name, triggerId });
 		},
 		onLoadError: () => { addToast('Unable to load this conversation', 'error'); onClose(); },
 		addToast,
@@ -94,8 +94,8 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		onVoiceReply: (text, ttsInstructions) => { void speakReply(text, ttsInstructions); },
 		onAction,
 		extraParams: worldSessionId && getPositions
-			? { worldId: world.id, worldSessionId, get positions() { return getPositions(); } }
-			: { worldId: world.id },
+			? { worldId: world.id, worldSessionId, get positions() { return getPositions(); }, get residentPosture() { return getResidentPosture(resident.id); } }
+			: { worldId: world.id, get residentPosture() { return getResidentPosture(resident.id); } },
 	});
 
 	useEffect(() => {

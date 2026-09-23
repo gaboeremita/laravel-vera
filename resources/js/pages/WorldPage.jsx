@@ -31,6 +31,7 @@ export default function WorldPage() {
 	const offscreenIndicator = useRef(null);
 	const navigation = useRef(null);
 	const residentCommands = useRef(new Map());
+	const occupiedSpots = useRef(new Map());
 	const [floorMaps, setFloorMaps] = useState([]);
 	const [mapExpanded, setMapExpanded] = useState(false);
 	const [conversationRange, setConversationRange] = useState('ok');
@@ -139,6 +140,8 @@ export default function WorldPage() {
 		return () => window.removeEventListener('keydown', keyDown);
 	}, []);
 
+	const getResidentPosture = useCallback((residentId) => residentCommands.current.get(residentId)?.posture() ?? 'standing', []);
+
 	const getFollowTarget = useCallback(() => {
 		const view = playerView.current;
 		if (!view) return null;
@@ -166,7 +169,7 @@ export default function WorldPage() {
 			}
 		}
 
-		const result = await executeAction(action, { commands: residentCommands.current.get(resident.id), layout: world?.layout, getFollowTarget, fromUser });
+		const result = await executeAction(action, { commands: residentCommands.current.get(resident.id), layout: world?.layout, getFollowTarget, fromUser, residentId: resident.id, occupiedSpots: occupiedSpots.current });
 		if (result.outcome === 'failed') {
 			const attempted = action.target ? `${action.verb.replace('_', ' ')} ${action.target}` : action.verb;
 			console.error(`[WorldPage] ${resident.assistant.name} could not ${attempted}: ${result.reason}`);
@@ -221,7 +224,7 @@ export default function WorldPage() {
 			<div className="relative flex-1 min-w-0">
 				{chatResident && (
 					<div className="absolute left-5 top-16 bottom-5 z-20 w-[min(26rem,40%)] min-w-72">
-						<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} onVoiceAudio={playResidentVoice} onAction={handleChatAction} />
+						<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} getResidentPosture={getResidentPosture} onVoiceAudio={playResidentVoice} onAction={handleChatAction} />
 					</div>
 				)}
 				{chatResident && conversationRange === 'warning' && (

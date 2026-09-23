@@ -5,10 +5,7 @@ import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
-import PoseEditor from '../components/PoseEditor.jsx';
-import DefaultPoseEditor from '../components/DefaultPoseEditor.jsx';
-import WorldMotionPoseEditor from '../components/WorldMotionPoseEditor.jsx';
-import { isWorldMotionPose } from '../components/world/worldMotionPoses.js';
+import PosturePoseSections from '../components/PosturePoseSections.jsx';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
 export default function CreateAssistantPage({ kind = 'assistant' }) {
@@ -112,7 +109,13 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 		);
 	};
 
-	const handleAddPose = (poseName, blendshapes, file) => {
+	const isDefaultPoseFor = (posture) => (pose) => pose.name === 'default' && pose.posture === posture;
+
+	const handleAddPose = (poseName, blendshapes, file, posture = 'standing') => {
+		if (stagedPoses.some((p) => p.name === poseName && p.posture === posture)) {
+			addToast(`A ${posture} pose named "${poseName}" already exists`, 'error');
+			return;
+		}
 		const localId = crypto.randomUUID();
 		if (file) {
 			stagedPoseFilesRef.current[localId] = file;
@@ -122,6 +125,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 			{
 				id: localId,
 				name: poseName,
+				posture,
 				vrm_blendshapes: blendshapes,
 				animation_url: file ? URL.createObjectURL(file) : null,
 				animation_original_name: file ? file.name : null,
@@ -135,8 +139,12 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 		delete stagedPoseFilesRef.current[pose.id];
 	};
 
-	const handleUpdatePoseBlendshapes = (pose, name, blendshapes) => {
-		setStagedPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, name, vrm_blendshapes: blendshapes } : p)));
+	const handleUpdatePose = (pose, name, blendshapes, posture = pose.posture) => {
+		if (stagedPoses.some((p) => p.id !== pose.id && p.name === name && p.posture === posture)) {
+			addToast(`A ${posture} pose named "${name}" already exists`, 'error');
+			return;
+		}
+		setStagedPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, name, posture, vrm_blendshapes: blendshapes } : p)));
 	};
 
 	const handleUploadPoseAnimation = (pose, file) => {
@@ -153,36 +161,36 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 
 	/* ── Default pose (staged like any other pose, but name-locked and never shown in the general list) ── */
 
-	const handleUpdateDefaultPoseBlendshapes = (blendshapes) => {
+	const handleUpdateDefaultPoseBlendshapes = (blendshapes, posture) => {
 		setStagedPoses((prev) => {
-			if (prev.some((p) => p.name === 'default')) {
-				return prev.map((p) => (p.name === 'default' ? { ...p, vrm_blendshapes: blendshapes } : p));
+			if (prev.some(isDefaultPoseFor(posture))) {
+				return prev.map((p) => (isDefaultPoseFor(posture)(p) ? { ...p, vrm_blendshapes: blendshapes } : p));
 			}
-			return [...prev, { id: crypto.randomUUID(), name: 'default', vrm_blendshapes: blendshapes, animation_url: null, animation_original_name: null }];
+			return [...prev, { id: crypto.randomUUID(), name: 'default', posture, vrm_blendshapes: blendshapes, animation_url: null, animation_original_name: null }];
 		});
 	};
 
-	const handleUploadDefaultPoseAnimation = (file) => {
+	const handleUploadDefaultPoseAnimation = (file, posture) => {
 		const preview = URL.createObjectURL(file);
 		setStagedPoses((prev) => {
-			const existing = prev.find((p) => p.name === 'default');
+			const existing = prev.find(isDefaultPoseFor(posture));
 			const localId = existing?.id ?? crypto.randomUUID();
 			stagedPoseFilesRef.current[localId] = file;
 			if (existing) {
-				return prev.map((p) => (p.name === 'default' ? { ...p, animation_url: preview, animation_original_name: file.name } : p));
+				return prev.map((p) => (isDefaultPoseFor(posture)(p) ? { ...p, animation_url: preview, animation_original_name: file.name } : p));
 			}
-			return [...prev, { id: localId, name: 'default', vrm_blendshapes: null, animation_url: preview, animation_original_name: file.name }];
+			return [...prev, { id: localId, name: 'default', posture, vrm_blendshapes: null, animation_url: preview, animation_original_name: file.name }];
 		});
 	};
 
-	const handleDeleteDefaultPoseAnimation = () => {
+	const handleDeleteDefaultPoseAnimation = (posture) => {
 		setStagedPoses((prev) => {
-			const existing = prev.find((p) => p.name === 'default');
+			const existing = prev.find(isDefaultPoseFor(posture));
 			if (existing) {
 				delete stagedPoseFilesRef.current[existing.id];
 				if (existing.animation_url) URL.revokeObjectURL(existing.animation_url);
 			}
-			return prev.map((p) => (p.name === 'default' ? { ...p, animation_url: null, animation_original_name: null } : p));
+			return prev.map((p) => (isDefaultPoseFor(posture)(p) ? { ...p, animation_url: null, animation_original_name: null } : p));
 		});
 	};
 
@@ -247,6 +255,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 			} else {
 				stagedPoses.forEach((pose, i) => {
 					formData.append(`poses[${i}][name]`, pose.name);
+					formData.append(`poses[${i}][posture]`, pose.posture);
 					(pose.vrm_blendshapes || []).forEach((b, j) => {
 						formData.append(`poses[${i}][vrm_blendshapes][${j}][expression]`, b.expression);
 						formData.append(`poses[${i}][vrm_blendshapes][${j}][weight]`, b.weight);
@@ -474,28 +483,16 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 						{/* Divider */}
 						<div className="border-t border-line-1" />
 
-						<DefaultPoseEditor
-							pose={stagedPoses.find((p) => p.name === 'default') || { name: 'default', vrm_blendshapes: null, animation_url: null, animation_original_name: null }}
-							onUpdateBlendshapes={handleUpdateDefaultPoseBlendshapes}
-							onUploadAnimation={handleUploadDefaultPoseAnimation}
-							onDeleteAnimation={handleDeleteDefaultPoseAnimation}
-						/>
-
-						<WorldMotionPoseEditor
+						<PosturePoseSections
 							poses={stagedPoses}
 							onAdd={handleAddPose}
-							onUpdateBlendshapes={handleUpdatePoseBlendshapes}
-							onUploadAnimation={handleUploadPoseAnimation}
-							onDeleteAnimation={handleDeletePoseAnimation}
-						/>
-
-						<PoseEditor
-							poses={stagedPoses.filter((p) => p.name !== 'default' && !isWorldMotionPose(p))}
-							onAdd={handleAddPose}
 							onDelete={handleDeletePose}
-							onUpdateBlendshapes={handleUpdatePoseBlendshapes}
+							onUpdatePose={handleUpdatePose}
 							onUploadAnimation={handleUploadPoseAnimation}
 							onDeleteAnimation={handleDeletePoseAnimation}
+							onUpdateDefaultBlendshapes={handleUpdateDefaultPoseBlendshapes}
+							onUploadDefaultAnimation={handleUploadDefaultPoseAnimation}
+							onDeleteDefaultAnimation={handleDeleteDefaultPoseAnimation}
 						/>
 					</>
 				)}

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Posture;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Pose;
@@ -190,4 +191,106 @@ it('emotions index returns poses alongside emotions', function () {
     $response->assertStatus(200)
         ->assertJsonStructure(['portrait_type', 'vrm_url', 'emotions', 'poses'])
         ->assertJsonPath('poses.0.name', 'spin');
+});
+
+it('creates poses as standing unless a posture is given', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.store', ['assistant' => $assistant->id]), ['name' => 'laugh'])
+        ->assertCreated()
+        ->assertJsonPath('posture', 'standing');
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.store', ['assistant' => $assistant->id]), ['name' => 'laugh', 'posture' => 'sitting'])
+        ->assertCreated()
+        ->assertJsonPath('posture', 'sitting');
+
+    expect(Pose::where('assistant_id', $assistant->id)->where('name', 'laugh')->count())->toBe(2);
+});
+
+it('rejects the same pose name twice in one posture', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+    Pose::factory()->posture(Posture::Lying)->create(['assistant_id' => $assistant->id, 'name' => 'stretch']);
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.store', ['assistant' => $assistant->id]), ['name' => 'stretch', 'posture' => 'lying'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['name']);
+});
+
+it('rejects an unknown posture', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.store', ['assistant' => $assistant->id]), ['name' => 'float', 'posture' => 'floating'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['posture']);
+});
+
+it('moves a pose to another posture unless that posture already has the name', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+    $pose = Pose::factory()->create(['assistant_id' => $assistant->id, 'name' => 'wave']);
+    Pose::factory()->posture(Posture::Reclining)->create(['assistant_id' => $assistant->id, 'name' => 'nap']);
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.update', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['posture' => 'sitting'])
+        ->assertSuccessful()
+        ->assertJsonPath('posture', 'sitting');
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.update', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['name' => 'nap', 'posture' => 'reclining'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['name']);
+});
+
+it('keeps a separate default pose for each posture', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.default.update', ['assistant' => $assistant->id]), ['vrm_blendshapes' => [['expression' => 'relaxed', 'weight' => 40]]])
+        ->assertSuccessful()
+        ->assertJsonPath('posture', 'standing');
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.default.update', ['assistant' => $assistant->id]), ['posture' => 'sitting', 'vrm_blendshapes' => [['expression' => 'happy', 'weight' => 60]]])
+        ->assertSuccessful()
+        ->assertJsonPath('posture', 'sitting');
+
+    expect(Pose::where('assistant_id', $assistant->id)->where('name', 'default')->pluck('posture')->map->value->sort()->values()->all())
+        ->toBe(['sitting', 'standing']);
+});
+
+it('uploads and deletes the default animation of one posture', function () {
+    Storage::fake('public');
+    [$user, $assistant] = setUpAssistantForPoses();
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.default.animation.store', ['assistant' => $assistant->id]), [
+            'posture' => 'lying',
+            'animation' => UploadedFile::fake()->create('lie.vrma', 10),
+        ])
+        ->assertCreated()
+        ->assertJsonPath('posture', 'lying');
+
+    expect(Pose::where('assistant_id', $assistant->id)->where('name', 'default')->where('posture', 'lying')->first()->animationFile)->not->toBeNull();
+
+    $this->actingAs($user)
+        ->deleteJson(route('assistants.poses.default.animation.destroy', ['assistant' => $assistant->id, 'posture' => 'standing']))
+        ->assertNotFound();
+
+    $this->actingAs($user)
+        ->deleteJson(route('assistants.poses.default.animation.destroy', ['assistant' => $assistant->id, 'posture' => 'lying']))
+        ->assertSuccessful();
+});
+
+it('returns only standing poses to the chat portrait', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+    Pose::factory()->create(['assistant_id' => $assistant->id, 'name' => 'laugh']);
+    Pose::factory()->posture(Posture::Sitting)->create(['assistant_id' => $assistant->id, 'name' => 'laugh']);
+
+    $this->actingAs($user)
+        ->getJson(route('emotions.index', ['assistant' => $assistant->id]))
+        ->assertSuccessful()
+        ->assertJsonCount(1, 'poses');
 });

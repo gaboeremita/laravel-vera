@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
+use App\Enums\Posture;
 use Database\Factories\AssistantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -80,10 +81,22 @@ class Assistant extends Model
     }
 
     /**
-     * @return array<string>
+     * @return array{available: array<int, string>, standingOnly: array<int, string>}
      */
-    public function promptPoseNames(): array
+    public function promptPoseNames(Posture $posture = Posture::Standing): array
     {
-        return $this->poses()->pluck('name')->toArray();
+        $poses = $this->poses()->get(['name', 'posture']);
+        $available = $poses->filter(fn (Pose $pose) => $pose->posture === $posture)->pluck('name');
+        $standingOnly = $poses->filter(fn (Pose $pose) => $pose->posture === Posture::Standing)->pluck('name')->diff($available);
+
+        return ['available' => $available->values()->all(), 'standingOnly' => $standingOnly->values()->all()];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function poseNames(): array
+    {
+        return $this->poses()->distinct()->pluck('name')->all();
     }
 }

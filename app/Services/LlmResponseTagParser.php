@@ -28,7 +28,7 @@ class LlmResponseTagParser
         $regularEmotions = $assistant->promptEmotionNames()['regular'];
         $intimateEmotions = $assistant->promptEmotionNames()['intimate'];
         $emotionNames = [...$regularEmotions, ...$intimateEmotions];
-        $poseNames = $assistant->promptPoseNames();
+        $poseNames = $assistant->poseNames();
 
         $content = preg_replace_callback(
             '/\[(?<identifier>[a-z][a-z0-9 _-]*):\s*(?<value>[^\]\r\n]*)\]/iu',

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\AppendWorldConversationContext;
+use App\Actions\ResolveWorldState;
 use App\Contracts\SttProvider;
 use App\Directors\PromptDirector;
 use App\DTOs\LlmResponse;
 use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
+use App\Enums\Posture;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAvatarBackground;
 use App\Jobs\SummarizeConversation;
@@ -31,6 +33,7 @@ use App\Services\TtsProviders\TtsManager;
 use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ConversationController extends Controller
 {
@@ -184,6 +187,7 @@ class ConversationController extends Controller
             'positions.residents.*.x' => ['required', 'numeric'],
             'positions.residents.*.y' => ['required', 'numeric'],
             'positions.residents.*.z' => ['required', 'numeric'],
+            'residentPosture' => ['nullable', Rule::enum(Posture::class)],
         ]);
 
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
@@ -315,7 +319,7 @@ class ConversationController extends Controller
 
         $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world, $validated['positions'] ?? null, $worldSession);
         $director = new PromptDirector($prompt);
-        $this->appendExpressionTags($director, $assistantModel, $excludedSections);
+        $this->appendExpressionTags($director, $assistantModel, $excludedSections, Posture::from($validated['residentPosture'] ?? Posture::Standing->value));
 
         $director->except($excludedSections);
 
@@ -381,7 +385,12 @@ class ConversationController extends Controller
                     return response()->json(['message' => 'Assistants living in a world need a model that supports tool calling. Choose one in this assistant\'s settings.'], 422);
                 }
 
-                $worldToolbox = new WorldToolbox($world);
+                $resident = $world->residents()->where('assistant_id', $assistantModel->id)->firstOrFail();
+                $residentPoint = $validated['positions']['residents'][$resident->id] ?? null;
+                $worldToolbox = new WorldToolbox(
+                    $world,
+                    $residentPoint !== null ? app(ResolveWorldState::class)->locate($world->layout, $residentPoint)['zoneChain'] : [],
+                );
                 $tools = [...$tools, ...$worldToolbox->tools()];
             }
 
@@ -567,18 +576,23 @@ class ConversationController extends Controller
      * stored prompt (e.g. from before it was in this mode) never renders
      * alongside it and confuses the model with two competing tag formats.
      */
-    private function appendExpressionTags(PromptDirector $director, Assistant $assistantModel, array &$excludedSections): void
+    private function appendExpressionTags(PromptDirector $director, Assistant $assistantModel, array &$excludedSections, Posture $posture = Posture::Standing): void
     {
         if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
             $excludedSections[] = 'emotion tags';
 
-            $poses = $assistantModel->promptPoseNames();
+            $poses = $assistantModel->promptPoseNames($posture);
 
-            if (! empty($poses)) {
-                $director->append('pose tags', [
+            if ($poses['available'] !== [] || $poses['standingOnly'] !== []) {
+                $section = [
                     'format' => 'Use [pose: <exact pose name>] to select a pose. Use only a name from the available poses list. Control tags may appear in any order and are removed before the reply is shown.',
-                    'available poses' => $poses,
-                ]);
+                    'available poses' => $poses['available'],
+                ];
+                if ($posture !== Posture::Standing && $poses['standingOnly'] !== []) {
+                    $section['format'] = "You are {$posture->value}. Use [pose: <exact pose name>] to select a pose. Poses under available poses fit how you are right now; poses under poses that make you stand up get you up on your feet first, and you stay standing afterwards. Control tags may appear in any order and are removed before the reply is shown.";
+                    $section['poses that make you stand up'] = $poses['standingOnly'];
+                }
+                $director->append('pose tags', $section);
             }
 
             return;

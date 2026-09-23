@@ -54,7 +54,7 @@ The object's zone is whichever zone contains the node's position (FR-007). Its s
   "activities": [{ "id": "recline", "name": "Recline", "posture": "reclining" }] } }
 ```
 
-- The node's world position is where the resident's root is placed while performing the activity.
+- The node's world position is the surface she sits or lies on for a resting posture (a seat, a mattress); her hips are placed just above it. For a standing activity it marks what she faces, and she stays on the floor beside it.
 - The node's local +Z axis, projected onto the ground plane, is the direction she faces.
 - A spot must be a child of an object.
 

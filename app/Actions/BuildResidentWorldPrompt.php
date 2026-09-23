@@ -51,7 +51,7 @@ class BuildResidentWorldPrompt
 
     public function worldAwareness(): string
     {
-        return "World awareness:\nRemember that your tools are yours to use whenever you feel like it, on your own initiative, whether or not the user asks: what_is_in shows what a place holds and what you can do there, where_can_i finds where you could do something, describe tells you more about a place or thing, and go_to, follow and stop move you. Reach for them whenever a thought, a mood, a craving or the conversation brings the space to mind, the way anyone glances around a room.";
+        return "World awareness:\nRemember that your tools are yours to use whenever you feel like it, on your own initiative, whether or not the user asks: what_is_in shows what a place holds and what you can do there, where_can_i finds where you could do something, describe tells you more about a place or thing, go_to, follow and stop move you, use sits, lies or reclines you on a spot for an activity, and zone does an activity of the place you are in. Reach for them whenever a thought, a mood, a craving or the conversation brings the space to mind, the way anyone glances around a room.";
     }
 
     public function recentActivity(World $world, WorldSession $session, WorldResident $resident): ?string

@@ -25,6 +25,8 @@ class WorldResidentResource extends JsonResource
                 'poses' => $this->assistant->relationLoaded('poses')
                     ? $this->assistant->poses->map(fn ($pose) => [
                         'name' => $pose->name,
+                        'posture' => $pose->posture->value,
+                        'vrmBlendshapes' => $pose->vrm_blendshapes,
                         'animationUrl' => $pose->animationFile?->url,
                     ])->values()
                     : [],

@@ -13,14 +13,17 @@ class WorldToolbox
      */
     private ?array $chosenAction = null;
 
-    public function __construct(public readonly World $world) {}
+    /**
+     * @param  array<int, array<string, mixed>>  $residentZoneChain  the zone she stands in and the zones around it; empty when her position is unknown
+     */
+    public function __construct(public readonly World $world, public readonly array $residentZoneChain = []) {}
 
     /**
      * @return AgentTool[]
      */
     public function tools(): array
     {
-        return [
+        $tools = [
             new WhereCanITool($this),
             new WhatIsInTool($this),
             new DescribeTool($this),
@@ -28,6 +31,16 @@ class WorldToolbox
             new FollowTool($this),
             new StopTool($this),
         ];
+
+        if ($this->spots() !== []) {
+            $tools[] = new UseTool($this);
+        }
+
+        if ($this->zoneActivityIds() !== []) {
+            $tools[] = new ZoneTool($this);
+        }
+
+        return $tools;
     }
 
     /**
@@ -75,6 +88,27 @@ class WorldToolbox
     public function targetIds(): array
     {
         return collect($this->zones())->merge($this->objects())->pluck('id')->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function spots(): array
+    {
+        return collect($this->objects())->flatMap(fn (array $object) => collect($object['spots'])->map(fn (array $spot) => [...$spot, 'objectId' => $object['id'], 'objectName' => $object['name']]))->values()->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function zoneActivityIds(): array
+    {
+        return collect($this->zones())->flatMap(fn (array $zone) => collect($zone['activities'])->pluck('id'))->unique()->values()->all();
+    }
+
+    public function findSpot(string $written): ?array
+    {
+        return collect($this->spots())->first(fn (array $spot) => $this->sameName($spot['id'], $written));
     }
 
     public function findZone(string $written): ?array

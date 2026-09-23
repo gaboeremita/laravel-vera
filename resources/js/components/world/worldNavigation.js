@@ -8,11 +8,14 @@ const MIN_WALKABLE_NORMAL_Y = Math.cos(Math.PI / 4);
 const SURFACE_MERGE_DISTANCE = 0.05;
 const NEAREST_SEARCH_RINGS = 3;
 const NEAREST_MAX_HEIGHT_DIFFERENCE = 1;
+const APPROACH_RADIUS = 1.2;
+const LEVEL_TOLERANCE = 0.05;
 const MAX_EXPANSIONS = 40000;
 const SMOOTHING_LOOKAHEAD = 25;
 const SIGHT_SAMPLE_SPACING = 0.25;
 const DIRECTIONS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 const DIAGONAL_PARTS = { 4: [0, 2], 5: [0, 3], 6: [1, 2], 7: [1, 3] };
+const REVERSE_DIRECTION = [1, 0, 3, 2, 7, 6, 5, 4];
 const EDGE_UNKNOWN = 0;
 const EDGE_OPEN = 1;
 const EDGE_BLOCKED = 2;
@@ -35,6 +38,7 @@ class NavigationGrid {
 		const nodeCount = this.columns * this.rows * LEVELS;
 		this.heights = new Float32Array(nodeCount).fill(Number.NaN);
 		this.edges = new Uint8Array(nodeCount * DIRECTIONS.length);
+		this.failedNodes = new Set();
 		this.cost = new Float32Array(nodeCount).fill(Number.POSITIVE_INFINITY);
 		this.cameFrom = new Int32Array(nodeCount).fill(-1);
 		this.closed = new Uint8Array(nodeCount);
@@ -176,9 +180,57 @@ class NavigationGrid {
 			const [alongX, alongZ] = DIAGONAL_PARTS[direction];
 			open = this.edgeOpen(node, alongX) && this.edgeOpen(node, alongZ);
 		}
+		// A step is taken straight on, and only where the stair has no drop
+		// beside it, so a route cannot clip the side of a stair next to the
+		// open edge it overhangs.
+		if (open && Math.abs(this.heights[target] - this.heights[node]) > LEVEL_TOLERANCE) {
+			open = direction < 4 && !this.dropBeside(target, direction) && !this.dropBeside(node, direction);
+		}
 		if (open) open = !this.sweepBlocked(this.nodePosition(node), this.nodePosition(target));
 		this.edges[slot] = open ? EDGE_OPEN : EDGE_BLOCKED;
 		return open;
+	}
+
+	/** Whether either side of a node, across the direction of travel, falls away below it. */
+	dropBeside(node, direction) {
+		const column = Math.floor(node / LEVELS);
+		const height = this.heights[node];
+		for (const side of direction < 2 ? [2, 3] : [0, 1]) {
+			const i = (column % this.columns) + DIRECTIONS[side][0];
+			const j = Math.floor(column / this.columns) + DIRECTIONS[side][1];
+			if (i < 0 || j < 0 || i >= this.columns || j >= this.rows) continue;
+			let level = false;
+			let lower = false;
+			for (let index = 0; index < LEVELS; index++) {
+				const candidate = this.heights[(j * this.columns + i) * LEVELS + index];
+				if (Number.isNaN(candidate)) break;
+				if (Math.abs(candidate - height) <= LEVEL_TOLERANCE) level = true;
+				else if (candidate < height) lower = true;
+			}
+			if (lower && !level) return true;
+		}
+		return false;
+	}
+
+	/** Marks the move from a point toward another as impassable, after a resident failed to make it. */
+	blockStep(from, toward) {
+		const node = this.nearestNode(from);
+		if (node === -1) return;
+		const angle = Math.atan2(toward.z - from.z, toward.x - from.x);
+		let direction = 0;
+		let best = Number.POSITIVE_INFINITY;
+		DIRECTIONS.forEach(([dx, dz], index) => {
+			const difference = Math.abs(Math.atan2(Math.sin(Math.atan2(dz, dx) - angle), Math.cos(Math.atan2(dz, dx) - angle)));
+			if (difference < best) {
+				best = difference;
+				direction = index;
+			}
+		});
+		this.edges[node * DIRECTIONS.length + direction] = EDGE_BLOCKED;
+		const target = this.neighbour(node, direction);
+		if (target === -1) return;
+		this.edges[target * DIRECTIONS.length + REVERSE_DIRECTION[direction]] = EDGE_BLOCKED;
+		this.failedNodes.add(target);
 	}
 
 	/** Body sweep between two points, taken at the higher of the two so a step's riser does not count as a wall. */
@@ -279,6 +331,57 @@ class NavigationGrid {
 		return false;
 	}
 
+	/**
+	 * A* toward a point she may not be able to stand on, such as a seat: the
+	 * goal is a virtual node reached from any ground within `radius` of the
+	 * point and at most a step above it, costing the remaining horizontal
+	 * distance. Returns the ground node she should stop on, or -1.
+	 */
+	searchNear(start, point, radius) {
+		this.resetSearch();
+		const minY = point.y - NEAREST_MAX_HEIGHT_DIFFERENCE;
+		const maxY = point.y + MAX_STEP_HEIGHT;
+		const position = { x: 0, y: 0, z: 0 };
+		const distance = (node) => {
+			this.nodePosition(node, position);
+			return Math.hypot(position.x - point.x, position.z - point.z);
+		};
+		this.cost[start] = 0;
+		this.touched.push(start);
+		this.heapPush(start, distance(start));
+		let best = -1;
+		let bestScore = Number.POSITIVE_INFINITY;
+		let expansions = 0;
+
+		while (this.heapNodes.length > 0 && expansions < MAX_EXPANSIONS && this.heapScores[0] < bestScore) {
+			const node = this.heapPop();
+			if (this.closed[node]) continue;
+			this.closed[node] = 1;
+			expansions++;
+
+			const remaining = distance(node);
+			const height = this.heights[node];
+			if (remaining <= radius && height >= minY && height <= maxY && this.cost[node] + remaining < bestScore) {
+				best = node;
+				bestScore = this.cost[node] + remaining;
+			}
+
+			for (let direction = 0; direction < DIRECTIONS.length; direction++) {
+				if (!this.edgeOpen(node, direction)) continue;
+				const next = this.neighbour(node, direction);
+				if (this.closed[next]) continue;
+				const step = (direction >= 4 ? Math.SQRT2 : 1) * this.cellSize + Math.abs(this.heights[next] - this.heights[node]);
+				const candidate = this.cost[node] + step;
+				if (candidate >= this.cost[next]) continue;
+				if (this.cost[next] === Number.POSITIVE_INFINITY) this.touched.push(next);
+				this.cost[next] = candidate;
+				this.cameFrom[next] = node;
+				this.heapPush(next, candidate + distance(next));
+			}
+		}
+		return best;
+	}
+
 	/** Whether a straight walk between two points stays on reachable ground without hitting anything. */
 	clearLine(a, b) {
 		const length = Math.hypot(b.x - a.x, b.z - a.z);
@@ -296,11 +399,12 @@ class NavigationGrid {
 				if (Number.isNaN(candidate)) break;
 				const rise = candidate - previous.y;
 				if (rise <= MAX_STEP_HEIGHT && -rise <= MAX_DROP_HEIGHT) {
+					if (this.failedNodes.has(column * LEVELS + level)) return false;
 					height = candidate;
 					break;
 				}
 			}
-			if (Number.isNaN(height)) return false;
+			if (Number.isNaN(height) || Math.abs(height - previous.y) > LEVEL_TOLERANCE) return false;
 			const point = { x, y: height, z };
 			if (this.sweepBlocked(previous, point)) return false;
 			previous = point;
@@ -322,7 +426,19 @@ class NavigationGrid {
 		const goal = this.nearestNode(to);
 		if (start === -1 || goal === -1) return null;
 		if (start !== goal && !this.search(start, goal)) return null;
+		return this.pathBetween(start, goal);
+	}
 
+	/** Route to the reachable ground closest to a point she cannot stand on, such as the floor beside a seat, or null when there is none. */
+	findPathNear(from, to, radius = APPROACH_RADIUS) {
+		if (!this.isComplete) return null;
+		const start = this.nearestNode(from);
+		if (start === -1) return null;
+		const goal = this.searchNear(start, to, radius);
+		return goal === -1 ? null : this.pathBetween(start, goal);
+	}
+
+	pathBetween(start, goal) {
 		const nodes = [goal];
 		while (nodes[nodes.length - 1] !== start) nodes.push(this.cameFrom[nodes[nodes.length - 1]]);
 		const points = nodes.reverse().map((node) => this.nodePosition(node));

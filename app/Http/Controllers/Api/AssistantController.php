@@ -6,6 +6,7 @@ use App\Actions\DeleteAssistantAssets;
 use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
+use App\Enums\Posture;
 use App\Http\Controllers\Controller;
 use App\Models\Assistant;
 use App\Models\Emotion;
@@ -99,6 +100,7 @@ class AssistantController extends Controller
             ->map(fn (Pose $pose) => [
                 'id' => $pose->id,
                 'name' => $pose->name,
+                'posture' => $pose->posture->value,
                 'vrm_blendshapes' => $pose->vrm_blendshapes,
                 'animation_url' => $pose->animationFile?->url,
                 'animation_original_name' => $pose->animationFile?->original_name,
@@ -150,12 +152,25 @@ class AssistantController extends Controller
             'restricted_emotions.*.name' => ['required', 'string', 'max:255', 'distinct'],
             'restricted_emotions.*.image' => ['required', 'file', 'image', 'max:10480'],
             'poses' => $isAvatarMode ? ['sometimes', 'array'] : ['prohibited'],
-            'poses.*.name' => ['required', 'string', 'max:255', 'distinct'],
+            'poses.*.name' => ['required', 'string', 'max:255'],
+            'poses.*.posture' => ['sometimes', new Enum(Posture::class)],
             'poses.*.vrm_blendshapes' => ['sometimes', 'array'],
             'poses.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'poses.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
             'poses.*.animation' => ['sometimes', 'file', 'extensions:vrma,fbx', 'max:10240'],
         ]);
+
+        $duplicatePose = collect($validated['poses'] ?? [])
+            ->map(fn (array $pose) => ($pose['posture'] ?? Posture::Standing->value).'|'.$pose['name'])
+            ->duplicates()
+            ->isNotEmpty();
+
+        if ($duplicatePose) {
+            return response()->json([
+                'message' => 'Pose names must be unique within each posture.',
+                'errors' => ['poses' => ['Pose names must be unique within each posture.']],
+            ], 422);
+        }
 
         $duplicateAcrossArrays = collect($validated['emotions'] ?? [])
             ->pluck('name')
@@ -239,6 +254,7 @@ class AssistantController extends Controller
             foreach ($validated['poses'] ?? [] as $poseData) {
                 $pose = $assistant->poses()->create([
                     'name' => $poseData['name'],
+                    'posture' => $poseData['posture'] ?? Posture::Standing->value,
                     'vrm_blendshapes' => Pose::normalizeBlendshapes($poseData['vrm_blendshapes'] ?? null),
                 ]);
 

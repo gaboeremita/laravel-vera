@@ -85,3 +85,49 @@ test('an open route is smoothed to a straight line', (context) => {
 	assert.ok(path);
 	assert.equal(path.length, 2);
 });
+
+test('a seat is approached from the floor beside it', (context) => {
+	const bed = box(2, 0.6, 2.2, 0, 0.3, 0);
+	const grid = navigate(context, [bed]);
+	const seat = { x: 0, y: 0.7, z: 1.4 };
+	assert.equal(grid.findPath({ x: 0, y: 0, z: 6 }, seat), null);
+	const path = grid.findPathNear({ x: 0, y: 0, z: 6 }, seat);
+	assert.ok(path);
+	const end = path.at(-1);
+	assert.ok(Math.abs(end.y) < 0.05, `ended at height ${end.y}`);
+	assert.ok(Math.hypot(end.x - seat.x, end.z - seat.z) <= 1.2);
+});
+
+test('a seat with no floor nearby has no approach', (context) => {
+	const walls = [
+		box(3, 3, 0.2, 5, 1.5, 3.5),
+		box(3, 3, 0.2, 5, 1.5, 6.5),
+		box(0.2, 3, 3, 3.5, 1.5, 5),
+		box(0.2, 3, 3, 6.5, 1.5, 5),
+	];
+	const grid = navigate(context, walls);
+	assert.equal(grid.findPathNear({ x: -5, y: 0, z: -5 }, { x: 5, y: 0.5, z: 5 }, 0.8), null);
+});
+
+test('steps into a pit are taken through their middle, away from the drop beside them', (context) => {
+	const pitFloor = box(20, 0.1, 20, 0, -0.65, 0);
+	const deck = box(20, 0.6, 8.2, 0, -0.3, 3.9);
+	const upperStep = box(2, 0.4, 0.4, 0, -0.4, -0.4);
+	const lowerStep = box(2, 0.2, 0.4, 0, -0.5, -0.8);
+	const grid = navigate(context, [pitFloor, deck, upperStep, lowerStep], { withFloor: false });
+	const path = grid.findPath({ x: 4, y: 0, z: 3 }, { x: 4, y: -0.6, z: -4 });
+	assert.ok(path);
+	const onSteps = path.filter((point) => point.z < -0.2 && point.z > -1.0);
+	assert.ok(onSteps.length > 0);
+	for (const point of onSteps) assert.ok(Math.abs(point.x) <= 0.5, `stepped down at x=${point.x}`);
+});
+
+test('a step a resident failed to make is avoided on the next plan', (context) => {
+	const grid = navigate(context, []);
+	const direct = grid.findPath({ x: 0, y: 0, z: 2 }, { x: 0, y: 0, z: -2 });
+	assert.equal(direct.length, 2);
+	grid.blockStep({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -1 });
+	const detour = grid.findPath({ x: 0, y: 0, z: 2 }, { x: 0, y: 0, z: -2 });
+	assert.ok(detour);
+	assert.ok(detour.length > 2);
+});

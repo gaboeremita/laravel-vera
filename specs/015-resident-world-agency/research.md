@@ -50,9 +50,9 @@
 
 ## R9. Poses at spots
 
-- **Decision**: A spot's node position is the root placement for the resident while she performs the activity, and the node's +Z axis is her facing. Each activity may declare a posture (see R9a), held until she leaves, and a pose played once in that posture. She walks to an approach point 0.6 m in front of the spot on walkable ground, then blends to the spot placement over 0.4 s.
+- **Decision**: A spot's node position is the surface she rests on (a seat, a mattress), and the node's +Z axis is her facing. For a resting posture, her root is placed so that the hips of the posture's default clip sit 0.1 m above that surface, which fits one sitting clip to stools, chairs and sofas of any height. Standing activities keep her on the floor beside the spot. Each activity may declare a posture (see R9a), held until she leaves, and a pose played once in that posture. She walks to the reachable floor closest to an approach point 0.6 m in front of the spot, then blends to the spot placement over 0.4 s.
 - **Rationale**: Separating the approach point from the spot placement lets spots sit on furniture (a lounger, a bar stool) that the walkable grid never reaches. Posture loops hold her in place on furniture for as long as she stays.
-- **Alternatives considered**: Deriving placement from the furniture's geometry. It needs per-pose knowledge of hip height and fails for arbitrary furniture shapes.
+- **Alternatives considered**: Deriving placement from the furniture's geometry. It fails for arbitrary furniture shapes; the marked surface height gives the same fit with no geometry analysis.
 
 ## R9a. Postures
 
