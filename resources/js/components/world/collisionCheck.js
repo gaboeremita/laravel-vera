@@ -27,10 +27,11 @@ export class WorldCollision {
 
 		const instanceMatrix = new Matrix4();
 		const worldMatrix = new Matrix4();
-		const collect = (node, parentVisible, parentCollider) => {
+		const collect = (node, parentVisible, parentCollider, parentPassable) => {
 			const collider = parentCollider || COLLISION_NAME.test(node.name);
 			const visible = parentVisible && node.visible;
-			if (node.isMesh && (visible || collider)) {
+			const passable = parentPassable || node.userData.passable === true;
+			if (node.isMesh && !passable && (visible || collider)) {
 				if (node.isInstancedMesh) {
 					for (let instance = 0; instance < node.count; instance++) {
 						node.getMatrixAt(instance, instanceMatrix);
@@ -41,10 +42,10 @@ export class WorldCollision {
 					this.addGeometry(node.geometry, node.matrixWorld);
 				}
 			}
-			for (const child of node.children) collect(child, visible, collider);
+			for (const child of node.children) collect(child, visible, collider, passable);
 			if (collider) node.visible = false;
 		};
-		collect(scene, true, false);
+		collect(scene, true, false, false);
 		if (this.triangleCount === 0) throw new Error('This environment has no geometry for collision.');
 		this.octree.build();
 	}

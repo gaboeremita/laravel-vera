@@ -58,6 +58,24 @@ it('persists a resident-specific opening message and custom prompt', function ()
         ->custom_prompt->toBe($payload['customPrompt']);
 });
 
+it('persists the resident facing rotation', function () {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $assistant = residentAssistantFor($user);
+    $payload = [
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'rotation' => ['x' => 0, 'y' => 1.5708, 'z' => 0],
+        'behavior' => 'stationary',
+    ];
+
+    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), $payload)
+        ->assertSuccessful()
+        ->assertJsonPath('rotation.y', 1.5708);
+
+    expect(WorldResident::where('world_id', $world->id)->where('assistant_id', $assistant->id)->first()->rotation)
+        ->toBe($payload['rotation']);
+});
+
 it('rejects a resident without a VRM asset', function () {
     $user = User::factory()->create();
     $world = World::factory()->forUser($user)->create();

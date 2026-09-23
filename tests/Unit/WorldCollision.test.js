@@ -57,6 +57,30 @@ test('named invisible proxies supplement ordinary visible geometry', (context) =
 	assert.equal(proxyWall.visible, false);
 });
 
+test('meshes flagged passable do not block movement', (context) => {
+	const passableWall = wall();
+	passableWall.userData.passable = true;
+	const world = createWorld(context, passableWall);
+	const position = new Vector3(0, 0, 2);
+	world.move(position, 0, -4);
+	assert.ok(Math.abs(position.z + 2) < 0.001);
+});
+
+test('a passable water surface is waded through down to the basin floor', (context) => {
+	const deck = new Mesh(new BoxGeometry(20, 0.2, 10), new MeshBasicMaterial());
+	deck.position.set(0, 0.1, 5);
+	const surface = new Mesh(new PlaneGeometry(20, 10).rotateX(-Math.PI / 2), new MeshBasicMaterial());
+	surface.position.set(0, 0.15, -5);
+	const water = new Group();
+	water.userData.passable = true;
+	water.add(surface);
+	const world = createWorld(context, deck, water);
+	const position = new Vector3(0, 0.2, 2);
+	world.move(position, 0, -4);
+	assert.ok(Math.abs(position.z + 2) < 0.001);
+	assert.ok(Math.abs(position.y) < 0.001);
+});
+
 test('a doorway in one mesh stays open while its jamb blocks the body width', (context) => {
 	const parts = [
 		new BoxGeometry(2.4, 3, 0.2).translate(-1.8, 1.5, 0),
