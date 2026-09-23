@@ -8,4 +8,5 @@ enum Posture: string
     case Sitting = 'sitting';
     case Lying = 'lying';
     case Reclining = 'reclining';
+    case Swimming = 'swimming';
 }

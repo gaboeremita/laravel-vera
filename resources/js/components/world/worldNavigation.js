@@ -347,9 +347,9 @@ class NavigationGrid {
 	 * point and at most a step above it, costing the remaining horizontal
 	 * distance. Returns the ground node she should stop on, or -1.
 	 */
-	searchNear(start, point, radius) {
+	searchNear(start, point, radius, depthBelow = NEAREST_MAX_HEIGHT_DIFFERENCE) {
 		this.resetSearch();
-		const minY = point.y - NEAREST_MAX_HEIGHT_DIFFERENCE;
+		const minY = point.y - depthBelow;
 		const maxY = point.y + MAX_STEP_HEIGHT;
 		const position = { x: 0, y: 0, z: 0 };
 		const distance = (node) => {
@@ -390,6 +390,37 @@ class NavigationGrid {
 			}
 		}
 		return best;
+	}
+
+	/** Cheapest reachable node, by route cost, that satisfies `isGoal(position)`, or -1. */
+	searchWhere(start, isGoal) {
+		this.resetSearch();
+		const position = { x: 0, y: 0, z: 0 };
+		this.cost[start] = 0;
+		this.touched.push(start);
+		this.heapPush(start, 0);
+		let expansions = 0;
+
+		while (this.heapNodes.length > 0 && expansions < MAX_EXPANSIONS) {
+			const node = this.heapPop();
+			if (this.closed[node]) continue;
+			this.closed[node] = 1;
+			expansions++;
+			if (isGoal(this.nodePosition(node, position))) return node;
+
+			for (let direction = 0; direction < DIRECTIONS.length; direction++) {
+				if (!this.edgeOpen(node, direction)) continue;
+				const next = this.neighbour(node, direction);
+				if (this.closed[next]) continue;
+				const candidate = this.cost[node] + (direction >= 4 ? Math.SQRT2 : 1) * this.cellSize + Math.abs(this.heights[next] - this.heights[node]);
+				if (candidate >= this.cost[next]) continue;
+				if (this.cost[next] === Number.POSITIVE_INFINITY) this.touched.push(next);
+				this.cost[next] = candidate;
+				this.cameFrom[next] = node;
+				this.heapPush(next, candidate);
+			}
+		}
+		return -1;
 	}
 
 	/** Whether a straight walk between two points stays on reachable ground without hitting anything. */
@@ -440,11 +471,20 @@ class NavigationGrid {
 	}
 
 	/** Route to the reachable ground closest to a point she cannot stand on, such as the floor beside a seat, or null when there is none. */
-	findPathNear(from, to, radius = APPROACH_RADIUS) {
+	findPathNear(from, to, radius = APPROACH_RADIUS, depthBelow = NEAREST_MAX_HEIGHT_DIFFERENCE) {
 		if (!this.isComplete) return null;
 		const start = this.nearestNode(from);
 		if (start === -1) return null;
-		const goal = this.searchNear(start, to, radius);
+		const goal = this.searchNear(start, to, radius, depthBelow);
+		return goal === -1 ? null : this.pathBetween(start, goal);
+	}
+
+	/** Route to the nearest reachable point that satisfies `isGoal(position)`, or null when there is none. */
+	findPathWhere(from, isGoal) {
+		if (!this.isComplete) return null;
+		const start = this.nearestNode(from);
+		if (start === -1) return null;
+		const goal = this.searchWhere(start, isGoal);
 		return goal === -1 ? null : this.pathBetween(start, goal);
 	}
 

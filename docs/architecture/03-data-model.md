@@ -21,6 +21,10 @@ erDiagram
     world_sessions o|--o{ conversations : scopes
     worlds ||--o{ world_residents : contains
     assistants ||--o{ world_residents : placed_as
+    world_sessions ||--o{ resident_activities : records
+    world_residents ||--o{ resident_activities : performs
+    world_sessions ||--o{ world_session_residents : saves
+    world_residents ||--o{ world_session_residents : restored_as
     users ||--o{ ai_providers : owns
     ai_providers ||--o{ ai_models : offers
     users ||--o{ image_gen_providers : owns
@@ -92,6 +96,7 @@ erDiagram
         bigint id PK
         bigint assistant_id FK
         string name
+        string posture
         json vrm_blendshapes
     }
     pose_animation_files {
@@ -266,6 +271,7 @@ erDiagram
         text assistant_context_prompt
         text npc_context_prompt
         json settings
+        json layout
     }
     world_user {
         bigint id PK
@@ -288,6 +294,31 @@ erDiagram
         json behavior_settings
         text opening_message
         text custom_prompt
+    }
+    resident_activities {
+        bigint id PK
+        bigint world_session_id FK
+        bigint world_resident_id FK
+        string source
+        string verb
+        string target
+        string activity
+        text reason
+        string zone_id
+        string outcome
+        text outcome_reason
+        timestamp finished_at
+    }
+    world_session_residents {
+        bigint id PK
+        bigint world_session_id FK
+        bigint world_resident_id FK
+        json position
+        json rotation
+        string spot_id
+        string activity_id
+        string posture
+        json exit_position
     }
     conversations {
         bigint id PK
@@ -341,6 +372,10 @@ erDiagram
     assistant_user o|--o{ conversations : owns
     worlds ||--o{ world_residents : contains
     assistants ||--o{ world_residents : placed_as
+    world_sessions ||--o{ resident_activities : records
+    world_residents ||--o{ resident_activities : performs
+    world_sessions ||--o{ world_session_residents : saves
+    world_residents ||--o{ world_session_residents : restored_as
     discord_servers ||--o{ discord_channels : contains
     assistant_user ||--o{ assistant_discord_servers : configures
     discord_servers ||--o{ assistant_discord_servers : configured_for

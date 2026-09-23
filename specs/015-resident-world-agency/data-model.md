@@ -44,7 +44,7 @@ A resident's saved state within one world session (FR-032).
 | `rotation` | json | `{y}` |
 | `spot_id` | string, nullable | Layout spot id she occupies. |
 | `activity_id` | string, nullable | Layout activity id she is holding. |
-| `posture` | string | `standing`, `sitting`, `lying` or `reclining`; restored on return. |
+| `posture` | string | `standing`, `sitting`, `lying`, `reclining` or `swimming`; restored on return. |
 | `exit_position` | json, nullable | `{x, y, z}`, the floor point she stands up to when she leaves the spot. |
 | timestamps | | |
 

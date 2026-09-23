@@ -8,8 +8,8 @@ const postureOf = (pose) => pose.posture ?? 'standing';
 
 /**
  * Poses grouped by the posture they are made for. Each posture has its own
- * default pose, held while she is in it; the world motion poses (walking,
- * greeting) are standing poses.
+ * default pose, held while she is in it. Walking and greeting are standing
+ * motion poses; swimming has its own, for moving and resting at the side.
  *
  * @param {Array} poses - [{id, name, posture, vrm_blendshapes, animation_url}]
  * @param {function} onAdd - (name, blendshapes, file, posture) => void
@@ -57,11 +57,13 @@ export default function PosturePoseSections({ poses, onAdd, onDelete, onUpdatePo
 				onDeleteAnimation={() => onDeleteDefaultAnimation(posture)}
 			/>
 
-			{posture === 'standing' && (
+			{(posture === 'standing' || posture === 'swimming') && (
 				<WorldMotionPoseEditor
+					key={`motion-${posture}`}
+					posture={posture}
 					poses={posturePoses}
-					onAdd={(name, blendshapes, file) => onAdd(name, blendshapes, file, 'standing')}
-					onUpdateBlendshapes={(pose, name, blendshapes) => onUpdatePose(pose, name, blendshapes, 'standing')}
+					onAdd={(name, blendshapes, file) => onAdd(name, blendshapes, file, posture)}
+					onUpdateBlendshapes={(pose, name, blendshapes) => onUpdatePose(pose, name, blendshapes, posture)}
 					onUploadAnimation={onUploadAnimation}
 					onDeleteAnimation={onDeleteAnimation}
 				/>

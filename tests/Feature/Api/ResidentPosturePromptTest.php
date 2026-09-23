@@ -52,3 +52,15 @@ it('rejects an unknown posture', function () {
 
     sendWorldMessage($this, $scenario, [], ['residentPosture' => 'floating'])->assertUnprocessable()->assertJsonValidationErrors(['residentPosture']);
 });
+
+it('lists only the poses that fit while she swims', function () {
+    $scenario = postureScenario();
+    Pose::factory()->posture(Posture::Swimming)->create(['assistant_id' => $scenario[1]->id, 'name' => 'splash']);
+
+    sendWorldMessage($this, $scenario, [], ['residentPosture' => 'swimming'])->assertSuccessful();
+
+    expect(sentSystemPrompt())
+        ->toContain('You are swimming.')
+        ->toContain('Available poses: splash')
+        ->not->toContain('Poses that make you stand up');
+});

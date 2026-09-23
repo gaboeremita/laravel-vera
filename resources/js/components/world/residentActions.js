@@ -18,6 +18,8 @@ export function describeStep(step) {
 		case 'zone': return step.activity;
 		case 'pose': return step.target;
 		case 'do': return step.description;
+		case 'swim_to_edge': return 'swim to the edge';
+		case 'wander': return step.target ? `wander around ${step.target}` : 'wander around';
 		default: return step.verb;
 	}
 }
@@ -43,6 +45,11 @@ export async function executeAction(action, context) {
 
 	switch (action.verb) {
 		case 'go_to': {
+			if (action.target === 'user') {
+				const user = getFollowTarget?.();
+				if (!user) return { outcome: 'failed', reason: 'could not find the user' };
+				return commands.goTo(user, { near: true, towardUser: true });
+			}
 			const target = resolveTarget(layout, action.target);
 			if (!target) return { outcome: 'failed', reason: `there is no place or thing called "${action.target}" here any more` };
 			if (target.isPrivate && !fromUser) return { outcome: 'failed', reason: 'that is a private place' };
@@ -50,6 +57,15 @@ export async function executeAction(action, context) {
 		}
 		case 'follow':
 			return commands.follow(getFollowTarget);
+		case 'swim_to_edge':
+			return commands.swimToEdge();
+		case 'wander': {
+			if (!action.target) return commands.wander();
+			const zone = layout?.zones?.find((candidate) => candidate.id === action.target);
+			if (!zone) return { outcome: 'failed', reason: `there is no place called "${action.target}" here any more` };
+			if (zone.private && !fromUser) return { outcome: 'failed', reason: 'that is a private place' };
+			return commands.wander({ outline: zone.outline, y: zone.entry.y });
+		}
 		case 'stop':
 			return commands.stop();
 		case 'use': {
@@ -88,8 +104,7 @@ export async function executeAction(action, context) {
 		case 'pose':
 			return commands.pose(action.target);
 		case 'do':
-			if (action.pose) await commands.pose(action.pose);
-			return commands.hold(DO_HOLD_MS);
+			return action.pose ? commands.pose(action.pose) : commands.hold(DO_HOLD_MS);
 		case 'plan': {
 			const steps = action.steps ?? [];
 			for (const [index, step] of steps.entries()) {

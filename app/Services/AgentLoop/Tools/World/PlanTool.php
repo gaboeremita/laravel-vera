@@ -8,7 +8,7 @@ class PlanTool extends WorldTool
 {
     private const MAX_STEPS = 5;
 
-    private const STEP_ACTIONS = ['go_to', 'use', 'zone', 'pose', 'do', 'stay'];
+    private const STEP_ACTIONS = ['go_to', 'use', 'zone', 'pose', 'do', 'stay', 'swim_to_edge', 'wander'];
 
     public function name(): string
     {
@@ -17,7 +17,7 @@ class PlanTool extends WorldTool
 
     public function description(): string
     {
-        return 'Does something that takes several steps, in order, such as getting a drink: go_to the bar, use the back bar to mix a drink, then use a stool to drink it. Each step is go_to (target), use (target spot and activity), zone (activity of the place you are in by then), pose (a pose of yours), do (anything else, described in a few words, such as singing a song or making tea where you stand; your narration carries it) or stay. Steps run one after another; if one fails, the rest stop and you decide again.';
+        return 'Does something that takes several steps, in order, such as getting a drink: go_to the bar, use the back bar to mix a drink, then use a stool to drink it. Each step is go_to (target), use (target spot and activity), zone (activity of the place you are in by then), pose (a pose of yours), do (anything else, described in a few words, such as singing a song or making tea where you stand; your narration carries it) swim_to_edge (to the nearest side of the pool, while in the water), wander (optionally a place as target; roam and explore for a while) or stay. Steps run one after another; if one fails, the rest stop and you decide again.';
     }
 
     public function parameters(): array
@@ -34,7 +34,7 @@ class PlanTool extends WorldTool
                         'type' => 'object',
                         'properties' => [
                             'action' => ['type' => 'string', 'enum' => self::STEP_ACTIONS],
-                            'target' => ['type' => 'string', 'description' => 'For go_to, a place or thing id; for use, a spot id.'],
+                            'target' => ['type' => 'string', 'description' => 'For go_to, a place or thing id, or "user" to go to the user; for use, a spot id.'],
                             'activity' => ['type' => 'string', 'description' => 'For use and zone, the activity id.'],
                             'pose' => ['type' => 'string', 'description' => 'For pose, one of your poses. For use, zone and do, optionally the pose of yours that fits the step, when an activity\'s own pose is named differently from yours. Your poses: '.($this->toolbox->poseNames === [] ? 'none' : implode(', ', $this->toolbox->poseNames)).'.'],
                             'description' => ['type' => 'string', 'description' => 'For do, what you do, in a few words.'],
@@ -89,6 +89,9 @@ class PlanTool extends WorldTool
 
         switch ($action) {
             case 'go_to':
+                if ($this->toolbox->sameName(WorldToolbox::USER_TARGET, $target)) {
+                    return [[...$normalized, 'target' => WorldToolbox::USER_TARGET], $location];
+                }
                 $zone = $this->toolbox->findZone($target);
                 $object = $zone === null ? $this->toolbox->findObject($target) : null;
                 if ($zone === null && $object === null) {
@@ -134,7 +137,18 @@ class PlanTool extends WorldTool
 
                 return [[...$normalized, 'pose' => $this->toolbox->poseForActivity([], $pose)], $location];
             case 'stay':
+            case 'swim_to_edge':
                 return [$normalized, $location];
+            case 'wander':
+                if ($target === '') {
+                    return [$normalized, $location];
+                }
+                $zone = $this->toolbox->findZone($target);
+                if ($zone === null) {
+                    throw new RuntimeException(sprintf('There is no place called "%s" here to wander around.', $target));
+                }
+
+                return [[...$normalized, 'target' => $zone['id']], $this->toolbox->zoneChainOf($zone['id'])];
             default:
                 throw new RuntimeException(sprintf('"%s" is not a step you can take; use one of %s.', $action, implode(', ', self::STEP_ACTIONS)));
         }

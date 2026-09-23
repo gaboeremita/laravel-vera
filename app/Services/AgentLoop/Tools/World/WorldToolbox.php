@@ -8,6 +8,8 @@ use RuntimeException;
 
 class WorldToolbox
 {
+    public const USER_TARGET = 'user';
+
     /**
      * @var ?array{verb: string, target: ?string, activity: ?string, steps?: array<int, array<string, ?string>>}
      */
@@ -47,6 +49,8 @@ class WorldToolbox
             $tools[] = new ZoneTool($this);
         }
 
+        $tools[] = new SwimToEdgeTool($this);
+        $tools[] = new WanderTool($this);
         $tools[] = new PlanTool($this);
 
         return $tools;

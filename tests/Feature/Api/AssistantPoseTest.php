@@ -209,6 +209,15 @@ it('creates poses as standing unless a posture is given', function () {
     expect(Pose::where('assistant_id', $assistant->id)->where('name', 'laugh')->count())->toBe(2);
 });
 
+it('accepts every posture, swimming included', function (string $posture) {
+    [$user, $assistant] = setUpAssistantForPoses();
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.store', ['assistant' => $assistant->id]), ['name' => 'float', 'posture' => $posture])
+        ->assertCreated()
+        ->assertJsonPath('posture', $posture);
+})->with(['standing', 'sitting', 'lying', 'reclining', 'swimming']);
+
 it('rejects the same pose name twice in one posture', function () {
     [$user, $assistant] = setUpAssistantForPoses();
     Pose::factory()->posture(Posture::Lying)->create(['assistant_id' => $assistant->id, 'name' => 'stretch']);

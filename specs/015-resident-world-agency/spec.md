@@ -205,7 +205,8 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-017**: An interaction spot MUST be usable by only one resident at a time.
 - **FR-018**: Residents MUST NOT pick up, carry or place objects. Activities are performed as poses at a spot or in a zone.
 - **FR-019**: Activities without a dedicated pose MUST still complete using the resident's default stance.
-- **FR-019a**: A resident MUST always be in exactly one posture: standing (the default), sitting, lying or reclining.
+- **FR-019a**: A resident MUST always be in exactly one posture: standing (the default), sitting, lying, reclining or swimming.
+- **FR-019g**: A resident MUST be swimming whenever the water under her is deeper than about chest height (1.1 m), and standing again once it is shallower. While swimming she floats with her hips just under the surface, holds her swimming default pose (treading water) when still, moves with her Swim motion pose, and on stopping at the side of the pool plays her Swim To Edge motion pose once and rests there until she moves. She MUST be able to swim to the nearest side on her own choice, and when going to or following a user who is out of the water, she swims to the side nearest them. Poses with no swimming version wait until she is out of the water.
 - **FR-019b**: Poses MUST be tagged with the posture they are made for, defaulting to standing. The same pose name MAY exist once per posture.
 - **FR-019c**: When a pose is triggered, the version for her current posture MUST play. When none exists, she MUST get out of her posture, play the standing version, and remain standing.
 - **FR-019d**: Each posture MUST have its own default pose, held while she is in that posture. Changing posture MUST blend from one default pose to the other, with no transition motions. A posture without a default pose falls back to the standing default.
@@ -231,6 +232,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-026**: The resident MUST be able to plan an activity of several steps at once, stating them in order (for example: go to the bar, mix a drink at the back bar, then drink it on a stool), with each step checked before the plan starts. The steps run one after another, each is recorded with its outcome, and a failed step stops the plan and lets her decide again right away.
 - **FR-026a**: A step MUST be able to be something with no marked spot, activity or pose behind it, described in a few words (singing at the microphone, making tea); she stays where she is while her narration carries it.
 - **FR-026b**: Postures MUST be described to her exactly: sitting is upright on a seat, reclining is leaning far back on a lounger, a bed or in a bath, and lying is flat on a bed. Seats offer reclining only where it fits the furniture.
+- **FR-026c**: The resident MUST be able to wander with no particular goal for a while, around a chosen place or around where she is, exploring and pausing here and there; in the water, wandering swims her around the pool.
 - **FR-027**: Anything the user says to the resident MUST interrupt her current self-chosen activity. Activities the user asked for continue while the conversation goes on.
 - **FR-028**: The user entering the world is not an event the resident reacts to; her first decision after the user enters follows the same idle wait as any other.
 - **FR-029**: Idle decisions MUST be rate-limited per resident, and when several residents share a world their decisions MUST NOT all happen at the same moment.

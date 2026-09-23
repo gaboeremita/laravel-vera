@@ -11,7 +11,7 @@ class GoToTool extends WorldTool
 
     public function description(): string
     {
-        return 'Walks you to a place or thing in this world. You start walking when your reply is shown; your recent activity later tells you whether you arrived.';
+        return 'Walks you to a place or thing in this world, or to the user with target "user". In the water, going to the user swims you to the side of the pool nearest them, where you rest at the edge. You start moving when your reply is shown; your recent activity later tells you whether you arrived.';
     }
 
     public function parameters(): array
@@ -19,7 +19,7 @@ class GoToTool extends WorldTool
         return [
             'type' => 'object',
             'properties' => [
-                'target' => ['type' => 'string', 'enum' => $this->toolbox->targetIds(), 'description' => 'The id of the place or thing to walk to.'],
+                'target' => ['type' => 'string', 'enum' => [WorldToolbox::USER_TARGET, ...$this->toolbox->targetIds()], 'description' => 'The id of the place or thing to walk to, or "user" to go to the user.'],
             ],
             'required' => ['target'],
         ];
@@ -28,6 +28,12 @@ class GoToTool extends WorldTool
     public function handle(array $arguments): array
     {
         $written = (string) ($arguments['target'] ?? '');
+        if ($this->toolbox->sameName(WorldToolbox::USER_TARGET, $written)) {
+            $this->toolbox->choose(['verb' => 'go_to', 'target' => WorldToolbox::USER_TARGET, 'activity' => null]);
+
+            return ['status' => 'started', 'note' => 'You are going to the user.'];
+        }
+
         $target = $this->toolbox->findZone($written) ?? $this->toolbox->findObject($written);
         if ($target === null) {
             throw new \RuntimeException(sprintf('There is no place or thing called "%s" here. Use one of the ids from the go_to tool.', $written));

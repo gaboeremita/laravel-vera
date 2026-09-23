@@ -5,7 +5,7 @@ import { api } from '../../utils/api.js';
 import { useEmotions } from '../../hooks/useEmotions.js';
 import { useConversationChat } from '../../hooks/useConversationChat.js';
 import { useVoiceMode } from '../../hooks/useVoiceMode.js';
-import { stripForSpeech } from '../../utils/parsers.js';
+import { spokenWords, stripForSpeech } from '../../utils/parsers.js';
 import { isTypingTarget } from './keyboardFocus.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
@@ -113,7 +113,8 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 				throw new Error(errorData.message || 'Transcription failed');
 			}
 			const { text } = await response.json();
-			if (text?.trim() && conversationId) sendMessage(text, { voiceMode: true });
+			const words = spokenWords(text);
+			if (words && conversationId) sendMessage(words, { voiceMode: true });
 		} catch (error) {
 			addToast(error.message || 'Failed to transcribe audio', 'error');
 		} finally {
@@ -142,6 +143,17 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		return () => window.removeEventListener('keydown', keyDown);
 	}, []);
 
+	useEffect(() => {
+		const keyDown = (event) => {
+			if (event.code !== 'KeyV' || event.repeat || isTypingTarget(event.target)) return;
+			event.preventDefault();
+			if (isListening) stopVoiceMode();
+			else startVoiceMode();
+		};
+		window.addEventListener('keydown', keyDown);
+		return () => window.removeEventListener('keydown', keyDown);
+	}, [isListening, startVoiceMode, stopVoiceMode]);
+
 	const voiceStatus = !isListening ? null
 		: isSpeaking ? 'HEARING YOU'
 			: isTranscribing || isLoading ? 'PROCESSING'
@@ -166,7 +178,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 				</div>
 				<div className="flex items-center gap-3">
 					{voiceStatus && <span className="text-accent text-[0.6rem] tracking-[0.12em]">{voiceStatus}</span>}
-					<button type="button" onClick={isListening ? stopVoiceMode : startVoiceMode} title={isListening ? 'Turn voice mode off' : 'Turn voice mode on'} className={`cursor-pointer ${isListening ? 'text-accent' : 'text-fg-3 hover:text-fg-1'}`}>
+					<button type="button" onClick={isListening ? stopVoiceMode : startVoiceMode} title={isListening ? 'Turn voice mode off (V)' : 'Turn voice mode on (V)'} className={`cursor-pointer ${isListening ? 'text-accent' : 'text-fg-3 hover:text-fg-1'}`}>
 						{isListening ? <Mic size={16} /> : <MicOff size={16} />}
 					</button>
 					<button type="button" onClick={onClose} className="text-fg-3 text-xs hover:text-fg-1 cursor-pointer">END (C)</button>

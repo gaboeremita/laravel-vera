@@ -3,7 +3,7 @@ import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Pencil, Mic, MicOff, Volume2, VolumeX, Brain } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
-import { stripForSpeech } from '../utils/parsers.js';
+import { spokenWords, stripForSpeech } from '../utils/parsers.js';
 import { useVoiceMode } from '../hooks/useVoiceMode.js';
 import { useConversationChat } from '../hooks/useConversationChat.js';
 import ChatMessage from '../components/ChatMessage.jsx';
@@ -219,8 +219,9 @@ export default function ChatPage() {
 			}
 
 			const { text } = await response.json();
-			if (text && text.trim()) {
-				sendMessage(text, { voiceMode: true });
+			const words = spokenWords(text);
+			if (words) {
+				sendMessage(words, { voiceMode: true });
 			}
 		} catch (error) {
 			addToast(error.message || 'Failed to transcribe audio', 'error');

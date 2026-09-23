@@ -98,20 +98,25 @@ sequenceDiagram
 stateDiagram-v2
     [*] --> Unloaded
     Unloaded --> Deferred: Farther than 30 units
-    Unloaded --> LoadingVRM: Valid spawn, URL present, within 30 units
-    LoadingVRM --> Resting: VRM loaded and rest pose captured
-    Resting --> Roaming: Behavior is roam, world unpaused, player near
-    Roaming --> Resting: Paused or behavior stationary
-    Resting --> PoseActive: Chat emits new pose trigger
-    Roaming --> PoseActive: Chat emits new pose trigger
-    PoseActive --> Returning: Animation finishes
-    PoseActive --> Resting: Blendshape-only hold expires
-    Returning --> Resting: 0.6 second blend to captured rest pose
-    Resting --> Disposed: Component unmount
-    Roaming --> Disposed: Component unmount
+    Unloaded --> LoadingVRM: Valid spawn or saved state, URL present, within 30 units
+    LoadingVRM --> Idle: VRM loaded, posture default pose held
+    Idle --> Roaming: Behavior is roam, world unpaused, player near
+    Roaming --> Idle: Paused or behavior stationary
+    Idle --> Routing: go_to, follow, use, wander, plan step
+    Routing --> Idle: Arrived, failed after re-plans, or interrupted
+    Routing --> OnSpot: Arrived at a spot with a resting posture
+    OnSpot --> Routing: Next move stands her up
+    Idle --> Swimming: Water deeper than 1.1 m
+    Swimming --> AtEdge: Stopped beside the pool wall
+    AtEdge --> Swimming: Moves again
+    Swimming --> Idle: Water shallower than 0.9 m
+    Idle --> PoseActive: Chat, activity or plan step triggers a pose
+    OnSpot --> PoseActive: Pose in her posture
+    PoseActive --> Idle: Pose finishes and eases back
+    Idle --> Disposed: Component unmount
 ```
 
-Resident roaming is deterministic circular motion around the configured origin, capped to radius 3 and passed through the same collision world as the player. It is client runtime state only; resident positions are not written back. Session persistence stores the player's camera position, which is later validated/restored against collision geometry.
+Residents move along navigation-grid routes through the same collision world as the player, keep to the middle of doors, take steps straight on, and recover from getting stuck by stepping back, then routing around the failed spot. Each posture has its own default pose; on a spot her hips are fitted to the marked surface. In deep water she floats and swims, and rests at the pool's edge when she stops beside it. Autonomous residents choose their next step themselves while the user is present and active, with a thought bubble showing the reason and action. Each resident's position, spot and posture are saved per session and restored on return; the player's camera position is saved alongside.
 
 ## Portrait pose lifecycle
 

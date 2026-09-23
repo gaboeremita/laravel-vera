@@ -6,7 +6,7 @@ import WorldScene from '../components/world/WorldScene.jsx';
 import WorldChat from '../components/world/WorldChat.jsx';
 import WorldTrackPlayer from '../components/world/WorldTrackPlayer.jsx';
 import { PLAYER_EYE_HEIGHT } from '../components/world/collisionCheck.js';
-import { conversationRangeState } from '../components/world/conversationRange.js';
+import { CONVERSATION_END_DISTANCE, conversationRangeState } from '../components/world/conversationRange.js';
 import { isTypingTarget } from '../components/world/keyboardFocus.js';
 import { executeAction } from '../components/world/residentActions.js';
 import { useResidentAgency } from '../hooks/useResidentAgency.js';
@@ -144,7 +144,7 @@ export default function WorldPage() {
 					setConversationRange(state);
 				}
 				if (state === 'ended') {
-					addToast(`You walked too far away from ${chatResident.assistant.name}, so the conversation ended`, 'info');
+					addToast(`${chatResident.assistant.name} is out of talking range (more than ${CONVERSATION_END_DISTANCE} m away)`, 'info');
 					setConversationRange('ok');
 					closeChat();
 					return;

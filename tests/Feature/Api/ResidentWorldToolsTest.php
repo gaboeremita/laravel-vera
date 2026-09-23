@@ -32,7 +32,7 @@ it('offers the world tools, with go_to limited to the world\'s real ids', functi
     /** @var Request $request */
     $request = Http::recorded()[0][0];
     $tools = collect($request['tools'])->keyBy('function.name');
-    expect($tools->keys()->sort()->values()->all())->toBe(['describe', 'follow', 'go_to', 'plan', 'stop', 'use', 'what_is_in', 'where_can_i', 'zone']);
+    expect($tools->keys()->sort()->values()->all())->toBe(['describe', 'follow', 'go_to', 'plan', 'stop', 'swim_to_edge', 'use', 'wander', 'what_is_in', 'where_can_i', 'zone']);
     expect($tools['go_to']['function']['parameters']['properties']['target']['enum'])
         ->toContain('pool-terrace')
         ->toContain('studio')
@@ -228,3 +228,27 @@ it('rejects a pose she does not have', function () {
     sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', null);
     expect(toolResultSentBack())->toContain('You have no pose called \\"backflip\\"')->toContain('prepare_drink');
 });
+
+it('goes to the user', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    fakeTurn(toolCallResponse('call_1', 'go_to', ['target' => 'user']), finalAnswerResponse('Coming.'));
+
+    sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', ['verb' => 'go_to', 'target' => 'user', 'activity' => null]);
+});
+
+it('swims to the edge on her own', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    fakeTurn(toolCallResponse('call_1', 'swim_to_edge', []), finalAnswerResponse('(My arms are tired) *swims to the side and rests*'));
+
+    sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', ['verb' => 'swim_to_edge', 'target' => null, 'activity' => null]);
+});
+
+it('wanders around a place or around where she is', function (array $arguments, ?string $target) {
+    $scenario = worldStateScenario(fakeReply: false);
+    fakeTurn(toolCallResponse('call_1', 'wander', $arguments), finalAnswerResponse('(Let us see) *drifts off to explore*'));
+
+    sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', ['verb' => 'wander', 'target' => $target, 'activity' => null]);
+})->with([
+    'a place' => [['place' => 'gallery'], 'gallery'],
+    'around her' => [[], null],
+]);

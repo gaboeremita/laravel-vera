@@ -16,7 +16,7 @@ class BuildResidentWorldPrompt
     /**
      * Poses the world plays for her (walking, greeting someone who starts a conversation), which are never hers to choose.
      */
-    private const WORLD_MOTION_POSE_NAMES = ['walk', 'walking', 'walk-cycle', 'walk_cycle', 'walk cycle', 'walk-start', 'walk_start', 'walk start', 'walk-stop', 'walk_stop', 'walk stop', 'greeting', 'greet'];
+    private const WORLD_MOTION_POSE_NAMES = ['walk', 'walking', 'walk-cycle', 'walk_cycle', 'walk cycle', 'walk-start', 'walk_start', 'walk start', 'walk-stop', 'walk_stop', 'walk stop', 'greeting', 'greet', 'swim', 'swimming', 'swim-to-edge', 'swim_to_edge', 'swim to edge', 'swimming-to-edge', 'swimming_to_edge', 'swimming to edge'];
 
     /**
      * @param  array{floor: ?array, zone: ?array, zoneChain: array<int, array>, distanceToUser?: ?float}  $resident
@@ -58,7 +58,7 @@ class BuildResidentWorldPrompt
 
     public function worldAwareness(): string
     {
-        return "World awareness:\nRemember that your tools are yours to use whenever you feel like it, on your own initiative, whether or not the user asks: what_is_in shows what a place holds and what you can do there, where_can_i finds where you could do something, describe tells you more about a place or thing, go_to, follow and stop move you, use sits, lies or reclines you on a spot for an activity, zone does an activity of the place you are in, and plan does something that takes several steps, in order. Reach for them whenever a thought, a mood, a craving or the conversation brings the space to mind, the way anyone glances around a room.\nThink in steps: getting a drink is going to the bar, mixing it at the back bar, then sitting on a stool to drink it, so call plan with those steps. Anything you want to do works even with no marked spot or pose for it, such as singing at the microphone or making tea at the counter: go there, then add a do step describing it, and your narration carries it.\nPostures are exact: sitting is upright on a seat, reclining is leaning far back on a lounger, a bed or in a bath, and lying is flat on your back or side on a bed.";
+        return "World awareness:\nRemember that your tools are yours to use whenever you feel like it, on your own initiative, whether or not the user asks: what_is_in shows what a place holds and what you can do there, where_can_i finds where you could do something, describe tells you more about a place or thing, go_to, follow and stop move you, use sits, lies or reclines you on a spot for an activity, zone does an activity of the place you are in, and plan does something that takes several steps, in order. go_to with target 'user' brings you to the user; in the water it swims you to the side of the pool nearest them, where you rest at the edge, and swim_to_edge takes you to the nearest side to rest there on your own. When nothing in particular calls you, wander lets you roam and explore for a while, around a place or around where you are; in the water it swims you around the pool. Reach for them whenever a thought, a mood, a craving or the conversation brings the space to mind, the way anyone glances around a room.\nThink in steps: getting a drink is going to the bar, mixing it at the back bar, then sitting on a stool to drink it, so call plan with those steps. Anything you want to do works even with no marked spot or pose for it, such as singing at the microphone or making tea at the counter: go there, then add a do step describing it, and your narration carries it.\nPostures are exact: sitting is upright on a seat, reclining is leaning far back on a lounger, a bed or in a bath, and lying is flat on your back or side on a bed.";
     }
 
     /**
@@ -108,7 +108,7 @@ class BuildResidentWorldPrompt
 
     public function idleInstruction(): string
     {
-        return "Your next step:\nThe user is somewhere in the world and leaves you to yourself right now. Decide what you do next, the way you would on your own: call one action tool (go_to, use, zone, follow or stop), call plan for something that takes several steps, use one pose tag, or stay where you are. Choose what fits your mood, your personality and what you did recently, and vary your activities; when you repeat your previous one, give a reason for doing it again. Reply with exactly one short line of at most 20 words: a brief reason as a thought in parentheses, followed by what you do as a brief action in asterisks, for example (I want to forget about today) *walks to the bar for a drink*.";
+        return "Your next step:\nThe user is somewhere in the world and leaves you to yourself right now. Decide what you do next, the way you would on your own: call one action tool (go_to, use, zone, wander, swim_to_edge, follow or stop), call plan for something that takes several steps, use one pose tag, or stay where you are. Choose what fits your mood, your personality and what you did recently, and vary your activities; when you repeat your previous one, give a reason for doing it again. Reply with exactly one short line of at most 20 words: a brief reason as a thought in parentheses, followed by what you do as a brief action in asterisks, for example (I want to forget about today) *walks to the bar for a drink*.";
     }
 
     public function recentActivity(World $world, WorldSession $session, WorldResident $resident): ?string
@@ -160,6 +160,8 @@ class BuildResidentWorldPrompt
             'pose' => "posed: {$activity->target}",
             'plan' => "planned to {$activity->target}",
             'do' => (string) $activity->target,
+            'swim_to_edge' => 'swam to the side of the pool',
+            'wander' => $activity->target !== null ? "wandered around {$activity->target}" : 'wandered around',
             default => $activity->verb,
         };
     }

@@ -76,13 +76,14 @@ app/
 │   ├── BuildResidentWorldPrompt.php        # new: world-state + recent-activity + available-activities text
 │   └── AppendWorldConversationContext.php  # changed: include world state when positions are given
 ├── Enums/
-│   └── WorldResidentBehavior.php           # changed: Autonomous
+│   ├── WorldResidentBehavior.php           # changed: Autonomous
+│   └── Posture.php                         # new: standing, sitting, lying, reclining, swimming
 ├── Models/
 │   ├── World.php                           # changed: layout cast
 │   ├── WorldSessionResident.php            # new
 │   └── ResidentActivity.php                # new
 ├── Services/
-│   └── AgentLoop/Tools/World/              # new: world toolbox, query tools and action tools
+│   └── AgentLoop/Tools/World/              # new: WorldToolbox; where_can_i, what_is_in, describe; go_to, follow, stop, use, zone, swim_to_edge, wander, plan
 └── Http/
     ├── Controllers/Api/
     │   ├── WorldController.php             # changed: parse markers on upload, return warnings
@@ -104,18 +105,22 @@ routes/api.php                              # decisions, activities, state route
 resources/js/
 ├── pages/WorldPage.jsx                     # changed: world never paused by chat; hosts overlays and the agency loop
 ├── components/WorldForm.jsx                # changed: shows layout warnings after upload
-├── components/ (assistant pose editor)      # changed: one section per posture, each with its default pose
+├── components/PosturePoseSections.jsx      # new: one tab per posture, each with its default pose and motion poses
+├── components/PoseEditor.jsx, DefaultPoseEditor.jsx, WorldMotionPoseEditor.jsx # changed: posture field, per-posture defaults and motion slots
+├── utils/parsers.js                        # changed: spokenWords drops sound-only voice transcripts
 ├── components/world/
 │   ├── WorldScene.jsx                      # changed: navigation grid, name tags, positional audio listener
 │   ├── ResidentController.jsx              # changed: existing locomotion cycle follows routes; held poses; follow
 │   ├── WorldChat.jsx                       # changed: overlay, focus rules, voice mode, distance limit, close control
 │   ├── worldNavigation.js                  # new: walkable grid + A* + smoothing
-│   ├── residentActions.js                  # new: executes go_to, use, zone, follow, stop
+│   ├── residentActions.js                  # new: executes actions and plans step by step
+│   ├── activityLog.js                      # new: records actions and their outcomes
+│   ├── collisionCheck.js                   # changed: water surfaces from passable meshes; wider body checks
 │   ├── conversationRange.js                # new: conversation warning and end distances
 │   ├── worldMapProjection.js               # new: map projection, floor lookup, label spreading
 │   ├── WorldEnvironment.jsx                # changed: builds the navigation grid while loading
 │   ├── FirstPersonController.jsx           # changed: ignores movement keys while typing
-│   ├── InteractionSystem.jsx               # changed: C starts or closes the single conversation
+│   ├── InteractionSystem.jsx               # changed: C starts or closes the single conversation; 4 m along the floor
 │   ├── worldMotionPoses.js                 # changed: posture-aware pose and default lookup
 │   ├── NameTags.jsx                        # new
 │   ├── OffscreenIndicator.jsx              # new
@@ -130,14 +135,23 @@ tests/
 ├── Feature/Api/
 │   ├── WorldLayoutImportTest.php
 │   ├── ResidentWorldStatePromptTest.php
-│   ├── ResidentAgencyDecisionTest.php
-│   ├── ResidentAgencyActivityTest.php
-│   └── ResidentAgencyIsolationTest.php
+│   ├── ResidentWorldToolsTest.php
+│   ├── ResidentActivityTest.php
+│   ├── ResidentPosturePromptTest.php
+│   ├── ResidentDecisionTest.php
+│   ├── ResidentStateTest.php
+│   ├── AssistantPoseTest.php (extended)
+│   └── WorldResidentControllerTest.php (extended)
 └── Unit/
-    └── WorldNavigation.test.js
+    ├── WorldNavigation.test.js
+    ├── PosturePoses.test.js
+    ├── ResidentActions.test.js
+    ├── SpokenWords.test.js
+    ├── ConversationRange.test.js
+    └── WorldMapProjection.test.js
 ```
 
-Outside the repository: the penthouse generator is updated to emit markers for every floor, room, seat and lounger, and the connection node environment is re-exported with floor and zone markers.
+Outside the repository: the penthouse generator emits markers for every floor, room, seat, lounger, kitchen and bar station and the TV, and the connection node environment is re-exported with floor and zone markers.
 
 **Structure Decision**: The existing single-repo layout (`app/`, `database/`, `routes/`, `resources/js/`, `tests/`), adding files only to existing directories.
 

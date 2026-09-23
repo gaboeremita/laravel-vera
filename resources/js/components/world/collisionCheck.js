@@ -14,10 +14,13 @@ const CONTACT_MARGIN = 0.005;
 const SPAWN_SPACING = 0.6;
 const MAX_SPAWN_RINGS = 40;
 const COLLISION_NAME = /collision/i;
+const WATER_SEARCH_HEIGHT = 4;
 
 export class WorldCollision {
 	constructor(scene) {
 		this.octree = new Octree();
+		this.waterOctree = new Octree();
+		this.hasWater = false;
 		this.bounds = new Box3();
 		this.bodyBounds = new Box3();
 		this.candidates = [];
@@ -31,7 +34,10 @@ export class WorldCollision {
 			const collider = parentCollider || COLLISION_NAME.test(node.name);
 			const visible = parentVisible && node.visible;
 			const passable = parentPassable || node.userData.passable === true;
-			if (node.isMesh && !passable && (visible || collider)) {
+			if (node.isMesh && passable && visible) {
+				this.addGeometry(node.geometry, node.matrixWorld, this.waterOctree);
+				this.hasWater = true;
+			} else if (node.isMesh && !passable && (visible || collider)) {
 				if (node.isInstancedMesh) {
 					for (let instance = 0; instance < node.count; instance++) {
 						node.getMatrixAt(instance, instanceMatrix);
@@ -48,9 +54,10 @@ export class WorldCollision {
 		collect(scene, true, false, false);
 		if (this.triangleCount === 0) throw new Error('This environment has no geometry for collision.');
 		this.octree.build();
+		if (this.hasWater) this.waterOctree.build();
 	}
 
-	addGeometry(geometry, matrix) {
+	addGeometry(geometry, matrix, octree = this.octree) {
 		const positions = geometry.getAttribute('position');
 		if (!positions) return;
 		const indices = geometry.index;
@@ -62,7 +69,8 @@ export class WorldCollision {
 				.applyMatrix4(matrix));
 			const triangle = new Triangle(...vertices);
 			if (triangle.getArea() === 0) continue;
-			this.octree.addTriangle(triangle);
+			octree.addTriangle(triangle);
+			if (octree !== this.octree) continue;
 			for (const vertex of vertices) this.bounds.expandByPoint(vertex);
 			this.triangleCount++;
 		}
@@ -138,6 +146,12 @@ export class WorldCollision {
 		return null;
 	}
 
+	/** Height of the water surface over a point standing at `groundY`, or null when it is dry. */
+	waterSurfaceAbove(x, z, groundY) {
+		if (!this.hasWater) return null;
+		return getGroundHeight(x, z, this.waterOctree, groundY, groundY + WATER_SEARCH_HEIGHT);
+	}
+
 	restorePlayerPosition(savedPosition, fallback) {
 		const coordinates = ['x', 'y', 'z'].map((axis) => savedPosition?.[axis]);
 		if (!coordinates.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate))) return fallback.clone();
@@ -147,6 +161,7 @@ export class WorldCollision {
 
 	dispose() {
 		this.octree.clear();
+		this.waterOctree.clear();
 		this.candidates.length = 0;
 	}
 }

@@ -18,9 +18,11 @@ Each records her choice for the world page to carry out, and returns `{ "status"
 
 | Tool | Arguments | World page action |
 |------|-----------|-------------------|
-| `go_to` | `target`: a zone or thing id | `{ verb: "go_to", target }` |
+| `go_to` | `target`: a zone or thing id, or `user` | `{ verb: "go_to", target }`; for `user` she walks to within about a metre of the user, or, while swimming, swims to the side of the pool nearest them and rests at the edge |
 | `follow` | none | `{ verb: "follow" }` |
 | `stop` | none | `{ verb: "stop" }` |
+| `wander` | optional `place`: a zone id | `{ verb: "wander", target: place }`; for 30–60 s she moves between random reachable spots inside the place, or within about 7 m of where she is, pausing 2–5 s at each; in the water, without a place, she swims between spots in deep water |
+| `swim_to_edge` | none | `{ verb: "swim_to_edge" }`; while in the water she swims to the nearest side of the pool and rests there with her Swim To Edge pose; out of the water it fails with "not in the water" |
 | `use` (US5) | `spot`, `activity` ids, optional `pose` (one of hers) | `{ verb: "use", target: spot, activity }` |
 | `zone` (US5) | `activity` id of her current zone, optional `pose` (one of hers) | `{ verb: "zone", activity }` |
 | `plan` | `goal`, and `steps`: 1–5 steps in order, each `go_to` (`target`), `use` (`target` spot, `activity`), `zone` (`activity`), `pose` (`pose`), `do` (`description`, optional `pose`) or `stay` | `{ verb: "plan", target: goal, steps: [{ verb, target, activity, pose, description }] }` |

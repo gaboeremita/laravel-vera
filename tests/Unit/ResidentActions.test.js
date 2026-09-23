@@ -50,9 +50,12 @@ test('a plan stops at the first step that fails and says which one', async () =>
 	assert.deepEqual(commands.calls.map(([name]) => name), ['goTo']);
 });
 
-test('a narrated step plays its pose, if any, and holds while her narration carries it', async () => {
-	const commands = fakeCommands();
-	await executeAction({ verb: 'do', description: 'sings a song', pose: 'sing' }, { commands, layout });
+test('a narrated step plays its pose, or holds while her narration carries it', async () => {
+	const withPose = fakeCommands();
+	await executeAction({ verb: 'do', description: 'sings a song', pose: 'sing' }, { commands: withPose, layout });
+	assert.deepEqual(withPose.calls.map(([name]) => name), ['pose']);
 
-	assert.deepEqual(commands.calls.map(([name]) => name), ['pose', 'hold']);
+	const withoutPose = fakeCommands();
+	await executeAction({ verb: 'do', description: 'makes tea' }, { commands: withoutPose, layout });
+	assert.deepEqual(withoutPose.calls.map(([name]) => name), ['hold']);
 });

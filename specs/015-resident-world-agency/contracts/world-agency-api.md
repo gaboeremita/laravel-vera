@@ -25,7 +25,7 @@ Used by several endpoints below.
 
 ## Changed: send a message
 
-`POST /assistants/{assistant}/conversations/{id}/messages` (existing) accepts optional `worldSessionId`, `positions` and `residentPosture` (`standing`, `sitting`, `lying` or `reclining`; defaults to `standing`). When present, the prompt gains the world state (FR-008) and the resident's recent activity (FR-022). The response gains:
+`POST /assistants/{assistant}/conversations/{id}/messages` (existing) accepts optional `worldSessionId`, `positions` and `residentPosture` (`standing`, `sitting`, `lying`, `reclining` or `swimming`; defaults to `standing`). When present, the prompt gains the world state (FR-008) and the resident's recent activity (FR-022). The response gains:
 
 ```json
 { "action": { "verb": "go_to", "target": "bar", "activity": null } }

@@ -39,3 +39,13 @@ test('defaultPoseFor returns the posture default or the standing default', () =>
 test('world motion poses come from standing poses only', () => {
 	assert.equal(findWorldMotionPose(poses, 'walk'), null);
 });
+
+test('swim motions come from swimming poses only', () => {
+	const library = [
+		{ name: 'swim', posture: 'standing', animationUrl: 'wrong.vrma' },
+		{ name: 'Swimming', posture: 'swimming', animationUrl: 'swim.vrma' },
+		{ name: 'swimming_to_edge', posture: 'swimming', animationUrl: 'edge.vrma' },
+	];
+	assert.equal(findWorldMotionPose(library, 'swim'), library[1]);
+	assert.equal(findWorldMotionPose(library, 'swimToEdge'), library[2]);
+});
