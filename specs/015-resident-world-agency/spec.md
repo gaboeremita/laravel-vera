@@ -225,8 +225,8 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 **Marker import**
 
-- **FR-033**: Zones, objects and interaction spots MUST come only from markers embedded in the world's environment file. There is no manual authoring.
-- **FR-034**: Markers MUST be read when the environment is uploaded or replaced, and replacing the environment MUST replace the world's zones, objects and spots with the new file's markers.
+- **FR-033**: Floors, zones, objects and interaction spots MUST come only from markers embedded in the world's environment file. There is no manual authoring.
+- **FR-034**: Markers MUST be read when the environment is uploaded or replaced, and replacing the environment MUST replace the world's floors, zones, objects and spots with the new file's markers.
 - **FR-034a**: Markers with missing or invalid required information MUST be skipped and reported to the world owner, while valid markers are still imported.
 - **FR-035**: A world's zones and objects MUST belong to that world and MUST NOT be readable by other users.
 
@@ -273,7 +273,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **Resident state**: A resident's current position, zone, current activity and occupied spot within a world session.
 - **Activity history entry**: A record of what a resident did, where, when, the outcome, and the stated reason.
 - **World map**: The top-down view generated from a world's environment, used for the in-world map.
-- **Environment marker**: Information embedded in the environment file that defines a zone, object or interaction spot, following a documented format.
+- **Environment marker**: Information embedded in the environment file that defines a floor, zone, object or interaction spot, following a documented format.
 
 ## Success Criteria *(mandatory)*
 
