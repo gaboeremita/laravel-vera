@@ -36,7 +36,10 @@ class AppendWorldConversationContext
         if ($residentPosition !== null && ! empty($world->layout['zones'])) {
             $state = $this->resolveWorldState->handle($world, $positions);
             $prompt['world_state'] = $this->buildResidentWorldPrompt->worldState($world, $state['residents'][$resident->id], $state['user']);
-            $prompt['world_actions'] = $this->buildResidentWorldPrompt->actionInstructions();
+        }
+
+        if (! empty($world->layout['zones'])) {
+            $prompt['world_awareness'] = $this->buildResidentWorldPrompt->worldAwareness();
         }
 
         if ($session !== null) {

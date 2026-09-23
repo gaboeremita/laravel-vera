@@ -47,7 +47,7 @@ export default function CreateWorldPage() {
 			const failures = [];
 			for (const resident of value.residents) {
 				const residentResponse = await api.put(route('worlds.residents.upsert', { world: world.id, assistant: resident.assistant.id }), { position: resident.position, rotation: resident.rotation, behavior: resident.behavior, openingMessage: resident.openingMessage, customPrompt: resident.customPrompt });
-				if (!residentResponse.ok) failures.push(resident.assistant.name);
+				if (!residentResponse.ok) failures.push(`${resident.assistant.name} (${(await residentResponse.json().catch(() => ({}))).message || `HTTP ${residentResponse.status}`})`);
 			}
 			if (cardImageFile && !(await uploadStagedFile('worlds.image.card.store', world.id, 'image', cardImageFile))) failures.push('card image');
 			if (portraitImageFile && !(await uploadStagedFile('worlds.image.portrait.store', world.id, 'image', portraitImageFile))) failures.push('portrait image');

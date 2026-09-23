@@ -15,7 +15,7 @@ class ResidentActivityController extends Controller
 {
     use ResolvesWorldUser;
 
-    public const VERBS = ['go_to', 'use', 'zone', 'follow', 'stop', 'stay', 'pose', 'invalid'];
+    public const VERBS = ['go_to', 'use', 'zone', 'follow', 'stop', 'stay', 'pose'];
 
     public const OUTCOMES = ['completed', 'failed', 'interrupted'];
 

@@ -13,7 +13,6 @@ function resolveTarget(layout, id) {
  * { outcome: 'completed' | 'failed' | 'interrupted', reason }.
  */
 export async function executeAction(action, { commands, layout, getFollowTarget, fromUser }) {
-	if (action.verb === 'invalid') return { outcome: 'failed', reason: action.reason };
 	if (!commands) return { outcome: 'failed', reason: 'you are not ready to move yet' };
 
 	switch (action.verb) {

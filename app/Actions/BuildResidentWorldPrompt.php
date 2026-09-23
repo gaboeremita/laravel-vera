@@ -14,53 +14,44 @@ class BuildResidentWorldPrompt
     /**
      * @param  array{floor: ?array, zone: ?array, zoneChain: array<int, array>, distanceToUser?: ?float}  $resident
      * @param  ?array{floor: ?array, zone: ?array, zoneChain: array<int, array>}  $user
+     * @return array<string, string|array<int, string>>
      */
-    public function worldState(World $world, array $resident, ?array $user): string
+    public function worldState(World $world, array $resident, ?array $user): array
     {
         $layout = $world->layout ?? [];
-        $lines = ['World state:', 'You are in: '.$this->placePhrase($resident).'.'];
+        $state = ['you are in' => $this->placePhrase($resident)];
 
         if ($resident['zone'] !== null) {
-            $lines[] = $resident['zone']['description'];
+            $state['here'] = $resident['zone']['description'];
 
             if ($resident['zone']['activities'] !== []) {
-                $lines[] = 'Things to do here: '.$this->activityList($resident['zone']['activities']);
+                $state['things to do here'] = collect($resident['zone']['activities'])
+                    ->map(fn (array $activity) => "{$activity['name']} [{$activity['id']}]")->all();
             }
 
             $objects = collect($layout['objects'] ?? [])->where('zoneId', $resident['zone']['id']);
             if ($objects->isNotEmpty()) {
-                $lines[] = 'Things here: '.$objects->map(fn (array $object) => $this->objectPhrase($object))->implode('; ');
+                $state['things here'] = $objects->map(fn (array $object) => $this->objectPhrase($object))->values()->all();
             }
         }
 
         if ($user !== null) {
-            $lines[] = sprintf(
-                'The user is %sin: %s, %s.',
+            $state['the user is'] = sprintf(
+                '%sin %s, %s',
                 $this->relativeFloor($resident['floor'], $user['floor']),
                 $this->placePhrase($user),
                 $this->distancePhrase($resident['distanceToUser'] ?? null),
             );
         }
 
-        $otherPlaces = collect($layout['zones'] ?? [])
-            ->reject(fn (array $zone) => $zone['id'] === ($resident['zone']['id'] ?? null))
-            ->map(fn (array $zone) => $this->zoneName($layout, $zone));
-        if ($otherPlaces->isNotEmpty()) {
-            $lines[] = 'Other places: '.$otherPlaces->implode('; ');
-        }
+        $state['available places'] = collect($layout['zones'] ?? [])->map(fn (array $zone) => $this->zoneName($layout, $zone))->all();
 
-        return implode("\n", $lines);
+        return $state;
     }
 
-    public function actionInstructions(): string
+    public function worldAwareness(): string
     {
-        return implode("\n", [
-            'Actions: to move in the world, add one action tag to your reply, using only the ids in brackets above.',
-            '[action: go_to <place or thing id>] walks you there.',
-            '[action: follow] follows the user until you stop.',
-            '[action: stop] stops what you are doing.',
-            'Place the tag by itself at the very end of your reply. One action per reply; after it finishes, your recent activity tells you how it went.',
-        ]);
+        return "World awareness:\nRemember that your tools are yours to use whenever you feel like it, on your own initiative, whether or not the user asks: what_is_in shows what a place holds and what you can do there, where_can_i finds where you could do something, describe tells you more about a place or thing, and go_to, follow and stop move you. Reach for them whenever a thought, a mood, a craving or the conversation brings the space to mind, the way anyone glances around a room.";
     }
 
     public function recentActivity(World $world, WorldSession $session, WorldResident $resident): ?string
@@ -110,7 +101,6 @@ class BuildResidentWorldPrompt
             'zone' => (string) $activity->activity,
             'stay' => 'stayed put',
             'pose' => "posed: {$activity->target}",
-            'invalid' => 'tried an action that does not exist',
             default => $activity->verb,
         };
     }
@@ -165,10 +155,5 @@ class BuildResidentWorldPrompt
         $phrase = "{$object['name']} [{$object['id']}]: {$object['description']}";
 
         return $spots->isEmpty() ? $phrase : $phrase.' Spots: '.$spots->implode(', ');
-    }
-
-    private function activityList(array $activities): string
-    {
-        return collect($activities)->map(fn (array $activity) => "{$activity['name']} [{$activity['id']}]")->implode('; ');
     }
 }

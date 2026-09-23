@@ -199,7 +199,7 @@ function toolCallResponse(string $callId, string $toolName, array $arguments): a
 /**
  * @return array{0: User, 1: Assistant, 2: Conversation, 3: World, 4: \App\Models\WorldResident, 5: WorldSession}
  */
-function worldStateScenario(array $worldAttributes = []): array
+function worldStateScenario(array $worldAttributes = [], bool $fakeReply = true): array
 {
     [$user, $assistant, $conversation] = setUpAgentAssistant('assistant');
     $world = World::factory()->forUser($user)->withLayout()->create($worldAttributes);
@@ -211,7 +211,9 @@ function worldStateScenario(array $worldAttributes = []): array
     $worldUser = WorldUser::where('world_id', $world->id)->where('user_id', $user->id)->firstOrFail();
     $session = WorldSession::factory()->create(['world_user_id' => $worldUser->id]);
 
-    Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Right here.'))]);
+    if ($fakeReply) {
+        Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Right here.'))]);
+    }
 
     return [$user, $assistant, $conversation, $world, $resident, $session];
 }

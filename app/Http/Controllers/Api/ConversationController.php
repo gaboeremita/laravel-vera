@@ -6,6 +6,7 @@ use App\Actions\AppendWorldConversationContext;
 use App\Contracts\SttProvider;
 use App\Directors\PromptDirector;
 use App\DTOs\LlmResponse;
+use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
 use App\Http\Controllers\Controller;
@@ -22,6 +23,7 @@ use App\Services\AgentLoop\AgentLoopRunner;
 use App\Services\AgentLoop\Tools\BasicCalculatorTool;
 use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\AgentLoop\Tools\ImageGenerationTool;
+use App\Services\AgentLoop\Tools\World\WorldToolbox;
 use App\Services\ImageGenProviders\ImageGenerationService;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\LlmResponseTagParser;
@@ -351,6 +353,8 @@ class ConversationController extends Controller
             $aiModel = $llmManager->resolveModelForAssistantUser($assistantUser);
             $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
 
+            $tools = [];
+
             if ($assistantModel->mode === AssistantMode::Agent) {
                 if (! $aiModel) {
                     return response()->json(['message' => 'This assistant is in agent mode and requires an explicitly selected AI model that supports tool-calling.'], 422);
@@ -369,7 +373,19 @@ class ConversationController extends Controller
                 if ($imageGenerationService->isAvailableFor($assistantUser)) {
                     $tools[] = new ImageGenerationTool($imageGenerationService, $assistantUser, $conversation);
                 }
+            }
 
+            $worldToolbox = null;
+            if ($world !== null && ! empty($world->layout['zones'])) {
+                if ($assistantModel->kind !== AssistantKind::WorldNpc && ! $aiModel?->supports_tools) {
+                    return response()->json(['message' => 'Assistants living in a world need a model that supports tool calling. Choose one in this assistant\'s settings.'], 422);
+                }
+
+                $worldToolbox = new WorldToolbox($world);
+                $tools = [...$tools, ...$worldToolbox->tools()];
+            }
+
+            if ($tools !== []) {
                 $runner = new AgentLoopRunner($llm, $tools);
 
                 $agentResult = $runner->run(
@@ -411,7 +427,7 @@ class ConversationController extends Controller
             'thinking' => $response->thinking,
         ]);
 
-        $action = $world !== null ? app(LlmResponseTagParser::class)->parseAction($content, $world) : null;
+        $action = $worldToolbox?->chosenAction();
 
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
 

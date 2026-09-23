@@ -2,7 +2,7 @@
 
 ## R1. Where the idle agent loop runs
 
-- **Decision**: The world page in the browser drives the loop. When a resident's idle wait ends, the page requests one decision from the server. The server makes one model call and returns a single step. The page executes the step and reports its outcome with the next decision request. The server holds no loop state between requests.
+- **Decision**: The world page in the browser drives the loop. When a resident's idle wait ends, the page requests one decision from the server. The server runs one agent-loop turn, which ends when she has chosen her step through an action tool, and returns it. The page executes the step and reports its outcome with the next decision request. The server holds no loop state between requests.
 - **Rationale**: FR-031 requires that nothing happens while the user is not in the world. A loop driven by the open world page stops by construction when the page closes or is hidden, so no presence tracking, timers or background jobs are needed on the server. Every step is still decided by the model with the previous step's outcome in its context (FR-020, FR-026). Actions execute in the browser anyway, so a server-side loop would need a round trip per step regardless.
 - **Alternatives considered**: A queued server-side loop that pushes steps over Reverb presence channels and waits for outcomes. It needs presence bookkeeping, cancellation when the user leaves, and a way to park a job while the browser executes a step, for no user-visible gain. The existing `AgentLoopRunner` runs tools synchronously inside one request, which cannot wait for an action that plays out over seconds in the browser.
 
@@ -60,11 +60,12 @@
 - **Rationale**: Clips are authored for one body position, so a standing laugh cannot play on a stool. Tagging poses per posture keeps names meaningful to the model ("laugh" in any posture) while the world picks the right clip, and reusing the `default` name means no new slots.
 - **Alternatives considered**: One pose per name with per-posture additive layers. Additive VRMA animation is not supported by the existing pose pipeline.
 
-## R10. Action tags
+## R10. How residents act and look things up
 
-- **Decision**: Actions ride on the existing tag convention, next to `[pose: …]`: `[action: go_to <id>]`, `[action: use <spot-id> <activity-id>]`, `[action: follow]`, `[action: stop]`, `[action: stay]`. Identifiers are the marker ids from the layout. The complete grammar is in [contracts/action-tags.md](contracts/action-tags.md).
-- **Rationale**: `LlmResponseTagParser` already strips `[identifier: value]` tags and collects them, and the world chat already reacts to `[pose: …]`. Tags work with every configured model, including ones without tool support.
-- **Alternatives considered**: Native tool calls. They are more structured, but only available on models flagged `supports_tools`, and conversation replies in this app are not tool-driven.
+- **Decision**: Residents use native tool calls through the existing `AgentLoopRunner`. A world toolbox gives her query tools (`where_can_i`, `what_is_in`, `describe`) that answer from the layout on the server, and action tools (`go_to`, `follow`, `stop`, later `use` and `zone`) whose arguments are enums of the world's real ids. An action tool records her choice for the world page to execute and tells her she'll learn the outcome in her recent activity. One action per turn. The complete tool set is in [contracts/world-tools.md](contracts/world-tools.md).
+- **Rationale**: Enum arguments make invented verbs and ids impossible, and a rejected call goes back to her inside the same turn, so she can correct herself. Query tools keep the prompt small: the rest of the world is looked up only when she needs it.
+- **Alternatives considered**: Free-text `[action: …]` tags parsed from her reply. They work with models without tool support, but they let the model write any verb or id, and a mistake only surfaces after the turn has ended.
+- **Model requirement**: Assistants living in a world need a model with `supports_tools`. NPCs use the application's default model and always get the tools.
 
 ## R11. How the resident learns outcomes
 
@@ -74,7 +75,7 @@
 
 ## R12. Idle decision prompt and rate limit
 
-- **Decision**: An idle decision uses the resident's own conversation model (clarification 2026-09-22) with her normal system prompt, the world context, the resolved world state, her recent activity, and a list of available activities: zone activities, spots with their activities and whether each is free, and every pose in her library. She must answer with one line, `(reason) *action*`, followed by exactly one action or pose tag. The server rejects a decision request for the same resident within 8 seconds of the previous one (FR-029). The page staggers residents' idle waits independently from the 10–60 second window.
+- **Decision**: An idle decision uses the resident's own conversation model (clarification 2026-09-22) with her normal system prompt, the world context, the resolved world state, her recent activity, and a list of available activities: zone activities, spots with their activities and whether each is free, and every pose in her library. She answers with one line, `(reason) *action*`, and chooses the step through an action tool or a pose. The server rejects a decision request for the same resident within 8 seconds of the previous one (FR-029). The page staggers residents' idle waits independently from the 10–60 second window.
 - **Rationale**: One constrained line per decision keeps calls cheap and parsing reliable. The 8-second floor protects against runaway requests while leaving the 10-second minimum wait untouched.
 
 ## R13. Walking and talking

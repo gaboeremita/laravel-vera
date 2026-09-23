@@ -9,7 +9,7 @@
 Residents gain knowledge of the world, purposeful movement, held poses at furniture, and self-chosen activities, and users gain walk-and-talk conversations, voice in the world, name tags and a per-floor map.
 
 - **World knowledge**: environment files carry floor, zone, object and spot markers in glTF node `extras`. They are parsed on upload into a `layout` JSON column on `worlds`. The server resolves positions sent by the world page into floors and zones, and adds a world-state block and a recent-activity block to the resident's prompt.
-- **Actions**: residents act through `[action: …]` tags next to the existing `[pose: …]` tags. The world page executes them with A* route-finding over a walkable grid built from the existing collision system, plays the assistant's existing walk and default poses, and holds poses at spots. Every action's outcome is recorded as a resident activity.
+- **Actions**: residents act through native tool calls in the existing agent loop: query tools (`where_can_i`, `what_is_in`, `describe`) answer from the layout, and action tools (`go_to`, `follow`, `stop`) take enum arguments limited to the world's real ids. The world page executes the chosen action with A* route-finding over a walkable grid built from the existing collision system, plays the assistant's existing walk and default poses, and holds poses at spots. Every action's outcome is recorded as a resident activity. Assistants living in a world need a tool-capable model; NPCs always get the tools.
 - **Self-chosen activities**: the world page drives them one step at a time: after a random 10–60 second wait it asks the server for one decision, executes it, and reports the outcome with the next request. The loop exists only while the world page is open and visible, which satisfies "nothing happens while the user is away" without server-side presence tracking.
 - **Talking and finding residents**: conversations stop pausing the world, voice mode is reused from the web chat with positional playback, and name tags plus a top-down map rendered per floor make residents easy to find.
 
@@ -41,7 +41,7 @@ Residents gain knowledge of the world, purposeful movement, held poses at furnit
 - **II. Append-Only Migrations**: New migrations add `worlds.layout`, add `poses.posture` and replace the poses unique index, create `world_session_residents` and `resident_activities`. The behavior enum is a PHP enum over a string column, so adding `autonomous` needs no schema change. No existing migration is edited. PASS.
 - **III. Comments Justify Only Non-Obvious Decisions**: Only non-obvious constraints get comments, for example why spots have separate approach points. PASS.
 - **IV. Data Isolation by Ownership**: Every new route resolves `{world}` through the requester's `WorldUser` and `{session}` through that membership's sessions, then checks the resident belongs to the world. Activities and resident states are only reachable through that chain. The layout is returned only with a world the requester belongs to. PASS.
-- **V. Errors Fail Loudly**: Invalid markers produce warnings in the upload response. Invalid or unknown action tags produce `failed` outcomes with reasons. Decision failures return error responses and log. No swallowed exceptions. PASS.
+- **V. Errors Fail Loudly**: Invalid markers produce warnings in the upload response. Invalid tool arguments are returned to the resident within her turn, failed actions show an error toast in the world and are recorded with their reason, and invalid tool use is logged. Decision failures return error responses and log. No swallowed exceptions. PASS.
 - **VI. Feature-Test-First, Factory-Backed**: Feature tests cover marker parsing through the upload endpoint, zone resolution and prompt content through the message endpoint, the decision and activity endpoints, rate limiting and cross-user isolation. New factories: `WorldSessionResidentFactory`, `ResidentActivityFactory`, and `WorldFactory::withLayout()`. Grid and A* logic has no server counterpart and gets node unit tests, the established exception for client-only logic. PASS.
 - **VII. No Speculative Abstraction**: The layout is one JSON column rather than four tables because nothing queries it by row. Idle steps reuse the tag parser and the existing chat model path rather than introducing a tool framework. The client loop is one hook, not a general scheduler. PASS.
 
@@ -61,7 +61,7 @@ specs/015-resident-world-agency/
 ├── quickstart.md
 ├── contracts/
 │   ├── environment-markers.md
-│   ├── action-tags.md
+│   ├── world-tools.md
 │   └── world-agency-api.md
 └── tasks.md             # created by /speckit-tasks
 ```
@@ -82,7 +82,7 @@ app/
 │   ├── WorldSessionResident.php            # new
 │   └── ResidentActivity.php                # new
 ├── Services/
-│   └── LlmResponseTagParser.php            # changed: parse [action: …]
+│   └── AgentLoop/Tools/World/              # new: world toolbox, query tools and action tools
 └── Http/
     ├── Controllers/Api/
     │   ├── WorldController.php             # changed: parse markers on upload, return warnings

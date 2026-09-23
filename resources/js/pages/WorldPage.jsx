@@ -162,11 +162,16 @@ export default function WorldPage() {
 				activityId = (await response.json()).id;
 			} catch (error) {
 				console.error(`[WorldPage] could not record ${resident.assistant.name}'s ${action.verb} action`, error);
+				addToast(`Could not record ${resident.assistant.name}'s action (${error.message}), so she won't remember it`, 'error');
 			}
 		}
 
 		const result = await executeAction(action, { commands: residentCommands.current.get(resident.id), layout: world?.layout, getFollowTarget, fromUser });
-		if (result.outcome === 'failed') console.warn(`[WorldPage] ${resident.assistant.name} could not ${action.verb}: ${result.reason}`);
+		if (result.outcome === 'failed') {
+			const attempted = action.target ? `${action.verb.replace('_', ' ')} ${action.target}` : action.verb;
+			console.error(`[WorldPage] ${resident.assistant.name} could not ${attempted}: ${result.reason}`);
+			addToast(`${resident.assistant.name} couldn't ${attempted}: ${result.reason}`, 'error');
+		}
 
 		if (activityId) {
 			try {
@@ -174,9 +179,10 @@ export default function WorldPage() {
 				if (!response.ok) throw new Error(`HTTP ${response.status}`);
 			} catch (error) {
 				console.error(`[WorldPage] could not report the outcome of ${resident.assistant.name}'s ${action.verb} action`, error);
+				addToast(`Could not save how ${resident.assistant.name}'s action went (${error.message})`, 'error');
 			}
 		}
-	}, [worldId, sessionId, world, getFollowTarget]);
+	}, [worldId, sessionId, world, getFollowTarget, addToast]);
 
 	const handleChatAction = useCallback((action) => {
 		if (chatResident) void runResidentAction(chatResident, action);

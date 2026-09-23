@@ -20,6 +20,7 @@
 - Q: Can self-chosen activities be poses from her own library, without using the world? → A: Yes. Any pose in her library (check phone, stretch, dance) is a self-chosen activity she can perform wherever she is.
 - Q: How do poses work when she is sitting, lying or reclining? → A: She is always in one posture: standing (the default), sitting, lying or reclining. Poses are tagged with the posture they are made for, and the version for her current posture plays. Each posture has its own default pose, held while she is in it; changing posture blends between default poses, with no transition motions.
 - Q: What happens when she is asked for a pose that has no version for her current posture? → A: She gets out of the posture, plays the standing version, and stays standing.
+- Q: How do residents act in the world and look things up? → A: Through tool calls. Query tools answer where an activity is available, what a place contains, and what a place or thing is; action tools move her, with arguments limited to the world's real places, things, spots and activities. Assistants living in a world must use a tool-capable model; NPCs always get the tools.
 - Q: How do maps and location awareness work in worlds with several floors, like the connection node? → A: Floors come from the markers, with every zone belonging to one floor. The map shows one floor at a time, following the user's floor with manual switching, and residents on other floors appear dimmed with their floor name.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -186,6 +187,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-006**: Each zone MUST define an entry point that residents walk to when told to go to that zone.
 - **FR-007**: An object's zone MUST be determined by which zone contains it; owners do not assign it separately.
 - **FR-008**: Whenever the resident responds or decides, she MUST know her current zone and floor, the user's current zone and floor, her approximate distance to the user, the objects in her current zone with their activities, and the names of all other zones.
+- **FR-009a**: Residents MUST be able to look up, when they need it, where an activity is available, what any place contains, and what any place or thing is, without that information being in every prompt.
 - **FR-009**: The knowledge given to the resident MUST describe her current zone in detail and other zones only by name and floor, and the whole world-state section MUST stay under 2,000 characters for worlds with up to 40 zones.
 - **FR-010**: Worlds without any zones or objects MUST keep today's behavior.
 
@@ -214,6 +216,9 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 - **FR-020**: Every action the resident takes MUST report its outcome (completed, failed with a reason, or interrupted) back to her before she continues.
 - **FR-021**: Actions naming things that do not exist MUST fail with a reason the resident is told about. They MUST NOT be silently ignored.
+- **FR-021b**: Residents MUST act through tool calls whose arguments are limited to the world's real places, things, spots and activities. A rejected call MUST be returned to her within the same turn so she can correct it.
+- **FR-021c**: Assistants MUST use a tool-capable model to live in a world; a conversation in a world with an assistant whose model lacks tool calling MUST fail with a clear error. NPCs always get the world tools.
+- **FR-021d**: In a marked world, the resident's prompt MUST remind her that she can use her world tools on her own initiative whenever the conversation, her mood or a passing thought brings the space to mind, whether or not the user asks.
 - **FR-021a**: When the zone, object or spot an action targets disappears while the action runs (for example, because the environment was replaced), the action MUST fail with a reason.
 - **FR-022**: Each resident MUST keep a recent-activity history (what she did, where, when, and why she chose it) that informs her later decisions.
 

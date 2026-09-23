@@ -17,8 +17,8 @@ it('tells the resident her zone, the user\'s zone and their distance', function 
     $prompt = sentSystemPrompt();
     expect($prompt)
         ->toContain('World state:')
-        ->toContain('You are in: Vocal booth, inside Music studio, on the Ground floor.')
-        ->toContain('The user is in: Pool terrace, on the Ground floor, about 14 m away from you.');
+        ->toContain('You are in: Vocal booth, inside Music studio, on the Ground floor')
+        ->toContain('The user is: in Pool terrace, on the Ground floor, about 14 m away from you');
 });
 
 it('describes her own zone in detail and other zones only by name and floor', function () {
@@ -35,7 +35,8 @@ it('describes her own zone in detail and other zones only by name and floor', fu
         ->toContain('An open terrace with an infinity pool.')
         ->toContain('Things to do here: Swim [swim]')
         ->toContain('Pool lounger [pool-lounger-1]: A white lounger by the pool. Spots: pool-lounger-1-seat (Recline [recline], reclining)')
-        ->toContain('Other places: Music studio [studio] (Ground floor); Vocal booth [vocal-booth] (Ground floor); Gallery [gallery] (Upper floor)')
+        ->toContain('Here: An open terrace with an infinity pool.')
+        ->toContain('Available places: Music studio [studio] (Ground floor), Vocal booth [vocal-booth] (Ground floor), Pool terrace [pool-terrace] (Ground floor), Gallery [gallery] (Upper floor)')
         ->not->toContain('A studio full of keyboards.')
         ->not->toContain('An upper gallery overlooking the city.');
 });
@@ -49,7 +50,7 @@ it('says when the user is on another floor', function () {
         'residents' => [$residentId => ['x' => -5, 'y' => 0, 'z' => 2]],
     ])->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain('The user is upstairs, in: Gallery, on the Upper floor');
+    expect(sentSystemPrompt())->toContain('The user is: upstairs, in Gallery, on the Upper floor');
 });
 
 it('keeps today\'s prompt for a world without markers', function () {
@@ -127,4 +128,14 @@ it('includes her recent activity, newest first, limited to the last eight', func
         ->not->toContain('place-8')
         ->not->toContain('place-9');
     expect(strpos($prompt, 'pool-terrace, from'))->toBeLessThan(strpos($prompt, 'place-1:'));
+});
+
+it('reminds the resident she can use her world tools on her own initiative', function () {
+    $scenario = worldStateScenario();
+
+    sendWorldMessage($this, $scenario, [])->assertSuccessful();
+
+    expect(sentSystemPrompt())
+        ->toContain('World awareness:')
+        ->toContain('your tools are yours to use whenever you feel like it, on your own initiative');
 });
