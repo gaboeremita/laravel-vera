@@ -89,26 +89,33 @@ app/
     │   ├── ConversationController.php      # changed: positions + action in sendMessage
     │   ├── ResidentDecisionController.php  # new: idle decisions
     │   ├── ResidentActivityController.php  # new: record requested actions, report outcomes
-    │   └── ResidentStateController.php     # new: save resident state
+    │   ├── ResidentStateController.php     # new: save resident state
+    │   └── WorldSessionController.php      # changed: residentStates in index
     ├── Requests/                           # new form requests for the above
     └── Resources/
-        ├── WorldResource.php               # changed: layout
-        └── WorldSessionResource.php        # changed or new: residentStates
+        └── WorldResource.php               # changed: layout
 
 database/
 ├── factories/ (WorldSessionResidentFactory, ResidentActivityFactory, WorldFactory::withLayout)
-└── migrations/ (add layout to worlds, create world_session_residents, create resident_activities)
+└── migrations/ (add layout to worlds, add posture to poses and widen its unique index, create world_session_residents, create resident_activities)
 
 routes/api.php                              # decisions, activities, state routes under worlds/{world}/sessions/{session}/residents/{resident}
 
 resources/js/
 ├── pages/WorldPage.jsx                     # changed: world never paused by chat; hosts overlays and the agency loop
+├── components/WorldForm.jsx                # changed: shows layout warnings after upload
 ├── components/ (assistant pose editor)      # changed: one section per posture, each with its default pose
 ├── components/world/
 │   ├── WorldScene.jsx                      # changed: navigation grid, name tags, positional audio listener
 │   ├── ResidentController.jsx              # changed: existing locomotion cycle follows routes; held poses; follow
 │   ├── WorldChat.jsx                       # changed: overlay, focus rules, voice mode, distance limit, close control
 │   ├── worldNavigation.js                  # new: walkable grid + A* + smoothing
+│   ├── residentActions.js                  # new: executes go_to, use, zone, follow, stop
+│   ├── conversationRange.js                # new: conversation warning and end distances
+│   ├── worldMapProjection.js               # new: map projection, floor lookup, label spreading
+│   ├── WorldEnvironment.jsx                # changed: builds the navigation grid while loading
+│   ├── FirstPersonController.jsx           # changed: ignores movement keys while typing
+│   ├── InteractionSystem.jsx               # changed: C starts or closes the single conversation
 │   ├── worldMotionPoses.js                 # changed: posture-aware pose and default lookup
 │   ├── NameTags.jsx                        # new
 │   ├── OffscreenIndicator.jsx              # new

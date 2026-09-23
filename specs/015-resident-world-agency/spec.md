@@ -178,6 +178,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 - **FR-001**: Worlds MUST support named zones, each with a description, an area on the ground with a vertical range, an optional parent zone, and the floor it belongs to.
 - **FR-001a**: Worlds MUST support named floors, each with a height range. A world without floor markers has a single floor.
+- **FR-001b**: A position MUST belong to the floor whose height range contains it, including positions on stairs between floors.
 - **FR-002**: Worlds MUST support interactive objects, each with a name, description, position, and zero or more interaction spots.
 - **FR-003**: Each interaction spot MUST define its position, the direction the resident faces, and the activities it offers.
 - **FR-004**: Zones MAY offer zone-level activities that do not belong to a single object (swim in the pool, look out at the city).
@@ -185,20 +186,20 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-006**: Each zone MUST define an entry point that residents walk to when told to go to that zone.
 - **FR-007**: An object's zone MUST be determined by which zone contains it; owners do not assign it separately.
 - **FR-008**: Whenever the resident responds or decides, she MUST know her current zone and floor, the user's current zone and floor, her approximate distance to the user, the objects in her current zone with their activities, and the names of all other zones.
-- **FR-009**: The knowledge given to the resident MUST stay concise enough for large worlds by describing her current zone in detail and other zones only by name and short description.
+- **FR-009**: The knowledge given to the resident MUST describe her current zone in detail and other zones only by name and floor, and the whole world-state section MUST stay under 2,000 characters for worlds with up to 40 zones.
 - **FR-010**: Worlds without any zones or objects MUST keep today's behavior.
 
 **Movement**
 
 - **FR-011**: Residents MUST be able to go to a zone, go to an object or interaction spot, follow the user, and stop.
 - **FR-012**: Residents MUST travel along routes that respect the same walkability rules as the user, including steps, drops and water.
-- **FR-013**: Residents MUST visibly walk while moving, not glide.
+- **FR-013**: Residents MUST walk using their Walk motion pose while moving when one is configured; without one, they move in their default pose.
 - **FR-014**: When a destination is unreachable, the resident MUST stop trying and be told the destination could not be reached.
-- **FR-015**: While following, the resident MUST stay near the user and keep up as the user moves.
+- **FR-015**: While following, the resident MUST stay about 1 m behind the user and keep up as the user moves.
 
 **Using objects**
 
-- **FR-016**: When a resident uses an interaction spot, she MUST end up at the spot's position and direction and hold the activity's pose until she leaves.
+- **FR-016**: When a resident uses an interaction spot, she MUST end up at the spot's position and direction, take the activity's posture and hold that posture's default pose until she leaves, and play the activity's pose, if any, once.
 - **FR-017**: An interaction spot MUST be usable by only one resident at a time.
 - **FR-018**: Residents MUST NOT pick up, carry or place objects. Activities are performed as poses at a spot or in a zone.
 - **FR-019**: Activities without a dedicated pose MUST still complete using the resident's default stance.
@@ -213,6 +214,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 - **FR-020**: Every action the resident takes MUST report its outcome (completed, failed with a reason, or interrupted) back to her before she continues.
 - **FR-021**: Actions naming things that do not exist MUST fail with a reason the resident is told about. They MUST NOT be silently ignored.
+- **FR-021a**: When the zone, object or spot an action targets disappears while the action runs (for example, because the environment was replaced), the action MUST fail with a reason.
 - **FR-022**: Each resident MUST keep a recent-activity history (what she did, where, when, and why she chose it) that informs her later decisions.
 
 **Idle autonomy**
@@ -222,7 +224,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-025**: Staying put MUST be a valid idle decision.
 - **FR-025a**: The activities offered to her MUST include every pose in her own pose library, which she can perform wherever she currently is, alongside zone activities and object interaction spots.
 - **FR-026**: The resident MUST be able to carry out multi-step activities, deciding each next step after learning the previous step's outcome.
-- **FR-027**: Anything the user says to the resident MUST interrupt her current activity.
+- **FR-027**: Anything the user says to the resident MUST interrupt her current self-chosen activity. Activities the user asked for continue while the conversation goes on.
 - **FR-028**: The user arriving in the world MUST be available to the resident as a moment she can respond to.
 - **FR-029**: Idle decisions MUST be rate-limited per resident, and when several residents share a world their decisions MUST NOT all happen at the same moment.
 - **FR-030**: Each self-chosen step MUST be added to the conversation as her reason in parentheses followed by the action in asterisks, stating both the intention and the concrete action (for example `(I want to forget about today for a while) *walks to the bar to get a drink*`).
@@ -232,7 +234,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 **Presence**
 
 - **FR-031**: Residents MUST take no actions and make no decisions while the user is not in the world.
-- **FR-032**: When the user leaves, any in-progress activity MUST stop. On return the resident MUST be where she was left, and her unfinished plan MUST be discarded while her activity history is kept.
+- **FR-032**: When the user leaves, any movement in progress MUST stop and her unfinished plan MUST be discarded. On return she MUST be where she was left, keeping the spot and posture she was holding, and her activity history is kept.
 
 **Marker import**
 
@@ -240,6 +242,11 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-034**: Markers MUST be read when the environment is uploaded or replaced, and replacing the environment MUST replace the world's floors, zones, objects and spots with the new file's markers.
 - **FR-034a**: Markers with missing or invalid required information MUST be skipped and reported to the world owner, while valid markers are still imported.
 - **FR-035**: A world's zones and objects MUST belong to that world and MUST NOT be readable by other users.
+
+**Direct commands**
+
+- **FR-036**: The user MUST be able to ask the resident in conversation to follow or stop, and she decides how to respond in character.
+- **FR-037**: The user MUST also have direct controls for "follow me" and "stop" that the resident always obeys. The resident MUST be told when a direct control was used so she can react to it.
 
 **Conversation while moving**
 
@@ -269,11 +276,6 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-058**: The map MUST show the user's current floor by default, switch automatically when the user changes floors, and let the user switch floors manually.
 - **FR-059**: Residents on a floor other than the one shown MUST appear dimmed at their position, labelled with their floor name.
 
-**Direct commands**
-
-- **FR-036**: The user MUST be able to ask the resident in conversation to follow or stop, and she decides how to respond in character.
-- **FR-037**: The user MUST also have direct controls for "follow me" and "stop" that the resident always obeys. The resident MUST be told when a direct control was used so she can react to it.
-
 ### Key Entities
 
 - **Floor**: A named level of a world with a height range; every zone belongs to one floor.
@@ -299,7 +301,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **SC-005**: Over a 20-minute unaddressed session, the resident makes at least 3 self-chosen activity decisions, and no activity repeats back-to-back unless she states a reason.
 - **SC-006**: Zero resident decisions or actions happen while the user is not in the world.
 - **SC-007**: Every zone, object and spot embedded in the penthouse environment is available to residents after a single upload, with no manual steps.
-- **SC-010**: In a world with five residents, a user can locate any named resident within 10 seconds using the name tags or the map.
+- **SC-008**: In a world with five residents, a user can locate any named resident within 10 seconds using the name tags or the map.
 - **SC-009**: For every self-chosen step, the user can tell from the thought bubble alone both what the resident is doing and why.
 
 ## Assumptions
@@ -312,4 +314,5 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - Idle decisions use the resident's own conversation model; at one decision every 10 seconds to 1 minute this is roughly 100 model calls per hour per idle resident, which is accepted.
 - Only the world owner's own world sessions drive resident behavior; worlds visited by multiple users at once are out of scope.
 - Voice mode in the world reuses the existing transcription and speech settings of the resident's assistant; no new voice providers are needed.
+- "In the world" means the world page is open and its browser tab is visible; a hidden tab counts as the user being away.
 - The distance at which a conversation ends has a sensible default, well beyond the distance needed to start one, that the owner can change later.
