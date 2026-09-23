@@ -2,6 +2,8 @@
 
 use App\Models\Assistant;
 use App\Models\AssistantUser;
+use App\Models\Pose;
+use App\Models\PoseAnimationFile;
 use App\Models\User;
 use App\Models\World;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -73,4 +75,24 @@ it('returns a runtime-ready world with an empty resident list', function () {
         ->assertSuccessful()
         ->assertJsonPath('id', $world->id)
         ->assertJsonPath('residents', []);
+});
+
+it('includes a resident walk pose animation for world movement', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $assistant = Assistant::factory()->create();
+    AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $assistant->id]);
+    $world->residents()->create([
+        'assistant_id' => $assistant->id,
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'behavior' => 'roam',
+    ]);
+    $walkPose = Pose::factory()->for($assistant)->create(['name' => 'walk']);
+    $animation = PoseAnimationFile::factory()->for($walkPose)->create(['path' => 'poses/walk.vrma']);
+
+    $this->actingAs($user)->getJson(route('worlds.show', $world))
+        ->assertSuccessful()
+        ->assertJsonPath('residents.0.assistant.poses.0.name', 'walk')
+        ->assertJsonPath('residents.0.assistant.poses.0.animationUrl', Storage::disk('public')->url($animation->path));
 });
