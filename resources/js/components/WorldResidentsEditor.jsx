@@ -4,7 +4,7 @@ import { Square, SquareCheck } from 'lucide-react';
 import { api } from '../utils/api.js';
 import Accordion from './common/Accordion.jsx';
 
-const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, behavior: 'stationary', openingMessage: '', customPrompt: '' };
+const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, behavior: 'stationary', openingMessage: '', customPrompt: '' };
 const FIELD_LABEL = 'text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1';
 const FIELD_INPUT = 'w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors';
 const GROUP_INDENT = 'ml-4 border-l border-line-1 pl-3 space-y-2';
@@ -15,8 +15,27 @@ function isEligible(candidate) {
 	return candidate.portrait_type === 'avatar3d' && !!candidate.vrm_url;
 }
 
+function radiansToDegrees(radians) {
+	return Math.round((radians * 180) / Math.PI * 100) / 100;
+}
+
+function toDraft(placement) {
+	return {
+		position: placement.position,
+		facing: radiansToDegrees(placement.rotation?.y ?? 0),
+		behavior: placement.behavior,
+		openingMessage: placement.openingMessage ?? '',
+		customPrompt: placement.customPrompt ?? '',
+	};
+}
+
+function toPlacement({ facing, ...draft }) {
+	return { ...draft, rotation: { x: 0, y: (facing * Math.PI) / 180, z: 0 } };
+}
+
 function isDirty(draft, resident) {
 	return draft.behavior !== resident.behavior
+		|| draft.facing !== radiansToDegrees(resident.rotation?.y ?? 0)
 		|| draft.position.x !== resident.position.x
 		|| draft.position.y !== resident.position.y
 		|| draft.position.z !== resident.position.z
@@ -26,9 +45,7 @@ function isDirty(draft, resident) {
 
 function ResidentRow({ candidate, resident, onAdd, onRemove, onUpdate }) {
 	const [collapsed, setCollapsed] = useState(true);
-	const [draft, setDraft] = useState(resident
-		? { position: resident.position, behavior: resident.behavior, openingMessage: resident.openingMessage ?? '', customPrompt: resident.customPrompt ?? '' }
-		: DEFAULT_PLACEMENT);
+	const [draft, setDraft] = useState(toDraft(resident ?? DEFAULT_PLACEMENT));
 	const [isSaving, setIsSaving] = useState(false);
 
 	if (!resident) {
@@ -49,7 +66,7 @@ function ResidentRow({ candidate, resident, onAdd, onRemove, onUpdate }) {
 	const dirty = isDirty(draft, resident);
 	const save = async () => {
 		setIsSaving(true);
-		await onUpdate(candidate, draft);
+		await onUpdate(candidate, toPlacement(draft));
 		setIsSaving(false);
 	};
 
@@ -76,6 +93,18 @@ function ResidentRow({ candidate, resident, onAdd, onRemove, onUpdate }) {
 							/>
 						</div>
 					))}
+				</div>
+			</div>
+			<div className="grid grid-cols-3 gap-2">
+				<div>
+					<label className={FIELD_LABEL}>Facing <span className="normal-case text-fg-3">(degrees)</span></label>
+					<input
+						type="number"
+						value={draft.facing}
+						onWheel={blurOnWheel}
+						onChange={(event) => setDraft((current) => ({ ...current, facing: Number(event.target.value) }))}
+						className={FIELD_INPUT}
+					/>
 				</div>
 			</div>
 			<div>
@@ -168,7 +197,7 @@ export default function WorldResidentsEditor({ world, onWorldChange, addToast })
 
 	const updateResident = async (assistant, placement) => {
 		if (!world.id) {
-			const resident = { id: `staged-${assistant.id}`, assistant, position: placement.position, behavior: placement.behavior, openingMessage: placement.openingMessage, customPrompt: placement.customPrompt };
+			const resident = { id: `staged-${assistant.id}`, assistant, position: placement.position, rotation: placement.rotation, behavior: placement.behavior, openingMessage: placement.openingMessage, customPrompt: placement.customPrompt };
 			onWorldChange((current) => ({ ...current, residents: [...current.residents.filter((item) => item.assistant.id !== assistant.id), resident] }));
 			return;
 		}
