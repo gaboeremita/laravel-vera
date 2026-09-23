@@ -8,6 +8,16 @@
 
 **Input**: User description: "Resident AIs understand world zones and objects, move with purpose, hold poses at interaction spots, and choose idle activities through an agent loop that runs only while the user is in the world."
 
+## Clarifications
+
+### Session 2026-09-22
+
+- Q: For worlds without built-in markers, how should spots be placed and oriented? → A: No manual authoring. Zones, objects and interaction spots come only from markers embedded in the environment file; worlds without markers have no zones or objects.
+- Q: When does the resident count as "in conversation" for holding off self-chosen actions? → A: Exactly while a conversation with her is open; she may resume self-chosen actions as soon as it closes.
+- Q: How long does the resident wait between self-chosen activity decisions? → A: A random 10 seconds to 1 minute after her previous activity (or decision to stay put) finishes.
+- Q: What happens to items she picks up, like a drink? → A: Residents do not pick up or carry objects. Activities such as getting a drink are performed as poses at the spot, with no held item.
+- Q: Which model makes the resident's self-chosen activity decisions? → A: Always her own conversation model.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - The resident knows the world she is in (Priority: P1)
@@ -53,9 +63,9 @@ Talking to a resident no longer freezes the world. The conversation stays on scr
 
 ### User Story 3 - Find residents with name tags and a map (Priority: P3)
 
-Residents are easy to find, even in a large world with many of them. Every resident shows a floating name tag above her head that stays readable at any distance and remains visible through walls and furniture. The resident the user is talking to has a highlighted tag. When she is off-screen, an indicator at the edge of the screen points toward her. The user can also open a map of the world: a small corner minimap while moving, and a full-screen map on demand. The map shows the world from above (the uploaded blueprint when there is one), zone names, the user's position and facing, and every resident with her name. The resident being talked to is highlighted.
+Residents are easy to find, even in a large world with many of them. Every resident shows a floating name tag above her head that stays readable at any distance and remains visible through walls and furniture. The resident the user is talking to has a highlighted tag. When she is off-screen, an indicator at the edge of the screen points toward her. The user can also open a map of the world: a small corner minimap while moving, and a full-screen map on demand. The map shows the world from above, zone names, the user's position and facing, and every resident with her name. The resident being talked to is highlighted.
 
-**Why this priority**: Residents already get lost in large worlds today, and conversations that follow the user around make it more important to know where she is. The map reuses the top-down view the editor needs, so building it here also lays groundwork for the editor.
+**Why this priority**: Residents already get lost in large worlds today, and conversations that follow the user around make it more important to know where she is. The map is generated from the world itself, so it works for every world without extra setup.
 
 **Independent Test**: In the penthouse with three residents, open the full-screen map and find each of them by name. Start a conversation with one, walk into another room, and follow the off-screen indicator and the highlighted map marker back to her.
 
@@ -66,8 +76,7 @@ Residents are easy to find, even in a large world with many of them. Every resid
 3. **Given** a conversation is open and the resident is off-screen, **When** the user looks elsewhere, **Then** an indicator at the screen edge points toward her.
 4. **Given** the user opens the full-screen map, **When** it is shown, **Then** it displays the world from above with zone names, the user's position and facing, and every resident's position and name.
 5. **Given** a conversation is open, **When** the user views the map, **Then** that resident's marker is highlighted.
-6. **Given** the owner uploaded and aligned a blueprint, **When** the user opens the map, **Then** the blueprint is shown with markers placed correctly on it.
-7. **Given** the user and residents move, **When** the map or minimap is open, **Then** the markers follow their positions continuously.
+6. **Given** the user and residents move, **When** the map or minimap is open, **Then** the markers follow their positions continuously.
 
 ---
 
@@ -91,7 +100,7 @@ When the resident decides to go somewhere, either because the user asked ("meet 
 
 ### User Story 5 - The resident uses things in the world (Priority: P5)
 
-Objects offer interaction spots with an activity: sit on the piano bench, lie down on the bed, recline on a pool lounger, get a drink at the bar, play the Rhodes. When the resident uses one, she walks to that exact spot, faces the right way, and holds the matching pose until she moves on. Some activities give her something to hold, like a glass after getting a drink, and that state is part of what she knows about herself.
+Objects offer interaction spots with an activity: sit on the piano bench, lie down on the bed, recline on a pool lounger, get a drink at the bar, play the Rhodes. When the resident uses one, she walks to that exact spot, faces the right way, and holds or performs the matching pose until she moves on. Activities are poses only: getting a drink at the bar means performing a drinking pose there, without a glass appearing or being carried.
 
 **Why this priority**: This is the payoff that makes the world feel inhabited, but it needs the resident to know the world (P1) and reach the spot (P4) first.
 
@@ -102,14 +111,14 @@ Objects offer interaction spots with an activity: sit on the piano bench, lie do
 1. **Given** a free pool lounger, **When** the resident chooses to recline on it, **Then** she ends up lying on it, aligned with its position and direction, and stays there.
 2. **Given** the resident is reclining, **When** she chooses another activity, **Then** she gets up and leaves the lounger free.
 3. **Given** another resident already occupies a lounger, **When** the resident tries to use the same lounger, **Then** she is told it is taken and can pick another one.
-4. **Given** the resident gets a drink at the bar, **When** she walks elsewhere, **Then** she visibly carries the drink and knows she is holding it.
+4. **Given** the resident gets a drink at the bar, **When** she performs it, **Then** she plays the drinking pose at the bar, and no object appears in her hands.
 5. **Given** an activity with no dedicated pose, **When** the resident performs it, **Then** she still completes it with her default stance, and nothing fails.
 
 ---
 
 ### User Story 6 - The resident chooses what to do when left alone (Priority: P6)
 
-While the user is in the world but not in conversation with her, the resident periodically decides for herself whether to do something and what. While the user is talking with her, she makes no self-chosen actions; she gives the user her attention and only acts when the user asks her to. Her choice comes from her personality, her mood, what she has done recently and what the world offers. She is not picked at random from a list. An extroverted resident may go get a drink; one who loves music may wander into the studio; one who just had a drink will choose something else. She can carry out a multi-step activity ("get a drink, take it to the pool, lie on a lounger"). She adjusts the plan when a step fails, and drops it when the user speaks to her. Staying where she is counts as a real choice.
+While the user is in the world and no conversation with her is open, the resident periodically decides for herself whether to do something and what. While a conversation with her is open, she makes no self-chosen actions; she gives the user her attention and only acts when the user asks her to. Her choice comes from her personality, her mood, what she has done recently and what the world offers. She is not picked at random from a list. An extroverted resident may go get a drink; one who loves music may wander into the studio; one who just had a drink will choose something else. She can carry out a multi-step activity ("get a drink at the bar, then go lie on a lounger by the pool"). She adjusts the plan when a step fails, and drops it when the user speaks to her. Staying where she is counts as a real choice.
 
 Every self-chosen step is recorded in the conversation using roleplay convention: her reason as a thought in parentheses and the step as an action in asterisks. For example: `(I want to forget about today for a while) *walks to the bar to get a drink*`. The same line appears in a thought bubble above her in the world, so the user can see what she is doing and why at a glance.
 
@@ -119,34 +128,14 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 **Acceptance Scenarios**:
 
-1. **Given** the user is in the world and has not spoken to the resident for a while, **When** her idle period ends, **Then** she decides on an activity, or on staying put, based on her personality and recent history.
+1. **Given** the user is in the world, no conversation with her is open, and her previous activity finished between 10 seconds and 1 minute ago, **When** her idle wait ends, **Then** she decides on an activity, or on staying put, based on her personality and recent history.
 2. **Given** the resident had a drink a few minutes ago, **When** she next decides what to do, **Then** her choice takes that recent activity into account.
 3. **Given** the resident is partway through a multi-step activity, **When** the user speaks to her, **Then** she stops the activity and gives the user her attention.
 4. **Given** a step of her plan fails (the lounger is taken), **When** she learns the outcome, **Then** she adapts the plan or picks something else.
 5. **Given** the user leaves the world, **When** the resident is mid-activity or idle, **Then** she makes no further decisions and takes no further actions.
 6. **Given** the user comes back to the world, **When** the world loads, **Then** the resident is where the user left her, and her first decision can respond to the user's arrival.
 7. **Given** the resident decides to get a drink because she wants to forget her day, **When** she starts, **Then** the conversation shows a line like `(I want to forget about today for a while) *walks to the bar to get a drink*`, and a thought bubble above her shows the same line.
-8. **Given** the user is in conversation with the resident, **When** her idle period would otherwise end, **Then** she makes no self-chosen action.
-
----
-
-### User Story 7 - World owners mark zones and objects in an intuitive editor (Priority: P7)
-
-A world owner marks up a world without technical knowledge. The editor shows a top-down map of the world, generated from the environment itself. The owner can optionally lay an uploaded blueprint image over it and align it to the map. On the map, the owner draws zones as rectangles or free outlines and names and describes them. The owner places objects on the map or directly in the 3D view and adds interaction spots with a facing direction and activities. A preview of the resident standing, sitting or lying at each spot shows whether it lines up. The editor warns about mistakes the owner cannot easily see: a spot the resident cannot walk to, a zone with no entry point, or overlapping zones that are not nested. Markers already contained in an uploaded environment are imported automatically and can be edited like hand-made ones.
-
-**Why this priority**: Stories 1–6 can be demonstrated on the penthouse, which ships its own markers. The editor is what extends the feature to every other world, like the renaissance faire. It is also the largest single piece of work, so it comes after the behavior it configures has been proven.
-
-**Independent Test**: In an unmarked world, draw a "Jousting field" zone on the map and add a "Grandstand bench" object with a sit spot. The spot preview shows the resident seated on the bench. Entering the world, the resident knows the jousting field exists and can sit on the bench.
-
-**Acceptance Scenarios**:
-
-1. **Given** a world with no markers, **When** the owner opens the editor, **Then** a top-down map of the world's environment is shown without the owner uploading anything.
-2. **Given** the owner uploads a blueprint image, **When** they align it to the map by moving, scaling and rotating it, **Then** it stays aligned under the map on later visits to the editor.
-3. **Given** the map view, **When** the owner draws a rectangle or free outline and names it, **Then** a zone is created with that area, and the resident knows it on the next visit.
-4. **Given** the owner places a spot with a "sit" activity, **When** they view its preview, **Then** they see the resident seated at that position and facing that direction before saving.
-5. **Given** a spot the resident cannot walk to, **When** the owner saves it, **Then** the editor warns that it is unreachable.
-6. **Given** an uploaded environment containing markers, **When** the world is created or its environment replaced, **Then** those markers appear in the editor as the world's zones and objects.
-7. **Given** any change in the editor, **When** the owner undoes it, **Then** the previous state is restored.
+8. **Given** a conversation with the resident is open, **When** her idle period would otherwise end, **Then** she makes no self-chosen action.
 
 ---
 
@@ -199,7 +188,7 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 
 - **FR-016**: When a resident uses an interaction spot, she MUST end up at the spot's position and direction and hold the activity's pose until she leaves.
 - **FR-017**: An interaction spot MUST be usable by only one resident at a time.
-- **FR-018**: Activities MAY give the resident a held item (a drink), which MUST be shown on her and included in what she knows about herself until she puts it down or finishes it.
+- **FR-018**: Residents MUST NOT pick up, carry or place objects. Activities are performed as poses at a spot or in a zone.
 - **FR-019**: Activities without a dedicated pose MUST still complete using the resident's default stance.
 
 **Action outcomes**
@@ -210,8 +199,8 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 
 **Idle autonomy**
 
-- **FR-023**: While the user is in the world and not actively engaging the resident, she MUST periodically decide whether to do something and what.
-- **FR-024**: Idle decisions MUST be made by the resident's model, using her personality, her current state, her recent-activity history and the activities available. They MUST NOT be random selection among options.
+- **FR-023**: While the user is in the world and no conversation with her is open, the resident MUST decide whether to do something and what at a random moment between 10 seconds and 1 minute after her previous activity, or her decision to stay put, finishes.
+- **FR-024**: Idle decisions MUST be made by the resident's own conversation model, using her personality, her current state, her recent-activity history and the activities available. They MUST NOT be random selection among options.
 - **FR-025**: Staying put MUST be a valid idle decision.
 - **FR-026**: The resident MUST be able to carry out multi-step activities, deciding each next step after learning the previous step's outcome.
 - **FR-027**: Anything the user says to the resident MUST interrupt her current activity.
@@ -219,25 +208,19 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - **FR-029**: Idle decisions MUST be rate-limited per resident, and when several residents share a world their decisions MUST NOT all happen at the same moment.
 - **FR-030**: Each self-chosen step MUST be added to the conversation as her reason in parentheses followed by the action in asterisks, stating both the intention and the concrete action (for example `(I want to forget about today for a while) *walks to the bar to get a drink*`).
 - **FR-030a**: The same reason-and-action line MUST appear in a thought bubble above the resident in the world while that step is in progress.
-- **FR-030b**: While the user is in conversation with the resident, she MUST NOT take self-chosen actions. Actions the user asks for during conversation are still carried out.
+- **FR-030b**: While a conversation with the resident is open, she MUST NOT take self-chosen actions. Actions the user asks for during conversation are still carried out. She MAY resume self-chosen actions as soon as the conversation closes.
 
 **Presence**
 
 - **FR-031**: Residents MUST take no actions and make no decisions while the user is not in the world.
 - **FR-032**: When the user leaves, any in-progress activity MUST stop. On return the resident MUST be where she was left, and her unfinished plan MUST be discarded while her activity history is kept.
 
-**Authoring**
+**Marker import**
 
-- **FR-033**: World owners MUST be able to create, edit and delete zones, objects and interaction spots for their worlds in the world editor.
-- **FR-033a**: The editor MUST show a top-down map of the world generated from its environment, with no upload required.
-- **FR-033b**: Owners MAY upload a blueprint image and align it under the map by moving, scaling and rotating it. The alignment MUST persist.
-- **FR-033c**: Owners MUST be able to draw zones on the map as rectangles or free outlines and set each zone's vertical range, parent zone, entry point, activities and private flag.
-- **FR-033d**: Owners MUST be able to place objects and interaction spots either on the map or by clicking in the 3D view, and set each spot's facing direction and activities.
-- **FR-033e**: The editor MUST preview the resident's pose at a spot before it is saved.
-- **FR-033f**: The editor MUST warn when a spot or zone entry point is unreachable on foot, and when zones overlap without being nested.
-- **FR-033g**: The editor MUST support undoing and redoing changes within an editing session.
-- **FR-034**: Zone and object markers contained in an uploaded environment file MUST be imported as the world's zones and objects when the environment is uploaded or replaced.
-- **FR-035**: Zones and objects MUST belong to their world and MUST NOT be readable or editable by other users.
+- **FR-033**: Zones, objects and interaction spots MUST come only from markers embedded in the world's environment file. There is no manual authoring.
+- **FR-034**: Markers MUST be read when the environment is uploaded or replaced, and replacing the environment MUST replace the world's zones, objects and spots with the new file's markers.
+- **FR-034a**: Markers with missing or invalid required information MUST be skipped and reported to the world owner, while valid markers are still imported.
+- **FR-035**: A world's zones and objects MUST belong to that world and MUST NOT be readable by other users.
 
 **Conversation while moving**
 
@@ -260,7 +243,7 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - **FR-051**: The name tag of the resident in the open conversation MUST be highlighted distinctly from all others.
 - **FR-052**: When the resident in the open conversation is off-screen, an indicator at the screen edge MUST point toward her.
 - **FR-053**: The user MUST be able to show a corner minimap while moving and open a full-screen map on demand.
-- **FR-054**: The map MUST show the world's top-down view (the aligned blueprint when one exists), zone names, the user's position and facing, and every resident's position and name, updating continuously.
+- **FR-054**: The map MUST show a top-down view generated from the world's environment, zone names, the user's position and facing, and every resident's position and name, updating continuously.
 - **FR-055**: The map marker of the resident in the open conversation MUST be highlighted.
 - **FR-056**: Overlapping name tags and map markers MUST remain individually readable.
 
@@ -274,10 +257,11 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - **Zone**: A named area of a world with a description, a ground outline, a vertical range, an optional parent zone, an entry point, optional zone-level activities, and a private flag.
 - **World object**: A named, described thing at a position in a world. It belongs to whichever zone contains it, and offers interaction spots.
 - **Interaction spot**: A precise place on an object with a facing direction, the activities it supports, and at most one occupying resident at a time.
-- **Activity**: Something a resident can do at a spot or in a zone, with an optional pose and an optional held item.
-- **Resident state**: A resident's current position, zone, current activity, held item and occupied spot within a world session.
+- **Activity**: Something a resident can do at a spot or in a zone, with an optional pose.
+- **Resident state**: A resident's current position, zone, current activity and occupied spot within a world session.
 - **Activity history entry**: A record of what a resident did, where, when, the outcome, and the stated reason.
-- **World map**: The top-down view of a world's environment, used both for authoring and for the in-world map, with an optional uploaded blueprint image and its alignment.
+- **World map**: The top-down view generated from a world's environment, used for the in-world map.
+- **Environment marker**: Information embedded in the environment file that defines a zone, object or interaction spot, following a documented format.
 
 ## Success Criteria *(mandatory)*
 
@@ -289,19 +273,18 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - **SC-004**: When using an interaction spot, the resident ends up visibly aligned with it (seated on the seat, lying on the lounger) in at least 9 of 10 attempts.
 - **SC-005**: Over a 20-minute unaddressed session, the resident makes at least 3 self-chosen activity decisions, and no activity repeats back-to-back unless she states a reason.
 - **SC-006**: Zero resident decisions or actions happen while the user is not in the world.
-- **SC-007**: A world owner can mark a new zone with one sittable object and see the resident use it in under 5 minutes.
-- **SC-008**: A first-time owner can mark all rooms of a ten-room world in under 20 minutes without instructions.
+- **SC-007**: Every zone, object and spot embedded in the penthouse environment is available to residents after a single upload, with no manual steps.
 - **SC-010**: In a world with five residents, a user can locate any named resident within 10 seconds using the name tags or the map.
 - **SC-009**: For every self-chosen step, the user can tell from the thought bubble alone both what the resident is doing and why.
 
 ## Assumptions
 
-- The penthouse environment will ship with built-in zone and object markers for every room and seat, and serves as the reference world for testing Stories 1–4.
+- The penthouse environment will ship with built-in zone and object markers for every room and seat, and serves as the reference world for testing.
+- The marker format is documented so environments can be generated with markers or authored with them in 3D modeling tools; worlds without markers, such as the renaissance faire today, need their environment re-exported with markers to gain zones and objects.
 - Residents interacting with each other (conversation or shared activities) is out of scope; residents only avoid sharing a spot.
 - Swimming, as floating or diving, is out of scope; residents in the pool wade on the pool floor like the user.
 - Per-activity poses reuse the existing pose library. Activities whose pose is not yet in an assistant's library fall back to the default stance.
-- Idle decisions use the resident's own configured model, and the idle period and rate limits have sensible defaults the owner can change later.
+- Idle decisions use the resident's own conversation model; at one decision every 10 seconds to 1 minute this is roughly 100 model calls per hour per idle resident, which is accepted.
 - Only the world owner's own world sessions drive resident behavior; worlds visited by multiple users at once are out of scope.
 - Voice mode in the world reuses the existing transcription and speech settings of the resident's assistant; no new voice providers are needed.
 - The distance at which a conversation ends has a sensible default, well beyond the distance needed to start one, that the owner can change later.
-- "In conversation" means the user has messaged the resident recently; the length of that window has a sensible default the owner can change later.
