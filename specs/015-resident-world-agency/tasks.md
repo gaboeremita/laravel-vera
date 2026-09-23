@@ -109,18 +109,18 @@ description: "Task list for Resident World Agency"
 
 ### Tests for User Story 3
 
-- [ ] T028 [P] [US3] Write `tests/Unit/WorldMapProjection.test.js` for `resources/js/components/world/worldMapProjection.js`: world-to-map projection for a floor's bounds, floor selection for a height (matching the layout rules), and marker label spreading so overlapping labels are offset (FR-056)
+- [X] T028 [P] [US3] Write `tests/Unit/WorldMapProjection.test.js` for `resources/js/components/world/worldMapProjection.js`: world-to-map projection for a floor's bounds, floor selection for a height (matching the layout rules), and marker label spreading so overlapping labels are offset (FR-056)
 
 ### Implementation for User Story 3
 
-- [ ] T029 [US3] Create `resources/js/components/world/worldMapProjection.js` with `projectToMap(point, floorBounds, mapSize)`, `floorForHeight(layout, y)` and `spreadLabels(markers, minSpacing)`
-- [ ] T030 [US3] Create `resources/js/components/world/NameTags.jsx`: a sprite per resident above her head with her name, `depthTest` off so it shows through walls, scaled by distance to stay readable, and offset vertically when tags overlap on screen so each stays readable (FR-050, FR-056)
-- [ ] T031 [US3] Highlight the conversation resident's tag in `NameTags.jsx` (distinct color and glow) using the open conversation's resident id passed from `WorldPage.jsx` (FR-051)
-- [ ] T032 [P] [US3] Create `resources/js/components/world/OffscreenIndicator.jsx`: an HTML arrow on the screen edge pointing toward the conversation resident when she is outside the camera frustum (FR-052)
-- [ ] T033 [US3] Create `resources/js/components/world/floorMaps.js`: after the environment loads, render one top-down image per floor with an orthographic camera fitted to the floor's bounds and a clipping plane at the floor's `maxY`, returning data URLs and bounds (FR-057); worlds without floors get one image
-- [ ] T034 [US3] Create `resources/js/components/world/WorldMap.jsx`: a corner minimap and a full-screen map toggled with `M`, drawing the current floor image, zone names, the player's position and facing, every resident's position and name, the conversation resident highlighted, and residents on other floors dimmed with their floor name (FR-053–FR-059)
-- [ ] T035 [US3] Switch the map floor automatically when the player's floor changes, with manual floor buttons, in `resources/js/components/world/WorldMap.jsx` (FR-058); derive the shown floor during render from the player's floor and the manual choice, per Principle VIII
-- [ ] T036 [US3] Mount `NameTags`, `OffscreenIndicator` and `WorldMap` from `resources/js/components/world/WorldScene.jsx` and `resources/js/pages/WorldPage.jsx`, feeding them the positions ref from T015
+- [X] T029 [US3] Create `resources/js/components/world/worldMapProjection.js` with `projectToMap(point, floorBounds, mapSize)`, `floorForHeight(layout, y)` and `spreadLabels(markers, minSpacing)`
+- [X] T030 [US3] Create `resources/js/components/world/NameTags.jsx`: a sprite per resident above her head with her name, `depthTest` off so it shows through walls, scaled by distance to stay readable, and offset vertically when tags overlap on screen so each stays readable (FR-050, FR-056)
+- [X] T031 [US3] Highlight the conversation resident's tag in `NameTags.jsx` (distinct color and glow) using the open conversation's resident id passed from `WorldPage.jsx` (FR-051)
+- [X] T032 [P] [US3] Create `resources/js/components/world/OffscreenIndicator.jsx`: an HTML arrow on the screen edge pointing toward the conversation resident when she is outside the camera frustum (FR-052)
+- [X] T033 [US3] Create `resources/js/components/world/floorMaps.js`: after the environment loads, render one top-down image per floor with an orthographic camera fitted to the floor's bounds and a clipping plane at the floor's `maxY`, returning data URLs and bounds (FR-057); worlds without floors get one image
+- [X] T034 [US3] Create `resources/js/components/world/WorldMap.jsx`: a corner minimap and a full-screen map toggled with `M`, drawing the current floor image, zone names, the player's position and facing, every resident's position and name, the conversation resident highlighted, and residents on other floors dimmed with their floor name (FR-053–FR-059)
+- [X] T035 [US3] Switch the map floor automatically when the player's floor changes, with manual floor buttons, in `resources/js/components/world/WorldMap.jsx` (FR-058); derive the shown floor during render from the player's floor and the manual choice, per Principle VIII
+- [X] T036 [US3] Mount `NameTags`, `OffscreenIndicator` and `WorldMap` from `resources/js/components/world/WorldScene.jsx` and `resources/js/pages/WorldPage.jsx`, feeding them the positions ref from T015
 
 **Checkpoint**: Story 3 works on its own; residents are easy to find in the penthouse and the connection node.
 

@@ -1,7 +1,11 @@
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AudioListener } from 'three';
+import { PLAYER_EYE_HEIGHT } from './collisionCheck.js';
+import { renderFloorMaps } from './floorMaps.js';
 import FirstPersonController from './FirstPersonController.jsx';
+import NameTags from './NameTags.jsx';
+import { OffscreenIndicatorTracker } from './OffscreenIndicator.jsx';
 import InteractionSystem from './InteractionSystem.jsx';
 import ResidentController from './ResidentController.jsx';
 import WorldEnvironment from './WorldEnvironment.jsx';
@@ -23,7 +27,40 @@ function CameraAudioListener({ listenerRef }) {
 	return null;
 }
 
-export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices }) {
+function PlayerViewTracker({ viewRef }) {
+	const { camera } = useThree();
+
+	useFrame(() => {
+		const view = viewRef.current ?? {};
+		view.x = camera.position.x;
+		view.y = camera.position.y - PLAYER_EYE_HEIGHT;
+		view.z = camera.position.z;
+		view.yaw = camera.rotation.y;
+		viewRef.current = view;
+	});
+
+	return null;
+}
+
+function FloorMapRenderer({ layout, environment, onRendered }) {
+	const { gl, scene } = useThree();
+
+	useEffect(() => {
+		let cancelled = false;
+		const frame = requestAnimationFrame(() => {
+			if (cancelled) return;
+			onRendered(renderFloorMaps({ renderer: gl, scene, layout, environmentRoot: environment.root, fallbackGroundY: environment.spawnPosition.y }));
+		});
+		return () => {
+			cancelled = true;
+			cancelAnimationFrame(frame);
+		};
+	}, [environment, gl, scene, layout, onRendered]);
+
+	return null;
+}
+
+export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps }) {
 	const [environment, setEnvironment] = useState(null);
 	const audioListener = useRef(null);
 	const [playerPosition, setPlayerPosition] = useState([0, 1.6, 4]);
@@ -53,6 +90,10 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 				<>
 					<FirstPersonController collisionWorld={environment.collisionWorld} spawnPosition={spawnPosition} enabled={explorationEnabled} onPositionChange={handlePositionChange} />
 					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} interaction={interaction} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} residentVoices={residentVoices} audioListener={audioListener} inConversation={resident.id === activeResidentId} />)}
+					<PlayerViewTracker viewRef={playerView} />
+					<NameTags residents={world.residents} residentPositions={residentPositions} activeResidentId={activeResidentId} />
+					<OffscreenIndicatorTracker residentPositions={residentPositions} activeResidentId={activeResidentId} indicatorRef={offscreenIndicator} />
+					<FloorMapRenderer layout={world.layout} environment={environment} onRendered={onFloorMaps} />
 					<InteractionSystem residents={world.residents} residentPositions={residentPositions} onResidentChange={onResidentChange} onInteract={(resident) => { setInteraction({ residentId: resident.id, triggerId: crypto.randomUUID() }); onInteract(resident); }} onEndConversation={onEndConversation} activeResidentId={activeResidentId} enabled={explorationEnabled} />
 				</>
 			)}

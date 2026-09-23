@@ -23,7 +23,7 @@ export default function WorldEnvironment({ url, onReady, onError }) {
 				const spawnPosition = collisionWorld.findSpawn(center);
 				if (!spawnPosition) throw new Error('No walkable spawn with enough headroom was found in this environment.');
 				scene.add(loadedAsset);
-				onReady({ collisionWorld, spawnPosition });
+				onReady({ collisionWorld, spawnPosition, root: loadedAsset });
 			} catch (error) {
 				onError(error);
 			}

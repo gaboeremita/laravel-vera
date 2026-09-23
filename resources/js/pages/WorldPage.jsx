@@ -7,6 +7,9 @@ import WorldChat from '../components/world/WorldChat.jsx';
 import WorldTrackPlayer from '../components/world/WorldTrackPlayer.jsx';
 import { PLAYER_EYE_HEIGHT } from '../components/world/collisionCheck.js';
 import { conversationRangeState } from '../components/world/conversationRange.js';
+import { isTypingTarget } from '../components/world/keyboardFocus.js';
+import OffscreenIndicator from '../components/world/OffscreenIndicator.jsx';
+import WorldMap from '../components/world/WorldMap.jsx';
 
 export default function WorldPage() {
 	const { worldId } = useParams();
@@ -23,6 +26,10 @@ export default function WorldPage() {
 	const latestPosition = useRef(null);
 	const residentPositions = useRef(new Map());
 	const residentVoices = useRef(new Map());
+	const playerView = useRef(null);
+	const offscreenIndicator = useRef(null);
+	const [floorMaps, setFloorMaps] = useState([]);
+	const [mapExpanded, setMapExpanded] = useState(false);
 	const [conversationRange, setConversationRange] = useState('ok');
 
 	useEffect(() => {
@@ -120,6 +127,15 @@ export default function WorldPage() {
 		return () => cancelAnimationFrame(frame);
 	}, [chatResident, closeChat, addToast]);
 
+	useEffect(() => {
+		const keyDown = (event) => {
+			if (event.code !== 'KeyM' || isTypingTarget(event.target)) return;
+			setMapExpanded((expanded) => !expanded);
+		};
+		window.addEventListener('keydown', keyDown);
+		return () => window.removeEventListener('keydown', keyDown);
+	}, []);
+
 	const playResidentVoice = useCallback(async (audioBlob) => {
 		const playPositional = chatResident && residentVoices.current.get(chatResident.id);
 		const duration = playPositional ? await playPositional(audioBlob) : null;
@@ -151,7 +167,9 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready'} />
-				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready'} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} />
+				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready'} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} />
+				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} />}
+				{chatResident && <OffscreenIndicator ref={offscreenIndicator} name={chatResident.assistant.name} />}
 				<div className={`absolute inset-0 z-10 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${status !== 'ready' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
 					{world.cardImageUrl && (
 						<img src={world.cardImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover object-top scale-105 blur-sm brightness-[0.35]" />

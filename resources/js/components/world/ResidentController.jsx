@@ -59,6 +59,11 @@ export default function ResidentController({ resident, playerPosition, paused, a
 	const greetingPose = findWorldMotionPose(resident.assistant.poses, 'greeting');
 
 	useEffect(() => {
+		if (loaded || !position || !resident.assistant.vrmUrl) return;
+		residentPositions.current.set(resident.id, position);
+	}, [loaded, position, resident.id, resident.assistant.vrmUrl, residentPositions]);
+
+	useEffect(() => {
 		if (!position) console.warn(`No walkable spawn was found for resident ${resident.id}.`);
 	}, [position, resident.id]);
 
