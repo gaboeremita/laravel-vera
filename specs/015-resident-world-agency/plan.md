@@ -9,7 +9,7 @@
 Residents gain knowledge of the world, purposeful movement, held poses at furniture, and self-chosen activities, and users gain walk-and-talk conversations, voice in the world, name tags and a per-floor map.
 
 - **World knowledge**: environment files carry floor, zone, object and spot markers in glTF node `extras`. They are parsed on upload into a `layout` JSON column on `worlds`. The server resolves positions sent by the world page into floors and zones, and adds a world-state block and a recent-activity block to the resident's prompt.
-- **Actions**: residents act through `[action: …]` tags next to the existing `[pose: …]` tags. The world page executes them with A* route-finding over a walkable grid built from the existing collision system, plays walk and idle clips, and holds poses at spots. Every action's outcome is recorded as a resident activity.
+- **Actions**: residents act through `[action: …]` tags next to the existing `[pose: …]` tags. The world page executes them with A* route-finding over a walkable grid built from the existing collision system, plays the assistant's existing walk and default poses, and holds poses at spots. Every action's outcome is recorded as a resident activity.
 - **Self-chosen activities**: the world page drives them one step at a time: after a random 10–60 second wait it asks the server for one decision, executes it, and reports the outcome with the next request. The loop exists only while the world page is open and visible, which satisfies "nothing happens while the user is away" without server-side presence tracking.
 - **Talking and finding residents**: conversations stop pausing the world, voice mode is reused from the web chat with positional playback, and name tags plus a top-down map rendered per floor make residents easy to find.
 
@@ -101,15 +101,15 @@ database/
 
 routes/api.php                              # decisions, activities, state routes under worlds/{world}/sessions/{session}/residents/{resident}
 
-public/animations/                          # default walk.vrma and idle.vrma
-
 resources/js/
 ├── pages/WorldPage.jsx                     # changed: world never paused by chat; hosts overlays and the agency loop
+├── components/WorldMotionPoseEditor.jsx    # changed: shows the new reclining slots
 ├── components/world/
 │   ├── WorldScene.jsx                      # changed: navigation grid, name tags, positional audio listener
-│   ├── ResidentController.jsx              # changed: route following, walk/idle clips, held poses, follow
+│   ├── ResidentController.jsx              # changed: existing locomotion cycle follows routes; held poses; follow
 │   ├── WorldChat.jsx                       # changed: overlay, focus rules, voice mode, distance limit, close control
 │   ├── worldNavigation.js                  # new: walkable grid + A* + smoothing
+│   ├── worldMotionPoses.js                 # changed: Recline, Reclining and Get Up slots
 │   ├── NameTags.jsx                        # new
 │   ├── OffscreenIndicator.jsx              # new
 │   ├── WorldMap.jsx                        # new: minimap + full map, per-floor images, markers
@@ -132,7 +132,7 @@ tests/
 
 Outside the repository: the penthouse generator is updated to emit markers for every floor, room, seat and lounger, and the connection node environment is re-exported with floor and zone markers.
 
-**Structure Decision**: The existing single-repo layout (`app/`, `database/`, `routes/`, `resources/js/`, `tests/`), adding files only to existing directories. `public/animations/` is a new asset folder under the existing `public/` directory.
+**Structure Decision**: The existing single-repo layout (`app/`, `database/`, `routes/`, `resources/js/`, `tests/`), adding files only to existing directories.
 
 ## Delivery Slices
 
@@ -141,8 +141,8 @@ Each story is independently shippable. Suggested pull requests, in order:
 1. **Markers and world awareness (P1)**: marker parser, `layout`, zone resolution, prompt world state, penthouse markers.
 2. **Walk and talk (P2)**: chat overlay without pausing, focus rules, one conversation at a time, distance limit, voice mode with positional playback.
 3. **Finding residents (P3)**: name tags, off-screen indicator, per-floor map and minimap.
-4. **Going places (P4)**: walkable grid, A*, walk and idle clips, `go_to`, `follow`, `stop`, direct controls, activities and outcomes.
-5. **Using things (P5)**: spots, approach and placement, held and one-shot poses, occupancy.
+4. **Going places (P4)**: walkable grid, A*, route following through the existing locomotion cycle, `go_to`, `follow`, `stop`, direct controls, activities and outcomes.
+5. **Using things (P5)**: spots, approach and placement, held and one-shot poses, the Recline, Reclining and Get Up slots, occupancy.
 6. **Self-chosen activities (P6)**: `autonomous` behavior, decision endpoint, client loop, thought bubbles, presence pause, resident state save and restore.
 
 ## Complexity Tracking

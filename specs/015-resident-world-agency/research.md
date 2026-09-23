@@ -44,16 +44,20 @@
 
 ## R8. Walking animation
 
-- **Decision**: Ship one walk clip and one idle clip as application assets in VRMA format, used by every resident while moving and standing. An assistant pose named `walk` or `idle` overrides the default for that assistant.
-- **Rationale**: FR-013 requires visible walking, and today residents have no locomotion clip at all. Shared defaults make every resident walk without per-assistant setup.
-- **Alternatives considered**: Procedural leg animation. It looks mechanical and is more code than playing a clip. Requiring every assistant to upload a walk pose. It leaves residents gliding until someone does.
-- **Open item**: Source the clip (for example, a Mixamo walk converted to VRMA). Mixamo's terms allow use of its animations inside projects. The conversion is a one-time asset task in `tasks.md`.
+- **Decision**: Reuse the existing world motion poses (Walk Start, Walk, Walk Stop) and the default pose, and the locomotion cycle in `ResidentController` (idle, turning, starting, walking, stopping). Route following replaces the cycle's random heading with the direction of the next waypoint. There is no bundled fallback: a resident whose assistant has no Walk pose moves without a walk animation, as she does today.
+- **Rationale**: The motion slots and the cycle already exist and are configured per assistant. Route following only changes where the heading comes from.
+- **Alternatives considered**: Shipping default walk and idle clips with the application for assistants without their own. It needs a sourced and licensed asset, for a case the per-assistant slots already cover.
 
 ## R9. Poses at spots
 
 - **Decision**: A spot's node position is the root placement for the resident while she performs the activity, and the node's +Z axis is her facing. Each activity names a pose from her library and a mode: `hold` plays the clip and keeps its last frame until she leaves; `once` plays it and returns to idle. She walks to an approach point 0.6 m in front of the spot on walkable ground, then blends to the spot placement over 0.4 s.
 - **Rationale**: Separating the approach point from the spot placement lets spots sit on furniture (a lounger, a bar stool) that the walkable grid never reaches. Holding the last frame turns existing one-shot sitting or lying clips into held poses without new animation data.
 - **Alternatives considered**: Deriving placement from the furniture's geometry. It needs per-pose knowledge of hip height and fails for arbitrary furniture shapes.
+
+## R9a. Fixed reclining slots
+
+- **Decision**: Add three world motion slots next to Walk Start, Walk, Walk Stop and Greeting: Recline (once), Reclining (loop) and Get Up (once). An activity whose pose is `recline` plays Recline, then loops Reclining until she leaves, then plays Get Up. Every other activity pose is looked up by name in her normal pose library.
+- **Rationale**: Reclining on the pool loungers and the daybed is the held pose the penthouse needs most, and it needs an entry, a loop and an exit to look right, which a single library pose cannot express. Other activities work as single library poses until they need the same treatment.
 
 ## R10. Action tags
 
