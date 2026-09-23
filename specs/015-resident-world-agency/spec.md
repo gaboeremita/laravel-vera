@@ -18,6 +18,7 @@
 - Q: What happens to items she picks up, like a drink? → A: Residents do not pick up or carry objects. Activities such as getting a drink are performed as poses at the spot, with no held item.
 - Q: Which model makes the resident's self-chosen activity decisions? → A: Always her own conversation model.
 - Q: Can self-chosen activities be poses from her own library, without using the world? → A: Yes. Any pose in her library (check phone, stretch, dance) is a self-chosen activity she can perform wherever she is.
+- Q: How do maps and location awareness work in worlds with several floors, like the connection node? → A: Floors come from the markers, with every zone belonging to one floor. The map shows one floor at a time, following the user's floor with manual switching, and residents on other floors appear dimmed with their floor name.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -35,7 +36,8 @@ A world is divided into named zones (music studio, pool terrace, master bedroom)
 2. **Given** the resident stands inside the "Music studio" zone, **When** the user asks where she is, **Then** she names the music studio.
 3. **Given** the user walks from the kitchen to the garden, **When** the user next speaks to the resident, **Then** she knows the user is now in the garden.
 4. **Given** a zone nested in another (vocal booth inside the music studio), **When** the resident is inside the vocal booth, **Then** she describes her location as the vocal booth within the studio.
-5. **Given** a world with no marked zones or objects, **When** the user talks to the resident, **Then** the conversation works as it does today, with no errors and no invented places.
+5. **Given** a world with two floors, **When** the user is on the upper floor and the resident on the ground floor, **Then** she knows the user is upstairs and in which zone.
+6. **Given** a world with no marked zones or objects, **When** the user talks to the resident, **Then** the conversation works as it does today, with no errors and no invented places.
 
 ---
 
@@ -78,6 +80,8 @@ Residents are easy to find, even in a large world with many of them. Every resid
 4. **Given** the user opens the full-screen map, **When** it is shown, **Then** it displays the world from above with zone names, the user's position and facing, and every resident's position and name.
 5. **Given** a conversation is open, **When** the user views the map, **Then** that resident's marker is highlighted.
 6. **Given** the user and residents move, **When** the map or minimap is open, **Then** the markers follow their positions continuously.
+7. **Given** a world with two floors and the user on the ground floor, **When** the user opens the map, **Then** it shows the ground floor without the upper floor covering it, and residents on the upper floor appear dimmed with their floor name.
+8. **Given** the map is open, **When** the user climbs the stairs to the upper floor, **Then** the map switches to the upper floor, and the user can still switch floors manually.
 
 ---
 
@@ -156,7 +160,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - The user walks far away from the resident in the middle of a conversation.
 - Several residents stand close together when the user starts a conversation, or while one is in progress.
 - The resident being talked to walks away from the user on her own (following a request) until they are beyond the distance limit.
-- A world with several floors, where the map must show which floor each resident is on.
+- A resident standing on the stairs between two floors.
 - Many residents crowded into a small area, with their name tags and map markers overlapping.
 - In voice mode, the resident's own spoken reply or background sound is picked up by the microphone.
 - The user denies microphone access, or it becomes unavailable while walking in voice mode.
@@ -167,14 +171,15 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 **World knowledge**
 
-- **FR-001**: Worlds MUST support named zones, each with a description, an area on the ground with a vertical range, and an optional parent zone.
+- **FR-001**: Worlds MUST support named zones, each with a description, an area on the ground with a vertical range, an optional parent zone, and the floor it belongs to.
+- **FR-001a**: Worlds MUST support named floors, each with a height range. A world without floor markers has a single floor.
 - **FR-002**: Worlds MUST support interactive objects, each with a name, description, position, and zero or more interaction spots.
 - **FR-003**: Each interaction spot MUST define its position, the direction the resident faces, and the activities it offers.
 - **FR-004**: Zones MAY offer zone-level activities that do not belong to a single object (swim in the pool, look out at the city).
 - **FR-005**: Zones MAY be marked private, meaning residents only enter them when the user explicitly asks them to.
 - **FR-006**: Each zone MUST define an entry point that residents walk to when told to go to that zone.
 - **FR-007**: An object's zone MUST be determined by which zone contains it; owners do not assign it separately.
-- **FR-008**: Whenever the resident responds or decides, she MUST know her current zone, the user's current zone, her approximate distance to the user, the objects in her current zone with their activities, and the names of all other zones.
+- **FR-008**: Whenever the resident responds or decides, she MUST know her current zone and floor, the user's current zone and floor, her approximate distance to the user, the objects in her current zone with their activities, and the names of all other zones.
 - **FR-009**: The knowledge given to the resident MUST stay concise enough for large worlds by describing her current zone in detail and other zones only by name and short description.
 - **FR-010**: Worlds without any zones or objects MUST keep today's behavior.
 
@@ -249,6 +254,9 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-054**: The map MUST show a top-down view generated from the world's environment, zone names, the user's position and facing, and every resident's position and name, updating continuously.
 - **FR-055**: The map marker of the resident in the open conversation MUST be highlighted.
 - **FR-056**: Overlapping name tags and map markers MUST remain individually readable.
+- **FR-057**: In worlds with several floors, the map MUST show one floor at a time, drawn without the floors above it covering it.
+- **FR-058**: The map MUST show the user's current floor by default, switch automatically when the user changes floors, and let the user switch floors manually.
+- **FR-059**: Residents on a floor other than the one shown MUST appear dimmed at their position, labelled with their floor name.
 
 **Direct commands**
 
@@ -257,7 +265,8 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 ### Key Entities
 
-- **Zone**: A named area of a world with a description, a ground outline, a vertical range, an optional parent zone, an entry point, optional zone-level activities, and a private flag.
+- **Floor**: A named level of a world with a height range; every zone belongs to one floor.
+- **Zone**: A named area of a world with a description, a ground outline, a vertical range, its floor, an optional parent zone, an entry point, optional zone-level activities, and a private flag.
 - **World object**: A named, described thing at a position in a world. It belongs to whichever zone contains it, and offers interaction spots.
 - **Interaction spot**: A precise place on an object with a facing direction, the activities it supports, and at most one occupying resident at a time.
 - **Activity**: Something a resident can do at a spot, in a zone, or anywhere using a pose from her own library, with an optional pose.
