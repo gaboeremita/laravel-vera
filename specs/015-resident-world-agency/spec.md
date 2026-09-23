@@ -17,6 +17,7 @@
 - Q: How long does the resident wait between self-chosen activity decisions? → A: A random 10 seconds to 1 minute after her previous activity (or decision to stay put) finishes.
 - Q: What happens to items she picks up, like a drink? → A: Residents do not pick up or carry objects. Activities such as getting a drink are performed as poses at the spot, with no held item.
 - Q: Which model makes the resident's self-chosen activity decisions? → A: Always her own conversation model.
+- Q: Can self-chosen activities be poses from her own library, without using the world? → A: Yes. Any pose in her library (check phone, stretch, dance) is a self-chosen activity she can perform wherever she is.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -118,7 +119,7 @@ Objects offer interaction spots with an activity: sit on the piano bench, lie do
 
 ### User Story 6 - The resident chooses what to do when left alone (Priority: P6)
 
-While the user is in the world and no conversation with her is open, the resident periodically decides for herself whether to do something and what. While a conversation with her is open, she makes no self-chosen actions; she gives the user her attention and only acts when the user asks her to. Her choice comes from her personality, her mood, what she has done recently and what the world offers. She is not picked at random from a list. An extroverted resident may go get a drink; one who loves music may wander into the studio; one who just had a drink will choose something else. She can carry out a multi-step activity ("get a drink at the bar, then go lie on a lounger by the pool"). She adjusts the plan when a step fails, and drops it when the user speaks to her. Staying where she is counts as a real choice.
+While the user is in the world and no conversation with her is open, the resident periodically decides for herself whether to do something and what. While a conversation with her is open, she makes no self-chosen actions; she gives the user her attention and only acts when the user asks her to. Her choice comes from her personality, her mood, what she has done recently and what the world offers. She is not picked at random from a list. An extroverted resident may go get a drink; one who loves music may wander into the studio; one who just had a drink will choose something else. Not every activity needs the world: she can also pick any pose from her own library and do it where she stands, like checking her phone, stretching or dancing. She can carry out a multi-step activity ("get a drink at the bar, then go lie on a lounger by the pool"). She adjusts the plan when a step fails, and drops it when the user speaks to her. Staying where she is counts as a real choice.
 
 Every self-chosen step is recorded in the conversation using roleplay convention: her reason as a thought in parentheses and the step as an action in asterisks. For example: `(I want to forget about today for a while) *walks to the bar to get a drink*`. The same line appears in a thought bubble above her in the world, so the user can see what she is doing and why at a glance.
 
@@ -136,6 +137,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 6. **Given** the user comes back to the world, **When** the world loads, **Then** the resident is where the user left her, and her first decision can respond to the user's arrival.
 7. **Given** the resident decides to get a drink because she wants to forget her day, **When** she starts, **Then** the conversation shows a line like `(I want to forget about today for a while) *walks to the bar to get a drink*`, and a thought bubble above her shows the same line.
 8. **Given** a conversation with the resident is open, **When** her idle period would otherwise end, **Then** she makes no self-chosen action.
+9. **Given** the resident has a "check phone" pose in her library, **When** she decides on an activity, **Then** she can choose to check her phone where she is, without walking anywhere, and the conversation shows a line like `(I wonder if anyone texted me) *checks her phone*`.
 
 ---
 
@@ -202,6 +204,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-023**: While the user is in the world and no conversation with her is open, the resident MUST decide whether to do something and what at a random moment between 10 seconds and 1 minute after her previous activity, or her decision to stay put, finishes.
 - **FR-024**: Idle decisions MUST be made by the resident's own conversation model, using her personality, her current state, her recent-activity history and the activities available. They MUST NOT be random selection among options.
 - **FR-025**: Staying put MUST be a valid idle decision.
+- **FR-025a**: The activities offered to her MUST include every pose in her own pose library, which she can perform wherever she currently is, alongside zone activities and object interaction spots.
 - **FR-026**: The resident MUST be able to carry out multi-step activities, deciding each next step after learning the previous step's outcome.
 - **FR-027**: Anything the user says to the resident MUST interrupt her current activity.
 - **FR-028**: The user arriving in the world MUST be available to the resident as a moment she can respond to.
@@ -257,7 +260,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **Zone**: A named area of a world with a description, a ground outline, a vertical range, an optional parent zone, an entry point, optional zone-level activities, and a private flag.
 - **World object**: A named, described thing at a position in a world. It belongs to whichever zone contains it, and offers interaction spots.
 - **Interaction spot**: A precise place on an object with a facing direction, the activities it supports, and at most one occupying resident at a time.
-- **Activity**: Something a resident can do at a spot or in a zone, with an optional pose.
+- **Activity**: Something a resident can do at a spot, in a zone, or anywhere using a pose from her own library, with an optional pose.
 - **Resident state**: A resident's current position, zone, current activity and occupied spot within a world session.
 - **Activity history entry**: A record of what a resident did, where, when, the outcome, and the stated reason.
 - **World map**: The top-down view generated from a world's environment, used for the in-world map.
