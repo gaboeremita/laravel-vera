@@ -5,6 +5,7 @@ import { api } from '../utils/api.js';
 import WorldScene from '../components/world/WorldScene.jsx';
 import WorldChat from '../components/world/WorldChat.jsx';
 import WorldTrackPlayer from '../components/world/WorldTrackPlayer.jsx';
+import { PLAYER_EYE_HEIGHT } from '../components/world/collisionCheck.js';
 
 export default function WorldPage() {
 	const { worldId } = useParams();
@@ -19,6 +20,7 @@ export default function WorldPage() {
 	const [chatResident, setChatResident] = useState(null);
 	const [activePose, setActivePose] = useState(null);
 	const latestPosition = useRef(null);
+	const residentPositions = useRef(new Map());
 
 	useEffect(() => {
 		setHidePortrait(true);
@@ -77,6 +79,12 @@ export default function WorldPage() {
 	const openChat = useCallback((resident) => setChatResident(resident), []);
 	const closeChat = useCallback(() => setChatResident(null), []);
 	const handlePlayerPositionChange = useCallback((position) => { latestPosition.current = position; }, []);
+	const getPositions = useCallback(() => {
+		const residents = {};
+		for (const [residentId, position] of residentPositions.current) residents[residentId] = { x: position.x, y: position.y, z: position.z };
+		const eye = latestPosition.current;
+		return eye ? { user: { x: eye[0], y: eye[1] - PLAYER_EYE_HEIGHT, z: eye[2] }, residents } : { residents };
+	}, []);
 	const handleWorldReady = useCallback(() => setStatus('ready'), []);
 	const handleWorldError = useCallback((error) => {
 		addToast(error?.message || 'Failed to initialize world', 'error');
@@ -100,12 +108,12 @@ export default function WorldPage() {
 		<div className="flex h-full min-h-0 overflow-hidden bg-black">
 			{chatResident && (
 				<div className="w-[35%] min-w-80 max-w-md shrink-0">
-					<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} />
+					<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} />
 				</div>
 			)}
 			<div className="relative flex-1 min-w-0">
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready'} />
-				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready' && !chatResident} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} />
+				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready' && !chatResident} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} />
 				<div className={`absolute inset-0 z-10 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${status !== 'ready' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
 					{world.cardImageUrl && (
 						<img src={world.cardImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover object-top scale-105 blur-sm brightness-[0.35]" />

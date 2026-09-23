@@ -7,6 +7,7 @@ import Header from '../components/Header.jsx';
 import WorldForm from '../components/WorldForm.jsx';
 import WorldResidentsEditor from '../components/WorldResidentsEditor.jsx';
 import { ImageUploadField } from '../components/WorldImagesEditor.jsx';
+import { reportLayoutWarnings } from '../utils/layoutWarnings.js';
 
 export default function CreateWorldPage() {
 	const navigate = useNavigate();
@@ -41,6 +42,7 @@ export default function CreateWorldPage() {
 			const response = await api.postForm(route('worlds.store'), form);
 			if (!response.ok) throw new Error((await response.json()).message);
 			const world = await response.json();
+			reportLayoutWarnings(world.layoutWarnings, addToast);
 
 			const failures = [];
 			for (const resident of value.residents) {

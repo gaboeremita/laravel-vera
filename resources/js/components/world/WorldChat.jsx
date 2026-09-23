@@ -6,7 +6,7 @@ import { useConversationChat } from '../../hooks/useConversationChat.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
 	const scrollRef = useRef(null);
@@ -63,7 +63,9 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		onLoadError: () => { addToast('Unable to load this conversation', 'error'); onClose(); },
 		addToast,
 		fetchEmotions,
-		extraParams: { worldId: world.id },
+		extraParams: worldSessionId && getPositions
+			? { worldId: world.id, worldSessionId, get positions() { return getPositions(); } }
+			: { worldId: world.id },
 	});
 
 	useEffect(() => {

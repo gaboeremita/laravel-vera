@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['name', 'slug', 'description', 'environment_disk', 'environment_path', 'environment_original_name', 'assistant_context_prompt', 'npc_context_prompt', 'settings'])]
+#[Fillable(['name', 'slug', 'description', 'environment_disk', 'environment_path', 'environment_original_name', 'assistant_context_prompt', 'npc_context_prompt', 'settings', 'layout'])]
 class World extends Model
 {
     /** @use HasFactory<WorldFactory> */
@@ -20,7 +20,7 @@ class World extends Model
 
     protected function casts(): array
     {
-        return ['settings' => 'array'];
+        return ['settings' => 'array', 'layout' => 'array'];
     }
 
     public function users(): BelongsToMany

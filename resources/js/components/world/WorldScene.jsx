@@ -1,13 +1,12 @@
 import { Canvas } from '@react-three/fiber';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import FirstPersonController from './FirstPersonController.jsx';
 import InteractionSystem from './InteractionSystem.jsx';
 import ResidentController from './ResidentController.jsx';
 import WorldEnvironment from './WorldEnvironment.jsx';
 
-export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange }) {
+export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange, residentPositions }) {
 	const [environment, setEnvironment] = useState(null);
-	const residentPositions = useRef(new Map());
 	const [playerPosition, setPlayerPosition] = useState([0, 1.6, 4]);
 	const [interaction, setInteraction] = useState(null);
 	const handlePositionChange = useCallback((position) => {

@@ -156,6 +156,25 @@ function imageGenHttpResponse(string $imageData = 'fake-image-bytes'): array
     ];
 }
 
+/**
+ * @param  array<int, array<string, mixed>>  $nodes  glTF nodes; the scene's root nodes are those no other node lists as a child.
+ */
+function buildTestGlb(array $nodes): string
+{
+    $childIndexes = collect($nodes)->pluck('children')->filter()->flatten()->all();
+    $rootIndexes = array_values(array_diff(array_keys($nodes), $childIndexes));
+
+    $json = json_encode([
+        'asset' => ['version' => '2.0'],
+        'scene' => 0,
+        'scenes' => [['nodes' => $rootIndexes]],
+        'nodes' => array_values($nodes),
+    ], JSON_UNESCAPED_SLASHES);
+    $json = str_pad($json, (int) ceil(strlen($json) / 4) * 4, ' ');
+
+    return pack('a4VV', 'glTF', 2, 12 + 8 + strlen($json)).pack('VV', strlen($json), 0x4E4F534A).$json;
+}
+
 function toolCallResponse(string $callId, string $toolName, array $arguments): array
 {
     return [

@@ -171,6 +171,17 @@ class ConversationController extends Controller
             'messages.*.images' => ['sometimes', 'array'],
             'voice_mode' => ['sometimes', 'boolean'],
             'worldId' => ['nullable', 'integer', 'exists:worlds,id'],
+            'worldSessionId' => ['nullable', 'integer', 'required_with:positions'],
+            'positions' => ['nullable', 'array'],
+            'positions.user' => ['sometimes', 'array:x,y,z'],
+            'positions.user.x' => ['required_with:positions.user', 'numeric'],
+            'positions.user.y' => ['required_with:positions.user', 'numeric'],
+            'positions.user.z' => ['required_with:positions.user', 'numeric'],
+            'positions.residents' => ['sometimes', 'array'],
+            'positions.residents.*' => ['array:x,y,z'],
+            'positions.residents.*.x' => ['required', 'numeric'],
+            'positions.residents.*.y' => ['required', 'numeric'],
+            'positions.residents.*.z' => ['required', 'numeric'],
         ]);
 
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
@@ -293,7 +304,13 @@ class ConversationController extends Controller
         $world = isset($validated['worldId'])
             ? $request->user()->worlds()->findOrFail($validated['worldId'])
             : null;
-        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world);
+
+        if ($world !== null && isset($validated['worldSessionId'])) {
+            WorldUser::where('world_id', $world->id)->where('user_id', $request->user()->id)->firstOrFail()
+                ->sessions()->findOrFail($validated['worldSessionId']);
+        }
+
+        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world, $validated['positions'] ?? null);
         $director = new PromptDirector($prompt);
         $this->appendExpressionTags($director, $assistantModel, $excludedSections);
 
