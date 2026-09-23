@@ -59,7 +59,7 @@ class BuildResidentWorldPrompt
             '[action: go_to <place or thing id>] walks you there.',
             '[action: follow] follows the user until you stop.',
             '[action: stop] stops what you are doing.',
-            'Only one action per reply. After it finishes, your recent activity tells you how it went.',
+            'Place the tag by itself at the very end of your reply. One action per reply; after it finishes, your recent activity tells you how it went.',
         ]);
     }
 

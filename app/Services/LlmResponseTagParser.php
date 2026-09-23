@@ -173,7 +173,7 @@ class LlmResponseTagParser
 
         return match ($verb) {
             'follow', 'stop', 'stay' => ['verb' => $verb, 'target' => null, 'activity' => null],
-            'go_to' => $this->parseGoTo($tokens[1] ?? null, $layout, $invalid),
+            'go_to' => $this->parseGoTo(count($tokens) > 1 ? implode(' ', array_slice($tokens, 1)) : null, $layout, $invalid),
             'use' => $this->parseUse($tokens[1] ?? null, $tokens[2] ?? null, $layout, $invalid),
             'zone' => $this->parseZoneActivity($tokens[1] ?? null, $layout, $invalid),
             default => $invalid(sprintf('"%s" is not an action you can take', $verb)),
@@ -186,11 +186,23 @@ class LlmResponseTagParser
             return $invalid('go_to needs a place or thing to go to');
         }
 
-        $known = collect($layout['zones'] ?? [])->pluck('id')->merge(collect($layout['objects'] ?? [])->pluck('id'));
+        $match = collect($layout['zones'] ?? [])->merge($layout['objects'] ?? [])
+            ->first(fn (array $candidate) => $this->sameName($candidate['id'], $target) || $this->sameName($candidate['name'], $target));
 
-        return $known->contains($target)
-            ? ['verb' => 'go_to', 'target' => $target, 'activity' => null]
+        return $match !== null
+            ? ['verb' => 'go_to', 'target' => $match['id'], 'activity' => null]
             : $invalid(sprintf('there is no place or thing called "%s" here', $target));
+    }
+
+    /**
+     * Models write ids loosely ("pool_terrace", "Pool Terrace"), so ids and
+     * names compare case-insensitively with underscores and spaces as hyphens.
+     */
+    private function sameName(string $known, string $written): bool
+    {
+        $normalize = fn (string $value) => trim(preg_replace('/[\s_-]+/u', '-', mb_strtolower($value)), '-');
+
+        return $normalize($known) === $normalize($written);
     }
 
     private function parseUse(?string $spotId, ?string $activityId, array $layout, \Closure $invalid): array
@@ -199,14 +211,16 @@ class LlmResponseTagParser
             return $invalid('use needs a spot and an activity');
         }
 
-        $spot = collect($layout['objects'] ?? [])->flatMap(fn (array $object) => $object['spots'])->firstWhere('id', $spotId);
+        $spot = collect($layout['objects'] ?? [])->flatMap(fn (array $object) => $object['spots'])->first(fn (array $candidate) => $this->sameName($candidate['id'], $spotId));
         if ($spot === null) {
             return $invalid(sprintf('there is no spot called "%s" here', $spotId));
         }
 
-        return collect($spot['activities'])->contains('id', $activityId)
-            ? ['verb' => 'use', 'target' => $spotId, 'activity' => $activityId]
-            : $invalid(sprintf('"%s" cannot be done at "%s"', $activityId, $spotId));
+        $activity = collect($spot['activities'])->first(fn (array $candidate) => $this->sameName($candidate['id'], $activityId) || $this->sameName($candidate['name'], $activityId));
+
+        return $activity !== null
+            ? ['verb' => 'use', 'target' => $spot['id'], 'activity' => $activity['id']]
+            : $invalid(sprintf('"%s" cannot be done at "%s"', $activityId, $spot['id']));
     }
 
     private function parseZoneActivity(?string $activityId, array $layout, \Closure $invalid): array
@@ -215,10 +229,11 @@ class LlmResponseTagParser
             return $invalid('zone needs an activity');
         }
 
-        $exists = collect($layout['zones'] ?? [])->flatMap(fn (array $zone) => $zone['activities'])->contains('id', $activityId);
+        $activity = collect($layout['zones'] ?? [])->flatMap(fn (array $zone) => $zone['activities'])
+            ->first(fn (array $candidate) => $this->sameName($candidate['id'], $activityId) || $this->sameName($candidate['name'], $activityId));
 
-        return $exists
-            ? ['verb' => 'zone', 'target' => null, 'activity' => $activityId]
+        return $activity !== null
+            ? ['verb' => 'zone', 'target' => null, 'activity' => $activity['id']]
             : $invalid(sprintf('there is no activity called "%s" here', $activityId));
     }
 }

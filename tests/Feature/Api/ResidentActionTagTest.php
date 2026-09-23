@@ -29,6 +29,8 @@ it('returns the action a resident chose in her reply', function (string $reply, 
     'follow' => ['Lead the way. [action: follow]', ['verb' => 'follow', 'target' => null, 'activity' => null]],
     'stop' => ['Okay, stopping. [action: stop]', ['verb' => 'stop', 'target' => null, 'activity' => null]],
     'use a spot' => ['Time to relax. [action: use pool-lounger-1-seat recline]', ['verb' => 'use', 'target' => 'pool-lounger-1-seat', 'activity' => 'recline']],
+    'id written with underscores' => ['On my way! [action: go_to pool_terrace]', ['verb' => 'go_to', 'target' => 'pool-terrace', 'activity' => null]],
+    'place written by name' => ['On my way! [action: go_to Pool Terrace]', ['verb' => 'go_to', 'target' => 'pool-terrace', 'activity' => null]],
     'only the first action counts' => ['[action: follow] Actually no. [action: stop]', ['verb' => 'follow', 'target' => null, 'activity' => null]],
 ]);
 
