@@ -28,7 +28,27 @@ A world is divided into named zones (music studio, pool terrace, master bedroom)
 
 ---
 
-### User Story 2 - The resident goes where she means to go (Priority: P2)
+### User Story 2 - Talk while moving, by text or voice (Priority: P2)
+
+Talking to a resident no longer freezes the world. The conversation stays on screen while the user and the resident both keep moving. For typing, the user focuses the message box on purpose, so movement keys type text, and sending the message or leaving the box hands the keys back to movement. For speaking, the user turns on in-world voice mode, as in the regular chat, and talks hands-free while walking. The resident's replies are spoken aloud. Her voice comes from where she is, so it sounds closer or farther away as she moves.
+
+**Why this priority**: Everything the user asks for during a conversation, like "follow me", "meet me at the bar" or "show me the studio", only makes sense if both of them can move while talking. Voice is the most natural way to do that.
+
+**Independent Test**: Open a conversation with the resident, then walk from the foyer to the pool while exchanging messages, first by typing and then by voice. Neither the user nor the resident is ever paused, and every message reaches her.
+
+**Acceptance Scenarios**:
+
+1. **Given** a conversation is open and the message box is not focused, **When** the user presses movement keys, **Then** the user moves and the conversation stays visible.
+2. **Given** the message box is focused, **When** the user types letters that are also movement keys, **Then** they go into the message and the user does not move.
+3. **Given** the user sends a typed message, **When** it is sent, **Then** the keys control movement again without an extra step.
+4. **Given** voice mode is on, **When** the user speaks while walking, **Then** the speech is transcribed and sent without the user stopping, and her reply is spoken aloud.
+5. **Given** the resident is walking to the bar because the user asked her to, **When** the user keeps talking to her, **Then** she keeps walking and replies along the way.
+6. **Given** voice mode is on, **When** the resident is farther away, **Then** her spoken reply sounds farther away than when she is close.
+7. **Given** voice mode is on, **When** the user leaves the world or ends the conversation, **Then** the microphone stops listening.
+
+---
+
+### User Story 3 - The resident goes where she means to go (Priority: P3)
 
 When the resident decides to go somewhere, either because the user asked ("meet me at the bar", "follow me") or because she said she wants to, she walks there along a valid route: through doorways, up and down steps, and around furniture. She can go to a zone, go to a specific object, follow the user, or stop. When she arrives, fails to arrive, or is interrupted, she learns the outcome, so what she says afterwards matches what actually happened.
 
@@ -46,11 +66,11 @@ When the resident decides to go somewhere, either because the user asked ("meet 
 
 ---
 
-### User Story 3 - The resident uses things in the world (Priority: P3)
+### User Story 4 - The resident uses things in the world (Priority: P4)
 
 Objects offer interaction spots with an activity: sit on the piano bench, lie down on the bed, recline on a pool lounger, get a drink at the bar, play the Rhodes. When the resident uses one, she walks to that exact spot, faces the right way, and holds the matching pose until she moves on. Some activities give her something to hold, like a glass after getting a drink, and that state is part of what she knows about herself.
 
-**Why this priority**: This is the payoff that makes the world feel inhabited, but it needs the resident to know the world (P1) and reach the spot (P2) first.
+**Why this priority**: This is the payoff that makes the world feel inhabited, but it needs the resident to know the world (P1) and reach the spot (P3) first.
 
 **Independent Test**: Ask the resident to lie down on a pool lounger. She walks to it, lies down aligned with it, and stays reclined until asked to get up or until she chooses another activity.
 
@@ -64,7 +84,7 @@ Objects offer interaction spots with an activity: sit on the piano bench, lie do
 
 ---
 
-### User Story 4 - The resident chooses what to do when left alone (Priority: P4)
+### User Story 5 - The resident chooses what to do when left alone (Priority: P5)
 
 While the user is in the world but not in conversation with her, the resident periodically decides for herself whether to do something and what. While the user is talking with her, she makes no self-chosen actions; she gives the user her attention and only acts when the user asks her to. Her choice comes from her personality, her mood, what she has done recently and what the world offers. She is not picked at random from a list. An extroverted resident may go get a drink; one who loves music may wander into the studio; one who just had a drink will choose something else. She can carry out a multi-step activity ("get a drink, take it to the pool, lie on a lounger"). She adjusts the plan when a step fails, and drops it when the user speaks to her. Staying where she is counts as a real choice.
 
@@ -87,11 +107,11 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 
 ---
 
-### User Story 5 - World owners mark zones and objects in an intuitive editor (Priority: P5)
+### User Story 6 - World owners mark zones and objects in an intuitive editor (Priority: P6)
 
 A world owner marks up a world without technical knowledge. The editor shows a top-down map of the world, generated from the environment itself. The owner can optionally lay an uploaded blueprint image over it and align it to the map. On the map, the owner draws zones as rectangles or free outlines and names and describes them. The owner places objects on the map or directly in the 3D view and adds interaction spots with a facing direction and activities. A preview of the resident standing, sitting or lying at each spot shows whether it lines up. The editor warns about mistakes the owner cannot easily see: a spot the resident cannot walk to, a zone with no entry point, or overlapping zones that are not nested. Markers already contained in an uploaded environment are imported automatically and can be edited like hand-made ones.
 
-**Why this priority**: Stories 1–4 can be demonstrated on the penthouse, which ships its own markers. The editor is what extends the feature to every other world, like the renaissance faire. It is also the largest single piece of work, so it comes after the behavior it configures has been proven.
+**Why this priority**: Stories 1–5 can be demonstrated on the penthouse, which ships its own markers. The editor is what extends the feature to every other world, like the renaissance faire. It is also the largest single piece of work, so it comes after the behavior it configures has been proven.
 
 **Independent Test**: In an unmarked world, draw a "Jousting field" zone on the map and add a "Grandstand bench" object with a sit spot. The spot preview shows the resident seated on the bench. Entering the world, the resident knows the jousting field exists and can sit on the bench.
 
@@ -119,6 +139,9 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - A world with many zones and objects, such as the faire, produces more description than fits comfortably in the resident's context.
 - The user leaves the world while the resident is in the middle of a held pose.
 - Nobody talks to the resident for a long time, and she keeps choosing activities indefinitely.
+- The user walks far away from the resident in the middle of a conversation.
+- In voice mode, the resident's own spoken reply or background sound is picked up by the microphone.
+- The user denies microphone access, or it becomes unavailable while walking in voice mode.
 
 ## Requirements *(mandatory)*
 
@@ -189,6 +212,16 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - **FR-034**: Zone and object markers contained in an uploaded environment file MUST be imported as the world's zones and objects when the environment is uploaded or replaced.
 - **FR-035**: Zones and objects MUST belong to their world and MUST NOT be readable or editable by other users.
 
+**Conversation while moving**
+
+- **FR-038**: Opening a conversation with a resident MUST NOT pause the world. The user and all residents MUST keep moving and acting.
+- **FR-039**: The conversation MUST stay visible while the user moves.
+- **FR-040**: The user MUST explicitly focus the message box to type. While it is focused, keys MUST go only to the message; otherwise they MUST go only to movement. Sending a message MUST return keys to movement.
+- **FR-041**: The user MUST be able to turn on hands-free voice mode in the world, with the same transcription and spoken replies as the regular chat, without having to stop moving.
+- **FR-042**: The world MUST show whether voice mode is listening, processing or speaking.
+- **FR-043**: The resident's spoken replies MUST sound from her position in the world, with loudness depending on her distance from the user.
+- **FR-044**: The microphone MUST stop listening when the user ends the conversation, turns voice mode off, or leaves the world.
+
 **Direct commands**
 
 - **FR-036**: The user MUST be able to ask the resident in conversation to follow or stop, and she decides how to respond in character.
@@ -226,4 +259,6 @@ A world owner marks up a world without technical knowledge. The editor shows a t
 - Per-activity poses reuse the existing pose library. Activities whose pose is not yet in an assistant's library fall back to the default stance.
 - Idle decisions use the resident's own configured model, and the idle period and rate limits have sensible defaults the owner can change later.
 - Only the world owner's own world sessions drive resident behavior; worlds visited by multiple users at once are out of scope.
+- Voice mode in the world reuses the existing transcription and speech settings of the resident's assistant; no new voice providers are needed.
+- A conversation continues regardless of distance until the user ends it; walking away does not end it.
 - "In conversation" means the user has messaged the resident recently; the length of that window has a sensible default the owner can change later.

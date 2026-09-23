@@ -32,4 +32,5 @@
 ## Notes
 
 - Clarifications resolved: self-chosen steps logged as `(reason) *action*` in conversation and shown in a thought bubble, with no self-chosen actions during conversation (FR-030, FR-030a, FR-030b); editor in scope with auto-generated map and optional blueprint underlay (FR-033–FR-033g); follow/stop both conversational and direct controls (FR-036, FR-037).
+- Added User Story 2 (talk while moving, by text or voice, FR-038–FR-044); later stories renumbered to P3–P6.
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
