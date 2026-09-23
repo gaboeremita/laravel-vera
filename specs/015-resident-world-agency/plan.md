@@ -103,14 +103,13 @@ routes/api.php                              # decisions, activities, state route
 
 resources/js/
 ├── pages/WorldPage.jsx                     # changed: world never paused by chat; hosts overlays and the agency loop
-├── components/WorldMotionPoseEditor.jsx    # changed: shows the posture slots
-├── components/ (pose editor)                # changed: posture selector per pose
+├── components/ (assistant pose editor)      # changed: one section per posture, each with its default pose
 ├── components/world/
 │   ├── WorldScene.jsx                      # changed: navigation grid, name tags, positional audio listener
 │   ├── ResidentController.jsx              # changed: existing locomotion cycle follows routes; held poses; follow
 │   ├── WorldChat.jsx                       # changed: overlay, focus rules, voice mode, distance limit, close control
 │   ├── worldNavigation.js                  # new: walkable grid + A* + smoothing
-│   ├── worldMotionPoses.js                 # changed: sitting, lying and reclining slots; posture-aware pose lookup
+│   ├── worldMotionPoses.js                 # changed: posture-aware pose and default lookup
 │   ├── NameTags.jsx                        # new
 │   ├── OffscreenIndicator.jsx              # new
 │   ├── WorldMap.jsx                        # new: minimap + full map, per-floor images, markers
@@ -143,7 +142,7 @@ Each story is independently shippable. Suggested pull requests, in order:
 2. **Walk and talk (P2)**: chat overlay without pausing, focus rules, one conversation at a time, distance limit, voice mode with positional playback.
 3. **Finding residents (P3)**: name tags, off-screen indicator, per-floor map and minimap.
 4. **Going places (P4)**: walkable grid, A*, route following through the existing locomotion cycle, `go_to`, `follow`, `stop`, direct controls, activities and outcomes.
-5. **Using things (P5)**: spots, approach and placement, held and one-shot poses, postures (pose tagging, the nine posture slots, get-out before standing-only poses), occupancy.
+5. **Using things (P5)**: spots, approach and placement, held and one-shot poses, postures (posture-tagged poses, per-posture defaults, editor sections, standing up for standing-only poses), occupancy.
 6. **Self-chosen activities (P6)**: `autonomous` behavior, decision endpoint, client loop, thought bubbles, presence pause, resident state save and restore.
 
 ## Complexity Tracking

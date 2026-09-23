@@ -56,9 +56,9 @@
 
 ## R9a. Postures
 
-- **Decision**: A resident is always in one posture: `standing` (default), `sitting`, `lying` or `reclining`. Poses gain a `posture` column defaulting to `standing`, and uniqueness becomes (assistant, name, posture), so "laugh" can exist once standing and once sitting. Nine world motion slots are added next to Walk Start, Walk, Walk Stop and Greeting: Sit Down, Sitting, Stand Up; Lie Down, Lying, Get Up; Recline, Reclining, Rise. A triggered pose plays the version for her current posture. When there is none, the posture's get-out motion plays, then the standing version, and she stays standing. Missing slots fall back to the default pose for that step.
-- **Rationale**: Clips are authored for one body position, so a standing laugh cannot play on a stool. Tagging poses per posture keeps names meaningful to the model ("laugh" in any posture) while the world picks the right clip. Get-in, loop and get-out give each posture clean transitions.
-- **Alternatives considered**: One pose per name with per-posture additive layers. Additive VRMA animation is not supported by the existing pose pipeline and would need retargeting work for every assistant.
+- **Decision**: A resident is always in one posture: `standing` (default), `sitting`, `lying` or `reclining`. Poses gain a `posture` column defaulting to `standing`, and uniqueness becomes (assistant, name, posture). Each posture's resting pose is the pose named `default` in that posture, extending how the standing default works today. A triggered pose plays the version for her current posture. When there is none, she blends back to the standing default, plays the standing version, and stays standing. Changing posture blends between default poses using the existing return blend; there are no transition motions. The assistant editor groups poses into one section per posture.
+- **Rationale**: Clips are authored for one body position, so a standing laugh cannot play on a stool. Tagging poses per posture keeps names meaningful to the model ("laugh" in any posture) while the world picks the right clip, and reusing the `default` name means no new slots.
+- **Alternatives considered**: One pose per name with per-posture additive layers. Additive VRMA animation is not supported by the existing pose pipeline.
 
 ## R10. Action tags
 

@@ -23,7 +23,7 @@ Validation follows [contracts/environment-markers.md](contracts/environment-mark
 | `posture` | New string, default `standing`; one of `standing`, `sitting`, `lying`, `reclining`. |
 | unique (`assistant_id`, `name`) | Replaced by unique (`assistant_id`, `name`, `posture`) in a new migration. |
 
-World motion slots (resolved by pose name, like the existing Walk slots): `sit-down`, `sitting`, `stand-up`, `lie-down`, `lying`, `get-up`, `recline`, `reclining`, `rise`.
+Each posture's resting pose is the pose named `default` with that posture. No new world motion slots are added.
 
 ## world_residents (changed)
 

@@ -63,7 +63,7 @@ The object's zone is whichever zone contains the node's position (FR-007). Its s
 | Field | Required | Meaning |
 |-------|----------|---------|
 | `id`, `name` | yes | Identity and wording used in prompts and action lines. |
-| `posture` | no | `sitting`, `lying` or `reclining`. She plays the posture's get-in motion on arrival, holds its loop until she leaves, and plays its get-out motion when she does. Omitted means she stays standing. |
+| `posture` | no | `sitting`, `lying` or `reclining`. On arrival she blends into that posture's default pose and holds it until she leaves. Omitted means she stays standing. |
 | `pose` | no | Name of a pose from her library, played once in her posture after arriving. Missing poses fall back to her default stance (FR-019). |
 
 ## Validation
