@@ -18,6 +18,8 @@
 - Q: What happens to items she picks up, like a drink? → A: Residents do not pick up or carry objects. Activities such as getting a drink are performed as poses at the spot, with no held item.
 - Q: Which model makes the resident's self-chosen activity decisions? → A: Always her own conversation model.
 - Q: Can self-chosen activities be poses from her own library, without using the world? → A: Yes. Any pose in her library (check phone, stretch, dance) is a self-chosen activity she can perform wherever she is.
+- Q: How do poses work when she is sitting, lying or reclining? → A: She is always in one posture: standing (the default), sitting, lying or reclining. Poses are tagged with the posture they are made for, and the version for her current posture plays. Sitting, lying and reclining each have a get-in, a loop and a get-out motion.
+- Q: What happens when she is asked for a pose that has no version for her current posture? → A: She gets out of the posture, plays the standing version, and stays standing.
 - Q: How do maps and location awareness work in worlds with several floors, like the connection node? → A: Floors come from the markers, with every zone belonging to one floor. The map shows one floor at a time, following the user's floor with manual switching, and residents on other floors appear dimmed with their floor name.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -118,6 +120,9 @@ Objects offer interaction spots with an activity: sit on the piano bench, lie do
 3. **Given** another resident already occupies a lounger, **When** the resident tries to use the same lounger, **Then** she is told it is taken and can pick another one.
 4. **Given** the resident gets a drink at the bar, **When** she performs it, **Then** she plays the drinking pose at the bar, and no object appears in her hands.
 5. **Given** an activity with no dedicated pose, **When** the resident performs it, **Then** she still completes it with her default stance, and nothing fails.
+6. **Given** the resident is seated on a bar stool and has a sitting version of "laugh", **When** she laughs, **Then** the sitting version plays and she stays seated.
+7. **Given** the resident is seated and her "dance" pose exists only standing, **When** she dances, **Then** she stands up with her get-out motion, dances, and remains standing.
+8. **Given** the resident sits down on a bench, **When** she arrives at the spot, **Then** her sit-down motion plays, followed by her sitting loop until she leaves, and her stand-up motion plays when she does.
 
 ---
 
@@ -197,6 +202,12 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-017**: An interaction spot MUST be usable by only one resident at a time.
 - **FR-018**: Residents MUST NOT pick up, carry or place objects. Activities are performed as poses at a spot or in a zone.
 - **FR-019**: Activities without a dedicated pose MUST still complete using the resident's default stance.
+- **FR-019a**: A resident MUST always be in exactly one posture: standing (the default), sitting, lying or reclining.
+- **FR-019b**: Poses MUST be tagged with the posture they are made for, defaulting to standing. The same pose name MAY exist once per posture.
+- **FR-019c**: When a pose is triggered, the version for her current posture MUST play. When none exists, she MUST get out of her posture, play the standing version, and remain standing.
+- **FR-019d**: Sitting, lying and reclining MUST each have a get-in motion, a loop motion held while in the posture, and a get-out motion. Missing motions fall back to her default stance for that step.
+- **FR-019e**: Interaction spot activities MUST be able to declare the posture she takes there.
+- **FR-019f**: What she is told about her available poses MUST indicate which ones fit her current posture and which require standing up.
 
 **Action outcomes**
 
@@ -269,7 +280,9 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **Zone**: A named area of a world with a description, a ground outline, a vertical range, its floor, an optional parent zone, an entry point, optional zone-level activities, and a private flag.
 - **World object**: A named, described thing at a position in a world. It belongs to whichever zone contains it, and offers interaction spots.
 - **Interaction spot**: A precise place on an object with a facing direction, the activities it supports, and at most one occupying resident at a time.
-- **Activity**: Something a resident can do at a spot, in a zone, or anywhere using a pose from her own library, with an optional pose.
+- **Activity**: Something a resident can do at a spot, in a zone, or anywhere using a pose from her own library, with an optional posture and an optional pose.
+- **Posture**: The body state a resident is in (standing, sitting, lying, reclining), each non-standing posture with get-in, loop and get-out motions.
+- **Pose**: An entry in a resident's pose library, tagged with the posture it is made for.
 - **Resident state**: A resident's current position, zone, current activity and occupied spot within a world session.
 - **Activity history entry**: A record of what a resident did, where, when, the outcome, and the stated reason.
 - **World map**: The top-down view generated from a world's environment, used for the in-world map.

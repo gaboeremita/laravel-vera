@@ -50,14 +50,15 @@
 
 ## R9. Poses at spots
 
-- **Decision**: A spot's node position is the root placement for the resident while she performs the activity, and the node's +Z axis is her facing. Each activity names a pose from her library and a mode: `hold` plays the clip and keeps its last frame until she leaves; `once` plays it and returns to idle. She walks to an approach point 0.6 m in front of the spot on walkable ground, then blends to the spot placement over 0.4 s.
-- **Rationale**: Separating the approach point from the spot placement lets spots sit on furniture (a lounger, a bar stool) that the walkable grid never reaches. Holding the last frame turns existing one-shot sitting or lying clips into held poses without new animation data.
+- **Decision**: A spot's node position is the root placement for the resident while she performs the activity, and the node's +Z axis is her facing. Each activity may declare a posture (see R9a), held until she leaves, and a pose played once in that posture. She walks to an approach point 0.6 m in front of the spot on walkable ground, then blends to the spot placement over 0.4 s.
+- **Rationale**: Separating the approach point from the spot placement lets spots sit on furniture (a lounger, a bar stool) that the walkable grid never reaches. Posture loops hold her in place on furniture for as long as she stays.
 - **Alternatives considered**: Deriving placement from the furniture's geometry. It needs per-pose knowledge of hip height and fails for arbitrary furniture shapes.
 
-## R9a. Fixed reclining slots
+## R9a. Postures
 
-- **Decision**: Add three world motion slots next to Walk Start, Walk, Walk Stop and Greeting: Recline (once), Reclining (loop) and Get Up (once). An activity whose pose is `recline` plays Recline, then loops Reclining until she leaves, then plays Get Up. Every other activity pose is looked up by name in her normal pose library.
-- **Rationale**: Reclining on the pool loungers and the daybed is the held pose the penthouse needs most, and it needs an entry, a loop and an exit to look right, which a single library pose cannot express. Other activities work as single library poses until they need the same treatment.
+- **Decision**: A resident is always in one posture: `standing` (default), `sitting`, `lying` or `reclining`. Poses gain a `posture` column defaulting to `standing`, and uniqueness becomes (assistant, name, posture), so "laugh" can exist once standing and once sitting. Nine world motion slots are added next to Walk Start, Walk, Walk Stop and Greeting: Sit Down, Sitting, Stand Up; Lie Down, Lying, Get Up; Recline, Reclining, Rise. A triggered pose plays the version for her current posture. When there is none, the posture's get-out motion plays, then the standing version, and she stays standing. Missing slots fall back to the default pose for that step.
+- **Rationale**: Clips are authored for one body position, so a standing laugh cannot play on a stool. Tagging poses per posture keeps names meaningful to the model ("laugh" in any posture) while the world picks the right clip. Get-in, loop and get-out give each posture clean transitions.
+- **Alternatives considered**: One pose per name with per-posture additive layers. Additive VRMA animation is not supported by the existing pose pipeline and would need retargeting work for every assistant.
 
 ## R10. Action tags
 

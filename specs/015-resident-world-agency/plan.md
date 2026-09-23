@@ -19,7 +19,7 @@ Residents gain knowledge of the world, purposeful movement, held poses at furnit
 
 **Primary Dependencies**: Laravel 13, Sanctum, Pest 4; three.js 0.185, @react-three/fiber 9, @pixiv/three-vrm and three-vrm-animation, @ricky0123/vad-web (existing voice mode). No new dependencies.
 
-**Storage**: PostgreSQL. One new column (`worlds.layout`), two new tables (`world_session_residents`, `resident_activities`), one enum value.
+**Storage**: PostgreSQL. New columns `worlds.layout` and `poses.posture` (with its unique index widened to include posture), two new tables (`world_session_residents`, `resident_activities`), one enum value.
 
 **Testing**: Pest feature tests (backend, factory-backed); `node --test` unit tests for client navigation logic, following `tests/Unit/WorldCollision.test.js`. Rendering, animation, voice and map visuals are verified manually per [quickstart.md](quickstart.md).
 
@@ -38,7 +38,7 @@ Residents gain knowledge of the world, purposeful movement, held poses at furnit
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 - **I. Lint-Enforced Code Style**: Pint and ESLint run once at push or PR time per CLAUDE.md. PASS (not a plan-time gate).
-- **II. Append-Only Migrations**: New migrations add `worlds.layout`, create `world_session_residents` and `resident_activities`. The behavior enum is a PHP enum over a string column, so adding `autonomous` needs no schema change. No existing migration is edited. PASS.
+- **II. Append-Only Migrations**: New migrations add `worlds.layout`, add `poses.posture` and replace the poses unique index, create `world_session_residents` and `resident_activities`. The behavior enum is a PHP enum over a string column, so adding `autonomous` needs no schema change. No existing migration is edited. PASS.
 - **III. Comments Justify Only Non-Obvious Decisions**: Only non-obvious constraints get comments, for example why spots have separate approach points. PASS.
 - **IV. Data Isolation by Ownership**: Every new route resolves `{world}` through the requester's `WorldUser` and `{session}` through that membership's sessions, then checks the resident belongs to the world. Activities and resident states are only reachable through that chain. The layout is returned only with a world the requester belongs to. PASS.
 - **V. Errors Fail Loudly**: Invalid markers produce warnings in the upload response. Invalid or unknown action tags produce `failed` outcomes with reasons. Decision failures return error responses and log. No swallowed exceptions. PASS.
@@ -103,13 +103,14 @@ routes/api.php                              # decisions, activities, state route
 
 resources/js/
 ├── pages/WorldPage.jsx                     # changed: world never paused by chat; hosts overlays and the agency loop
-├── components/WorldMotionPoseEditor.jsx    # changed: shows the new reclining slots
+├── components/WorldMotionPoseEditor.jsx    # changed: shows the posture slots
+├── components/ (pose editor)                # changed: posture selector per pose
 ├── components/world/
 │   ├── WorldScene.jsx                      # changed: navigation grid, name tags, positional audio listener
 │   ├── ResidentController.jsx              # changed: existing locomotion cycle follows routes; held poses; follow
 │   ├── WorldChat.jsx                       # changed: overlay, focus rules, voice mode, distance limit, close control
 │   ├── worldNavigation.js                  # new: walkable grid + A* + smoothing
-│   ├── worldMotionPoses.js                 # changed: Recline, Reclining and Get Up slots
+│   ├── worldMotionPoses.js                 # changed: sitting, lying and reclining slots; posture-aware pose lookup
 │   ├── NameTags.jsx                        # new
 │   ├── OffscreenIndicator.jsx              # new
 │   ├── WorldMap.jsx                        # new: minimap + full map, per-floor images, markers
@@ -142,7 +143,7 @@ Each story is independently shippable. Suggested pull requests, in order:
 2. **Walk and talk (P2)**: chat overlay without pausing, focus rules, one conversation at a time, distance limit, voice mode with positional playback.
 3. **Finding residents (P3)**: name tags, off-screen indicator, per-floor map and minimap.
 4. **Going places (P4)**: walkable grid, A*, route following through the existing locomotion cycle, `go_to`, `follow`, `stop`, direct controls, activities and outcomes.
-5. **Using things (P5)**: spots, approach and placement, held and one-shot poses, the Recline, Reclining and Get Up slots, occupancy.
+5. **Using things (P5)**: spots, approach and placement, held and one-shot poses, postures (pose tagging, the nine posture slots, get-out before standing-only poses), occupancy.
 6. **Self-chosen activities (P6)**: `autonomous` behavior, decision endpoint, client loop, thought bubbles, presence pause, resident state save and restore.
 
 ## Complexity Tracking

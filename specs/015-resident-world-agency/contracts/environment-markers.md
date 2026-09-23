@@ -23,7 +23,7 @@ A file with no floor markers has one implicit floor covering all heights.
 { "vera": { "type": "zone", "id": "music-studio", "name": "Music studio", "floor": "ground",
   "description": "The Creator's personal studio. Keyboards everywhere; Hammond and Rhodes on the back wall.",
   "parent": null, "private": false,
-  "activities": [{ "id": "listen", "name": "Listen to music", "pose": "listen", "mode": "hold" }] } }
+  "activities": [{ "id": "listen", "name": "Listen to music", "pose": "listen" }] } }
 ```
 
 | Field | Required | Meaning |
@@ -51,7 +51,7 @@ The object's zone is whichever zone contains the node's position (FR-007). Its s
 
 ```json
 { "vera": { "type": "spot", "id": "pool-lounger-2-seat",
-  "activities": [{ "id": "recline", "name": "Recline", "pose": "recline", "mode": "hold" }] } }
+  "activities": [{ "id": "recline", "name": "Recline", "posture": "reclining" }] } }
 ```
 
 - The node's world position is where the resident's root is placed while performing the activity.
@@ -63,8 +63,8 @@ The object's zone is whichever zone contains the node's position (FR-007). Its s
 | Field | Required | Meaning |
 |-------|----------|---------|
 | `id`, `name` | yes | Identity and wording used in prompts and action lines. |
-| `pose` | no | Name of a pose from the resident's library. Missing or unknown poses fall back to her default stance (FR-019). |
-| `mode` | no | `hold` keeps the pose until she leaves; `once` plays it and returns to standing. Defaults to `once`. |
+| `posture` | no | `sitting`, `lying` or `reclining`. She plays the posture's get-in motion on arrival, holds its loop until she leaves, and plays its get-out motion when she does. Omitted means she stays standing. |
+| `pose` | no | Name of a pose from her library, played once in her posture after arriving. Missing poses fall back to her default stance (FR-019). |
 
 ## Validation
 

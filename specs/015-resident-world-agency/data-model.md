@@ -12,9 +12,18 @@ Layout shapes, all in world space:
 - **Zone**: `id`, `name`, `description`, `floorId`, `parentId`, `private`, `outline` (`[[x, z], …]`), `minY`, `maxY`, `entry` (`{x, y, z}`), `activities`.
 - **Object**: `id`, `name`, `description`, `position`, `zoneId` (resolved at import, FR-007), `spots`.
 - **Spot**: `id`, `position`, `facing` (yaw in radians), `approach` (`{x, y, z}`, 0.6 m along facing), `activities`.
-- **Activity**: `id`, `name`, `pose` (nullable), `mode` (`hold` | `once`).
+- **Activity**: `id`, `name`, `posture` (nullable: `sitting` | `lying` | `reclining`), `pose` (nullable, played once in that posture).
 
 Validation follows [contracts/environment-markers.md](contracts/environment-markers.md).
+
+## poses (changed)
+
+| Column | Change |
+|--------|--------|
+| `posture` | New string, default `standing`; one of `standing`, `sitting`, `lying`, `reclining`. |
+| unique (`assistant_id`, `name`) | Replaced by unique (`assistant_id`, `name`, `posture`) in a new migration. |
+
+World motion slots (resolved by pose name, like the existing Walk slots): `sit-down`, `sitting`, `stand-up`, `lie-down`, `lying`, `get-up`, `recline`, `reclining`, `rise`.
 
 ## world_residents (changed)
 
@@ -35,6 +44,7 @@ A resident's saved state within one world session (FR-032).
 | `rotation` | json | `{y}` |
 | `spot_id` | string, nullable | Layout spot id she occupies. |
 | `activity_id` | string, nullable | Layout activity id she is holding. |
+| `posture` | string | `standing`, `sitting`, `lying` or `reclining`; restored on return. |
 | timestamps | | |
 
 Ownership: reached only through `WorldUser → WorldSession`, and the resident must belong to the session's world (Principle IV).
