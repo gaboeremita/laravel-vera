@@ -6,6 +6,7 @@ import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
 import PosturePoseSections from '../components/PosturePoseSections.jsx';
+import ModelVoiceFields from '../components/ModelVoiceFields.jsx';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
 export default function CreateAssistantPage({ kind = 'assistant' }) {
@@ -36,6 +37,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 	// Archive
 	const [archives, setArchives] = useState([]);
 	const [selectedArchiveId, setSelectedArchiveId] = useState('');
+	const [modelVoice, setModelVoice] = useState({ aiModelId: null, ttsModelId: null, ttsVoice: null });
 
 	// Agent mode
 	const [assistantMode, setAssistantMode] = useState('assistant');
@@ -111,7 +113,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 
 	const isDefaultPoseFor = (posture) => (pose) => pose.name === 'default' && pose.posture === posture;
 
-	const handleAddPose = (poseName, blendshapes, file, posture = 'standing') => {
+	const handleAddPose = (poseName, blendshapes, file, posture = 'standing', restricted = false) => {
 		if (stagedPoses.some((p) => p.name === poseName && p.posture === posture)) {
 			addToast(`A ${posture} pose named "${poseName}" already exists`, 'error');
 			return;
@@ -126,6 +128,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 				id: localId,
 				name: poseName,
 				posture,
+				restricted,
 				vrm_blendshapes: blendshapes,
 				animation_url: file ? URL.createObjectURL(file) : null,
 				animation_original_name: file ? file.name : null,
@@ -256,6 +259,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 				stagedPoses.forEach((pose, i) => {
 					formData.append(`poses[${i}][name]`, pose.name);
 					formData.append(`poses[${i}][posture]`, pose.posture);
+					formData.append(`poses[${i}][restricted]`, pose.restricted ? '1' : '0');
 					(pose.vrm_blendshapes || []).forEach((b, j) => {
 						formData.append(`poses[${i}][vrm_blendshapes][${j}][expression]`, b.expression);
 						formData.append(`poses[${i}][vrm_blendshapes][${j}][weight]`, b.weight);
@@ -285,6 +289,21 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 					addToast(vrmError.message || `${isNpc ? 'NPC' : 'Assistant'} created, but the VRM upload failed`, 'error');
 					navigate(collectionPath);
 					return;
+				}
+			}
+
+			if (isNpc && created.id) {
+				const settingsRequests = [
+					modelVoice.aiModelId && ['settings.selectModel', { ai_model_id: modelVoice.aiModelId }, 'LLM model'],
+					modelVoice.ttsModelId && ['settings.selectVoiceModel', { tts_model_id: modelVoice.ttsModelId }, 'voice model'],
+					modelVoice.ttsVoice && ['settings.updateVoice', { tts_voice: modelVoice.ttsVoice }, 'voice'],
+				].filter(Boolean);
+				for (const [routeName, payload, label] of settingsRequests) {
+					const settingsRes = await api.put(route(routeName, { assistant: created.id }), payload);
+					if (!settingsRes.ok) {
+						const settingsError = await settingsRes.json().catch(() => ({}));
+						addToast(`NPC created, but its ${label} could not be saved (${settingsError.message || `HTTP ${settingsRes.status}`}); set it on the edit screen`, 'error');
+					}
 				}
 			}
 
@@ -381,6 +400,8 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 							))}
 						</select>
 					</div>
+
+					{isNpc && <ModelVoiceFields value={modelVoice} onChange={(changes) => setModelVoice((current) => ({ ...current, ...changes }))} addToast={addToast} />}
 
 					{!isNpc && <div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">

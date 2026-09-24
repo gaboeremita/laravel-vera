@@ -33,8 +33,8 @@ it('lists the poses that fit her posture and the ones that make her stand up', f
 
     expect(sentSystemPrompt())
         ->toContain('You are sitting.')
-        ->toContain('Available poses: laugh')
-        ->toContain('Poses that make you stand up: dance');
+        ->toContain("Available poses:\nRegular: laugh\nRestricted: \n")
+        ->toContain("Poses that make you stand up:\nRegular: dance");
 });
 
 it('assumes she is standing when no posture is sent', function () {
@@ -43,7 +43,7 @@ it('assumes she is standing when no posture is sent', function () {
     sendWorldMessage($this, $scenario, [])->assertSuccessful();
 
     expect(sentSystemPrompt())
-        ->toContain('Available poses: laugh, dance')
+        ->toContain("Available poses:\nRegular: laugh, dance")
         ->not->toContain('Poses that make you stand up');
 });
 
@@ -61,6 +61,18 @@ it('lists only the poses that fit while she swims', function () {
 
     expect(sentSystemPrompt())
         ->toContain('You are swimming.')
-        ->toContain('Available poses: splash')
+        ->toContain("Available poses:\nRegular: splash")
         ->not->toContain('Poses that make you stand up');
+});
+
+it('lists restricted poses apart from the regular ones', function () {
+    $scenario = postureScenario();
+    Pose::factory()->restricted()->create(['assistant_id' => $scenario[1]->id, 'name' => 'tease']);
+    Pose::factory()->posture(Posture::Sitting)->restricted()->create(['assistant_id' => $scenario[1]->id, 'name' => 'lean-in']);
+
+    sendWorldMessage($this, $scenario, [], ['residentPosture' => 'sitting'])->assertSuccessful();
+
+    expect(sentSystemPrompt())
+        ->toContain("Available poses:\nRegular: laugh\nRestricted: lean-in")
+        ->toContain("Poses that make you stand up:\nRegular: dance\nRestricted: tease");
 });

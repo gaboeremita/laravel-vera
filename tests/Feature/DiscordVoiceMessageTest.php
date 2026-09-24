@@ -82,6 +82,7 @@ function mockTts(string $audioBytes = 'fake-audio-bytes', string $contentType = 
 
         $managerMock = Mockery::mock(TtsManager::class);
         $managerMock->shouldReceive('forAssistantUser')->andReturn($ttsMock);
+        $managerMock->shouldReceive('resolveVoice')->andReturn(null);
 
         return $managerMock;
     });
@@ -91,11 +92,12 @@ function mockTtsExpectingText(string $expectedText, string $audioBytes = 'fake-a
 {
     app()->bind(TtsManager::class, function () use ($expectedText, $audioBytes) {
         $ttsMock = Mockery::mock(TtsProvider::class);
-        $ttsMock->shouldReceive('synthesize')->once()->with($expectedText)->andReturn($audioBytes);
+        $ttsMock->shouldReceive('synthesize')->once()->with($expectedText, null)->andReturn($audioBytes);
         $ttsMock->shouldReceive('contentType')->andReturn('audio/mpeg');
 
         $managerMock = Mockery::mock(TtsManager::class);
         $managerMock->shouldReceive('forAssistantUser')->andReturn($ttsMock);
+        $managerMock->shouldReceive('resolveVoice')->andReturn(null);
 
         return $managerMock;
     });
@@ -109,6 +111,7 @@ function mockFailingTts(): void
 
         $managerMock = Mockery::mock(TtsManager::class);
         $managerMock->shouldReceive('forAssistantUser')->andReturn($ttsMock);
+        $managerMock->shouldReceive('resolveVoice')->andReturn(null);
 
         return $managerMock;
     });
@@ -465,6 +468,52 @@ test('[US4] /send-voice-message from web returns audioError when TTS fails', fun
     expect($response->json('content'))->toBe('Fallback text reply');
     expect($response->json('audioBase64'))->toBeNull();
     expect($response->json('audioError'))->toContain('Voice synthesis failed');
+});
+
+test('[US2] synthesized reply uses the voice selected in settings', function () {
+    [$user, $assistant] = setUpDiscordAssistant(['discordVoiceResponseMode' => 'both']);
+    mockStt('Hello there');
+
+    $voiceProvider = VoiceProvider::create([
+        'user_id' => $user->id,
+        'name' => 'ElevenLabs',
+        'url' => 'https://fake-elevenlabs.test/v1/text-to-speech',
+        'format' => 'elevenlabs',
+    ]);
+
+    $voiceModel = VoiceModel::create([
+        'provider_id' => $voiceProvider->id,
+        'name' => 'Multilingual v2',
+        'endpoint' => 'eleven_multilingual_v2',
+        'voices' => ['default-voice-id', 'chosen-voice-id'],
+        'config' => ['timeout' => 30],
+    ]);
+
+    $settings = Settings::where('user_id', $user->id)
+        ->where('assistant_id', $assistant->id)
+        ->first();
+    $settings->update(['data' => [...$settings->data, 'tts_model_id' => $voiceModel->id, 'tts_voice' => 'chosen-voice-id']]);
+
+    Http::fake([
+        'fake-llm.test/*' => Http::response(finalAnswerResponse('Hi! How can I help?')),
+        'fake-elevenlabs.test/*' => Http::response('elevenlabs-audio', 200, ['Content-Type' => 'audio/mpeg']),
+    ]);
+
+    $response = $this->actingAs($user)->postJson(
+        route('conversations.sendDiscordMessage', $assistant),
+        [
+            'channel_id' => 'test-channel-chosen-voice',
+            'content' => null,
+            'audio' => base64_encode('fake-audio-data'),
+            'audioContentType' => 'audio/ogg',
+        ],
+    );
+
+    $response->assertSuccessful();
+    expect($response->json('audioBase64'))->toBe(base64_encode('elevenlabs-audio'));
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://fake-elevenlabs.test/v1/text-to-speech/chosen-voice-id');
+    Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/default-voice-id'));
 });
 
 // === Polish: Cross-cutting Tests ===

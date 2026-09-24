@@ -353,7 +353,7 @@ A resident placement has a position, a stationary-or-roam behavior (roam takes a
 
 ### NPCs
 
-NPCs are lightweight, assistant-backed characters managed in their own section (reachable from Home), reusing the same model/pose/prompt/archive tooling as a normal assistant — `CreateNpcPage`/`EditAssistantPage` render the existing assistant forms with `kind="world_npc"` rather than separate NPC-specific pages. An NPC is not tied to any one world; it can be added as a resident to any number of them, and removing it from a world only removes that placement, never the NPC itself (permanent deletion happens only from the NPC section, with confirmation).
+NPCs are lightweight, assistant-backed characters managed in their own section (reachable from Home), reusing the same model/pose/prompt/archive tooling as a normal assistant — `CreateNpcPage`/`EditAssistantPage` render the existing assistant forms with `kind="world_npc"` rather than separate NPC-specific pages. The NPC create and edit screens also choose its LLM model, voice model and voice (from the providers set up on the AI Providers and Voice pages) and its archive; without a model it uses the default one. An NPC is not tied to any one world; it can be added as a resident to any number of them, and removing it from a world only removes that placement, never the NPC itself (permanent deletion happens only from the NPC section, with confirmation).
 
 ### World Sessions
 
@@ -369,9 +369,9 @@ Approaching a resident within 4 m shows a `C — Chat` prompt; pressing `C` open
 
 ### Residents in a Marked World
 
-An environment GLB can mark floors, zones, objects and interaction spots with custom properties on empties (`extras.vera`); they are read on upload, and invalid ones are reported as warnings. There is no in-app marker editor. In a marked world, residents know where they are, where you are, and what is around them, and they act through tools during conversation: they can look up where to do something or what a place holds, go somewhere or come to you, follow you or stop (also `F`/`X` during a conversation), sit, lie, recline or do an activity at a spot, do an activity of the place they are in, wander around, swim and rest at the pool's edge, and plan several steps at once, including narrated steps with no marked spot behind them (singing at the mic, making tea). A resident needs a model that supports tool calling (NPCs use the default model).
+An environment GLB can mark floors, zones, objects and interaction spots with custom properties on empties (`extras.vera`); they are read on upload, and invalid ones are reported as warnings. There is no in-app marker editor. In a marked world, residents know where they are, where you are, and what is around them, and they act through tools during conversation: they can look up where to do something or what a place holds, go somewhere or come to you, follow you or stop (also `F`/`X` during a conversation), sit, lie, recline or do an activity at a spot, do an activity of the place they are in, wander around, swim and rest at the pool's edge, and plan several steps at once, including narrated steps with no marked spot behind them (singing at the mic, making tea). A resident needs a model that supports tool calling (an NPC without one of its own uses the default model).
 
-Poses belong to a posture — standing, sitting, lying, reclining or swimming — with one default pose each, edited in one tab per posture on the assistant page. The standing tab also holds the Walk Start/Walk/Walk Stop/Greeting motion poses, and the swimming tab Swim and Swim To Edge.
+Poses belong to a posture — standing, sitting, lying, reclining or swimming — with one default pose each, edited in one tab per posture on the assistant page. The standing tab also holds the Walk Start/Walk/Walk Stop/Greeting motion poses, and the swimming tab Swim and Swim To Edge. Each tab has a Restricted Poses list beside the regular one; the model sees both, grouped as regular and restricted, in conversation and in idle decisions.
 
 A resident set to **Autonomous** chooses what to do on her own while you are in the world and not talking to her: 10–30 seconds after each step she decides her next one with her own model, shown in a thought bubble as `(reason) *action*` and saved in her conversation. Decisions pause after 5 minutes without any input from you. Where each resident is, and in which posture, is saved per session.
 
@@ -649,7 +649,7 @@ laravel-vera/
 - **Multi-assistant architecture** — each assistant has its own prompt, expression set, and opening message, all stored in the DB
 - **Multi-theme support** — theme selection via Settings page, stored per-user in the DB
 - **Dynamic expression system** — emotion images and videos served from the database, per assistant
-- **Restricted emotion set** — alternate expressions unlocked based on context
+- **Restricted expressions** — a restricted set of emotions and of poses per assistant, used when the assistant's prompt calls for it
 - **Authentication** — Sanctum SPA auth with login flow
 - **Image sending** — attach and send images for the assistant to analyze (stored on disk)
 - **Thinking display** — collapsible view of the LLM's reasoning process
@@ -684,16 +684,14 @@ laravel-vera/
 
 ## Expression System
 
-Emotions are stored in the database as `Emotion` records with associated `Image` and `Video` files on disk, scoped per assistant. Two sets exist:
+Image-portrait assistants express themselves through emotions; 3D avatar assistants through poses. Both come in two sets per assistant, a standard set and a restricted set, managed on the assistant page (Restricted Emotions grid; Restricted Poses list in each posture tab).
 
-- **Standard set** (`restricted = false`) — default expressions
-- **Restricted set** (`restricted = true`) — alternate expressions, unlocked via the `unlocked` query param on `GET /api/assistants/{assistant}/emotions`
+- **Emotions** — `Emotion` records with an image and optional video on disk. The reply carries an `[emotion: name]` tag, parsed on the server, which picks the portrait image.
+- **Poses** — `Pose` records with VRM blendshapes and an optional VRMA/FBX animation, one version per posture. The reply carries a `[pose: name]` tag, which plays the pose on the avatar or the world resident.
 
-The LLM prefixes each response with an emotion tag (e.g. `[annoyed]`) which is parsed by the frontend and used to look up the matching expression asset.
+Both sets are sent to the model in every conversation, grouped as regular and restricted (the emotion list labels the restricted group `intimate`), and a tag from either set plays. When the restricted set is used is up to the assistant's own prompt, such as an intimate mode section. Restricted poses are also offered in world tools and idle decisions.
 
-Run `php artisan emotions:sync` to seed/update emotion records from config.
-
-Emotions are now also manageable per-assistant directly through the UI on the Edit Assistant page (`/assistants/:id/edit`).
+`php artisan emotions:sync --assistant=<id>` syncs an assistant's emotions from `storage/app/private/emotions/images` and `images/restricted` (plus the matching `videos` folders): it adds new ones and removes those without a source image.
 
 ## License
 

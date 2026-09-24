@@ -218,7 +218,7 @@ Every self-chosen step is recorded in the conversation using roleplay convention
 - **FR-020**: Every action the resident takes MUST report its outcome (completed, failed with a reason, or interrupted) back to her before she continues.
 - **FR-021**: Actions naming things that do not exist MUST fail with a reason the resident is told about. They MUST NOT be silently ignored.
 - **FR-021b**: Residents MUST act through tool calls whose arguments are limited to the world's real places, things, spots and activities. A rejected call MUST be returned to her within the same turn so she can correct it.
-- **FR-021c**: Assistants MUST use a tool-capable model to live in a world; a conversation in a world with an assistant whose model lacks tool calling MUST fail with a clear error. NPCs always get the world tools.
+- **FR-021c**: Assistants MUST use a tool-capable model to live in a world; a conversation in a world with an assistant whose model lacks tool calling MUST fail with a clear error. NPCs always get the world tools, on the model chosen for them, else the default model.
 - **FR-021d**: In a marked world, the resident's prompt MUST remind her that she can use her world tools on her own initiative whenever the conversation, her mood or a passing thought brings the space to mind, whether or not the user asks.
 - **FR-021a**: When the zone, object or spot an action targets disappears while the action runs (for example, because the environment was replaced), the action MUST fail with a reason.
 - **FR-022**: Each resident MUST keep a recent-activity history (what she did, where, when, and why she chose it) that informs her later decisions.

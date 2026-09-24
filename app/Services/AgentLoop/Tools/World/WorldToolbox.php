@@ -18,14 +18,21 @@ class WorldToolbox
     /**
      * @param  array<int, array<string, mixed>>  $residentZoneChain  the zone she stands in and the zones around it; empty when her position is unknown
      * @param  array<int, string>  $occupiedSpots  spot ids other residents are using
-     * @param  array<int, string>  $poseNames  names of the poses in her library, in any posture
+     * @param  array<string, array<int, string>>  $posePostures  the postures each of her poses exists in, by pose name
      */
     public function __construct(
         public readonly World $world,
         public readonly array $residentZoneChain = [],
         public readonly array $occupiedSpots = [],
-        public readonly array $poseNames = [],
-    ) {}
+        public readonly array $posePostures = [],
+    ) {
+        $this->poseNames = array_keys($posePostures);
+    }
+
+    /**
+     * @var array<int, string>
+     */
+    public readonly array $poseNames;
 
     /**
      * @return AgentTool[]
@@ -122,15 +129,30 @@ class WorldToolbox
     /**
      * The pose she plays for an activity: the one she chose from her own
      * library, else the activity's own pose when she has one by that name.
+     * It must have a version for the activity's posture, since an activity
+     * never stands her up; a null posture accepts any of her poses.
      *
      * @param  array<string, mixed>  $activity
      */
-    public function poseForActivity(array $activity, string $chosen): ?string
+    public function poseForActivity(array $activity, string $chosen, ?string $posture = 'activity'): ?string
     {
+        $posture = $posture === 'activity' ? ($activity['posture'] ?? 'standing') : $posture;
+        $fits = fn (string $name) => $posture === null || in_array($posture, $this->posePostures[$name] ?? [], true);
+
         if ($chosen !== '') {
             $pose = collect($this->poseNames)->first(fn (string $name) => $this->sameName($name, $chosen));
             if ($pose === null) {
                 throw new RuntimeException(sprintf('You have no pose called "%s". Your poses: %s.', $chosen, implode(', ', $this->poseNames)));
+            }
+            if (! $fits($pose)) {
+                $fitting = collect($this->poseNames)->filter($fits)->reject(fn (string $name) => $name === 'default');
+                throw new RuntimeException(sprintf(
+                    'Your pose "%s" has no %s version, and this activity keeps you %s. %s',
+                    $pose,
+                    $posture,
+                    $posture,
+                    $fitting->isEmpty() ? 'Leave the pose out.' : 'Your '.$posture.' poses: '.$fitting->implode(', ').'; or leave the pose out.',
+                ));
             }
 
             return $pose;
@@ -138,7 +160,7 @@ class WorldToolbox
 
         $own = $activity['pose'] ?? null;
 
-        return $own === null ? null : collect($this->poseNames)->first(fn (string $name) => $this->sameName($name, $own));
+        return $own === null ? null : collect($this->poseNames)->first(fn (string $name) => $this->sameName($name, $own) && $fits($name));
     }
 
     /**
@@ -146,7 +168,7 @@ class WorldToolbox
      */
     public function poseParameter(): array
     {
-        $parameter = ['type' => 'string', 'description' => 'The pose of yours that fits this activity best, when its own pose is named differently from yours. Leave it out to use the activity\'s own pose.'];
+        $parameter = ['type' => 'string', 'description' => 'The pose of yours that fits this activity best, when its own pose is named differently from yours. It must be a pose you have in the posture the activity puts you in (a sitting pose for sitting down). Leave it out to use the activity\'s own pose.'];
 
         return $this->poseNames === [] ? $parameter : [...$parameter, 'enum' => $this->poseNames];
     }

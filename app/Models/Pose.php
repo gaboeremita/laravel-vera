@@ -19,6 +19,7 @@ class Pose extends Model
         'name',
         'posture',
         'vrm_blendshapes',
+        'restricted',
     ];
 
     /**
@@ -26,6 +27,7 @@ class Pose extends Model
      */
     protected $attributes = [
         'posture' => 'standing',
+        'restricted' => false,
     ];
 
     protected function casts(): array
@@ -33,6 +35,7 @@ class Pose extends Model
         return [
             'posture' => Posture::class,
             'vrm_blendshapes' => 'array',
+            'restricted' => 'boolean',
         ];
     }
 

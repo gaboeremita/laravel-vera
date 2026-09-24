@@ -303,3 +303,64 @@ it('returns only standing poses to the chat portrait', function () {
         ->assertSuccessful()
         ->assertJsonCount(1, 'poses');
 });
+
+it('creates poses as unrestricted unless restricted is given', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.store', ['assistant' => $assistant->id]), ['name' => 'wave'])
+        ->assertCreated()
+        ->assertJsonPath('restricted', false);
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.store', ['assistant' => $assistant->id]), ['name' => 'tease', 'posture' => 'sitting', 'restricted' => true])
+        ->assertCreated()
+        ->assertJsonPath('restricted', true)
+        ->assertJsonPath('posture', 'sitting');
+
+    expect(Pose::where('assistant_id', $assistant->id)->where('name', 'tease')->first()->restricted)->toBeTrue();
+});
+
+it('keeps a restricted pose restricted when it moves to another posture', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+    $pose = Pose::factory()->restricted()->create(['assistant_id' => $assistant->id, 'name' => 'tease']);
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.update', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['posture' => 'lying'])
+        ->assertSuccessful()
+        ->assertJsonPath('posture', 'lying')
+        ->assertJsonPath('restricted', true);
+});
+
+it('assistants.show marks restricted poses', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+    Pose::factory()->create(['assistant_id' => $assistant->id, 'name' => 'spin']);
+    Pose::factory()->restricted()->create(['assistant_id' => $assistant->id, 'name' => 'tease']);
+
+    $this->actingAs($user)
+        ->getJson(route('assistants.show', ['id' => $assistant->id]))
+        ->assertSuccessful()
+        ->assertJsonPath('poses.0.restricted', false)
+        ->assertJsonPath('poses.1.name', 'tease')
+        ->assertJsonPath('poses.1.restricted', true);
+});
+
+it('creates restricted poses at assistant creation time', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->postJson(route('assistants.store'), [
+            'name' => 'Avatar Assistant',
+            'slug' => 'avatar-assistant-restricted-poses',
+            'portrait_type' => 'avatar3d',
+            'poses' => [
+                ['name' => 'spin'],
+                ['name' => 'tease', 'posture' => 'sitting', 'restricted' => true],
+            ],
+        ]);
+
+    $response->assertCreated();
+    $assistant = Assistant::find($response->json('id'));
+    expect($assistant->poses()->where('name', 'spin')->first()->restricted)->toBeFalse()
+        ->and($assistant->poses()->where('name', 'tease')->first()->restricted)->toBeTrue();
+});

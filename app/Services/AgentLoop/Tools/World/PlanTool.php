@@ -135,7 +135,7 @@ class PlanTool extends WorldTool
                     throw new RuntimeException('A do step needs a description of what you do.');
                 }
 
-                return [[...$normalized, 'pose' => $this->toolbox->poseForActivity([], $pose)], $location];
+                return [[...$normalized, 'pose' => $this->toolbox->poseForActivity([], $pose, null)], $location];
             case 'stay':
             case 'swim_to_edge':
                 return [$normalized, $location];

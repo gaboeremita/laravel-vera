@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AssistantKind;
+use App\Enums\Posture;
 use App\Models\AiModel;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
@@ -211,7 +212,7 @@ it('gives a plan with a bad step back to her with the step number', function (ar
 
 it('plays the pose she picks from her own library for an activity', function (array $arguments, ?string $pose) {
     $scenario = worldStateScenario(fakeReply: false);
-    Pose::factory()->create(['assistant_id' => $scenario[1]->id, 'name' => 'lounge_back']);
+    Pose::factory()->posture(Posture::Reclining)->create(['assistant_id' => $scenario[1]->id, 'name' => 'lounge_back']);
     fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline', ...$arguments]), finalAnswerResponse('Ah.'));
 
     sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action.pose', $pose);
@@ -252,3 +253,32 @@ it('wanders around a place or around where she is', function (array $arguments, 
     'a place' => [['place' => 'gallery'], 'gallery'],
     'around her' => [[], null],
 ]);
+
+it('rejects a pose with no version for the posture the activity puts her in', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    Pose::factory()->create(['assistant_id' => $scenario[1]->id, 'name' => 'flirty']);
+    Pose::factory()->posture(Posture::Reclining)->create(['assistant_id' => $scenario[1]->id, 'name' => 'sunbathe']);
+    fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline', 'pose' => 'flirty']), finalAnswerResponse('Hm.'));
+
+    sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', null);
+    expect(toolResultSentBack())->toContain('has no reclining version')->toContain('Your reclining poses: sunbathe');
+});
+
+it('runs an NPC on the model chosen for it instead of the default', function () {
+    config(['ai.default.url' => 'https://default-llm.test/chat/completions', 'ai.default.model' => 'default', 'ai.default.format' => 'generic']);
+    [$user, , , $world] = worldStateScenario(fakeReply: false);
+    $npc = Assistant::factory()->create(['kind' => AssistantKind::WorldNpc, 'mode' => 'assistant']);
+    $assistantUser = AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $npc->id]);
+    $conversation = Conversation::factory()->create(['assistant_user_id' => $assistantUser->id]);
+    $world->residents()->create(['assistant_id' => $npc->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
+    $this->actingAs($user)->putJson(route('settings.selectModel', ['assistant' => $npc->id]), ['ai_model_id' => AiModel::query()->value('id')])->assertSuccessful();
+    Http::fake([
+        'fake-llm.test/*' => Http::response(finalAnswerResponse('Hi.')),
+        'default-llm.test/*' => Http::response(finalAnswerResponse('Wrong model.')),
+    ]);
+
+    $this->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $npc->id, 'id' => $conversation->id]), [
+        'messages' => [['role' => 'user', 'content' => 'Hello.']],
+        'worldId' => $world->id,
+    ])->assertSuccessful()->assertJsonPath('content', 'Hi.');
+});

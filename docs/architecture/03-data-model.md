@@ -97,6 +97,7 @@ erDiagram
         bigint assistant_id FK
         string name
         string posture
+        boolean restricted
         json vrm_blendshapes
     }
     pose_animation_files {

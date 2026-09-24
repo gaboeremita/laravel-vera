@@ -35,6 +35,15 @@ class TtsManager
             : null;
     }
 
+    public function resolveVoice(AssistantUser $assistantUser): ?string
+    {
+        $settings = Settings::where('user_id', $assistantUser->user_id)
+            ->where('assistant_id', $assistantUser->assistant_id)
+            ->first();
+
+        return $settings?->data['tts_voice'] ?? null;
+    }
+
     public function fromModel(VoiceModel $voiceModel): TtsProvider
     {
         $class = $voiceModel->provider->format->providerClass();

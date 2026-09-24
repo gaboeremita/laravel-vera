@@ -221,7 +221,7 @@ export default function ResidentController({ resident, savedState = null, player
 			});
 		});
 		const performActivity = (poseName) => interruptible((async () => {
-			const result = poseName ? await playPoseRef.current?.(poseName) : null;
+			const result = poseName ? await playPoseRef.current?.(poseName, { standUpIfNeeded: false }) : null;
 			if (!result?.played) await new Promise((resolve) => setTimeout(resolve, ACTIVITY_HOLD_MS));
 			return completed;
 		})());
