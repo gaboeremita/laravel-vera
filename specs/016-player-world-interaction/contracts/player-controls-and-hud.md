@@ -1,0 +1,43 @@
+# Contract: Player Controls and World Interface
+
+## Keys
+
+All keys are ignored while the message box or any text field has focus.
+
+| Key | Where | Action |
+|-----|-------|--------|
+| W A S D | exploring | Move (existing). |
+| W A S D, Space | on a spot | Get up. |
+| W A S D | standing activity in progress | Cancel it. |
+| Shift (hold) | moving | Run; swim faster in the water. |
+| E | an object in focus | Open its card; press again to close. |
+| G | inside a zone | Open the zone's card; press again to close. |
+| 1–9 | a card is open | Start that row's activity. |
+| C, F, X, M, V | unchanged | Chat, follow, stop, map, voice. |
+
+## Interface elements
+
+| Element | Position | Appears | Leaves | Content |
+|---------|----------|---------|--------|---------|
+| Zone title card | upper centre, below the conversation warning | on a zone crossing (not within 2 s of leaving that zone) and when the world becomes ready | after 3 s, or when replaced | Zone name; context line with parent zone and, in multi-floor worlds, floor. |
+| Location readout | bottom right, above the minimap | while exploring a world with zones | never | `ZONE · FLOOR`, or the world's name outside zones. Breathing glow. |
+| Object dots | in the world, at objects within 6 m | on entering 6 m | on leaving | Faint breathing dot. |
+| Spot beacons | in the world, at each spot of the focused object | on focus | on losing focus | Ring per spot (accent = free, dimmed warning = taken), light column at the object. |
+| Focus prompt | in the world, above the object | on focus | on losing focus | Object name, `E — INSPECT`, and for single-activity objects `1 — <ACTIVITY>`. |
+| Object card | right side, clear of the conversation panel (left) and minimap (bottom right) | E | E, leaving reach, or starting an activity | Name; zone chain; description; activity rows: key, name, posture glyph, availability (`FREE`, `2 OF 8 FREE`, `TAKEN · VERA`). Objects without activities say `NOTHING TO DO HERE`. |
+| Zone card | right side, same slot | G | G, or leaving the zone | Name; parent zone; floor; description; zone activity rows. |
+| Posture hint | bottom centre | on settling on a spot | on getting up | `SPACE — GET UP`. |
+| Progress ring | screen centre | on starting a standing or zone activity | when filled or cancelled | Filling ring with glowing head; activity name beneath. |
+| Action line | bottom centre, above the posture hint | when an activity is started (resting), completed (standing) or left | after 4 s | The line, italic, e.g. *sits down at the bar counter*. |
+| Notice | bottom centre | when no spot is free for the chosen activity | after 3 s | e.g. `NO FREE SEAT — ALL 8 ARE TAKEN`. |
+| Swim overlay | screen edges | while swimming | on leaving the water | Caustic shimmer and tint. |
+
+Only one card is open at a time; opening one replaces the other. The title card and notices never cover the conversation panel, a card or the full map; while the full map is open, the title card waits and shows the latest crossing when the map closes.
+
+## Motion
+
+Every element enters and leaves with an animation (wipe, slide or fade), and persistent elements carry a slow ongoing effect (glow pulse, scan-line drift, beacon rotation). Under `prefers-reduced-motion: reduce`, entrances and exits become 150 ms fades, and ongoing effects, the swimming bob and the running field-of-view change stop.
+
+## Theming
+
+Colours, fonts and borders come only from the active theme's tokens (`--accent`, `--bg-*`, `--fg-*`, `--border-*`, `--warning`, `--font-display`); nothing is hard-coded per theme.
