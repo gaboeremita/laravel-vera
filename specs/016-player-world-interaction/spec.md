@@ -14,8 +14,10 @@
 
 - Q: Does the user stay a bodiless first-person view, or gain a visible body? → A: The user stays a first-person view with no body; sitting, lying and reclining change where the view sits and how it is tilted.
 - Q: What happens when the user does an activity with no posture change, like making coffee or looking out at the city? → A: The user faces the spot, a glowing progress ring runs for a few seconds, and an action line such as "*makes a coffee*" appears on screen.
-- Q: When a conversation is open and the user starts or ends an activity, is it added to the conversation? → A: Yes. It is added as an action line (for example `*sits down at the bar*`), and the resident reacts to it right away.
-- Q: How do residents behave toward the user during a conversation? → A: Keep it simple: while a conversation is open, the resident turns to face the user.
+- Q: Who learns about the user's activities, and who reacts? → A: Every resident nearby who could reasonably see the user gets the action line (for example `*sits down at the bar*`). The resident in the open conversation replies to it right away; the others get it silently in their own conversation and know it the next time they speak or decide.
+- Q: How do residents behave toward the user during a conversation? → A: Keep it simple: while a conversation is open, the resident turns to face the user. A resident holding a seat, bed or lounger keeps its direction.
+- Q: How does the user choose an activity from a card? → A: The card holds a list of the activities that the user moves through with the arrow keys and starts with Enter.
+- Q: Can the user crouch? → A: Yes. Q toggles crouching; the user can walk while crouched.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -39,13 +41,13 @@ As the user walks through a world, crossing into a new zone shows a title card: 
 
 ---
 
-### User Story 2 - Run and swim (Priority: P2)
+### User Story 2 - Run, crouch and swim (Priority: P2)
 
-The user can run by holding a key while moving, covering ground in large worlds like the faire much faster. In water deeper than about chest height, the user swims: the view floats just above the surface with a gentle bob, movement is slower, and the water surface, light and sound make it clear they are swimming. Leaving deep water, by the pool steps or anywhere the ground rises, returns them to walking.
+The user can run by holding a key while moving, covering ground in large worlds like the faire much faster. They can crouch with a key press and walk crouched, slowly and low, until they press it again or start running. In water deeper than about chest height, the user swims: the view floats just above the surface with a gentle bob, movement is slower, and the water surface, light and sound make it clear they are swimming. Leaving deep water, by the pool steps or anywhere the ground rises, returns them to walking.
 
-**Why this priority**: Running and swimming are pure movement and need no world markers, so they work in every world. They make the space nicer to move through, and swimming is the first posture the user shares with residents.
+**Why this priority**: Running, crouching and swimming are pure movement and need no world markers, so they work in every world. They make the space nicer to move through, and swimming is the first posture the user shares with residents.
 
-**Independent Test**: In the faire, run the length of the Lane and compare the time with walking. In the penthouse, walk down the pool steps into the deep end, swim across, and walk back out.
+**Independent Test**: In the faire, run the length of the Lane and compare the time with walking. Crouch and walk around a table. In the penthouse, walk down the pool steps into the deep end, swim across, and walk back out.
 
 **Acceptance Scenarios**:
 
@@ -55,12 +57,17 @@ The user can run by holding a key while moving, covering ground in large worlds 
 4. **Given** the user is swimming, **When** they reach water shallow enough to stand in, **Then** they are walking again.
 5. **Given** the user is swimming, **When** they hold the run key, **Then** they swim faster, still slower than walking speed on land.
 6. **Given** a resident is asked to come to the user while the user swims, **When** she arrives, **Then** she comes to the user the same way she would for any swimmer.
+7. **Given** the user is standing, **When** they press the crouch key, **Then** the view lowers smoothly to crouching height and stays there.
+8. **Given** the user is crouched, **When** they move, **Then** they walk at about half walking speed, still crouched.
+9. **Given** the user is crouched, **When** they press the crouch key again or hold the run key, **Then** they rise smoothly to standing, and running starts if they hold the run key.
+10. **Given** the user is crouched, **When** they walk into water deep enough to swim, **Then** they stop crouching and swim.
+11. **Given** the user is crouched, **When** they ask a resident what they are doing, **Then** she knows the user is crouching.
 
 ---
 
 ### User Story 3 - See and read what the world holds (Priority: P3)
 
-Everything a resident can know about the world, the user can discover by walking up to it. When the user gets close to an object, it gains a soft animated glow and a small floating label with its name and a key prompt. Pressing the key opens a description card styled like the rest of the world interface: the object's name, its description, the zone it belongs to, and the activities it offers, with each activity showing whether a spot for it is free or which resident is using it. The user can also open the same kind of card for the zone they are in, with its description and its zone activities.
+Everything a resident can know about the world, the user can discover by walking up to it. When the user gets close to an object, it gains a soft animated glow and a small floating label with its name and a key prompt. Pressing the key opens a description card styled like the rest of the world interface: the object's name, its description, the zone it belongs to, and the activities it offers, with each activity showing whether a spot for it is free or which resident is using it. The activities form a list the user moves through with the arrow keys; the highlighted row glows. The user can also open the same kind of card for the zone they are in, with its description and its zone activities.
 
 **Why this priority**: It turns the world's descriptions, which only residents could read, into something the user sees. It is also how the user finds what they can do, which Story 4 builds on.
 
@@ -70,18 +77,19 @@ Everything a resident can know about the world, the user can discover by walking
 
 1. **Given** the user is several metres from the bar counter, **When** they walk up to it, **Then** it glows softly and shows its name with the key prompt.
 2. **Given** several objects are within reach, **When** the user looks around, **Then** only the object they are looking at, or the nearest one when none is in view, shows the prompt, and the prompt follows their gaze.
-3. **Given** the prompt is shown, **When** the user presses the inspect key, **Then** a card opens with the object's name, description, zone and activities.
-4. **Given** a resident reclines on a pool lounger, **When** the user opens the pool loungers' card, **Then** that spot shows as taken by her name and the other loungers show as free.
-5. **Given** a card is open, **When** the user walks away, presses the key again or presses the close key, **Then** the card closes with an animation.
-6. **Given** the user is on the pool terrace, **When** they open the zone card, **Then** it shows "Pool terrace", its description and "Look out at the city".
-7. **Given** an object with a description and no spots, such as the TV, **When** the user inspects it, **Then** its card shows the description and states that it offers no activities.
-8. **Given** a conversation is open and the message box is focused, **When** the user types the inspect key, **Then** it goes into the message and no card opens.
+3. **Given** the prompt is shown, **When** the user presses the inspect key, **Then** a card opens with the object's name, description, zone and activities, with the first activity highlighted.
+4. **Given** a card with several activities is open, **When** the user presses the down and up arrow keys, **Then** the highlight moves between activities, wrapping at either end, and the user keeps looking and moving normally.
+5. **Given** a resident reclines on a pool lounger, **When** the user opens the pool loungers' card, **Then** that spot shows as taken by her name and the other loungers show as free.
+6. **Given** a card is open, **When** the user walks away, presses the key again or presses the close key, **Then** the card closes with an animation.
+7. **Given** the user is on the pool terrace, **When** they open the zone card, **Then** it shows "Pool terrace", its description and "Look out at the city".
+8. **Given** an object with a description and no spots, such as the TV, **When** the user inspects it, **Then** its card shows the description and states that it offers no activities.
+9. **Given** a conversation is open and the message box is focused, **When** the user types the inspect key, **Then** it goes into the message and no card opens.
 
 ---
 
 ### User Story 4 - Sit, lie down, recline and do things like the residents (Priority: P4)
 
-From an object's card, or directly from the prompt, the user chooses one of its activities. The user is carried smoothly to a free spot for it and takes its posture: sitting on a bar stool, lying on the bed, reclining on a lounger or in the bath. The view settles where their eyes would be in that posture, facing the way the spot faces, and they can still look around within a natural range. Standing activities, such as making coffee, singing at the microphone or looking out at the city, and zone activities play out where the user is: the user turns to face the spot, a glowing progress ring fills for a few seconds, and an action line such as "*makes a coffee*" appears on screen. While the user holds a spot, no resident can take it, and residents know what the user is doing when they speak. When a conversation is open, each activity the user starts or ends is added to it as an action line, and the resident reacts to it right away. The user gets up by pressing a movement key or the get-up key and is set back on the floor beside the spot.
+From an object's card, the user highlights one of its activities with the arrow keys and presses Enter. The user is carried smoothly to a free spot for it and takes its posture: sitting on a bar stool, lying on the bed, reclining on a lounger or in the bath. The view settles where their eyes would be in that posture, facing the way the spot faces, and they can still look around within a natural range. Standing activities, such as making coffee, singing at the microphone or looking out at the city, and zone activities play out where the user is: the user turns to face the spot, a glowing progress ring fills for a few seconds, and an action line such as "*makes a coffee*" appears on screen. While the user holds a spot, no resident can take it, and residents know what the user is doing when they speak. Each activity the user starts, completes or gets up from produces an action line that every nearby resident who could reasonably see the user receives. The resident in the open conversation, if any, replies to it right away; the others take note silently and know it the next time they speak or decide. The user gets up by pressing a movement key or the get-up key and is set back on the floor beside the spot.
 
 **Why this priority**: This is the heart of the request, doing what the residents do, but it depends on Story 3 for discovering activities.
 
@@ -89,7 +97,7 @@ From an object's card, or directly from the prompt, the user chooses one of its 
 
 **Acceptance Scenarios**:
 
-1. **Given** the user opens the bar counter's card, **When** they choose "Sit down", **Then** they are carried to the nearest free stool, seated at seated eye height, facing the counter.
+1. **Given** the user opens the bar counter's card, **When** they highlight "Sit down" and press Enter, **Then** they are carried to the nearest free stool, seated at seated eye height, facing the counter.
 2. **Given** the user chooses "Lie down" on the bed, **When** they settle, **Then** the view is low and looking up and along the bed, and they can look around within a limited range.
 3. **Given** the user reclines on a lounger, **When** they press a movement key, **Then** they get up smoothly and stand beside the lounger, and the lounger is free again.
 4. **Given** every stool at the bar is taken by residents, **When** the user chooses "Sit down", **Then** they are told no seat is free, and nothing moves.
@@ -100,9 +108,11 @@ From an object's card, or directly from the prompt, the user chooses one of its 
 9. **Given** the user holds a spot, **When** they leave the world and later resume the session, **Then** they return standing beside that spot and the spot is free.
 10. **Given** the user is at the back counter, **When** they choose "Make coffee", **Then** they turn to face the counter, a glowing progress ring fills for a few seconds, and "*makes a coffee*" appears on screen.
 11. **Given** the user is doing a standing activity, **When** they press a movement key before the ring fills, **Then** the activity is cancelled and no action line appears.
-12. **Given** a conversation with a resident is open, **When** the user sits down at the bar, **Then** `*sits down at the bar*` is added to the conversation and she replies to it.
+12. **Given** a conversation with a resident is open, **When** the user sits down at the bar, **Then** `*sits down at the bar counter*` is added to the conversation and she replies to it.
 13. **Given** a conversation is open and the user is seated, **When** they get up, **Then** an action line saying so is added to the conversation and she replies to it.
-14. **Given** no conversation is open, **When** the user starts an activity, **Then** nothing is added to any conversation, and residents still know what the user is doing the next time they speak or decide.
+14. **Given** a second resident stands across the bar in plain view, **When** the user sits down, **Then** the line is added to her conversation too, without a reply, and when the user later talks to her she knows they sat down.
+15. **Given** a resident is in another room behind a wall, or far across the world, **When** the user sits down, **Then** nothing is added to her conversation.
+16. **Given** no conversation is open, **When** the user starts an activity in view of two residents, **Then** both get the line silently, and neither replies.
 
 ---
 
@@ -160,6 +170,7 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 **Movement**
 
 - **FR-008**: Holding the run key while moving MUST move the user at about twice walking speed, with the same collision, step and drop rules as walking.
+- **FR-008a**: Pressing the crouch key MUST lower the view smoothly to crouching height, and pressing it again MUST raise it back to standing. While crouched, the user MUST move at about half walking speed. Holding the run key while crouched MUST stand the user up and run. Crouching MUST end on entering water deep enough to swim, and MUST NOT be possible while swimming or holding a spot.
 - **FR-009**: The user MUST be swimming whenever the water under them is deeper than the resident swimming threshold (about 1.1 m), and walking again when it is shallower.
 - **FR-010**: While swimming, the user's view MUST float just above the water surface with a gentle bob, movement MUST be slower than walking, and running MUST speed it up while keeping it below walking speed.
 - **FR-011**: While swimming, the view MUST never pass through the water surface, the pool walls or objects in the water.
@@ -171,13 +182,14 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - **FR-014**: When the user is within reach of an object (about 2.5 m, on the same floor), the object MUST show an animated glow and a floating label with its name and the inspect key.
 - **FR-015**: At most one object MUST show the prompt at a time: the one the user is looking at within reach, else the nearest within reach.
 - **FR-016**: Pressing the inspect key MUST open a card with the object's name, description, zone and activities. Each activity MUST show whether a spot offering it is free, or the name of the resident using it.
+- **FR-016a**: A card's activities MUST form a selectable list: the up and down arrow keys move a highlight between them, wrapping at either end, and Enter starts the highlighted activity. The first activity is highlighted when the card opens. The arrow keys and Enter MUST NOT move the user or act while typing.
 - **FR-017**: The user MUST be able to open a card for the zone they are in, showing its name, description, parent zone, floor and zone activities.
 - **FR-018**: A card MUST close when the user presses the inspect or close key, or moves out of reach of its object.
 - **FR-019**: Keys used by the interface MUST NOT act while the user is typing in the message box.
 
 **Doing activities**
 
-- **FR-020**: The user MUST be able to start any activity of an object from its card or prompt, and any zone activity of the zone they are in from the zone card.
+- **FR-020**: The user MUST be able to start any activity of an object from its card, and any zone activity of the zone they are in from the zone card.
 - **FR-021**: Starting a spot activity MUST carry the user smoothly to the nearest free spot offering it and set their view to that spot's facing and that posture's eye position.
 - **FR-022**: The user MUST take the postures residents take: sitting, lying and reclining, each with its own eye height and a limited look-around range suited to it.
 - **FR-023**: When no spot offering the activity is free, the user MUST be told so and stay where they are.
@@ -185,7 +197,9 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - **FR-025**: The user MUST get up by pressing a movement key or the get-up key, ending standing on the floor beside the spot and freeing it.
 - **FR-026**: Starting an activity with no posture, or a zone activity, MUST turn the user to face its spot (for a zone activity, they stay facing where they are), fill a glowing progress ring over about 3 seconds, and then show an action line describing it (for example "*makes a coffee*") on screen. Pressing a movement key before the ring fills MUST cancel the activity without an action line.
 - **FR-027**: Whenever a resident responds or decides, she MUST know the user's current posture and activity, and the object or zone it belongs to, alongside the user's zone and floor.
-- **FR-028**: While a conversation is open, every activity the user starts, completes or gets up from MUST be added to that conversation as an action line in asterisks (for example `*sits down at the bar*`), and the resident MUST reply to it as she would to a message. With no conversation open, nothing is added to any conversation.
+- **FR-028**: Every activity the user starts, completes or gets up from MUST produce an action line in asterisks (for example `*sits down at the bar counter*`), added to the session conversation of every resident who could reasonably see the user at that moment.
+- **FR-028b**: A resident could reasonably see the user when she is on the same floor, within about 15 m, with nothing solid between her eyes and the user's, and either within about 4 m or facing within about 110° of the user.
+- **FR-028c**: The resident of the open conversation, if any, MUST reply to the line as she would to a message. Every other resident MUST receive it silently, with no reply, and know it the next time she speaks or decides.
 - **FR-028a**: Action lines MUST be written in the third person from the activity's name and its object (for example "Sit down" at the "Bar counter" becomes `*sits down at the bar counter*`).
 - **FR-029**: Conversations, voice mode, the map and direct controls MUST work in every posture and while swimming.
 - **FR-030**: The user MUST be able to use objects in private zones; privacy restricts residents only.
@@ -209,10 +223,11 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 
 ### Key Entities
 
-- **Player state**: The user's current movement mode (walking, running, swimming), posture (standing, sitting, lying, reclining), the spot and activity they hold, and their current zone and floor.
+- **Player state**: The user's current movement mode (walking, running, crouching, swimming), posture (standing, crouching, sitting, lying, reclining), the spot and activity they hold, and their current zone and floor.
 - **Zone**: As defined for residents: a named, described area with a floor, an optional parent zone and zone activities.
 - **World object**: As defined for residents: a named, described thing with interaction spots.
 - **Interaction spot**: As defined for residents, now occupiable by either one resident or the user.
+- **Action line**: A third-person description of something the user did, added to the conversations of the residents who saw it.
 - **Activity**: As defined for residents: something done at a spot or in a zone, with an optional posture.
 
 ## Success Criteria *(mandatory)*
@@ -230,15 +245,17 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - **SC-009**: Every new interface element animates in and out, and renders legibly in all four application themes.
 - **SC-010**: Within 1 second of a conversation opening, a standing resident is facing the user, whichever way she faced before.
 - **SC-011**: While a conversation is open, every activity the user starts or gets up from appears in the conversation and gets a reply from the resident.
+- **SC-012**: When the user sits down in view of a resident across the room and out of view of one behind a wall, only the first one knows about it when asked afterwards.
 
 ## Assumptions
 
 - The user stays a first-person view with no visible body; postures change where the view sits and how far it can turn.
 - The user has no pose library; poses remain a resident-only feature.
-- Default keys: Shift to run, E to inspect and use, G to open the zone card, and a movement key or Space to get up. C, F, X and M keep their current meanings.
+- Default keys: Shift to run, Q to toggle crouching, E to inspect, G to open the zone card, the arrow keys and Enter to choose and start an activity from a card, and a movement key or Space to get up. C, F, X, M and V keep their current meanings.
 - The penthouse, the faire and The Index are the reference worlds; the Connection Node and the café gain these features once their environments carry markers.
 - Swimming uses the same depth thresholds residents use, so the user and residents enter and leave the water at the same depths.
 - Diving below the surface is out of scope.
 - The user's own spot is not saved per session; the user resumes standing beside it.
 - Running has no stamina or limit.
+- Crouching lowers the view and slows the user; it does not let them pass under anything they could not pass standing.
 - The interface reuses the application's four themes and existing world interface styles; no new theme is added.

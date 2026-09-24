@@ -31,4 +31,4 @@
 
 ## Notes
 
-- All items pass. Clarifications resolved in the 2026-09-24 session: first-person view, progress-ring standing activities, user action lines posted into an open conversation, residents facing the user while talking.
+- All items pass. Clarifications resolved in the 2026-09-24 session: first-person view, progress-ring standing activities, action lines delivered to residents who can see the user (the conversation partner replies, others learn silently), residents facing the user while talking (keeping a held spot's direction), arrow-key activity lists on cards, and Q-toggled crouching.

@@ -8,14 +8,15 @@
 
 **Alternatives considered**: Asking the server on every position save (10 s cadence, far too slow). Precomputing a zone raster per floor from the map renderer (fast lookups, but a second source of truth for zone borders and extra memory for The Index's three floors).
 
-## R2. Player movement: running and swimming
+## R2. Player movement: running, crouching and swimming
 
 **Decision**: `FirstPersonController` gains a movement mode derived each frame:
 
 - **Running**: Shift doubles speed from 3.5 to 7 m/s. Collision still runs through `WorldCollision.move`, which already subdivides movement into 8 cm steps, so faster movement cannot tunnel through walls. The field of view eases from 70° to 76° while running, for a sense of speed.
+- **Crouching**: Q toggles it. The eye height eases from 1.6 m to 1.05 m over 0.25 s, and speed drops to 0.5 × walking. Holding Shift stands the user up and runs. Entering swimming depth ends it, and it is unavailable while swimming or on a spot. The collision body keeps its standing height, so crouching changes the view and speed only.
 - **Swimming**: the body keeps moving along the pool floor through the existing collision world, so pool walls, steps and objects block it exactly as today. Only the view changes: when `waterSurfaceAbove` reports water deeper than 1.1 m over the feet, the eye sits 0.12 m above the surface with a 2 cm, 0.5 Hz bob. The user leaves swimming below 0.9 m. These are the thresholds residents use, moved from `ResidentController.jsx` into `collisionCheck.js` as `SWIM_DEPTH` and `LEAVE_WATER_DEPTH` so both read the same values. Swimming speed is 0.55 × walking, and 0.85 × walking with Shift.
 
-**Rationale**: Keeping the body on the pool floor reuses every collision rule and makes FR-011 hold by construction, since the view only ever rises from the floor-based eye height to the surface. Using the residents' thresholds satisfies the spec's assumption that both enter and leave the water at the same depths.
+**Rationale**: A toggle suits crouch-walking, which would otherwise mean holding a key alongside WASD for long stretches. Q sits next to WASD; Ctrl is avoided because Ctrl+W closes the browser tab, and C is already chat. Keeping the body height unchanged avoids a second collision profile and the case of standing up under a table. Keeping the body on the pool floor reuses every collision rule and makes FR-011 hold by construction, since the view only ever rises from the floor-based eye height to the surface. Using the residents' thresholds satisfies the spec's assumption that both enter and leave the water at the same depths.
 
 **Alternatives considered**: A separate floating body with its own collision against pool walls at surface height (duplicates collision, and objects in the water would need a second pass).
 
@@ -65,13 +66,16 @@
 
 **Decision**: A standing or zone activity turns the view to face the spot (0.4 s; zone activities do not turn) and fills a progress ring at screen centre over 3 s. When it fills, an action line appears at the bottom centre of the screen for 4 s. A movement key cancels it with no line (FR-026). Action lines come from `activityLines.js`: the activity name's first word is conjugated to the third person (`Sit` → `sits`, `Watch` → `watches`, `Have` → `has`, `Try` → `tries`), the rest of the name is kept, and `at the <object name>` is added unless the object's name already appears in the activity name (`Play the Rhodes` → `plays the Rhodes`). Zone activities use the name alone (`looks out at the city`). Getting up gives `gets up from the <object name>`.
 
-**Conversation**: While a conversation is open, the line is sent to the resident as a user message in asterisks through the chat's normal send path, so she replies to it like any message (FR-028). A resting activity sends a line when the user settles and another when they get up; a standing activity sends one line when it completes. Lines produced while her reply is still pending are queued and sent together, as one message, when it arrives.
+**Who receives it**: A resting activity produces a line when the user settles and another when they get up; a standing activity produces one line when it completes. Each line goes to the residents who can see the user at that moment ([R13](#r13-residents-who-can-see-the-user)):
 
-**Rationale**: A user message in roleplay asterisks is already how she reads actions, so no new message type, prompt section or endpoint is needed. Queueing avoids two replies racing when the user sits and stands up quickly.
+- The resident of the open conversation, if she can see the user, gets it as a user message in asterisks through the chat's normal send path, so she replies to it like any message (FR-028c). Lines produced while her reply is still pending are queued and sent together, as one message, when it arrives.
+- Every other onlooker gets it through the observation endpoint, which stores it silently in her session conversation ([contracts/world-requests.md](contracts/world-requests.md)).
+
+**Rationale**: A user message in roleplay asterisks is already how she reads actions, so both the reply path and the silent path use the same message shape, and the lines sit in each resident's own history, which she already reads before every reply and decision. Queueing avoids two replies racing when the user sits and stands up quickly. Consecutive user messages, which silent lines produce, are accepted by the configured model providers.
 
 ## R9. What residents know about the user's activity
 
-**Decision**: Chat messages and idle decisions send `userState: { posture, spotId, activityId }`. The server resolves the spot's object and the activity from the world's layout, and the world state line becomes, for example, `the user is: in Pool terrace, about 3 m away, reclining on the Pool loungers`. Unknown ids are rejected with a 422 (Principle V). Swimming is reported as `swimming in the pool` with the zone name.
+**Decision**: Chat messages and idle decisions send `userState: { posture, spotId, activityId }`, where posture also allows `crouching`. The server resolves the spot's object and the activity from the world's layout, and the world state line becomes, for example, `the user is: in Pool terrace, about 3 m away, reclining on the Pool loungers`. Unknown ids are rejected with a 422 (Principle V). Swimming is reported as `swimming in the pool` with the zone name.
 
 **Rationale**: The layout on the server is the source of truth for names, so the client sends ids only. Adding it to the existing `the user is` entry keeps the world-state block under its 2,000-character budget (spec 015 FR-009).
 
@@ -88,7 +92,7 @@
 - **Frame**: translucent `bg-0` panels with `backdrop-filter: blur`, a 1 px accent-tinted border with corner brackets drawn by pseudo-elements, and a faint animated scan-line texture (`repeating-linear-gradient` drifting slowly).
 - **Glow**: `text-shadow` and `box-shadow` from `color-mix(in oklab, var(--accent) …, transparent)`, with a 2.4 s breathing pulse on persistent elements (the prompt and the location readout).
 - **Title card**: the zone name in `--font-display`, revealed by a horizontal clip-path wipe with a bright leading edge, letter spacing easing from wide to normal, and a blur-to-sharp settle. It holds 3 s, then dissolves upward. The context line (parent zone, floor) fades in 150 ms after the name.
-- **Cards**: slide in from the right with the same wipe, with activity rows staggered 40 ms apart; each row shows its number key, the activity, a posture glyph and its availability.
+- **Cards**: slide in from the right with the same wipe, with activity rows staggered 40 ms apart; each row shows the activity, a posture glyph and its availability. The rows are a list: the highlighted row carries an accent bar on its left edge, a soft glow and a slow shimmer, and the highlight slides between rows over 120 ms. A hint under the list shows `↑ ↓ — CHOOSE · ENTER — START`.
 - **Progress ring**: an SVG circle whose stroke fills over 3 s, with a glowing head and a soft outer halo.
 - **Action line**: italic, centred low on screen, typed in over 400 ms and faded out.
 - **Swimming**: a thin animated caustic shimmer at the screen edges and a soft tint while swimming, plus a short splash on entering and leaving the water, synthesised with Web Audio from filtered noise (no audio assets).
@@ -100,6 +104,21 @@ The in-canvas beacons read the same tokens through a shared `themeColor()` helpe
 
 ## R12. Keys
 
-**Decision**: Shift runs; E inspects the focused object (again closes the card); 1–9 start the card's activities; G opens the current zone's card; Space, or any movement key, gets up. C, F, X, M and V keep their meanings. Every interface key is ignored while typing (`isTypingTarget`, FR-019), and each is shown where it applies (FR-036).
+**Decision**: Shift runs; Q toggles crouching; E inspects the focused object (again closes the card); G opens the current zone's card; with a card open, ↑ and ↓ move through its activities and Enter starts one; Space, or any movement key, gets up. C, F, X, M and V keep their meanings. Every interface key is ignored while typing (`isTypingTarget`, FR-019), and each is shown where it applies (FR-036). Arrow keys call `preventDefault` while a card is open so the page never scrolls.
 
-**Rationale**: E is the conventional "interact" key in first-person games, and none of these keys is bound today.
+**Rationale**: E is the conventional "interact" key in first-person games, arrow keys leave WASD free for moving while choosing, and none of these keys is bound today.
+
+## R13. Residents who can see the user
+
+**Decision**: When an action line is produced, `onlookers.js` picks every resident who:
+
+- is on the user's floor;
+- is within 15 m horizontally;
+- has an unobstructed line from her eyes (1.5 m above her feet, or just above the water while swimming) to the user's eyes, tested with a ray against the collision octree (a new `WorldCollision.hasLineOfSight`);
+- is within 4 m, or faces within 110° of the direction to the user.
+
+Water surfaces do not block the ray, since they are in their own octree. Glazing does block it, which is accepted: a resident behind a closed glass wall does not see the user.
+
+The silent path is a new endpoint, `POST /api/worlds/{world}/sessions/{session}/residents/{resident}/observations`. It finds or creates the resident's session conversation (as idle decisions do) and stores the line as a user message. The world page calls it once per onlooker, skipping the resident of the open conversation.
+
+**Rationale**: Distance, line of sight and a wide field of view match "could reasonably see" without modelling perception further: close residents notice regardless of facing, far ones only when looking the user's way. The octree already supports ray queries, so the test costs a few rays per action line, never per frame. Storing lines in each resident's own conversation makes them part of the history she already reads, with no new prompt section.

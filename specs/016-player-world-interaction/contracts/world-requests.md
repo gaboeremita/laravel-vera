@@ -1,6 +1,6 @@
 # Contract: User State in World Requests
 
-Two existing endpoints gain the user's state, and chat messages gain the occupancy list decisions already send.
+Two existing endpoints gain the user's state, chat messages gain the occupancy list decisions already send, and a new endpoint stores what a resident saw the user do.
 
 ## Endpoints
 
@@ -12,7 +12,7 @@ Two existing endpoints gain the user's state, and chat messages gain the occupan
 | Field | Rules | Meaning |
 |-------|-------|---------|
 | `userState` | nullable, array | The user's current state. Omitted means standing with no activity. |
-| `userState.posture` | required with `userState`; one of `standing`, `sitting`, `lying`, `reclining`, `swimming` | |
+| `userState.posture` | required with `userState`; one of `standing`, `crouching`, `sitting`, `lying`, `reclining`, `swimming` | |
 | `userState.spotId` | nullable string, max 100; must be a spot in the world's layout | The spot the user holds. |
 | `userState.activityId` | nullable string, max 100; must be an activity of that spot, or, without `spotId`, of a zone in the layout | What the user is doing. |
 | `occupiedSpots` (messages only; decisions already accept it) | nullable array of strings, max 100 each | Spot ids taken by anyone other than this resident, including the user. |
@@ -30,6 +30,7 @@ The `the user is` entry of the world state gains the user's activity, resolved f
 | standing activity in progress | `, doing "Make coffee" at the Back counter` |
 | zone activity in progress | `, doing "Look out at the city"` |
 | swimming | `, swimming` |
+| crouching | `, crouching` |
 
 Example: `the user is: in Pool terrace, about 3 m away, reclining on the Pool loungers`.
 
@@ -37,4 +38,24 @@ Example: `the user is: in Pool terrace, about 3 m away, reclining on the Pool lo
 
 ## Action lines
 
-While a conversation is open, the world page sends the user's activity changes as ordinary user messages whose whole content is one or more action lines in asterisks, for example `*sits down at the bar counter*` or `*gets up from the bar counter* *makes coffee at the back counter*`. No new field marks them; she reads them as she reads any roleplay action.
+An action line is one or more roleplay actions in asterisks, for example `*sits down at the bar counter*` or `*gets up from the bar counter* *makes coffee at the back counter*`. The world page delivers each one to the residents who can see the user:
+
+- **The resident of the open conversation** gets it as an ordinary user message through the messages endpoint above, and replies.
+- **Every other onlooker** gets it through the observation endpoint below, silently.
+
+No field marks them as action lines; residents read them as they read any roleplay action.
+
+## New endpoint: observations
+
+`POST /api/worlds/{world}/sessions/{session}/residents/{resident}/observations`
+
+Route name `worlds.sessions.residents.observations.store`, beside the existing decisions route and under the same middleware.
+
+| Field | Rules |
+|-------|-------|
+| `line` | required string, max 500 |
+
+- `{world}` resolves through the requester's worlds, `{session}` through their `WorldUser` membership, and `{resident}` must belong to `{world}`; otherwise `404`.
+- Finds or creates the resident's conversation for the session, the same way idle decisions do, and stores the line as a `user` message.
+- No model call. Responds `201` with `{ "messageId": <id> }`.
+- Worlds without zones accept it too; the line still becomes part of her history.

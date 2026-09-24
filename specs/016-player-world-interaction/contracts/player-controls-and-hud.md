@@ -9,10 +9,12 @@ All keys are ignored while the message box or any text field has focus.
 | W A S D | exploring | Move (existing). |
 | W A S D, Space | on a spot | Get up. |
 | W A S D | standing activity in progress | Cancel it. |
-| Shift (hold) | moving | Run; swim faster in the water. |
+| Shift (hold) | moving | Run; swim faster in the water. Stands up from a crouch. |
+| Q | exploring, not swimming or on a spot | Toggle crouching. |
 | E | an object in focus | Open its card; press again to close. |
 | G | inside a zone | Open the zone's card; press again to close. |
-| 1–9 | a card is open | Start that row's activity. |
+| ↑ / ↓ | a card is open | Move the highlight through its activities, wrapping at the ends. |
+| Enter | a card is open | Start the highlighted activity. |
 | C, F, X, M, V | unchanged | Chat, follow, stop, map, voice. |
 
 ## Interface elements
@@ -23,10 +25,10 @@ All keys are ignored while the message box or any text field has focus.
 | Location readout | bottom right, above the minimap | while exploring a world with zones | never | `ZONE · FLOOR`, or the world's name outside zones. Breathing glow. |
 | Object dots | in the world, at objects within 6 m | on entering 6 m | on leaving | Faint breathing dot. |
 | Spot beacons | in the world, at each spot of the focused object | on focus | on losing focus | Ring per spot (accent = free, dimmed warning = taken), light column at the object. |
-| Focus prompt | in the world, above the object | on focus | on losing focus | Object name, `E — INSPECT`, and for single-activity objects `1 — <ACTIVITY>`. |
-| Object card | right side, clear of the conversation panel (left) and minimap (bottom right) | E | E, leaving reach, or starting an activity | Name; zone chain; description; activity rows: key, name, posture glyph, availability (`FREE`, `2 OF 8 FREE`, `TAKEN · VERA`). Objects without activities say `NOTHING TO DO HERE`. |
-| Zone card | right side, same slot | G | G, or leaving the zone | Name; parent zone; floor; description; zone activity rows. |
-| Posture hint | bottom centre | on settling on a spot | on getting up | `SPACE — GET UP`. |
+| Focus prompt | in the world, above the object | on focus | on losing focus | Object name and `E — INSPECT`. |
+| Object card | right side, clear of the conversation panel (left) and minimap (bottom right) | E | E, leaving reach, or starting an activity | Name; zone chain; description; activity list: name, posture glyph, availability (`FREE`, `2 OF 8 FREE`, `TAKEN · VERA`), with the highlighted row glowing; hint `↑ ↓ — CHOOSE · ENTER — START`. Objects without activities say `NOTHING TO DO HERE`. |
+| Zone card | right side, same slot | G | G, or leaving the zone | Name; parent zone; floor; description; zone activity list, chosen the same way. |
+| Posture hint | bottom centre | on settling on a spot, or crouching | on getting up, or standing | `SPACE — GET UP`, or `Q — STAND UP` while crouched. |
 | Progress ring | screen centre | on starting a standing or zone activity | when filled or cancelled | Filling ring with glowing head; activity name beneath. |
 | Action line | bottom centre, above the posture hint | when an activity is started (resting), completed (standing) or left | after 4 s | The line, italic, e.g. *sits down at the bar counter*. |
 | Notice | bottom centre | when no spot is free for the chosen activity | after 3 s | e.g. `NO FREE SEAT — ALL 8 ARE TAKEN`. |
@@ -36,7 +38,7 @@ Only one card is open at a time; opening one replaces the other. The title card 
 
 ## Motion
 
-Every element enters and leaves with an animation (wipe, slide or fade), and persistent elements carry a slow ongoing effect (glow pulse, scan-line drift, beacon rotation). Under `prefers-reduced-motion: reduce`, entrances and exits become 150 ms fades, and ongoing effects, the swimming bob and the running field-of-view change stop.
+Every element enters and leaves with an animation (wipe, slide or fade), and persistent elements carry a slow ongoing effect (glow pulse, scan-line drift, beacon rotation). Under `prefers-reduced-motion: reduce`, entrances and exits become 150 ms fades, and ongoing effects, the swimming bob and the running field-of-view change stop. The view still glides into postures and crouches, since a jump cut there disorients more than it helps.
 
 ## Theming
 
