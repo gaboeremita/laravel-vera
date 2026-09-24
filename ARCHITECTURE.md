@@ -1124,7 +1124,7 @@ An environment GLB can carry markers: glTF nodes whose `extras.vera` describe fl
 
 ### World tools
 
-In a marked world, `ConversationController::sendMessage` runs the resident's turn through `AgentLoopRunner` with `WorldToolbox`'s tools (plus the agent-mode tools for agent-mode assistants). NPCs run on the default model; other residents need a tool-capable model (422 otherwise). The tools (`app/Services/AgentLoop/Tools/World/`) are:
+In a marked world, `ConversationController::sendMessage` runs the resident's turn through `AgentLoopRunner` with `WorldToolbox`'s tools (plus the agent-mode tools for agent-mode assistants). NPCs run on the model chosen on their create/edit screen (`ModelVoiceFields`, saved through the same per-user settings routes assistants use), else the default model; other residents need a tool-capable model (422 otherwise). The tools (`app/Services/AgentLoop/Tools/World/`) are:
 
 | Tool | Purpose |
 |------|---------|

@@ -6,6 +6,7 @@ import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
 import PosturePoseSections from '../components/PosturePoseSections.jsx';
+import ModelVoiceFields from '../components/ModelVoiceFields.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
@@ -51,6 +52,40 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 			.then(setArchives)
 			.catch(() => {});
 	}, []);
+
+	const [modelVoice, setModelVoice] = useState({ aiModelId: null, ttsModelId: null, ttsVoice: null });
+
+	useEffect(() => {
+		if (!isNpc) return;
+		api.get(route('settings.show', { assistant: id }))
+			.then((res) => {
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				return res.json();
+			})
+			.then((settings) => setModelVoice({ aiModelId: settings.ai_model_id ?? null, ttsModelId: settings.tts_model_id ?? null, ttsVoice: settings.tts_voice ?? null }))
+			.catch((error) => addToast(`Failed to load the model and voice (${error.message})`, 'error'));
+	}, [id, isNpc, addToast]);
+
+	const handleModelVoiceChange = async (changes) => {
+		try {
+			if ('aiModelId' in changes) {
+				const res = await api.put(route('settings.selectModel', { assistant: id }), { ai_model_id: changes.aiModelId });
+				if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to save the LLM model');
+			}
+			if ('ttsModelId' in changes) {
+				const res = await api.put(route('settings.selectVoiceModel', { assistant: id }), { tts_model_id: changes.ttsModelId });
+				if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to save the voice model');
+			}
+			if ('ttsVoice' in changes) {
+				const res = await api.put(route('settings.updateVoice', { assistant: id }), { tts_voice: changes.ttsVoice });
+				if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to save the voice');
+			}
+			setModelVoice((current) => ({ ...current, ...changes }));
+			addToast('Saved', 'success');
+		} catch (error) {
+			addToast(error.message, 'error');
+		}
+	};
 
 	// Load assistant data
 	useEffect(() => {
@@ -515,6 +550,8 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 							))}
 						</select>
 					</div>
+
+					{isNpc && <ModelVoiceFields value={modelVoice} onChange={handleModelVoiceChange} addToast={addToast} />}
 
 					<div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">

@@ -6,6 +6,7 @@ import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
 import PosturePoseSections from '../components/PosturePoseSections.jsx';
+import ModelVoiceFields from '../components/ModelVoiceFields.jsx';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
 export default function CreateAssistantPage({ kind = 'assistant' }) {
@@ -36,6 +37,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 	// Archive
 	const [archives, setArchives] = useState([]);
 	const [selectedArchiveId, setSelectedArchiveId] = useState('');
+	const [modelVoice, setModelVoice] = useState({ aiModelId: null, ttsModelId: null, ttsVoice: null });
 
 	// Agent mode
 	const [assistantMode, setAssistantMode] = useState('assistant');
@@ -290,6 +292,21 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 				}
 			}
 
+			if (isNpc && created.id) {
+				const settingsRequests = [
+					modelVoice.aiModelId && ['settings.selectModel', { ai_model_id: modelVoice.aiModelId }, 'LLM model'],
+					modelVoice.ttsModelId && ['settings.selectVoiceModel', { tts_model_id: modelVoice.ttsModelId }, 'voice model'],
+					modelVoice.ttsVoice && ['settings.updateVoice', { tts_voice: modelVoice.ttsVoice }, 'voice'],
+				].filter(Boolean);
+				for (const [routeName, payload, label] of settingsRequests) {
+					const settingsRes = await api.put(route(routeName, { assistant: created.id }), payload);
+					if (!settingsRes.ok) {
+						const settingsError = await settingsRes.json().catch(() => ({}));
+						addToast(`NPC created, but its ${label} could not be saved (${settingsError.message || `HTTP ${settingsRes.status}`}); set it on the edit screen`, 'error');
+					}
+				}
+			}
+
 			addToast(`${isNpc ? 'NPC' : 'Assistant'} created`, 'success');
 			navigate(collectionPath);
 		} catch (e) {
@@ -383,6 +400,8 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 							))}
 						</select>
 					</div>
+
+					{isNpc && <ModelVoiceFields value={modelVoice} onChange={(changes) => setModelVoice((current) => ({ ...current, ...changes }))} addToast={addToast} />}
 
 					{!isNpc && <div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">

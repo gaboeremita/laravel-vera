@@ -263,3 +263,22 @@ it('rejects a pose with no version for the posture the activity puts her in', fu
     sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', null);
     expect(toolResultSentBack())->toContain('has no reclining version')->toContain('Your reclining poses: sunbathe');
 });
+
+it('runs an NPC on the model chosen for it instead of the default', function () {
+    config(['ai.default.url' => 'https://default-llm.test/chat/completions', 'ai.default.model' => 'default', 'ai.default.format' => 'generic']);
+    [$user, , , $world] = worldStateScenario(fakeReply: false);
+    $npc = Assistant::factory()->create(['kind' => AssistantKind::WorldNpc, 'mode' => 'assistant']);
+    $assistantUser = AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $npc->id]);
+    $conversation = Conversation::factory()->create(['assistant_user_id' => $assistantUser->id]);
+    $world->residents()->create(['assistant_id' => $npc->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
+    $this->actingAs($user)->putJson(route('settings.selectModel', ['assistant' => $npc->id]), ['ai_model_id' => AiModel::query()->value('id')])->assertSuccessful();
+    Http::fake([
+        'fake-llm.test/*' => Http::response(finalAnswerResponse('Hi.')),
+        'default-llm.test/*' => Http::response(finalAnswerResponse('Wrong model.')),
+    ]);
+
+    $this->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $npc->id, 'id' => $conversation->id]), [
+        'messages' => [['role' => 'user', 'content' => 'Hello.']],
+        'worldId' => $world->id,
+    ])->assertSuccessful()->assertJsonPath('content', 'Hi.');
+});
