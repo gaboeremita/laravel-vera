@@ -359,7 +359,7 @@ NPCs are lightweight, assistant-backed characters managed in their own section (
 
 A world is shared like an assistant is — accessible to whichever users have been granted it, rather than owned by a single creator. Each user's activity in a world is organized into **sessions**: opening a world from the Worlds list first lands on that world's sessions page, where you can resume a past session, start a new one, or delete one you no longer want. Sessions list most-recently-active first, and a world with none yet shows an empty state with a "new session" action.
 
-Starting a new session gives you a genuinely fresh start: no remembered position, and fresh conversations with every resident — talking to the same resident again in a different session does not continue an earlier session's chat history. Resuming a session instead returns you to your last recorded position in the world and reopens that session's own conversations with residents. Deleting a session permanently removes it and its conversations; other sessions are unaffected.
+Starting a new session gives you a genuinely fresh start: no remembered position, and fresh conversations with every resident — talking to the same resident again in a different session does not continue an earlier session's chat history. Resuming a session instead returns you to your last recorded position in the world and reopens that session's own conversations with residents. Those conversations also appear in each assistant's regular conversation list, where you can read or continue them; outside the world she answers without knowing where she is. Deleting a session permanently removes it and its conversations; other sessions are unaffected.
 
 ### Exploring a World
 

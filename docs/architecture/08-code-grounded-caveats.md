@@ -28,13 +28,17 @@ These notes call out architecture-relevant discrepancies and boundaries discover
 
 6. **Browser retries are not idempotent.** The frontend may retry timeout-like send failures up to three times. The endpoint persists the last user message before calling external providers and has no idempotency key, so retries can duplicate user messages.
 
-7. **World resident motion is ephemeral.** A roaming resident's live position exists only in the browser and returns to its configured origin on reload. Only the player's session camera position is persisted, every ten seconds and on exit/unmount.
+7. **Only session residents' state persists.** Each resident's position, rotation, spot, activity and posture are saved per session every ten seconds and on exit/unmount, alongside the player's camera position, and restored on return. A roaming (non-autonomous) resident's wandering circle restarts from where she was saved.
 
 8. **Position meaning is camera-based.** The session saves `camera.position` including eye height. Restoration passes that value through collision-aware `restorePlayerPosition`; it is not a raw persisted foot position.
 
 9. **The `User::conversations()` relation does not match the migrated schema.** Migrations replace `conversations.user_id` with `assistant_user_id`, while `User` still declares a conventional direct `hasMany(Conversation::class)`. Telegram's `/switch` command calls this relation, so that path appears inconsistent with the final schema. The canonical ownership path elsewhere is `User -> AssistantUser -> Conversation`.
 
-10. **Global fallback wording needs nuance.** LLM, TTS, and image catalogs are UI-managed when selected, but their fallback endpoints and credentials still come from environment configuration. Embeddings and STT are config-only.
+10. **World conversations outside the world lack world context.** A world session's conversation also appears in the assistant's regular conversation list and can be continued there, but those messages carry no positions or world tools, so she answers without knowing where she is. Self-chosen decisions and world tool calls are stored in the same conversation.
+
+11. **World markers are only as good as the environment file.** Zones, spots and water come from the GLB (`extras.vera` markers and passable meshes). A spot placed inside furniture or a zone outline that misses a room is imported as authored; routes then fail with reasons the resident is told.
+
+12. **Global fallback wording needs nuance.** LLM, TTS, and image catalogs are UI-managed when selected, but their fallback endpoints and credentials still come from environment configuration. Embeddings and STT are config-only.
 
 ## Verified source boundaries
 

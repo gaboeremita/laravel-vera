@@ -9,7 +9,7 @@ This suite is the visual, code-grounded map of VERA. It reflects the repository 
 3. [Data model](03-data-model.md) — overview and domain ERDs derived from migrations and Eloquent relationships.
 4. [RAG and long-term memory](04-rag-and-memory.md) — archive ingestion, retrieval, hybrid search, and summarization.
 5. [Provider resolution](05-provider-resolution.md) — LLM, embedding, STT, TTS, and image-generation selection.
-6. [Avatar and World runtime](06-avatar-and-world.md) — VRM assets, poses, world loading, movement, sessions, music, and persistence.
+6. [Avatar and World runtime](06-avatar-and-world.md) — VRM assets, poses, world loading, movement, resident agency, swimming, sessions, music, and persistence.
 7. [Deployment and operations](07-deployment-and-operations.md) — runtime topology, queue behavior, retries, and failure handling.
 8. [Code-grounded caveats](08-code-grounded-caveats.md) — meaningful gaps between implementation, configuration, and README wording.
 
@@ -35,7 +35,8 @@ Mermaid is intentionally limited to broadly supported `flowchart`, `sequenceDiag
 | RAG and memory | `ArchiveController`, `SearchArchiveEntries`, `EmbedArchiveEntry`, `SummarizeConversation` |
 | Provider selection | `LlmManager`, `TtsManager`, `ImageGenManager`, `AppServiceProvider` |
 | Channel adapters | `TelegramPollCommand`, `TelegramService`, `DiscordController`, `ConversationController::sendDiscordMessage` |
-| 3D runtime | `WorldPage`, `WorldScene`, `WorldEnvironment`, `FirstPersonController`, `ResidentController`, `VrmAvatar` |
+| 3D runtime | `WorldPage`, `WorldScene`, `WorldEnvironment`, `FirstPersonController`, `ResidentController`, `residentActions`, `worldNavigation`, `useResidentAgency`, `VrmAvatar` |
+| Resident agency | `ParseEnvironmentLayout`, `ResolveWorldState`, `BuildResidentWorldPrompt`, `WorldToolbox` and `Tools/World/*`, `ResidentDecisionController`, `ResidentActivityController`, `ResidentStateController` |
 | Persistence | `database/migrations`, `app/Models` |
 | Runtime configuration | `config/ai.php`, `config/agent.php`, `config/queue.php`, `config/filesystems.php`, `.env.example` |
 

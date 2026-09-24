@@ -47,8 +47,8 @@ sequenceDiagram
     alt Assistant mode
         CC->>AI: Chat with system prompt and submitted history
         AI-->>CC: Content, thinking, optional expression tag
-    else Agent mode with tool-capable selected model
-        CC->>AI: Chat with tool definitions
+    else Agent mode, or any resident in a world with layout markers
+        CC->>AI: Chat with tool definitions (agent tools and/or world tools)
         loop Until final response, step limit, or failure limit
             AI-->>CC: Tool calls or final content
             CC->>CC: Execute tool with timeout and retries
@@ -57,6 +57,9 @@ sequenceDiagram
         end
     end
     CC->>DB: Persist assistant message
+    opt World conversation
+        CC-->>SPA: Chosen world action, carried out and recorded by the page
+    end
     opt Auto-summary enabled and 50 pending messages
         CC->>DB: Acquire memory timestamp lock
         CC-->>Q: Dispatch summary job
@@ -88,9 +91,9 @@ flowchart TD
 
     backgroundCommand -->|"No"| mode{"Assistant mode?"}
     mode -->|"Standard"| singleChat["Single provider chat call"]
-    mode -->|"Agent"| eligibility{"Selected model supports tools?"}
+    mode -->|"Agent, or resident in a marked world"| eligibility{"Selected model supports tools? (NPCs use the default model)"}
     eligibility -->|"No"| reject["Return 422"]
-    eligibility -->|"Yes"| loop["Agent loop with calculator, datetime, optional image tool"]
+    eligibility -->|"Yes"| loop["Agent loop with calculator, datetime, optional image tool, and world tools in a marked world"]
     singleChat --> persistReply["Persist reply"]
     loop --> persistReply
     sceneReaction --> persistReply

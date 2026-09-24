@@ -8,6 +8,7 @@ LLM, TTS, and image generation share the same two-level pattern: a selected data
 | --- | --- | --- | --- | --- |
 | LLM | `settings.data.ai_model_id` per user and assistant | `generic`, `anthropic` | `AI_DEFAULT_*` | invalid-argument exception; controller commonly returns 502 |
 | Agent LLM | Same as LLM, but explicit model required | Model must have `supports_tools` | None | 422 before loop |
+| World resident LLM | Same as LLM, for conversations and self-chosen decisions in a world with layout markers | Model must have `supports_tools`; NPCs use the config fallback | NPCs only: `AI_DEFAULT_*` | 422 before loop, and residents without one cannot be placed |
 | Embeddings | Application-wide binding | None | `AI_EMBEDDING_URL`, `AI_EMBEDDING_MODEL` | runtime exception from Ollama provider |
 | STT | Application-wide binding | None | `AI_STT_URL`, `AI_STT_MODEL` | 502 from voice or Discord endpoint |
 | TTS | `settings.data.tts_model_id` and `tts_voice` per user and assistant | `openai_compatible`, `openai_tts`, `deepgram`, `elevenlabs` | `AI_TTS_*` | 502, except forced replies degrade to text |
