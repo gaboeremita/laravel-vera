@@ -140,3 +140,52 @@ it('reminds the resident she can use her world tools on her own initiative', fun
         ->toContain('World awareness:')
         ->toContain('your tools are yours to use whenever you feel like it, on your own initiative');
 });
+
+it('tells the resident what the user is doing', function (array $userState, string $phrase) {
+    $scenario = worldStateScenario();
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -4.4],
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
+    ], ['userState' => $userState])->assertSuccessful();
+
+    expect(sentSystemPrompt())->toContain("away from you{$phrase}");
+})->with([
+    'reclining on a spot' => [['posture' => 'reclining', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'recline'], ', reclining on the Pool lounger'],
+    'doing a zone activity' => [['posture' => 'standing', 'activityId' => 'swim'], ', doing "Swim"'],
+    'swimming' => [['posture' => 'swimming'], ', swimming'],
+    'crouching' => [['posture' => 'crouching'], ', crouching'],
+]);
+
+it('adds nothing for a user who is simply standing', function () {
+    $scenario = worldStateScenario();
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -4.4],
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
+    ], ['userState' => ['posture' => 'standing']])->assertSuccessful();
+
+    expect(sentSystemPrompt())->toContain('away from you')->not->toContain('away from you, ');
+});
+
+it('rejects a user state naming a spot or activity the world does not have', function (array $userState, string $field) {
+    $scenario = worldStateScenario();
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -4.4],
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
+    ], ['userState' => $userState])->assertUnprocessable()->assertJsonValidationErrors($field);
+})->with([
+    'unknown spot' => [['posture' => 'sitting', 'spotId' => 'moon-chair'], 'userState.spotId'],
+    'activity the spot does not offer' => [['posture' => 'sitting', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'swim'], 'userState.activityId'],
+    'activity no place offers' => [['posture' => 'standing', 'activityId' => 'fly'], 'userState.activityId'],
+]);
+
+it('ignores the user state in a world without markers', function () {
+    $scenario = worldStateScenario(['layout' => null]);
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -4.4],
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
+    ], ['userState' => ['posture' => 'sitting', 'spotId' => 'moon-chair']])->assertSuccessful();
+});

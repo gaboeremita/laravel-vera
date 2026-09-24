@@ -35,3 +35,16 @@ export function makeClipInPlace(clip) {
 export function findWalkPose(poses = []) {
 	return poses.find(({ name }) => /^walking?(?:[\s_-].*)?$/iu.test(name?.trim() ?? '')) ?? null;
 }
+
+/**
+ * During a conversation a resident turns to the user whenever she is still:
+ * not walking a route, not being placed, and not holding a seat, bed or
+ * lounger, whose direction she keeps.
+ */
+export function shouldFaceUser({ inConversation, routing = false, placing = false, restingOnSpot = false, wandering = false }) {
+	return inConversation && !routing && !placing && !restingOnSpot && !wandering;
+}
+
+export function headingToward(from, to) {
+	return facingAngleForMovement(to.x - from.x, to.z - from.z);
+}

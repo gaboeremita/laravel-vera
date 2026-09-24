@@ -43,7 +43,7 @@ The user gains in the world what residents already have: knowing where they are,
 - **II. Append-Only Migrations**: No migrations. PASS.
 - **III. Comments Justify Only Non-Obvious Decisions**: Comments only where the reason is hidden, for example why the swimming body stays on the pool floor, or why spots are drawn instead of meshes. PASS.
 - **IV. Data Isolation by Ownership**: `userState` and `occupiedSpots` are validated against the layout of a world already resolved through `$request->user()->worlds()` and the session through `WorldUser`. The observation endpoint resolves world, session and resident through the same chain as decisions, and writes only to the requester's own `AssistantUser` conversation for that session; a feature test covers another user's session returning 404. PASS.
-- **V. Errors Fail Loudly**: Unknown spot or activity ids return 422. Failed action-line sends surface through the chat's existing error toast, and failed observation posts log and toast with the resident's name. A spot that disappears while held releases it with a notice. No swallowed errors. PASS.
+- **V. Errors Fail Loudly**: Unknown spot or activity ids return 422. Failed action-line sends surface through the chat's existing error toast, and failed observation posts log and toast with the resident's name. No swallowed errors. PASS.
 - **VI. Feature-Test-First, Factory-Backed**: Feature tests extend `ResidentWorldStatePromptTest`, `ResidentDecisionTest` and `ResidentWorldToolsTest`, and a new `ResidentObservationTest` covers the endpoint, all using `WorldFactory::withLayout()` and the existing session factories. Client-only logic uses node unit tests, the established exception. PASS.
 - **VII. No Speculative Abstraction**: The user reuses the residents' occupancy map, swim thresholds, turning helpers and chat send path. `themeColor()` and the swim constants move to shared modules because each now has a second caller. Silent observations reuse conversations and messages rather than a new table. The user's state is not persisted, since nothing needs it. PASS.
 - **VIII. State Derivation During Render**: Zone, focus and activity changes arrive as callbacks from the canvas and set state there. Derived values (card contents, availability, readout text) are computed during render. The title card timer effect only schedules its own dismissal. PASS.
@@ -73,6 +73,7 @@ specs/016-player-world-interaction/
 ```text
 app/
 ├── Actions/
+│   ├── ResolveUserActivity.php             # new: validates userState against the layout and resolves its names (shared by chat and decisions)
 │   ├── BuildResidentWorldPrompt.php        # changed: user activity phrase in "the user is"; recentConversation()
 │   └── AppendWorldConversationContext.php  # changed: passes userState through
 └── Http/
@@ -91,12 +92,14 @@ resources/css/app.css                       # changed: world HUD styles and keyf
 resources/js/
 ├── pages/WorldPage.jsx                     # changed: player state, keys (Q, E, G, arrows, Enter), HUD mounting, action line queue and onlooker delivery
 ├── hooks/useResidentAgency.js              # changed: sends userState with decisions
+├── hooks/usePlayerActivities.js            # new: cards, activities, action lines and onlooker delivery, used by WorldPage
 ├── utils/themeColor.js                     # new: moved from NameTags.jsx (second caller)
 └── components/world/
     ├── worldLocation.js                    # new: floorAt, zoneAt, zoneChain (port of ResolveWorldState), crossing debounce
     ├── playerMotion.js                     # new: movement mode, speeds, swim view height and bob
     ├── playerPostures.js                   # new: eye position, facing, pitch and look limits per posture
     ├── objectFocus.js                      # new: reach and gaze selection
+    ├── playerActivities.js                 # new: nearest free spot, activity kind
     ├── activityLines.js                    # new: action line and observation wording
     ├── onlookers.js                        # new: residents who can see the user; delivers lines (reply or silent)
     ├── collisionCheck.js                   # changed: exports SWIM_DEPTH, LEAVE_WATER_DEPTH; hasLineOfSight
@@ -106,6 +109,7 @@ resources/js/
     ├── FocusTracker.jsx                    # new: reports the focused object; positions the focus label
     ├── SpotBeacons.jsx                     # new: rings, light column, nearby dots (shader, additive)
     ├── ResidentController.jsx              # changed: faces the user during conversation; shared swim constants
+    ├── InteractionSystem.jsx               # changed: resident range measured from the player's foot position
     ├── NameTags.jsx                        # changed: imports themeColor
     ├── WorldChat.jsx                       # changed: exposes sendAction; sends userState and occupiedSpots
     └── hud/
@@ -116,6 +120,7 @@ resources/js/
         ├── ActivityProgress.jsx            # new
         ├── ActionLine.jsx                  # new: action lines and notices
         ├── PostureHint.jsx                 # new
+        ├── ControlsLegend.jsx              # new: run, crouch and zone-card keys above the minimap
         └── SwimOverlay.jsx                 # new: caustics, tint, splash
 
 tests/
@@ -130,6 +135,7 @@ tests/
     ├── PlayerPostures.test.js
     ├── ObjectFocus.test.js
     ├── ActivityLines.test.js
+    ├── PlayerActivities.test.js
     └── Onlookers.test.js
 ```
 

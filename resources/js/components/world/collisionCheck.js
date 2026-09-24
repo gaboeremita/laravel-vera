@@ -1,4 +1,4 @@
-import { Box3, Matrix4, Triangle, Vector3 } from 'three';
+import { Box3, Matrix4, Ray, Triangle, Vector3 } from 'three';
 import { Octree } from 'three/addons/math/Octree.js';
 import { getGroundHeight } from './groundHeight.js';
 import { clampToBounds } from './clampToBounds.js';
@@ -9,6 +9,8 @@ export const MAX_MOVEMENT_DELTA = 0.1;
 export const CHARACTER_RADIUS = 0.25;
 export const MAX_STEP_HEIGHT = 0.25;
 export const MAX_DROP_HEIGHT = 0.35;
+export const SWIM_DEPTH = 1.1;
+export const LEAVE_WATER_DEPTH = 0.9;
 const MOVEMENT_STEP = 0.08;
 const CONTACT_MARGIN = 0.005;
 const SPAWN_SPACING = 0.6;
@@ -144,6 +146,15 @@ export class WorldCollision {
 			}
 		}
 		return null;
+	}
+
+	hasLineOfSight(from, to) {
+		const origin = new Vector3(from.x, from.y, from.z);
+		const direction = new Vector3(to.x - from.x, to.y - from.y, to.z - from.z);
+		const distance = direction.length();
+		if (distance === 0) return true;
+		const hit = this.octree.rayIntersect(new Ray(origin, direction.normalize()));
+		return !hit || hit.distance >= distance;
 	}
 
 	/** Height of the water surface over a point standing at `groundY`, or null when it is dry. */

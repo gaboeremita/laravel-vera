@@ -13,7 +13,7 @@
 ### Session 2026-09-24
 
 - Q: Does the user stay a bodiless first-person view, or gain a visible body? → A: The user stays a first-person view with no body; sitting, lying and reclining change where the view sits and how it is tilted.
-- Q: What happens when the user does an activity with no posture change, like making coffee or looking out at the city? → A: The user faces the spot, a glowing progress ring runs for a few seconds, and an action line such as "*makes a coffee*" appears on screen.
+- Q: What happens when the user does an activity with no posture change, like making coffee or looking out at the city? → A: The user faces the spot, a glowing progress ring runs for a few seconds, and an action line such as "*makes coffee at the back counter*" appears on screen.
 - Q: Who learns about the user's activities, and who reacts? → A: Every resident nearby who could reasonably see the user gets the action line (for example `*sits down at the bar*`). The resident in the open conversation replies to it right away; the others get it silently in their own conversation and know it the next time they speak or decide.
 - Q: How do residents behave toward the user during a conversation? → A: Keep it simple: while a conversation is open, the resident turns to face the user. A resident holding a seat, bed or lounger keeps its direction.
 - Q: How does the user choose an activity from a card? → A: The card holds a list of the activities that the user moves through with the arrow keys and starts with Enter.
@@ -83,7 +83,7 @@ Everything a resident can know about the world, the user can discover by walking
 3. **Given** the prompt is shown, **When** the user presses the inspect key, **Then** a card opens with the object's name, description, zone and activities, with the first activity highlighted.
 4. **Given** a card with several activities is open, **When** the user presses the down and up arrow keys, **Then** the highlight moves between activities, wrapping at either end, and the user keeps looking and moving normally.
 5. **Given** a resident reclines on a pool lounger, **When** the user opens the pool loungers' card, **Then** that spot shows as taken by her name and the other loungers show as free.
-6. **Given** a card is open, **When** the user walks away, presses the key again or presses the close key, **Then** the card closes with an animation.
+6. **Given** a card is open, **When** the user walks out of reach of its object, presses the key that opened it again or presses Esc, **Then** the card closes with an animation.
 7. **Given** the user is on the pool terrace, **When** they open the zone card, **Then** it shows "Pool terrace", its description and "Look out at the city".
 8. **Given** an object with a description and no spots, such as the TV, **When** the user inspects it, **Then** its card shows the description and states that it offers no activities.
 9. **Given** a conversation is open and the message box is focused, **When** the user types the inspect key, **Then** it goes into the message and no card opens.
@@ -92,7 +92,7 @@ Everything a resident can know about the world, the user can discover by walking
 
 ### User Story 4 - Sit, lie down, recline and do things like the residents (Priority: P4)
 
-From an object's card, the user highlights one of its activities with the arrow keys and presses Enter. The user is carried smoothly to a free spot for it and takes its posture: sitting on a bar stool, lying on the bed, reclining on a lounger or in the bath. The view settles where their eyes would be in that posture, facing the way the spot faces, and they can still look around within a natural range. Standing activities, such as making coffee, singing at the microphone or looking out at the city, and zone activities play out where the user is: the user turns to face the spot, a glowing progress ring fills for a few seconds, and an action line such as "*makes a coffee*" appears on screen. While the user holds a spot, no resident can take it, and residents know what the user is doing when they speak. Each activity the user starts, completes or gets up from produces an action line that every nearby resident who could reasonably see the user receives. The resident in the open conversation, if any, replies to it right away; the others take note silently, recording in their own words what they saw, and know it the next time they speak or decide. The user gets up by pressing a movement key or the get-up key and is set back on the floor beside the spot.
+From an object's card, the user highlights one of its activities with the arrow keys and presses Enter. The user is carried smoothly to a free spot for it and takes its posture: sitting on a bar stool, lying on the bed, reclining on a lounger or in the bath. The view settles where their eyes would be in that posture, facing the way the spot faces, and they can still look around within a natural range. Standing activities, such as making coffee, singing at the microphone or looking out at the city, and zone activities play out where the user is: the user turns to face the spot, a glowing progress ring fills for a few seconds, and an action line such as "*makes coffee at the back counter*" appears on screen. While the user holds a spot, no resident can take it, and residents know what the user is doing when they speak. Each activity the user starts, completes or gets up from produces an action line that every nearby resident who could reasonably see the user receives. The resident in the open conversation, if any, replies to it right away; the others take note silently, recording in their own words what they saw, and know it the next time they speak or decide. The user gets up by pressing a movement key or the get-up key and is set back on the floor beside the spot.
 
 **Why this priority**: This is the heart of the request, doing what the residents do, but it depends on Story 3 for discovering activities.
 
@@ -109,7 +109,7 @@ From an object's card, the user highlights one of its activities with the arrow 
 7. **Given** the user is seated with a conversation open, **When** they type or speak, **Then** the conversation works exactly as when standing.
 8. **Given** the user is in a private zone such as the powder room, **When** they use its objects, **Then** they can, since private zones only restrict residents.
 9. **Given** the user holds a spot, **When** they leave the world and later resume the session, **Then** they return standing beside that spot and the spot is free.
-10. **Given** the user is at the back counter, **When** they choose "Make coffee", **Then** they turn to face the counter, a glowing progress ring fills for a few seconds, and "*makes a coffee*" appears on screen.
+10. **Given** the user is at the back counter, **When** they choose "Make coffee", **Then** they turn to face the counter, a glowing progress ring fills for a few seconds, and "*makes coffee at the back counter*" appears on screen.
 11. **Given** the user is doing a standing activity, **When** they press a movement key before the ring fills, **Then** the activity is cancelled and no action line appears.
 12. **Given** a conversation with a resident is open and she can see the user, **When** the user sits down at the bar, **Then** `*sits down at the bar counter*` is added to the conversation and she replies to it.
 13. **Given** a conversation is open, the user is seated and she can see them, **When** they get up, **Then** an action line saying so is added to the conversation and she replies to it.
@@ -147,7 +147,7 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - The user chooses an activity at a spot that is not reachable from where they stand, or is on another floor.
 - The zone the user is in has a nested zone in the same place, like the sun ledge inside the pool inside the pool terrace.
 - Many objects cluster together, like the eight bar stools or the keytar wall next to the keyboards, so glows and labels would overlap.
-- The environment is replaced while the user holds a spot, and the spot no longer exists.
+- The environment is replaced while the user holds a spot: the world's layout only changes when the world is loaded again, so a held spot cannot disappear during a visit.
 - The user tries to take a resting posture on a spot inside the water, like the in-water loungers.
 - The title card would appear while the full-screen map, an object card or a conversation is already on screen.
 - The user has the operating system's reduced-motion setting on.
@@ -187,10 +187,10 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - **FR-014**: When the user is within reach of an object (about 2.5 m, on the same floor), the object MUST show an animated glow and a floating label with its name and the inspect key.
 - **FR-015**: At most one object MUST show the prompt at a time: the one the user is looking at within reach, else the nearest within reach.
 - **FR-016**: Pressing the inspect key MUST open a card with the object's name, description, zone and activities. Each activity MUST show whether a spot offering it is free, or the name of the resident using it.
-- **FR-016a**: A card's activities MUST form a selectable list: the up and down arrow keys move a highlight between them, wrapping at either end, and Enter starts the highlighted activity. The first activity is highlighted when the card opens. The arrow keys and Enter MUST NOT move the user or act while typing.
-- **FR-017**: The user MUST be able to open a card for the zone they are in, showing its name, description, parent zone, floor and zone activities.
-- **FR-018**: A card MUST close when the user presses the inspect or close key, or moves out of reach of its object.
-- **FR-019**: Keys used by the interface MUST NOT act while the user is typing in the message box.
+- **FR-016a**: A card's activities MUST form a selectable list: the up and down arrow keys move a highlight between them, wrapping at either end, and Enter starts the highlighted activity. The first activity is highlighted when the card opens. The arrow keys and Enter MUST NOT move the user.
+- **FR-017**: The user MUST be able to open a card for the zone they are in, showing its name, description, parent zone, floor and zone activities. Zone activities have no spots, so their rows show no availability.
+- **FR-018**: An object card MUST close when the user presses the inspect key or Esc, starts an activity, or moves out of reach of its object; looking at another object within reach MUST NOT close it. A zone card MUST close on the zone card key, Esc, starting an activity or leaving the zone.
+- **FR-019**: Keys used by the interface, including the arrow keys and Enter, MUST NOT act while the user is typing in the message box.
 
 **Doing activities**
 
@@ -200,25 +200,17 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - **FR-023**: When no spot offering the activity is free, the user MUST be told so and stay where they are.
 - **FR-024**: A spot the user holds MUST count as occupied for residents, exactly as a resident-held spot does, and the user MUST NOT be able to take a spot a resident holds.
 - **FR-025**: The user MUST get up by pressing a movement key or the get-up key, ending standing on the floor beside the spot and freeing it.
-- **FR-026**: Starting an activity with no posture, or a zone activity, MUST turn the user to face its spot (for a zone activity, they stay facing where they are), fill a glowing progress ring over about 3 seconds, and then show an action line describing it (for example "*makes a coffee*") on screen. Pressing a movement key before the ring fills MUST cancel the activity without an action line.
+- **FR-026**: Starting an activity with no posture, or a zone activity, MUST turn the user to face its spot (for a zone activity, they stay facing where they are), fill a glowing progress ring over about 3 seconds, and then show an action line describing it (for example "*makes coffee at the back counter*") on screen. Pressing a movement key before the ring fills MUST cancel the activity without an action line.
 - **FR-027**: Whenever a resident responds or decides, she MUST know the user's current posture and activity, and the object or zone it belongs to, alongside the user's zone and floor.
 - **FR-028**: Every activity the user starts, completes or gets up from MUST produce an action line in asterisks (for example `*sits down at the bar counter*`), added to the session conversation of every resident who could reasonably see the user at that moment.
+- **FR-028a**: Action lines sent to the user's conversation partner MUST be written in the third person from the activity's name and its object (for example "Sit down" at the "Bar counter" becomes `*sits down at the bar counter*`).
 - **FR-028b**: A resident could reasonably see the user when she is on the same floor, within about 15 m, with nothing solid between her eyes and the user's, and either within about 4 m or facing within about 110° of the user.
 - **FR-028c**: The resident of the open conversation, if any, MUST reply to the line as she would to a message when she can see the user; when she cannot, nothing is added to the conversation. Every other resident MUST receive it silently, with no reply, and know it the next time she speaks or decides.
 - **FR-028d**: A line a resident receives silently MUST be recorded in her conversation as her own message, in the first person, as an action between asterisks describing what she sees (for example `*I see the user sit down at the bar counter*`, `*I see the user get up from the bar counter*`). Lines sent to the resident of the open conversation stay the user's own messages (`*sits down at the bar counter*`).
 - **FR-028e**: Every observation MUST be logged as its own message, in the order the user did things.
-- **FR-028a**: Action lines sent to the user's conversation partner MUST be written in the third person from the activity's name and its object (for example "Sit down" at the "Bar counter" becomes `*sits down at the bar counter*`).
 - **FR-029**: Conversations, voice mode, the map and direct controls MUST work in every posture and while swimming.
 - **FR-030**: The user MUST be able to use objects in private zones; privacy restricts residents only.
 - **FR-031**: When the user leaves the world while holding a spot, the spot MUST be freed, and on return the user MUST stand beside it.
-
-**Residents facing the user**
-
-- **FR-037**: While a conversation is open and the resident is standing still or swimming in place, she MUST turn smoothly to face the user and keep facing them as the user moves.
-- **FR-038**: Poses she plays during the conversation MUST play facing the user.
-- **FR-039**: While walking or swimming somewhere, she MUST face her direction of travel, and turn to face the user again when she stops.
-- **FR-040**: While she holds a spot in a resting posture (sitting, lying, reclining), she MUST keep the spot's facing, so she stays aligned with the seat, bed or lounger.
-- **FR-041**: When the conversation ends, she MUST stop turning toward the user.
 
 **Interface quality**
 
@@ -227,6 +219,14 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - **FR-034**: When the operating system asks for reduced motion, animations MUST be reduced to short fades, and ongoing effects MUST stop.
 - **FR-035**: New interface elements MUST stay readable against bright and dark scenes, and MUST NOT overlap each other, the conversation panel or the map.
 - **FR-036**: Every key the feature uses MUST be shown in the interface where it applies.
+
+**Residents facing the user**
+
+- **FR-037**: While a conversation is open and the resident is standing still or swimming in place, she MUST turn smoothly to face the user and keep facing them as the user moves.
+- **FR-038**: Poses she plays during the conversation MUST play facing the user.
+- **FR-039**: While walking or swimming somewhere, she MUST face her direction of travel, and turn to face the user again when she stops.
+- **FR-040**: While she holds a spot in a resting posture (sitting, lying, reclining), she MUST keep the spot's facing, so she stays aligned with the seat, bed or lounger.
+- **FR-041**: When the conversation ends, she MUST stop turning toward the user.
 
 ### Key Entities
 

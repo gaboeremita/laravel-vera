@@ -11,8 +11,9 @@ All keys are ignored while the message box or any text field has focus.
 | W A S D | standing activity in progress | Cancel it. |
 | Shift (hold) | moving | Run; swim faster in the water. Stands up from a crouch. |
 | Q | exploring, not swimming or on a spot | Toggle crouching. |
-| E | an object in focus | Open its card; press again to close. |
+| E | an object in focus, or its card open | Open its card; press again to close. |
 | G | inside a zone | Open the zone's card; press again to close. |
+| Esc | a card is open | Close it. |
 | ↑ / ↓ | a card is open | Move the highlight through its activities, wrapping at the ends. |
 | Enter | a card is open | Start the highlighted activity. |
 | C, F, X, M, V | unchanged | Chat, follow, stop, map, voice. |
@@ -26,8 +27,8 @@ All keys are ignored while the message box or any text field has focus.
 | Object dots | in the world, at objects within 6 m | on entering 6 m | on leaving | Faint breathing dot. |
 | Spot beacons | in the world, at each spot of the focused object | on focus | on losing focus | Ring per spot (accent = free, dimmed warning = taken), light column at the object. |
 | Focus prompt | in the world, above the object | on focus | on losing focus | Object name and `E — INSPECT`. |
-| Object card | right side, clear of the conversation panel (left) and minimap (bottom right) | E | E, leaving reach, or starting an activity | Name; zone chain; description; activity list: name, posture glyph, availability (`FREE`, `2 OF 8 FREE`, `TAKEN · VERA`), with the highlighted row glowing; hint `↑ ↓ — CHOOSE · ENTER — START`. Objects without activities say `NOTHING TO DO HERE`. |
-| Zone card | right side, same slot | G | G, or leaving the zone | Name; parent zone; floor; description; zone activity list, chosen the same way. |
+| Object card | right side, just left of the minimap column, clear of the conversation panel (left) | E | E, Esc, leaving its object's reach, or starting an activity; looking at another object does not close it | Name; zone chain; description; activity list: name, posture glyph, availability (`FREE`, `2 OF 8 FREE`, `TAKEN · VERA`), with the highlighted row glowing; hint `↑ ↓ — CHOOSE · ENTER — START`. Objects without activities say `NOTHING TO DO HERE`. |
+| Zone card | right side, same slot | G | G, Esc, leaving the zone, or starting an activity | Name; parent zone; floor; description; zone activity list, chosen the same way, with no availability (zone activities have no spots). |
 | Posture hint | bottom centre | on settling on a spot, or crouching | on getting up, or standing | `SPACE — GET UP`, or `Q — STAND UP` while crouched. |
 | Progress ring | screen centre | on starting a standing or zone activity | when filled or cancelled | Filling ring with glowing head; activity name beneath. |
 | Action line | bottom centre, above the posture hint | when an activity is started (resting), completed (standing) or left | after 4 s | The line, italic, e.g. *sits down at the bar counter*. |

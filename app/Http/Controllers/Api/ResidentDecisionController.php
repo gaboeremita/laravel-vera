@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\BuildResidentWorldPrompt;
+use App\Actions\ResolveUserActivity;
 use App\Actions\ResolveWorldState;
 use App\Directors\PromptDirector;
 use App\DTOs\AgentRunResult;
@@ -36,6 +37,7 @@ class ResidentDecisionController extends Controller
         int $resident,
         ResolveWorldState $resolveWorldState,
         BuildResidentWorldPrompt $buildResidentWorldPrompt,
+        ResolveUserActivity $resolveUserActivity,
     ): JsonResponse {
         $worldUser = $this->resolveWorldUser($request, $world);
         $worldSession = $worldUser->sessions()->findOrFail($session);
@@ -83,8 +85,14 @@ class ResidentDecisionController extends Controller
         $occupiedSpots = $validated['occupiedSpots'] ?? [];
         $posture = Posture::from($validated['residentPosture'] ?? Posture::Standing->value);
 
-        $director = new PromptDirector(app(AppendWorldConversationContext::class)->handle($assistant, $worldModel, $positions, $worldSession));
+        $userActivity = $resolveUserActivity->handle($worldModel, $validated['userState'] ?? null);
+
+        $director = new PromptDirector(app(AppendWorldConversationContext::class)->handle($assistant, $worldModel, $positions, $worldSession, $userActivity));
         $director->append('available activities', $buildResidentWorldPrompt->availableActivities($worldModel, $assistant, $location, $occupiedSpots, $posture));
+        $recentConversation = $buildResidentWorldPrompt->recentConversation($conversation);
+        if ($recentConversation !== null) {
+            $director->append('recent conversation', $recentConversation);
+        }
         $director->append('next step', $buildResidentWorldPrompt->idleInstruction());
         $director->except(['opening_message', 'voice mode', 'image handling', 'OOC mode', 'emotion tags', 'pose tags']);
         $director->withLongTermMemory($conversation);

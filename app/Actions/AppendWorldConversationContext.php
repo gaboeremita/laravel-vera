@@ -16,8 +16,9 @@ class AppendWorldConversationContext
 
     /**
      * @param  ?array{user?: array{x: float, y: float, z: float}, residents?: array<int|string, array{x: float, y: float, z: float}>}  $positions
+     * @param  ?array{posture: string, object: ?array, activity: ?array}  $userActivity
      */
-    public function handle(Assistant $assistant, ?World $world, ?array $positions = null, ?WorldSession $session = null): array
+    public function handle(Assistant $assistant, ?World $world, ?array $positions = null, ?WorldSession $session = null, ?array $userActivity = null): array
     {
         if ($world === null) {
             return $assistant->prompt;
@@ -35,7 +36,7 @@ class AppendWorldConversationContext
         $residentPosition = $positions['residents'][$resident->id] ?? null;
         if ($residentPosition !== null && ! empty($world->layout['zones'])) {
             $state = $this->resolveWorldState->handle($world, $positions);
-            $prompt['world_state'] = $this->buildResidentWorldPrompt->worldState($world, $state['residents'][$resident->id], $state['user']);
+            $prompt['world_state'] = $this->buildResidentWorldPrompt->worldState($world, $state['residents'][$resident->id], $state['user'], $userActivity);
         }
 
         if (! empty($world->layout['zones'])) {

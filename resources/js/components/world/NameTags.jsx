@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { CanvasTexture, SRGBColorSpace, Sprite, SpriteMaterial, Vector3 } from 'three';
+import { themeColor } from '../../utils/themeColor.js';
 
 const TAG_HEIGHT_ABOVE_FEET = 2.05;
 const SCREEN_SCALE = 0.045;
@@ -8,11 +9,6 @@ const MIN_WORLD_HEIGHT = 0.12;
 const TEXTURE_WIDTH = 512;
 const TEXTURE_HEIGHT = 96;
 const ASPECT = TEXTURE_WIDTH / TEXTURE_HEIGHT;
-
-function themeColor(variable, fallback) {
-	const value = getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
-	return value || fallback;
-}
 
 function makeTagTexture(name, highlighted) {
 	const canvas = document.createElement('canvas');
