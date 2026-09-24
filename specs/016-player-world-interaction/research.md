@@ -69,9 +69,9 @@
 **Who receives it**: A resting activity produces a line when the user settles and another when they get up; a standing activity produces one line when it completes. Each line goes to the residents who can see the user at that moment ([R13](#r13-residents-who-can-see-the-user)):
 
 - The resident of the open conversation, if she can see the user, gets it as a user message in asterisks through the chat's normal send path, so she replies to it like any message (FR-028c). Lines produced while her reply is still pending are queued and sent together, as one message, when it arrives.
-- Every other onlooker gets it through the observation endpoint, which stores it silently in her session conversation ([contracts/world-requests.md](contracts/world-requests.md)).
+- Every other onlooker gets an **observation** instead: the same activity in her own voice, stored silently as her own message in her session conversation through the observation endpoint ([contracts/world-requests.md](contracts/world-requests.md)). `observationLine` keeps the activity name in its base form after `*I see the user`: `*I see the user sit down at the bar counter*`, `*I see the user make coffee at the back counter*`, `*I see the user look out at the city*`, `*I see the user get up from the bar counter*`. Every observation is its own message.
 
-**Rationale**: A user message in roleplay asterisks is already how she reads actions, so both the reply path and the silent path use the same message shape, and the lines sit in each resident's own history, which she already reads before every reply and decision. Queueing avoids two replies racing when the user sits and stands up quickly. Consecutive user messages, which silent lines produce, are accepted by the configured model providers.
+**Rationale**: A user message in roleplay asterisks is already how she reads actions from the person she is talking to, so the reply path needs no new message type. An onlooker was not addressed, so recording what she saw as her own action keeps her conversation truthful: the user never said anything to her. The base form after "I see the user" needs no conjugation. Queueing avoids two replies racing when the user sits and stands up quickly.
 
 ## R9. What residents know about the user's activity
 
@@ -119,6 +119,16 @@ The in-canvas beacons read the same tokens through a shared `themeColor()` helpe
 
 Water surfaces do not block the ray, since they are in their own octree. Glazing does block it, which is accepted: a resident behind a closed glass wall does not see the user.
 
-The silent path is a new endpoint, `POST /api/worlds/{world}/sessions/{session}/residents/{resident}/observations`. It finds or creates the resident's session conversation (as idle decisions do) and stores the line as a user message. The world page calls it once per onlooker, skipping the resident of the open conversation.
+The silent path is a new endpoint, `POST /api/worlds/{world}/sessions/{session}/residents/{resident}/observations`. It finds or creates the resident's session conversation (as idle decisions do) and stores the observation as an `assistant` message, her own. The world page calls it once per onlooker, skipping the resident of the open conversation.
 
-**Rationale**: Distance, line of sight and a wide field of view match "could reasonably see" without modelling perception further: close residents notice regardless of facing, far ones only when looking the user's way. The octree already supports ray queries, so the test costs a few rays per action line, never per frame. Storing lines in each resident's own conversation makes them part of the history she already reads, with no new prompt section.
+**Rationale**: Distance, line of sight and a wide field of view match "could reasonably see" without modelling perception further: close residents notice regardless of facing, far ones only when looking the user's way. The octree already supports ray queries, so the test costs a few rays per action line, never per frame. Storing observations in each resident's own conversation makes them part of the history she reads whenever the user talks to her.
+
+## R14. Observations in idle decisions
+
+**Finding**: Idle decisions send the model only the system prompt (with long-term memory and her recent activity) and `[A moment passes in the world.]`. Recent conversation messages are not included, so an onlooker would not know what she saw when she next decides (FR-028c).
+
+**Decision**: `BuildResidentWorldPrompt` gains `recentConversation(Conversation $conversation)`, and the decision prompt appends it as a `recent conversation` section: her session conversation's last 6 messages, oldest first, each as `you:` or `the user:` followed by the content cut to 300 characters. It is omitted when the conversation is empty.
+
+**Rationale**: Observations are ordinary messages with no marker, so the way to include them is to include recent messages. Six messages covers several observations plus the last few exchanges, which also lets her decisions follow what the user said last, at a bounded prompt size.
+
+**Alternatives considered**: Sending the recent messages as chat turns before `[A moment passes in the world.]` (makes her next reply look like a continuation of that exchange, which the decision instruction is written to avoid).

@@ -41,9 +41,9 @@ Example: `the user is: in Pool terrace, about 3 m away, reclining on the Pool lo
 An action line is one or more roleplay actions in asterisks, for example `*sits down at the bar counter*` or `*gets up from the bar counter* *makes coffee at the back counter*`. The world page delivers each one to the residents who can see the user:
 
 - **The resident of the open conversation** gets it as an ordinary user message through the messages endpoint above, and replies.
-- **Every other onlooker** gets it through the observation endpoint below, silently.
+- **Every other onlooker** gets an observation through the endpoint below, silently: the same activity in her own voice, for example `*I see the user sit down at the bar counter*` or `*I see the user get up from the bar counter*`.
 
-No field marks them as action lines; residents read them as they read any roleplay action.
+No field marks either kind; residents read them as they read any roleplay action.
 
 ## New endpoint: observations
 
@@ -53,9 +53,13 @@ Route name `worlds.sessions.residents.observations.store`, beside the existing d
 
 | Field | Rules |
 |-------|-------|
-| `line` | required string, max 500 |
+| `line` | required string, max 500; her observation in the first person, between asterisks |
 
 - `{world}` resolves through the requester's worlds, `{session}` through their `WorldUser` membership, and `{resident}` must belong to `{world}`; otherwise `404`.
-- Finds or creates the resident's conversation for the session, the same way idle decisions do, and stores the line as a `user` message.
+- Finds or creates the resident's conversation for the session, the same way idle decisions do, and stores the line as an `assistant` message, her own. Every call adds a new message.
 - No model call. Responds `201` with `{ "messageId": <id> }`.
 - Worlds without zones accept it too; the line still becomes part of her history.
+
+## Recent conversation in idle decisions
+
+The decisions endpoint adds a `recent conversation` section to her prompt: the last 6 messages of her session conversation, oldest first, each as `you: …` or `the user: …`, cut to 300 characters. Her observations reach her next decision this way. The section is omitted when the conversation is empty.

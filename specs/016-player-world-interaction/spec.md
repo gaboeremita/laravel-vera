@@ -20,7 +20,7 @@
 - Q: Can the user crouch? → A: Yes. Q toggles crouching; the user can walk while crouched.
 - Q: When the user does something their conversation partner cannot see, does she still get the action line? → A: No. She gets it only when she can see the user, like every other resident; otherwise nothing is added to the chat.
 - Q: How are silently received action lines recorded in that resident's chat? → A: As her own messages, in her voice, as an action between asterisks describing what she sees (for example `*I see the user sit down at the bar counter*`).
-- Q: When a resident silently sees several things in a row, does each become its own message? → A: No. Only the latest observation in a run is kept: a new observation replaces her previous message when that message is also an observation with nothing after it.
+- Q: When a resident silently sees several things in a row, does each become its own message? → A: Yes. Every observation is logged as its own message.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -154,7 +154,7 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - Each of the four application themes gives the world interface its colours.
 - The user starts several activities in quick succession during a conversation, each asking the resident for a reply.
 - The user gets up while the resident is still replying to the line for sitting down.
-- The user sits, gets up and sits again in view of a resident with no conversation open; only her latest observation remains in her conversation.
+- The user sits, gets up and sits again in view of a resident with no conversation open; her conversation gains three observations, in order.
 - The resident is seated on a stool with the user standing behind her when a conversation opens.
 - The user and the resident are on different heights, like the sunken lounge and the living room above it, while she turns to face them.
 
@@ -206,7 +206,7 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - **FR-028b**: A resident could reasonably see the user when she is on the same floor, within about 15 m, with nothing solid between her eyes and the user's, and either within about 4 m or facing within about 110° of the user.
 - **FR-028c**: The resident of the open conversation, if any, MUST reply to the line as she would to a message when she can see the user; when she cannot, nothing is added to the conversation. Every other resident MUST receive it silently, with no reply, and know it the next time she speaks or decides.
 - **FR-028d**: A line a resident receives silently MUST be recorded in her conversation as her own message, in the first person, as an action between asterisks describing what she sees (for example `*I see the user sit down at the bar counter*`, `*I see the user get up from the bar counter*`). Lines sent to the resident of the open conversation stay the user's own messages (`*sits down at the bar counter*`).
-- **FR-028e**: When a resident's latest message is an observation with nothing after it, a new observation MUST replace it, so a run of observations leaves only the latest one.
+- **FR-028e**: Every observation MUST be logged as its own message, in the order the user did things.
 - **FR-028a**: Action lines sent to the user's conversation partner MUST be written in the third person from the activity's name and its object (for example "Sit down" at the "Bar counter" becomes `*sits down at the bar counter*`).
 - **FR-029**: Conversations, voice mode, the map and direct controls MUST work in every posture and while swimming.
 - **FR-030**: The user MUST be able to use objects in private zones; privacy restricts residents only.

@@ -51,7 +51,7 @@ Rules:
 
 ## Observation (server, existing table)
 
-An action line a resident saw, stored as a `messages` row with `role = user` and the line as `content`, in the resident's conversation for the world session (`conversations.world_session_id`). No schema change.
+What a resident saw the user do, in her own voice (`*I see the user sit down at the bar counter*`), stored as a `messages` row with `role = assistant` in her conversation for the world session (`conversations.world_session_id`). Every observation is its own row. No schema change.
 
 ## User state on the wire
 

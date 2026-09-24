@@ -12,7 +12,7 @@ The user gains in the world what residents already have: knowing where they are,
 - **Movement**: Shift runs and Q toggles a slow crouch-walk. In deep water the body keeps moving along the pool floor through the existing collision world, and only the view floats at the surface. The thresholds are the residents' own.
 - **Discovery**: objects are marker points with no mesh of their own, so interactivity is drawn at the points: a faint dot at nearby objects, and on focus a glowing ring at each spot with a light column and a label. E opens a card with the object's description and activities, including which spots are free or taken by whom. The activities form a list chosen with the arrow keys and started with Enter. G does the same for the zone.
 - **Using things**: choosing a resting activity glides the view onto the spot at that posture's eye position, with limited look-around. Standing and zone activities run a 3-second progress ring and end with an action line. The user claims spots in the same occupancy map residents use.
-- **Residents**: chat messages and idle decisions carry the user's state and the occupancy list, so she knows what the user is doing and cannot take their spot. Each activity change becomes an `*action line*` for every resident who can see the user: nearby, on the same floor, in line of sight and roughly facing them. The resident in the open conversation replies to it. The others get it silently through a new observation endpoint that stores it in their session conversation. During a conversation she turns to face the user whenever she is standing still or treading water; on a seat, bed or lounger she keeps its direction.
+- **Residents**: chat messages and idle decisions carry the user's state and the occupancy list, so she knows what the user is doing and cannot take their spot. Each activity change becomes an `*action line*` for every resident who can see the user: nearby, on the same floor, in line of sight and roughly facing them. The resident in the open conversation replies to it. The others record it silently as their own first-person observation (`*I see the user sit down at the bar counter*`), one message each time, through a new observation endpoint; idle decisions now include her last few conversation messages, so she also knows it when she next decides. During a conversation she turns to face the user whenever she is standing still or treading water; on a seat, bed or lounger she keeps its direction.
 - **Interface**: DOM overlays share one animated, theme-token HUD language, with a reduced-motion fallback.
 
 ## Technical Context
@@ -21,7 +21,7 @@ The user gains in the world what residents already have: knowing where they are,
 
 **Primary Dependencies**: Laravel 13, Pest 4; three.js, @react-three/fiber, @pixiv/three-vrm (existing). No new dependencies; the splash sound is synthesised with Web Audio.
 
-**Storage**: No schema changes. User state is held on the world page and sent with requests. Silent action lines are ordinary user messages in the resident's session conversation ([data-model.md](data-model.md)).
+**Storage**: No schema changes. User state is held on the world page and sent with requests. Silent observations are ordinary assistant messages in the resident's session conversation ([data-model.md](data-model.md)).
 
 **Testing**: Pest feature tests for the request fields, prompt text and observation endpoint. `node --test` unit tests for the pure client logic (zone lookup, movement mode, focus, action lines, posture views, onlookers), following `tests/Unit/*.test.js`. Visuals, motion and themes are verified manually per [quickstart.md](quickstart.md).
 
@@ -73,13 +73,13 @@ specs/016-player-world-interaction/
 ```text
 app/
 ├── Actions/
-│   ├── BuildResidentWorldPrompt.php        # changed: user activity phrase in "the user is"
+│   ├── BuildResidentWorldPrompt.php        # changed: user activity phrase in "the user is"; recentConversation()
 │   └── AppendWorldConversationContext.php  # changed: passes userState through
 └── Http/
     ├── Controllers/Api/
     │   ├── ConversationController.php      # changed: validates userState and occupiedSpots; passes occupiedSpots to WorldToolbox
-    │   ├── ResidentDecisionController.php  # changed: passes userState to the world state
-    │   └── ResidentObservationController.php # new: stores an action line silently in her session conversation
+    │   ├── ResidentDecisionController.php  # changed: passes userState to the world state; appends recent conversation
+    │   └── ResidentObservationController.php # new: stores her observation as her own message in her session conversation
     └── Requests/
         ├── StoreResidentDecisionRequest.php # changed: userState rules
         └── StoreResidentObservationRequest.php # new: line rules
@@ -97,7 +97,7 @@ resources/js/
     ├── playerMotion.js                     # new: movement mode, speeds, swim view height and bob
     ├── playerPostures.js                   # new: eye position, facing, pitch and look limits per posture
     ├── objectFocus.js                      # new: reach and gaze selection
-    ├── activityLines.js                    # new: action line wording
+    ├── activityLines.js                    # new: action line and observation wording
     ├── onlookers.js                        # new: residents who can see the user; delivers lines (reply or silent)
     ├── collisionCheck.js                   # changed: exports SWIM_DEPTH, LEAVE_WATER_DEPTH; hasLineOfSight
     ├── FirstPersonController.jsx           # changed: run, crouch, swim view, spot glide, look limits, get up, foot position
@@ -121,9 +121,9 @@ resources/js/
 tests/
 ├── Feature/Api/
 │   ├── ResidentWorldStatePromptTest.php    # extended: userState phrasing, 422 on unknown ids
-│   ├── ResidentDecisionTest.php            # extended: userState in decisions
+│   ├── ResidentDecisionTest.php            # extended: userState and recent conversation in decisions
 │   ├── ResidentWorldToolsTest.php          # extended: occupiedSpots from chat rejects a taken spot
-│   └── ResidentObservationTest.php         # new: stores the line, no model call, 404 across users
+│   └── ResidentObservationTest.php         # new: stores her own message per call, no model call, 404 across users
 └── Unit/
     ├── WorldLocation.test.js
     ├── PlayerMotion.test.js

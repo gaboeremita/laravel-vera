@@ -12,7 +12,7 @@
 php artisan test --compact --filter='ResidentWorldStatePromptTest|ResidentDecisionTest|ResidentWorldToolsTest|ResidentObservationTest'
 ```
 
-Covers `userState` validation and its prompt text, `occupiedSpots` reaching her tools in chat, and the observation endpoint (storage, no model call, isolation) ([contracts/world-requests.md](contracts/world-requests.md)).
+Covers `userState` validation and its prompt text, `occupiedSpots` reaching her tools in chat, the observation endpoint (stored as her own message, one per call, no model call, isolation), and recent conversation in idle decisions ([contracts/world-requests.md](contracts/world-requests.md)).
 
 ```bash
 node --test tests/Unit/WorldLocation.test.js tests/Unit/PlayerMotion.test.js tests/Unit/ObjectFocus.test.js tests/Unit/ActivityLines.test.js tests/Unit/PlayerPostures.test.js tests/Unit/Onlookers.test.js
@@ -33,7 +33,7 @@ Covers zone lookup (parity with the server fixture, nesting, floors, crossing de
 9. **Standing activity**: at the back counter, highlight *Make coffee* and press Enter. The view turns to the counter, the ring fills, and *makes coffee at the back counter* appears. Start it again and press W halfway: it cancels with no line.
 10. **Taken spots**: while a resident reclines on a lounger, open the loungers' card. Her lounger shows `TAKEN · <NAME>`. Recline on another lounger, then ask a resident (in chat) to use yours: she is told it is taken.
 11. **Conversation**: open a chat with a resident standing with her back to you. She turns to face you; circle her and she keeps turning. Sit at the bar: `*sits down at the bar counter*` appears in the chat and she replies. Ask "what am I doing?": she says you are sitting at the bar. Ask her to go to the kitchen: she walks facing forward, then turns back to you on arrival. A resident seated on a stool keeps facing the counter.
-12. **Onlookers**: with a second resident in plain view across the room and a third in another room, sit down with no chat open. Nobody replies. Open a chat with the second: she knows you sat down. Open a chat with the third: she does not.
+12. **Onlookers**: with a second resident in plain view across the room and a third in another room, sit down, get up and sit down again with no chat open. Nobody replies. Open a chat with the second: her history shows three messages of hers, `*I see the user sit down at the bar counter*`, `*I see the user get up from the bar counter*` and the first again, and she knows you sat down. Open a chat with the third: nothing new, and she does not know.
 13. **Resume**: while seated, exit the world and resume the session. You stand beside the stool and it is free.
 
 ## Other worlds
