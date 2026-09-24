@@ -450,7 +450,7 @@ class ConversationController extends Controller
                 $ttsManager = app(TtsManager::class);
                 $tts = $ttsManager->forAssistantUser($assistantUser);
                 $ttsText = mb_substr($this->stripForSpeech($content), 0, self::TTS_TRUNCATION_LENGTH);
-                $audioBytes = $tts->synthesize($ttsText);
+                $audioBytes = $tts->synthesize($ttsText, voice: $ttsManager->resolveVoice($assistantUser));
                 $audioBase64 = base64_encode($audioBytes);
                 $audioContentType = $tts->contentType();
             } catch (\Throwable $e) {
@@ -530,7 +530,7 @@ class ConversationController extends Controller
                 $tts = $ttsManager->forAssistantUser($assistantUser);
 
                 $ttsText = mb_substr($this->stripForSpeech($content), 0, self::TTS_TRUNCATION_LENGTH);
-                $audioBytes = $tts->synthesize($ttsText);
+                $audioBytes = $tts->synthesize($ttsText, voice: $ttsManager->resolveVoice($assistantUser));
 
                 $audioBase64 = base64_encode($audioBytes);
                 $audioContentType = $tts->contentType();
