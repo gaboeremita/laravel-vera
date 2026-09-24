@@ -101,6 +101,7 @@ class AssistantController extends Controller
                 'id' => $pose->id,
                 'name' => $pose->name,
                 'posture' => $pose->posture->value,
+                'restricted' => $pose->restricted,
                 'vrm_blendshapes' => $pose->vrm_blendshapes,
                 'animation_url' => $pose->animationFile?->url,
                 'animation_original_name' => $pose->animationFile?->original_name,
@@ -154,6 +155,7 @@ class AssistantController extends Controller
             'poses' => $isAvatarMode ? ['sometimes', 'array'] : ['prohibited'],
             'poses.*.name' => ['required', 'string', 'max:255'],
             'poses.*.posture' => ['sometimes', new Enum(Posture::class)],
+            'poses.*.restricted' => ['sometimes', 'boolean'],
             'poses.*.vrm_blendshapes' => ['sometimes', 'array'],
             'poses.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'poses.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -255,6 +257,7 @@ class AssistantController extends Controller
                 $pose = $assistant->poses()->create([
                     'name' => $poseData['name'],
                     'posture' => $poseData['posture'] ?? Posture::Standing->value,
+                    'restricted' => $poseData['restricted'] ?? false,
                     'vrm_blendshapes' => Pose::normalizeBlendshapes($poseData['vrm_blendshapes'] ?? null),
                 ]);
 

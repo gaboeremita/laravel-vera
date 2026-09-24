@@ -73,12 +73,14 @@ class BuildResidentWorldPrompt
     {
         $available = ['you are' => $posture->value];
 
-        $poses = $assistant->poses()->orderBy('id')->get(['name', 'posture'])
-            ->reject(fn ($pose) => $pose->name === 'default' || in_array(mb_strtolower(trim($pose->name)), self::WORLD_MOTION_POSE_NAMES, true))
-            ->groupBy('name')
-            ->map(fn ($versions, string $name) => sprintf('%s (%s)', $name, $versions->map(fn ($pose) => $pose->posture->value)->implode(', ')));
+        $poses = $assistant->poses()->orderBy('id')->get(['name', 'posture', 'restricted'])
+            ->reject(fn ($pose) => $pose->name === 'default' || in_array(mb_strtolower(trim($pose->name)), self::WORLD_MOTION_POSE_NAMES, true));
+        $describePoses = fn ($group) => $group->groupBy('name')
+            ->map(fn ($versions, string $name) => sprintf('%s (%s)', $name, $versions->map(fn ($pose) => $pose->posture->value)->implode(', ')))
+            ->values()->all();
         if ($poses->isNotEmpty()) {
-            $available['poses'] = $poses->values()->all();
+            [$restricted, $regular] = $poses->partition(fn ($pose) => $pose->restricted);
+            $available['poses'] = ['regular' => $describePoses($regular), 'restricted' => $describePoses($restricted)];
         }
 
         $zoneActivities = collect($location['zoneChain'])->flatMap(fn (array $zone) => collect($zone['activities'])->map(fn (array $activity) => "{$activity['name']} [{$activity['id']}] in {$zone['name']}"));

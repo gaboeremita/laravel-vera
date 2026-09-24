@@ -29,4 +29,9 @@ class PoseFactory extends Factory
     {
         return $this->state(fn () => ['posture' => $posture]);
     }
+
+    public function restricted(): static
+    {
+        return $this->state(fn () => ['restricted' => true]);
+    }
 }

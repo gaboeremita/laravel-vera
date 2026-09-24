@@ -583,15 +583,16 @@ class ConversationController extends Controller
             $excludedSections[] = 'emotion tags';
 
             $poses = $assistantModel->promptPoseNames($posture);
+            $hasStandingOnly = $poses['standingOnly']['regular'] !== [] || $poses['standingOnly']['restricted'] !== [];
 
-            if ($poses['available'] !== [] || $poses['standingOnly'] !== []) {
+            if ($poses['available']['regular'] !== [] || $poses['available']['restricted'] !== [] || $hasStandingOnly) {
                 $section = [
                     'format' => 'Use [pose: <exact pose name>] to select a pose. Use only a name from the available poses list. Control tags may appear in any order and are removed before the reply is shown.',
                     'available poses' => $poses['available'],
                 ];
                 if ($posture === Posture::Swimming) {
                     $section['format'] = 'You are swimming. Use [pose: <exact pose name>] to select a pose, from the available poses, which are the ones that fit while you swim. Control tags may appear in any order and are removed before the reply is shown.';
-                } elseif ($posture !== Posture::Standing && $poses['standingOnly'] !== []) {
+                } elseif ($posture !== Posture::Standing && $hasStandingOnly) {
                     $section['format'] = "You are {$posture->value}. Use [pose: <exact pose name>] to select a pose. Poses under available poses fit how you are right now; poses under poses that make you stand up get you up on your feet first, and you stay standing afterwards. Control tags may appear in any order and are removed before the reply is shown.";
                     $section['poses that make you stand up'] = $poses['standingOnly'];
                 }

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Collection;
 
 #[Fillable(['name', 'slug', 'description', 'prompt', 'opening_message', 'archive_id', 'mode', 'agent_config', 'portrait_type', 'kind'])]
 class Assistant extends Model
@@ -81,15 +82,27 @@ class Assistant extends Model
     }
 
     /**
-     * @return array{available: array<int, string>, standingOnly: array<int, string>}
+     * @return array{available: array{regular: array<int, string>, restricted: array<int, string>}, standingOnly: array{regular: array<int, string>, restricted: array<int, string>}}
      */
     public function promptPoseNames(Posture $posture = Posture::Standing): array
     {
-        $poses = $this->poses()->orderBy('id')->get(['name', 'posture']);
-        $available = $poses->filter(fn (Pose $pose) => $pose->posture === $posture)->pluck('name');
-        $standingOnly = $poses->filter(fn (Pose $pose) => $pose->posture === Posture::Standing)->pluck('name')->diff($available);
+        $poses = $this->poses()->orderBy('id')->get(['name', 'posture', 'restricted']);
+        $available = $poses->filter(fn (Pose $pose) => $pose->posture === $posture);
+        $availableNames = $available->pluck('name');
+        $standingOnly = $poses->filter(fn (Pose $pose) => $pose->posture === Posture::Standing && ! $availableNames->contains($pose->name));
 
-        return ['available' => $available->values()->all(), 'standingOnly' => $standingOnly->values()->all()];
+        return ['available' => self::splitRestrictedPoses($available), 'standingOnly' => self::splitRestrictedPoses($standingOnly)];
+    }
+
+    /**
+     * @param  Collection<int, Pose>  $poses
+     * @return array{regular: array<int, string>, restricted: array<int, string>}
+     */
+    public static function splitRestrictedPoses(Collection $poses): array
+    {
+        [$restricted, $regular] = $poses->partition(fn (Pose $pose) => $pose->restricted);
+
+        return ['regular' => $regular->pluck('name')->unique()->values()->all(), 'restricted' => $restricted->pluck('name')->unique()->values()->all()];
     }
 
     /**

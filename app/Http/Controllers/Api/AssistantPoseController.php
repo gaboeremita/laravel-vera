@@ -28,6 +28,7 @@ class AssistantPoseController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'posture' => ['sometimes', Rule::enum(Posture::class)],
+            'restricted' => ['sometimes', 'boolean'],
             'vrm_blendshapes' => ['sometimes', 'array'],
             'vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -49,6 +50,7 @@ class AssistantPoseController extends Controller
         $pose = $assistant->poses()->create([
             'name' => $validated['name'],
             'posture' => $posture,
+            'restricted' => $validated['restricted'] ?? false,
             'vrm_blendshapes' => Pose::normalizeBlendshapes($validated['vrm_blendshapes'] ?? null),
         ]);
 
@@ -160,7 +162,7 @@ class AssistantPoseController extends Controller
     }
 
     /**
-     * @return array{id: int, name: string, posture: string, vrm_blendshapes: ?array, animation_url: ?string, animation_original_name: ?string}
+     * @return array{id: int, name: string, posture: string, restricted: bool, vrm_blendshapes: ?array, animation_url: ?string, animation_original_name: ?string}
      */
     private function poseJson(Pose $pose): array
     {
@@ -170,6 +172,7 @@ class AssistantPoseController extends Controller
             'id' => $pose->id,
             'name' => $pose->name,
             'posture' => $pose->posture->value,
+            'restricted' => $pose->restricted,
             'vrm_blendshapes' => $pose->vrm_blendshapes,
             'animation_url' => $pose->animationFile?->url,
             'animation_original_name' => $pose->animationFile?->original_name,

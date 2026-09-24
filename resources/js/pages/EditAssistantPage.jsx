@@ -270,11 +270,12 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 
 	/* ── Pose handlers ── */
 
-	const handleAddPose = async (poseName, blendshapes, animationFile, posture = 'standing') => {
+	const handleAddPose = async (poseName, blendshapes, animationFile, posture = 'standing', restricted = false) => {
 		try {
 			const res = await api.post(route('assistants.poses.store', { assistant: id }), {
 				name: poseName,
 				posture,
+				restricted,
 				vrm_blendshapes: blendshapes,
 			});
 			if (!res.ok) {
@@ -297,7 +298,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 			}
 
 			setPoses((prev) => [...prev, data]);
-			addToast('Pose added', 'success');
+			addToast(restricted ? 'Restricted pose added' : 'Pose added', 'success');
 		} catch (e) {
 			addToast(e.message || 'Failed to add pose', 'error');
 		}

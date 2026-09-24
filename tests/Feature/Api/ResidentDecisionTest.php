@@ -143,6 +143,7 @@ it('asks her own model with her persona, the world, her history and what she can
     Pose::factory()->posture(Posture::Sitting)->create(['assistant_id' => $scenario[1]->id, 'name' => 'laugh']);
     Pose::factory()->create(['assistant_id' => $scenario[1]->id, 'name' => 'greeting']);
     Pose::factory()->create(['assistant_id' => $scenario[1]->id, 'name' => 'walk']);
+    Pose::factory()->restricted()->create(['assistant_id' => $scenario[1]->id, 'name' => 'tease']);
     ResidentActivity::factory()->finished()->create([
         'world_session_id' => $scenario[5]->id,
         'world_resident_id' => $scenario[4]->id,
@@ -160,7 +161,7 @@ it('asks her own model with her persona, the world, her history and what she can
         ->toContain('You are in: Pool terrace')
         ->toContain('Your recent activity')
         ->toContain('You are: sitting')
-        ->toContain('Poses: laugh (standing, sitting)')
+        ->toContain("Poses:\nRegular: laugh (standing, sitting)\nRestricted: tease (standing)")
         ->toContain('Things to do in this place: Swim [swim] in Pool terrace')
         ->toContain('pool-lounger-1-seat [pool-lounger-1] at the Pool lounger: Recline [recline] (taken)')
         ->toContain('leaves you to yourself right now')
