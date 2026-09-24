@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AssistantKind;
+use App\Enums\Posture;
 use App\Models\AiModel;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
@@ -211,7 +212,7 @@ it('gives a plan with a bad step back to her with the step number', function (ar
 
 it('plays the pose she picks from her own library for an activity', function (array $arguments, ?string $pose) {
     $scenario = worldStateScenario(fakeReply: false);
-    Pose::factory()->create(['assistant_id' => $scenario[1]->id, 'name' => 'lounge_back']);
+    Pose::factory()->posture(Posture::Reclining)->create(['assistant_id' => $scenario[1]->id, 'name' => 'lounge_back']);
     fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline', ...$arguments]), finalAnswerResponse('Ah.'));
 
     sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action.pose', $pose);
@@ -252,3 +253,13 @@ it('wanders around a place or around where she is', function (array $arguments, 
     'a place' => [['place' => 'gallery'], 'gallery'],
     'around her' => [[], null],
 ]);
+
+it('rejects a pose with no version for the posture the activity puts her in', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    Pose::factory()->create(['assistant_id' => $scenario[1]->id, 'name' => 'flirty']);
+    Pose::factory()->posture(Posture::Reclining)->create(['assistant_id' => $scenario[1]->id, 'name' => 'sunbathe']);
+    fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline', 'pose' => 'flirty']), finalAnswerResponse('Hm.'));
+
+    sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', null);
+    expect(toolResultSentBack())->toContain('has no reclining version')->toContain('Your reclining poses: sunbathe');
+});

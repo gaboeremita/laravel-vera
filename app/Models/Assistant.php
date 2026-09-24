@@ -106,6 +106,19 @@ class Assistant extends Model
     }
 
     /**
+     * The postures each pose exists in, by pose name, in the order the poses were made.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public function posturesByPoseName(): array
+    {
+        return $this->poses()->orderBy('id')->get(['name', 'posture'])
+            ->groupBy('name')
+            ->map(fn ($versions) => $versions->map(fn (Pose $pose) => $pose->posture->value)->values()->all())
+            ->all();
+    }
+
+    /**
      * @return array<int, string>
      */
     public function poseNames(): array

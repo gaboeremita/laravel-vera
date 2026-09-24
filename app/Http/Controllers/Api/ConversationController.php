@@ -390,7 +390,7 @@ class ConversationController extends Controller
                 $worldToolbox = new WorldToolbox(
                     $world,
                     $residentPoint !== null ? app(ResolveWorldState::class)->locate($world->layout, $residentPoint)['zoneChain'] : [],
-                    poseNames: $assistantModel->poseNames(),
+                    posePostures: $assistantModel->posturesByPoseName(),
                 );
                 $tools = [...$tools, ...$worldToolbox->tools()];
             }
