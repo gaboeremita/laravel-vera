@@ -18,6 +18,9 @@
 - Q: How do residents behave toward the user during a conversation? → A: Keep it simple: while a conversation is open, the resident turns to face the user. A resident holding a seat, bed or lounger keeps its direction.
 - Q: How does the user choose an activity from a card? → A: The card holds a list of the activities that the user moves through with the arrow keys and starts with Enter.
 - Q: Can the user crouch? → A: Yes. Q toggles crouching; the user can walk while crouched.
+- Q: When the user does something their conversation partner cannot see, does she still get the action line? → A: No. She gets it only when she can see the user, like every other resident; otherwise nothing is added to the chat.
+- Q: How are silently received action lines recorded in that resident's chat? → A: As her own messages, in her voice, as an action between asterisks describing what she sees (for example `*I see the user sit down at the bar counter*`).
+- Q: When a resident silently sees several things in a row, does each become its own message? → A: No. Only the latest observation in a run is kept: a new observation replaces her previous message when that message is also an observation with nothing after it.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -89,7 +92,7 @@ Everything a resident can know about the world, the user can discover by walking
 
 ### User Story 4 - Sit, lie down, recline and do things like the residents (Priority: P4)
 
-From an object's card, the user highlights one of its activities with the arrow keys and presses Enter. The user is carried smoothly to a free spot for it and takes its posture: sitting on a bar stool, lying on the bed, reclining on a lounger or in the bath. The view settles where their eyes would be in that posture, facing the way the spot faces, and they can still look around within a natural range. Standing activities, such as making coffee, singing at the microphone or looking out at the city, and zone activities play out where the user is: the user turns to face the spot, a glowing progress ring fills for a few seconds, and an action line such as "*makes a coffee*" appears on screen. While the user holds a spot, no resident can take it, and residents know what the user is doing when they speak. Each activity the user starts, completes or gets up from produces an action line that every nearby resident who could reasonably see the user receives. The resident in the open conversation, if any, replies to it right away; the others take note silently and know it the next time they speak or decide. The user gets up by pressing a movement key or the get-up key and is set back on the floor beside the spot.
+From an object's card, the user highlights one of its activities with the arrow keys and presses Enter. The user is carried smoothly to a free spot for it and takes its posture: sitting on a bar stool, lying on the bed, reclining on a lounger or in the bath. The view settles where their eyes would be in that posture, facing the way the spot faces, and they can still look around within a natural range. Standing activities, such as making coffee, singing at the microphone or looking out at the city, and zone activities play out where the user is: the user turns to face the spot, a glowing progress ring fills for a few seconds, and an action line such as "*makes a coffee*" appears on screen. While the user holds a spot, no resident can take it, and residents know what the user is doing when they speak. Each activity the user starts, completes or gets up from produces an action line that every nearby resident who could reasonably see the user receives. The resident in the open conversation, if any, replies to it right away; the others take note silently, recording in their own words what they saw, and know it the next time they speak or decide. The user gets up by pressing a movement key or the get-up key and is set back on the floor beside the spot.
 
 **Why this priority**: This is the heart of the request, doing what the residents do, but it depends on Story 3 for discovering activities.
 
@@ -108,11 +111,12 @@ From an object's card, the user highlights one of its activities with the arrow 
 9. **Given** the user holds a spot, **When** they leave the world and later resume the session, **Then** they return standing beside that spot and the spot is free.
 10. **Given** the user is at the back counter, **When** they choose "Make coffee", **Then** they turn to face the counter, a glowing progress ring fills for a few seconds, and "*makes a coffee*" appears on screen.
 11. **Given** the user is doing a standing activity, **When** they press a movement key before the ring fills, **Then** the activity is cancelled and no action line appears.
-12. **Given** a conversation with a resident is open, **When** the user sits down at the bar, **Then** `*sits down at the bar counter*` is added to the conversation and she replies to it.
-13. **Given** a conversation is open and the user is seated, **When** they get up, **Then** an action line saying so is added to the conversation and she replies to it.
-14. **Given** a second resident stands across the bar in plain view, **When** the user sits down, **Then** the line is added to her conversation too, without a reply, and when the user later talks to her she knows they sat down.
+12. **Given** a conversation with a resident is open and she can see the user, **When** the user sits down at the bar, **Then** `*sits down at the bar counter*` is added to the conversation and she replies to it.
+13. **Given** a conversation is open, the user is seated and she can see them, **When** they get up, **Then** an action line saying so is added to the conversation and she replies to it.
+14. **Given** a second resident stands across the bar in plain view, **When** the user sits down, **Then** her conversation gains her own line `*I see the user sit down at the bar counter*`, with no reply, and when the user later talks to her she knows they sat down.
 15. **Given** a resident is in another room behind a wall, or far across the world, **When** the user sits down, **Then** nothing is added to her conversation.
-16. **Given** no conversation is open, **When** the user starts an activity in view of two residents, **Then** both get the line silently, and neither replies.
+16. **Given** no conversation is open, **When** the user starts an activity in view of two residents, **Then** each records her own observation of it, and neither replies.
+17. **Given** a conversation is open and the resident is within talking range but behind a wall, **When** the user sits down, **Then** nothing is added to the conversation and she does not reply.
 
 ---
 
@@ -150,6 +154,7 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - Each of the four application themes gives the world interface its colours.
 - The user starts several activities in quick succession during a conversation, each asking the resident for a reply.
 - The user gets up while the resident is still replying to the line for sitting down.
+- The user sits, gets up and sits again in view of a resident with no conversation open; only her latest observation remains in her conversation.
 - The resident is seated on a stool with the user standing behind her when a conversation opens.
 - The user and the resident are on different heights, like the sunken lounge and the living room above it, while she turns to face them.
 
@@ -199,8 +204,10 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - **FR-027**: Whenever a resident responds or decides, she MUST know the user's current posture and activity, and the object or zone it belongs to, alongside the user's zone and floor.
 - **FR-028**: Every activity the user starts, completes or gets up from MUST produce an action line in asterisks (for example `*sits down at the bar counter*`), added to the session conversation of every resident who could reasonably see the user at that moment.
 - **FR-028b**: A resident could reasonably see the user when she is on the same floor, within about 15 m, with nothing solid between her eyes and the user's, and either within about 4 m or facing within about 110° of the user.
-- **FR-028c**: The resident of the open conversation, if any, MUST reply to the line as she would to a message. Every other resident MUST receive it silently, with no reply, and know it the next time she speaks or decides.
-- **FR-028a**: Action lines MUST be written in the third person from the activity's name and its object (for example "Sit down" at the "Bar counter" becomes `*sits down at the bar counter*`).
+- **FR-028c**: The resident of the open conversation, if any, MUST reply to the line as she would to a message when she can see the user; when she cannot, nothing is added to the conversation. Every other resident MUST receive it silently, with no reply, and know it the next time she speaks or decides.
+- **FR-028d**: A line a resident receives silently MUST be recorded in her conversation as her own message, in the first person, as an action between asterisks describing what she sees (for example `*I see the user sit down at the bar counter*`, `*I see the user get up from the bar counter*`). Lines sent to the resident of the open conversation stay the user's own messages (`*sits down at the bar counter*`).
+- **FR-028e**: When a resident's latest message is an observation with nothing after it, a new observation MUST replace it, so a run of observations leaves only the latest one.
+- **FR-028a**: Action lines sent to the user's conversation partner MUST be written in the third person from the activity's name and its object (for example "Sit down" at the "Bar counter" becomes `*sits down at the bar counter*`).
 - **FR-029**: Conversations, voice mode, the map and direct controls MUST work in every posture and while swimming.
 - **FR-030**: The user MUST be able to use objects in private zones; privacy restricts residents only.
 - **FR-031**: When the user leaves the world while holding a spot, the spot MUST be freed, and on return the user MUST stand beside it.
@@ -227,7 +234,7 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - **Zone**: As defined for residents: a named, described area with a floor, an optional parent zone and zone activities.
 - **World object**: As defined for residents: a named, described thing with interaction spots.
 - **Interaction spot**: As defined for residents, now occupiable by either one resident or the user.
-- **Action line**: A third-person description of something the user did, added to the conversations of the residents who saw it.
+- **Action line**: A description of something the user did: in the third person as the user's message to the resident they are talking to, and in the first person, as her own observation, for the residents who saw it silently.
 - **Activity**: As defined for residents: something done at a spot or in a zone, with an optional posture.
 
 ## Success Criteria *(mandatory)*
@@ -244,7 +251,7 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 - **SC-008**: When asked, residents correctly say what the user is doing in at least 9 of 10 attempts.
 - **SC-009**: Every new interface element animates in and out, and renders legibly in all four application themes.
 - **SC-010**: Within 1 second of a conversation opening, a standing resident is facing the user, whichever way she faced before.
-- **SC-011**: While a conversation is open, every activity the user starts or gets up from appears in the conversation and gets a reply from the resident.
+- **SC-011**: While a conversation is open and the resident can see the user, every activity the user starts or gets up from appears in the conversation and gets a reply from her.
 - **SC-012**: When the user sits down in view of a resident across the room and out of view of one behind a wall, only the first one knows about it when asked afterwards.
 
 ## Assumptions
