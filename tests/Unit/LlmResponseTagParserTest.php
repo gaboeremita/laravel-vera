@@ -2,6 +2,7 @@
 
 use App\Models\Assistant;
 use App\Models\Emotion;
+use App\Models\Message;
 use App\Models\Pose;
 use App\Services\LlmResponseTagParser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,4 +65,22 @@ test('unrecognized bare brackets are preserved as ordinary text', function () {
     $parsed = app(LlmResponseTagParser::class)->parse('Keep [this ordinary aside] intact.', $assistant);
 
     expect($parsed['content'])->toBe('Keep [this ordinary aside] intact.');
+});
+
+test('lines spoken in a world lose the bracketed tags parsing left behind', function () {
+    $parser = app(LlmResponseTagParser::class);
+
+    expect($parser->stripStrayTags("[amused]\n\nThe chalkboard's fine. [very quietly amused] Really."))->toBe("The chalkboard's fine. Really.")
+        ->and($parser->stripStrayTags('Keep [OOC: this] and [a tag that is far too long] here.'))->toBe('Keep [OOC: this] and [a tag that is far too long] here.');
+});
+
+test('the tags stripped from a world line are listed so they can be recorded', function () {
+    expect(app(LlmResponseTagParser::class)->strayTags('[amused] Fine. [very quietly amused] [OOC: kept]'))->toBe(['amused', 'very quietly amused']);
+});
+
+test('a message still reads out its emotion from its expression', function () {
+    $message = new Message(['expression' => ['emotion' => 'happy', 'pose' => 'laugh']]);
+
+    expect($message->emotion)->toBe('happy')
+        ->and($message->toArray()['emotion'])->toBe('happy');
 });

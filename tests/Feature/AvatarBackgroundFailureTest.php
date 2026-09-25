@@ -28,7 +28,7 @@ test('a provider failure leaves the previous background cache entry untouched an
 
     Log::spy();
 
-    $conversationUser = $conversation->assistantUser;
+    $conversationUser = $conversation->assistantUser();
 
     GenerateAvatarBackground::dispatchFor($conversationUser, $conversation, 'a futuristic park');
 
@@ -49,7 +49,7 @@ test('a provider failure with no previous background leaves the conversation wit
         'fake-image.test/*' => Http::response(['error' => 'boom'], 500),
     ]);
 
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a futuristic park');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a futuristic park');
 
     expect(Cache::get(GenerateAvatarBackground::cacheKeyFor($conversation->id)))->toBeNull();
 });

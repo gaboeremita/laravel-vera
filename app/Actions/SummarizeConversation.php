@@ -20,7 +20,7 @@ class SummarizeConversation
 
     private function buildInstructions(Conversation $conversation): string
     {
-        $sections = $conversation->assistantUser->memory_prompt ?? [];
+        $sections = $conversation->assistantUser()?->memory_prompt ?? [];
 
         $builder = new PromptBuilder;
 
@@ -63,8 +63,9 @@ class SummarizeConversation
         }
 
         $llm = null;
-        $userName = $conversation->assistantUser->user->name;
-        $assistantName = $conversation->assistantUser->assistant->name;
+        $assistantUser = $conversation->assistantUser();
+        $userName = $assistantUser->user->name;
+        $assistantName = $assistantUser->assistant->name;
         $instructions = $this->buildInstructions($conversation);
 
         while ($checkpoint < $upToMessageId) {
@@ -97,7 +98,7 @@ class SummarizeConversation
 
             $existingMemory = $conversation->long_term_memory ?: 'Nothing yet.';
 
-            $llm ??= $this->llmManager->forAssistantUser($conversation->assistantUser);
+            $llm ??= $this->llmManager->forAssistantUser($assistantUser);
 
             $response = $llm->chat([
                 ['role' => 'system', 'content' => $instructions],

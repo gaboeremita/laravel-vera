@@ -77,9 +77,9 @@ it('filters the conversations index by worldSessionId', function () {
     $sessionTwo = WorldSession::factory()->for($worldUser)->create();
 
     $assistantUser = AssistantUser::where('assistant_id', $assistant->id)->where('user_id', $user->id)->firstOrFail();
-    $conversationOne = Conversation::factory()->for($assistantUser)->forWorldSession($sessionOne)->create();
-    Conversation::factory()->for($assistantUser)->forWorldSession($sessionTwo)->create();
-    Conversation::factory()->for($assistantUser)->create();
+    $conversationOne = Conversation::factory()->forAssistantUser($assistantUser)->forWorldSession($sessionOne)->create();
+    Conversation::factory()->forAssistantUser($assistantUser)->forWorldSession($sessionTwo)->create();
+    Conversation::factory()->forAssistantUser($assistantUser)->create();
 
     $response = $this->actingAs($user)->getJson(route('conversations.index', ['assistant' => $assistant->id, 'worldSessionId' => $sessionOne->id]))
         ->assertSuccessful();

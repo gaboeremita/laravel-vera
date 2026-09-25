@@ -293,6 +293,12 @@ class ParseEnvironmentLayout
                 continue;
             }
 
+            $capacity = $marker['vera']['capacity'] ?? 1;
+            if (! is_int($capacity) || $capacity < 1) {
+                $this->warn($marker, 'spot capacity must be a whole number of at least 1');
+                $capacity = 1;
+            }
+
             $position = $this->position($marker['matrix']);
             [$dx, , $dz] = $this->transformDirection($marker['matrix'], [0, 0, 1]);
             $facing = atan2($dx, $dz);
@@ -308,6 +314,7 @@ class ParseEnvironmentLayout
                     'z' => round($position['z'] + cos($facing) * self::APPROACH_DISTANCE, 6),
                 ],
                 'activities' => $activities,
+                'capacity' => $capacity,
             ];
         }
 

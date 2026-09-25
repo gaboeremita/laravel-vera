@@ -20,8 +20,8 @@ class MessageFactory extends Factory
             'role' => fake()->randomElement($roles),
             'content' => fake()->paragraph(),
             'thinking' => fake()->optional(0.3)->paragraph(),
-            'emotion' => fake()->optional(0.5)->randomElement([
-                'default', 'happy', 'angry',
+            'expression' => fake()->optional(0.5)->randomElement([
+                ['emotion' => 'default'], ['emotion' => 'happy'], ['emotion' => 'angry'],
             ]),
         ];
     }

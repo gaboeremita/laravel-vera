@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\AssistantPoseController;
 use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\AssistantVrmController;
 use App\Http\Controllers\Api\AvatarBackgroundController;
+use App\Http\Controllers\Api\ConversationBrowserController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\ConversationMemoryController;
 use App\Http\Controllers\Api\DiscordController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Api\ImageGenModelController;
 use App\Http\Controllers\Api\ImageGenProviderController;
 use App\Http\Controllers\Api\NpcController;
 use App\Http\Controllers\Api\ResidentActivityController;
+use App\Http\Controllers\Api\ResidentConversationController;
 use App\Http\Controllers\Api\ResidentDecisionController;
 use App\Http\Controllers\Api\ResidentObservationController;
 use App\Http\Controllers\Api\ResidentStateController;
@@ -68,6 +70,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/worlds/{world}/sessions/{session}/residents/{resident}/state', [ResidentStateController::class, 'update'])->name('worlds.sessions.residents.state.update');
     Route::post('/worlds/{world}/sessions/{session}/residents/{resident}/decisions', [ResidentDecisionController::class, 'store'])->name('worlds.sessions.residents.decisions.store');
     Route::post('/worlds/{world}/sessions/{session}/residents/{resident}/observations', [ResidentObservationController::class, 'store'])->name('worlds.sessions.residents.observations.store');
+    Route::post('/worlds/{world}/sessions/{session}/residents/{resident}/conversations', [ResidentConversationController::class, 'store'])->name('worlds.sessions.residents.conversations.store');
+    Route::get('/worlds/{world}/sessions/{session}/conversations/{conversation}', [ResidentConversationController::class, 'show'])->name('worlds.sessions.conversations.show');
+    Route::post('/worlds/{world}/sessions/{session}/conversations/{conversation}/turns', [ResidentConversationController::class, 'turn'])->name('worlds.sessions.conversations.turns.store');
+    Route::post('/worlds/{world}/sessions/{session}/conversations/{conversation}/pause', [ResidentConversationController::class, 'pause'])->name('worlds.sessions.conversations.pause');
+    Route::post('/worlds/{world}/sessions/{session}/conversations/{conversation}/observers', [ResidentConversationController::class, 'observe'])->name('worlds.sessions.conversations.observers.store');
+    Route::get('/conversations', [ConversationBrowserController::class, 'index'])->name('conversation-browser.index');
+    Route::get('/conversations/{conversation}', [ConversationBrowserController::class, 'show'])->name('conversation-browser.show');
     Route::apiResource('npcs', NpcController::class);
 
     Route::prefix('assistants/{assistant}')->group(function () {

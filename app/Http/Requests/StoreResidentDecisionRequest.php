@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Actions\ResolveSpotStacking;
 use App\Actions\ResolveUserActivity;
 use App\Enums\Posture;
 use App\Http\Controllers\Api\ResidentActivityController;
@@ -31,11 +32,17 @@ class StoreResidentDecisionRequest extends FormRequest
             'residentPosture' => ['nullable', Rule::enum(Posture::class)],
             'occupiedSpots' => ['nullable', 'array'],
             'occupiedSpots.*' => ['string', 'max:100'],
+            'userBusyWith' => ['nullable', 'integer'],
+            'busyResidents' => ['nullable', 'array'],
+            'busyResidents.*.id' => ['required', 'integer'],
+            'busyResidents.*.talkingWith' => ['nullable', 'integer'],
             'previous' => ['nullable', 'array'],
             'previous.activityId' => ['required_with:previous', 'integer'],
             'previous.outcome' => ['required_with:previous', Rule::in(ResidentActivityController::OUTCOMES)],
             'previous.reason' => ['nullable', 'string', 'max:500'],
             ...ResolveUserActivity::rules(),
+            ...ResolveUserActivity::rules('residentState'),
+            ...ResolveSpotStacking::rules(),
         ];
     }
 }

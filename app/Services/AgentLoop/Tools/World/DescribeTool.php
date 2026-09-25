@@ -19,7 +19,7 @@ class DescribeTool extends WorldTool
         return [
             'type' => 'object',
             'properties' => [
-                'id' => ['type' => 'string', 'enum' => $this->toolbox->targetIds(), 'description' => 'The id of the place or thing.'],
+                'id' => ['type' => 'string', 'enum' => $this->toolbox->targetIds(), 'description' => 'The id of the place, thing or spot.'],
             ],
             'required' => ['id'],
         ];
@@ -41,7 +41,7 @@ class DescribeTool extends WorldTool
             ];
         }
 
-        $object = $this->toolbox->findObject($written);
+        $object = $this->toolbox->findTarget($written);
         if ($object !== null) {
             return [
                 'kind' => 'thing',
@@ -52,6 +52,6 @@ class DescribeTool extends WorldTool
             ];
         }
 
-        throw new \RuntimeException(sprintf('There is no place or thing called "%s" here. Use one of the ids from the describe tool.', $written));
+        throw new \RuntimeException(sprintf('There is no place, thing or spot called "%s" here. Use one of the ids from the describe tool.', $written));
     }
 }

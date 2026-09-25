@@ -305,12 +305,13 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 
 	/* ── Pose handlers ── */
 
-	const handleAddPose = async (poseName, blendshapes, animationFile, posture = 'standing', restricted = false) => {
+	const handleAddPose = async (poseName, blendshapes, animationFile, posture = 'standing', restricted = false, hold = false) => {
 		try {
 			const res = await api.post(route('assistants.poses.store', { assistant: id }), {
 				name: poseName,
 				posture,
 				restricted,
+				hold,
 				vrm_blendshapes: blendshapes,
 			});
 			if (!res.ok) {
@@ -339,11 +340,12 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 		}
 	};
 
-	const handleUpdatePose = async (pose, name, blendshapes, posture = pose.posture) => {
+	const handleUpdatePose = async (pose, name, blendshapes, posture = pose.posture, hold = !!pose.hold) => {
 		try {
 			const res = await api.post(route('assistants.poses.update', { assistant: id, pose: pose.id }), {
 				name,
 				posture,
+				hold,
 				vrm_blendshapes: blendshapes,
 			});
 			if (!res.ok) {

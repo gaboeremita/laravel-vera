@@ -12,6 +12,22 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Pose extends Model
 {
+    /**
+     * Poses the world plays for her (walking, greeting someone who starts a conversation, talking while she speaks), which are never hers to choose.
+     */
+    public const WORLD_MOTION_NAMES = ['walk', 'walking', 'walk-cycle', 'walk_cycle', 'walk cycle', 'walk-start', 'walk_start', 'walk start', 'walk-stop', 'walk_stop', 'walk stop', 'greeting', 'greet', 'talk', 'talking', 'swim', 'swimming', 'swim-to-edge', 'swim_to_edge', 'swim to edge', 'swimming-to-edge', 'swimming_to_edge', 'swimming to edge'];
+
+    /**
+     * Whether she picks this pose herself: everything except her idle default
+     * and the motions the world plays on its own.
+     */
+    public function isChosen(): bool
+    {
+        $name = mb_strtolower(trim($this->name));
+
+        return $name !== 'default' && ! in_array($name, self::WORLD_MOTION_NAMES, true);
+    }
+
     /** @use HasFactory<PoseFactory> */
     use HasFactory, HasNormalizedBlendshapes;
 
@@ -20,6 +36,7 @@ class Pose extends Model
         'posture',
         'vrm_blendshapes',
         'restricted',
+        'hold',
     ];
 
     /**
@@ -28,6 +45,7 @@ class Pose extends Model
     protected $attributes = [
         'posture' => 'standing',
         'restricted' => false,
+        'hold' => false,
     ];
 
     protected function casts(): array
@@ -36,6 +54,7 @@ class Pose extends Model
             'posture' => Posture::class,
             'vrm_blendshapes' => 'array',
             'restricted' => 'boolean',
+            'hold' => 'boolean',
         ];
     }
 

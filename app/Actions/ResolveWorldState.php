@@ -127,7 +127,7 @@ class ResolveWorldState
      * @param  array{x: float, y: float, z: float}  $a
      * @param  array{x: float, y: float, z: float}  $b
      */
-    private function distance(array $a, array $b): float
+    public function distance(array $a, array $b): float
     {
         return sqrt(($a['x'] - $b['x']) ** 2 + ($a['y'] - $b['y']) ** 2 + ($a['z'] - $b['z']) ** 2);
     }

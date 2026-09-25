@@ -1,4 +1,8 @@
+import { STACK_HEIGHT } from './spotOccupancy.js';
+
 const DEGREE = Math.PI / 180;
+export const MAX_PITCH = 1.35;
+const UPPER_TIER_TOWARD_FEET = 0.25;
 
 const POSTURE_VIEWS = {
 	sitting: { height: 0.72, back: 0.1, pitch: 0, yawRange: 75 * DEGREE, pitchMin: -60 * DEGREE, pitchMax: 50 * DEGREE },
@@ -15,23 +19,27 @@ export function yawForDirection(dx, dz) {
 
 /**
  * Where the user's eyes go on a spot: the spot marks the hips and its facing
- * points toward the feet or the desk, so the head sits behind it.
+ * points toward the feet or the desk, so the head sits behind it. Each tier
+ * up a shared spot lies one body higher and a little toward the feet, turned
+ * toward the head and looking down, and from on top the user can look all the
+ * way around.
  */
-export function postureView({ spot, posture }) {
+export function postureView({ spot, posture, tier = 0 }) {
 	const shape = POSTURE_VIEWS[posture];
 	const dx = Math.sin(spot.facing);
 	const dz = Math.cos(spot.facing);
+	const back = tier > 0 ? shape.back - UPPER_TIER_TOWARD_FEET : shape.back;
 	return {
 		eye: {
-			x: spot.position.x - dx * shape.back,
-			y: spot.position.y + shape.height,
-			z: spot.position.z - dz * shape.back,
+			x: spot.position.x - dx * back,
+			y: spot.position.y + shape.height + tier * STACK_HEIGHT,
+			z: spot.position.z - dz * back,
 		},
-		yaw: yawForDirection(dx, dz),
-		pitch: shape.pitch,
-		yawRange: shape.yawRange,
-		pitchMin: shape.pitchMin,
-		pitchMax: shape.pitchMax,
+		yaw: yawForDirection(dx, dz) + (tier > 0 ? Math.PI : 0),
+		pitch: tier > 0 ? -MAX_PITCH : shape.pitch,
+		yawRange: tier > 0 ? Math.PI : shape.yawRange,
+		pitchMin: tier > 0 ? -MAX_PITCH : shape.pitchMin,
+		pitchMax: tier > 0 ? MAX_PITCH : shape.pitchMax,
 	};
 }
 

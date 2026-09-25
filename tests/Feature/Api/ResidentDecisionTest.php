@@ -1,6 +1,8 @@
 <?php
 
 use App\Enums\Posture;
+use App\Models\Archive;
+use App\Models\ArchiveEntry;
 use App\Models\Assistant;
 use App\Models\Conversation;
 use App\Models\Pose;
@@ -40,6 +42,75 @@ function requestDecision($test, array $scenario, array $payload = []): TestRespo
     ]);
 }
 
+it('offers her thinking and remembering on top of the world tools', function () {
+    $scenario = autonomousScenario();
+    fakeTurn(finalAnswerResponse('(Quiet) *stays put*'));
+
+    requestDecision($this, $scenario)->assertCreated();
+
+    /** @var Request $request */
+    $request = Http::recorded()[0][0];
+    expect(collect($request['tools'])->pluck('function.name')->all())->toContain('think')->toContain('remember');
+});
+
+it('thinks about something where she is', function () {
+    $scenario = autonomousScenario();
+    fakeTurn(toolCallResponse('call_1', 'think', ['about' => 'the city lights']), finalAnswerResponse('(They never sleep) *gazes out at the city*'));
+
+    $response = requestDecision($this, $scenario)
+        ->assertCreated()
+        ->assertJsonPath('action', ['verb' => 'think', 'target' => 'the city lights', 'activity' => null]);
+
+    expect(ResidentActivity::find($response->json('activityId')))
+        ->verb->toBe('think')
+        ->target->toBe('the city lights')
+        ->narration->toBe('*gazes out at the city*');
+});
+
+it('remembers something from her time with the user', function () {
+    $scenario = autonomousScenario();
+    $scenario[2]->update(['long_term_memory' => 'He took her to the faire and laughed at the archery stall.']);
+    fakeTurn(toolCallResponse('call_1', 'remember', []), finalAnswerResponse('(That archery stall) *smiles to herself*'));
+
+    requestDecision($this, $scenario)
+        ->assertCreated()
+        ->assertJsonPath('action', ['verb' => 'remember', 'target' => 'your time with the user', 'activity' => null]);
+
+    expect(toolResultSentBack())->toContain('He took her to the faire and laughed at the archery stall.');
+});
+
+it('remembers something from her archive', function () {
+    $scenario = autonomousScenario();
+    $archive = Archive::factory()->create(['user_id' => $scenario[0]->id]);
+    ArchiveEntry::factory()->create(['archive_id' => $archive->id, 'title' => 'The ninth floor', 'content' => 'A shelf nobody has catalogued.']);
+    $scenario[1]->update(['archive_id' => $archive->id]);
+    fakeTurn(toolCallResponse('call_1', 'remember', []), finalAnswerResponse('(That shelf) *frowns*'));
+
+    requestDecision($this, $scenario)->assertCreated()->assertJsonPath('action.target', 'your archive: The ninth floor');
+
+    expect(toolResultSentBack())->toContain('A shelf nobody has catalogued.');
+});
+
+it('tells her nothing comes back when she has no memories yet', function () {
+    $scenario = autonomousScenario();
+    fakeTurn(toolCallResponse('call_1', 'remember', []), finalAnswerResponse('(Nothing) *stays put*'));
+
+    requestDecision($this, $scenario)->assertCreated()->assertJsonPath('action', null);
+
+    expect(toolResultSentBack())->toContain('Nothing comes back to you right now');
+});
+
+it('reads a thought wrapped in emphasis as her reason', function () {
+    $scenario = autonomousScenario();
+    fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline']), finalAnswerResponse('*(The sun is too good to waste)* *stretches out on the lounger*'));
+
+    $response = requestDecision($this, $scenario)->assertCreated();
+
+    expect(ResidentActivity::find($response->json('activityId')))
+        ->reason->toBe('The sun is too good to waste')
+        ->narration->toBe('*stretches out on the lounger*');
+});
+
 it('decides an action, records it and stores the line in her session conversation', function () {
     $scenario = autonomousScenario();
     fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline']), finalAnswerResponse('(The sun is too good to waste) *stretches out on the lounger*'));
@@ -57,6 +128,7 @@ it('decides an action, records it and stores the line in her session conversatio
         ->target->toBe('pool-lounger-1-seat')
         ->activity->toBe('recline')
         ->reason->toBe('The sun is too good to waste')
+        ->narration->toBe('*stretches out on the lounger*')
         ->zone_id->toBe('pool-terrace');
 
     $conversation = Conversation::where('world_session_id', $scenario[5]->id)->sole();
@@ -143,6 +215,7 @@ it('asks her own model with her persona, the world, her history and what she can
     Pose::factory()->posture(Posture::Sitting)->create(['assistant_id' => $scenario[1]->id, 'name' => 'laugh']);
     Pose::factory()->create(['assistant_id' => $scenario[1]->id, 'name' => 'greeting']);
     Pose::factory()->create(['assistant_id' => $scenario[1]->id, 'name' => 'walk']);
+    Pose::factory()->posture(Posture::Sitting)->create(['assistant_id' => $scenario[1]->id, 'name' => 'talk']);
     Pose::factory()->restricted()->create(['assistant_id' => $scenario[1]->id, 'name' => 'tease']);
     ResidentActivity::factory()->finished()->create([
         'world_session_id' => $scenario[5]->id,
@@ -164,10 +237,12 @@ it('asks her own model with her persona, the world, her history and what she can
         ->toContain("Poses:\nRegular: laugh (standing, sitting)\nRestricted: tease (standing)")
         ->toContain('Things to do in this place: Swim [swim] in Pool terrace')
         ->toContain('pool-lounger-1-seat [pool-lounger-1] at the Pool lounger: Recline [recline] (taken)')
-        ->toContain('leaves you to yourself right now')
-        ->toContain('vary your activities')
+        ->toContain('Read the moment before you choose')
+        ->toContain('Let the mood of your last exchange with the user carry into what you do')
+        ->not->toContain('leaves you to yourself')
         ->not->toContain('greeting (')
-        ->not->toContain('walk (');
+        ->not->toContain('walk (')
+        ->not->toContain('talk (');
     Http::assertSent(fn (Request $request) => str_starts_with($request->url(), 'https://fake-llm.test/'));
 });
 

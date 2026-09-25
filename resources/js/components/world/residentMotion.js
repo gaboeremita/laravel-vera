@@ -49,3 +49,35 @@ export function shouldFaceUser({ requested, inConversation, routing = false, pla
 export function headingToward(from, to) {
 	return facingAngleForMovement(to.x - from.x, to.z - from.z);
 }
+
+const SPOKEN_WORDS_PER_SECOND = 2.5;
+const MIN_SPEAKING_SECONDS = 1.5;
+const MAX_SPEAKING_SECONDS = 20;
+
+/** How long saying a line takes when there is no voice to time it by. */
+export function speakingSeconds(text) {
+	const words = (text ?? '').trim().split(/\s+/).filter(Boolean).length;
+	if (words === 0) return 0;
+	return Math.min(MAX_SPEAKING_SECONDS, Math.max(MIN_SPEAKING_SECONDS, words / SPOKEN_WORDS_PER_SECOND));
+}
+
+/**
+ * Whether a one-off pose fades out the clip she idles in while it plays, so
+ * the two never average and the pose shows at full strength.
+ */
+export function fadesIdleForPose({ idle, pose }) {
+	return Boolean(idle) && idle !== pose;
+}
+
+const MIN_IDLE_MS = 10000;
+const MAX_IDLE_MS = 30000;
+const RESTING_POSTURES = ['sitting', 'reclining', 'lying'];
+
+/**
+ * How long she waits before deciding her next step; resting on something she
+ * settles in, so she decides half as often.
+ */
+export function idleWait(posture = 'standing', random = Math.random) {
+	const wait = MIN_IDLE_MS + random() * (MAX_IDLE_MS - MIN_IDLE_MS);
+	return RESTING_POSTURES.includes(posture) ? wait * 2 : wait;
+}

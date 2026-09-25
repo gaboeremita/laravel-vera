@@ -97,9 +97,7 @@ function setUpAgentAssistant(string $mode = 'agent', array $assistantAttributes 
         'data' => ['ai_model_id' => $aiModel->id],
     ]);
 
-    $conversation = Conversation::factory()->create([
-        'assistant_user_id' => $assistantUser->id,
-    ]);
+    $conversation = Conversation::factory()->forAssistantUser($assistantUser)->create();
 
     return [$user, $assistant, $conversation];
 }

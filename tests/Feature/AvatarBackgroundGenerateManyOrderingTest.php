@@ -40,7 +40,7 @@ test('the floor and surroundings images stay correctly paired with the prompts t
         },
     ]);
 
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a plaza');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a plaza');
 
     $background = Cache::get(GenerateAvatarBackground::cacheKeyFor($conversation->id));
     expect($background)->not->toBeNull();

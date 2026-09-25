@@ -46,6 +46,20 @@ it('records a direct control with its reason', function () {
     expect(ResidentActivity::findOrFail($response->json('id'))->reason)->toBe('direct control');
 });
 
+it('records the words she used when she started an action', function () {
+    $scenario = worldStateScenario();
+
+    $response = $this->actingAs($scenario[0])->postJson(activityRoute('worlds.sessions.residents.activities.store', $scenario), [
+        'verb' => 'use',
+        'target' => 'pool-lounger-1-seat',
+        'activity' => 'recline',
+        'narration' => '*takes her gin tonic out to the lounger*',
+    ]);
+
+    $response->assertCreated();
+    expect(ResidentActivity::findOrFail($response->json('id'))->narration)->toBe('*takes her gin tonic out to the lounger*');
+});
+
 it('rejects unknown verbs', function () {
     $scenario = worldStateScenario();
 

@@ -11,6 +11,8 @@ export const WORLD_MOTION_POSES = [
 	{ key: 'walk', name: 'walk', posture: 'standing', label: 'Walk', description: 'Loops while the resident walks forward.' },
 	{ key: 'walkStop', name: 'walk-stop', posture: 'standing', label: 'Walk Stop', description: 'Plays once when the resident comes to a stop.' },
 	{ key: 'greeting', name: 'greeting', posture: 'standing', label: 'Greeting', description: 'Plays once when the player starts a conversation.' },
+	{ key: 'talk', name: 'talk', posture: 'standing', label: 'Talk', description: 'Loops while the resident speaks standing, and holds for as long as she talks.' },
+	{ key: 'talkSitting', name: 'talk', posture: 'sitting', label: 'Talk', description: 'Loops while the resident speaks seated, and holds for as long as she talks.' },
 	{ key: 'swim', name: 'swim', posture: 'swimming', label: 'Swim', description: 'Loops while the resident swims through deep water.' },
 	{ key: 'swimToEdge', name: 'swim-to-edge', posture: 'swimming', label: 'Swim To Edge', description: 'Plays once when the resident stops at the side of the pool, and holds while she rests there.' },
 ];
@@ -20,6 +22,8 @@ const MOTION_POSE_NAMES = {
 	walk: ['walk', 'walking', 'walk-cycle', 'walk_cycle', 'walk cycle'],
 	walkStop: ['walk-stop', 'walk_stop', 'walk stop'],
 	greeting: ['greeting', 'greet'],
+	talk: ['talk', 'talking'],
+	talkSitting: ['talk', 'talking'],
 	swim: ['swim', 'swimming'],
 	swimToEdge: ['swim-to-edge', 'swim_to_edge', 'swim to edge', 'swimming-to-edge', 'swimming_to_edge', 'swimming to edge'],
 };
@@ -38,17 +42,13 @@ export function isWorldMotionPose(pose) {
 }
 
 /**
- * The version of a pose to play in a posture. With no version for that
- * posture, the standing version plays and she has to stand up first.
+ * The version of a pose to play in a posture; a pose never changes her
+ * posture, so with no version for it she stays as she is.
  *
- * @returns {{ pose: object, standUp: boolean } | null}
+ * @returns {object | null}
  */
 export function resolvePose(poses = [], name, posture = 'standing') {
-	const inPosture = poses.find((pose) => postureOf(pose) === posture && sameName(pose.name, name));
-	if (inPosture) return { pose: inPosture, standUp: false };
-
-	const standing = poses.find((pose) => postureOf(pose) === 'standing' && sameName(pose.name, name));
-	return standing ? { pose: standing, standUp: posture !== 'standing' } : null;
+	return poses.find((pose) => postureOf(pose) === posture && sameName(pose.name, name)) ?? null;
 }
 
 /**

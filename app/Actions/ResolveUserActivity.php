@@ -13,25 +13,27 @@ class ResolveUserActivity
     /**
      * @return array<string, array<int, mixed>>
      */
-    public static function rules(): array
+    public static function rules(string $key = 'userState'): array
     {
         return [
-            'userState' => ['nullable', 'array'],
-            'userState.posture' => ['required_with:userState', 'string', Rule::in(self::POSTURES)],
-            'userState.spotId' => ['nullable', 'string', 'max:100'],
-            'userState.activityId' => ['nullable', 'string', 'max:100'],
+            $key => ['nullable', 'array'],
+            "{$key}.posture" => ["required_with:{$key}", 'string', Rule::in(self::POSTURES)],
+            "{$key}.spotId" => ['nullable', 'string', 'max:100'],
+            "{$key}.activityId" => ['nullable', 'string', 'max:100'],
+            "{$key}.pose" => ['nullable', 'string', 'max:100'],
         ];
     }
 
     /**
-     * The user's posture, and the object and activity they are busy with, looked up in the world's layout.
+     * Someone's posture, the object and activity they are busy with, looked up in the world's layout, and the pose they hold.
      *
-     * @param  ?array{posture: string, spotId?: ?string, activityId?: ?string}  $userState
-     * @return ?array{posture: string, object: ?array, activity: ?array}
+     * @param  ?array{posture: string, spotId?: ?string, activityId?: ?string, pose?: ?string}  $userState
+     * @param  string  $key  the request field the state came in, for validation messages
+     * @return ?array{posture: string, object: ?array, activity: ?array, pose: ?string}
      *
      * @throws ValidationException
      */
-    public function handle(World $world, ?array $userState): ?array
+    public function handle(World $world, ?array $userState, string $key = 'userState'): ?array
     {
         $layout = $world->layout ?? [];
         if ($userState === null || empty($layout['zones'])) {
@@ -51,7 +53,7 @@ class ResolveUserActivity
             }
 
             if ($spot === null) {
-                throw ValidationException::withMessages(['userState.spotId' => 'There is no spot with this id in the world.']);
+                throw ValidationException::withMessages(["{$key}.spotId" => 'There is no spot with this id in the world.']);
             }
         }
 
@@ -64,12 +66,12 @@ class ResolveUserActivity
             $activity = $candidates->firstWhere('id', $activityId);
 
             if ($activity === null) {
-                throw ValidationException::withMessages(['userState.activityId' => $spot !== null
+                throw ValidationException::withMessages(["{$key}.activityId" => $spot !== null
                     ? 'This spot does not offer that activity.'
                     : 'No place in the world offers that activity.']);
             }
         }
 
-        return ['posture' => $userState['posture'], 'object' => $object, 'activity' => $activity];
+        return ['posture' => $userState['posture'], 'object' => $object, 'activity' => $activity, 'pose' => $userState['pose'] ?? null];
     }
 }

@@ -52,9 +52,16 @@ test('objectsWithin lists same-floor objects inside the radius', () => {
 
 test('availability counts free spots and names the holders', () => {
 	const bench = layout.objects[2];
-	const occupied = new Map([['bench-1', 7], ['bench-3', 'user']]);
+	const occupied = new Map([['bench-1', [7]], ['bench-3', ['user']]]);
 	assert.deepEqual(spotAvailability(bench, 'sit', occupied, new Map([[7, 'Vera']])), { free: 1, total: 3, takenBy: ['Vera', 'YOU'] });
 	assert.deepEqual(spotAvailability(bench, 'sit', new Map(), new Map()), { free: 3, total: 3, takenBy: [] });
+});
+
+test('a shared spot stays free until every place in it is taken', () => {
+	const bed = { spots: [{ id: 'bed-left', capacity: 2, activities: [{ id: 'lie-down' }] }] };
+	const names = new Map([[7, 'Vera']]);
+	assert.deepEqual(spotAvailability(bed, 'lie-down', new Map([['bed-left', [7]]]), names), { free: 1, total: 1, takenBy: ['Vera'] });
+	assert.deepEqual(spotAvailability(bed, 'lie-down', new Map([['bed-left', [7, 'user']]]), names), { free: 0, total: 1, takenBy: ['Vera', 'YOU'] });
 });
 
 const splitBenches = { id: 'atrium-benches', position: { x: 0, y: 0, z: 1 }, spots: [spot('west', -8.55, 1), spot('east', 8.55, 1)] };

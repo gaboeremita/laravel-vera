@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AiModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -86,4 +87,51 @@ test('a non-agent-mode assistant is entirely unaffected', function () {
     Http::assertSentCount(1);
     expect($conversation->messages()->whereNotNull('tool_calls')->exists())->toBeFalse();
     expect($response->json('tool_calls'))->toBeNull();
+});
+
+test('thinking from every agent loop step is saved on the reply and returned', function () {
+    [$user, $assistant, $conversation] = setUpAgentAssistant();
+    AiModel::query()->update(['thinking_key' => 'reasoning']);
+
+    $toolStep = toolCallResponse('call_1', 'get_current_datetime', []);
+    $toolStep['choices'][0]['message']['reasoning'] = 'Check the date before answering.';
+    $finalStep = finalAnswerResponse('Today is a great day.');
+    $finalStep['choices'][0]['message']['reasoning'] = 'Now answer with the date.';
+
+    Http::fake([
+        'fake-llm.test/*' => Http::sequence()->push($toolStep)->push($finalStep),
+    ]);
+
+    $response = $this->actingAs($user)->postJson(
+        route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
+        ['messages' => [['role' => 'user', 'content' => 'What is today\'s date?']]],
+    );
+
+    $expectedThinking = "Check the date before answering.\n\nNow answer with the date.";
+
+    $response->assertSuccessful();
+    expect($response->json('thinking'))->toBe($expectedThinking);
+    expect($conversation->messages()->where('role', 'assistant')->latest('id')->first()->thinking)->toBe($expectedThinking);
+});
+
+test('the tool calls of a reply are saved on it and come back when the conversation is loaded', function () {
+    [$user, $assistant, $conversation] = setUpAgentAssistant();
+
+    Http::fake([
+        'fake-llm.test/*' => Http::sequence()
+            ->push(toolCallResponse('call_1', 'get_current_datetime', []))
+            ->push(finalAnswerResponse('Today is a great day.')),
+    ]);
+
+    $this->actingAs($user)->postJson(
+        route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
+        ['messages' => [['role' => 'user', 'content' => 'What is today\'s date?']]],
+    )->assertSuccessful();
+
+    $reply = collect($this->actingAs($user)->getJson(
+        route('conversations.show', ['assistant' => $assistant->id, 'id' => $conversation->id]),
+    )->assertSuccessful()->json('messages'))->firstWhere('role', 'assistant');
+
+    expect($reply['tool_calls'])->toHaveCount(1);
+    expect($reply['tool_calls'][0]['name'])->toBe('get_current_datetime');
 });

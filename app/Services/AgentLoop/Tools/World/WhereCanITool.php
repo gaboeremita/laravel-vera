@@ -11,7 +11,7 @@ class WhereCanITool extends WorldTool
 
     public function description(): string
     {
-        return 'Finds every place in this world where you can do something, such as swim, sit or play music. Returns each place with the thing, spot and activity id to use there.';
+        return 'Finds every place in this world where you can do something, such as swim, sit or play music. Returns each place with the thing, spot and activity id to use there, nearest to you first, with how many meters away it is.';
     }
 
     public function parameters(): array
@@ -38,6 +38,7 @@ class WhereCanITool extends WorldTool
         foreach ($this->toolbox->zones() as $zone) {
             foreach (array_filter($zone['activities'], $matches) as $activity) {
                 $results[] = [
+                    'point' => $zone['entry'],
                     'place' => $zone['name'],
                     'placeId' => $zone['id'],
                     'floor' => $this->toolbox->floorName($zone['floorId']),
@@ -52,6 +53,7 @@ class WhereCanITool extends WorldTool
             foreach ($object['spots'] as $spot) {
                 foreach (array_filter($spot['activities'], $matches) as $activity) {
                     $results[] = [
+                        'point' => $spot['position'],
                         'place' => $place['name'] ?? null,
                         'placeId' => $place['id'] ?? null,
                         'thing' => $object['name'],
@@ -65,7 +67,18 @@ class WhereCanITool extends WorldTool
             }
         }
 
-        return ['matches' => $results];
+        $matches = collect($results)
+            ->map(function (array $result): array {
+                $distance = $this->toolbox->distanceTo($result['point']);
+                unset($result['point']);
+
+                return [...$result, 'metersAway' => $distance === null ? null : (int) round($distance)];
+            })
+            ->sortBy(fn (array $result) => $result['metersAway'] ?? PHP_INT_MAX)
+            ->values()
+            ->all();
+
+        return ['matches' => $matches];
     }
 
     /**

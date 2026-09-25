@@ -34,9 +34,17 @@ class AssistantUser extends Pivot
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * The user's chats with this assistant: the user owns them and the
+     * assistant is the counterpart.
+     */
     public function conversations(): HasMany
     {
-        return $this->hasMany(Conversation::class, 'assistant_user_id');
+        return $this->hasMany(Conversation::class, 'owner_id', 'user_id')->withAttributes([
+            'owner_type' => (new User)->getMorphClass(),
+            'counterpart_type' => (new Assistant)->getMorphClass(),
+            'counterpart_id' => $this->assistant_id,
+        ]);
     }
 
     public function discordServers(): HasMany

@@ -12,6 +12,7 @@ use App\Models\Assistant;
 use App\Models\Emotion;
 use App\Models\Image;
 use App\Models\Pose;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,9 +30,7 @@ class AssistantController extends Controller
             ->withCount(['emotions'])
             ->with(['cardImage', 'vrm'])
             ->get()
-            ->map(function (Assistant $assistant) {
-                $pivotId = $assistant->pivot->id;
-
+            ->map(function (Assistant $assistant) use ($request) {
                 // Card image takes priority; the 'default' emotion image is
                 // the fallback for image-mode assistants without one set.
                 $cardImageUrl = $assistant->cardImage?->url;
@@ -45,9 +44,12 @@ class AssistantController extends Controller
                     $cardImageUrl = $defaultEmotion?->image?->url;
                 }
 
-                // Conversation stats via the pivot
+                // Conversation stats for the user's chats with this assistant
                 $stats = DB::table('conversations')
-                    ->where('assistant_user_id', $pivotId)
+                    ->where('owner_type', (new User)->getMorphClass())
+                    ->where('owner_id', $request->user()->id)
+                    ->where('counterpart_type', (new Assistant)->getMorphClass())
+                    ->where('counterpart_id', $assistant->id)
                     ->selectRaw('count(*) as conversations_count, max(updated_at) as last_activity')
                     ->first();
 
@@ -102,6 +104,7 @@ class AssistantController extends Controller
                 'name' => $pose->name,
                 'posture' => $pose->posture->value,
                 'restricted' => $pose->restricted,
+                'hold' => $pose->hold,
                 'vrm_blendshapes' => $pose->vrm_blendshapes,
                 'animation_url' => $pose->animationFile?->url,
                 'animation_original_name' => $pose->animationFile?->original_name,
@@ -156,6 +159,7 @@ class AssistantController extends Controller
             'poses.*.name' => ['required', 'string', 'max:255'],
             'poses.*.posture' => ['sometimes', new Enum(Posture::class)],
             'poses.*.restricted' => ['sometimes', 'boolean'],
+            'poses.*.hold' => ['sometimes', 'boolean'],
             'poses.*.vrm_blendshapes' => ['sometimes', 'array'],
             'poses.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'poses.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -258,6 +262,7 @@ class AssistantController extends Controller
                     'name' => $poseData['name'],
                     'posture' => $poseData['posture'] ?? Posture::Standing->value,
                     'restricted' => $poseData['restricted'] ?? false,
+                    'hold' => $poseData['hold'] ?? false,
                     'vrm_blendshapes' => Pose::normalizeBlendshapes($poseData['vrm_blendshapes'] ?? null),
                 ]);
 

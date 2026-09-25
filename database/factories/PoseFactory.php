@@ -34,4 +34,9 @@ class PoseFactory extends Factory
     {
         return $this->state(fn () => ['restricted' => true]);
     }
+
+    public function held(): static
+    {
+        return $this->state(fn () => ['hold' => true]);
+    }
 }

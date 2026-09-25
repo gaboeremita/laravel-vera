@@ -364,3 +364,72 @@ it('creates restricted poses at assistant creation time', function () {
     expect($assistant->poses()->where('name', 'spin')->first()->restricted)->toBeFalse()
         ->and($assistant->poses()->where('name', 'tease')->first()->restricted)->toBeTrue();
 });
+
+it('creates poses that play once unless hold is given', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.store', ['assistant' => $assistant->id]), ['name' => 'wave'])
+        ->assertCreated()
+        ->assertJsonPath('hold', false);
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.store', ['assistant' => $assistant->id]), ['name' => 'sleep', 'posture' => 'lying', 'hold' => true])
+        ->assertCreated()
+        ->assertJsonPath('hold', true);
+
+    expect(Pose::where('assistant_id', $assistant->id)->where('name', 'sleep')->first()->hold)->toBeTrue();
+});
+
+it('turns holding a pose on and off', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+    $pose = Pose::factory()->create(['assistant_id' => $assistant->id, 'name' => 'sleep', 'posture' => 'lying']);
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.update', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['hold' => true])
+        ->assertSuccessful()
+        ->assertJsonPath('hold', true);
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.update', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['name' => 'nap'])
+        ->assertSuccessful()
+        ->assertJsonPath('hold', true);
+
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.update', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['hold' => false])
+        ->assertSuccessful()
+        ->assertJsonPath('hold', false);
+});
+
+it('assistants.show marks held poses', function () {
+    [$user, $assistant] = setUpAssistantForPoses();
+    Pose::factory()->create(['assistant_id' => $assistant->id, 'name' => 'spin']);
+    Pose::factory()->held()->create(['assistant_id' => $assistant->id, 'name' => 'sleep']);
+
+    $this->actingAs($user)
+        ->getJson(route('assistants.show', ['id' => $assistant->id]))
+        ->assertSuccessful()
+        ->assertJsonPath('poses.0.hold', false)
+        ->assertJsonPath('poses.1.name', 'sleep')
+        ->assertJsonPath('poses.1.hold', true);
+});
+
+it('creates held poses at assistant creation time', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->postJson(route('assistants.store'), [
+            'name' => 'Avatar Assistant',
+            'slug' => 'avatar-assistant-held-poses',
+            'portrait_type' => 'avatar3d',
+            'poses' => [
+                ['name' => 'spin'],
+                ['name' => 'sleep', 'posture' => 'lying', 'hold' => true],
+            ],
+        ]);
+
+    $response->assertCreated();
+    $assistant = Assistant::find($response->json('id'));
+    expect($assistant->poses()->where('name', 'spin')->first()->hold)->toBeFalse()
+        ->and($assistant->poses()->where('name', 'sleep')->first()->hold)->toBeTrue();
+});

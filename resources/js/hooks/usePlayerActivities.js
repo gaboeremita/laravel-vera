@@ -6,6 +6,7 @@ import { actionLine, getUpLine, observationGetUpLine, observationLine } from '..
 import { spotAvailability } from '../components/world/objectFocus.js';
 import { selectOnlookers } from '../components/world/onlookers.js';
 import { activityKind, nearestFreeSpot } from '../components/world/playerActivities.js';
+import { claimSpot, holderUnder, releaseAllSpots, releaseSpot as releaseHeldSpot, stackTier } from '../components/world/spotOccupancy.js';
 import { floorAt, zoneChain } from '../components/world/worldLocation.js';
 
 const ACTIVITY_MS = 3000;
@@ -92,8 +93,14 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 	}, []);
 	const expireEntry = useCallback((id) => setHudEntries((entries) => entries.filter((entry) => entry.id !== id)), []);
 
-	const deliver = useCallback(({ line, observation }) => {
-		showEntry('line', line);
+	/**
+	 * `line` and `observation` take who the user is on top of, as each
+	 * recipient should read it: her name, or for the one underneath "you" in
+	 * the user's action and "me" in her own observation.
+	 */
+	const deliver = useCallback(({ line, observation, partnerId = null }) => {
+		const partnerFor = (residentId, selfWord) => (partnerId === null ? null : partnerId === residentId ? selfWord : residentNames.get(partnerId) ?? 'someone');
+		showEntry('line', line(partnerFor(null, 'you')));
 		const foot = playerStateRef.current?.footPosition;
 		if (!foot) return;
 		const collisionWorld = collisionWorldRef.current;
@@ -112,14 +119,14 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 		});
 		for (const resident of onlookers) {
 			if (resident.id === chatResident?.id) {
-				actionSenderRef.current?.(line);
+				actionSenderRef.current?.(line(partnerFor(resident.id, 'you')));
 				continue;
 			}
 			if (!sessionId) continue;
 			const name = resident.assistant.name;
 			void (async () => {
 				try {
-					const response = await api.post(route('worlds.sessions.residents.observations.store', { world: worldId, session: sessionId, resident: resident.id }), { line: observation });
+					const response = await api.post(route('worlds.sessions.residents.observations.store', { world: worldId, session: sessionId, resident: resident.id }), { line: observation(partnerFor(resident.id, 'me')) });
 					if (!response.ok) throw new Error(`HTTP ${response.status}`);
 				} catch (error) {
 					console.error(`[usePlayerActivities] could not tell ${name} what the user did`, error);
@@ -127,10 +134,12 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 				}
 			})();
 		}
-	}, [showEntry, playerStateRef, collisionWorldRef, layout, world, residentPositionsRef, residentCommandsRef, chatResident, actionSenderRef, sessionId, worldId, addToast]);
+	}, [showEntry, playerStateRef, collisionWorldRef, layout, world, residentPositionsRef, residentCommandsRef, chatResident, actionSenderRef, sessionId, worldId, addToast, residentNames]);
+
+	const residentUnderUser = useCallback((spotId) => holderUnder(occupiedSpotsRef.current, spotId, 'user'), [occupiedSpotsRef]);
 
 	const releaseSpot = useCallback((spotId) => {
-		if (spotId && occupiedSpotsRef.current.get(spotId) === 'user') occupiedSpotsRef.current.delete(spotId);
+		if (spotId) releaseHeldSpot(occupiedSpotsRef.current, spotId, 'user');
 	}, [occupiedSpotsRef]);
 
 	const start = useCallback(async (index) => {
@@ -160,34 +169,43 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			return;
 		}
 		setCard(null);
-		occupiedSpotsRef.current.set(spot.id, 'user');
+		claimSpot(occupiedSpotsRef.current, spot, 'user');
 		commands.setActivity({ spotId: spot.id, activityId: chosen.id });
 
 		if (activityKind(chosen, false) === 'resting') {
 			setActivity({ key: crypto.randomUUID(), kind: 'resting', activity: chosen, object: cardObject, spot, settling: true });
-			await commands.settleOnSpot({ spot, posture: chosen.posture });
+			await commands.settleOnSpot({ spot, posture: chosen.posture, getTier: () => stackTier(occupiedSpotsRef.current, spot.id, 'user') });
 			setActivity((current) => (current?.spot?.id === spot.id ? { ...current, settling: false } : current));
-			deliver({ line: actionLine({ activity: chosen, object: cardObject }), observation: observationLine({ activity: chosen, object: cardObject }) });
+			deliver({
+				line: (onTopOf) => actionLine({ activity: chosen, object: cardObject, onTopOf }),
+				observation: (onTopOf) => observationLine({ activity: chosen, object: cardObject, onTopOf }),
+				partnerId: residentUnderUser(spot.id),
+			});
 			return;
 		}
 
 		setActivity({ key: crypto.randomUUID(), kind: 'standing', activity: chosen, object: cardObject, spot, cancelled: false });
 		void commands.faceToward(spot.position);
-	}, [cardView, activity, playerCommandsRef, cardZone, cardObject, playerStateRef, occupiedSpotsRef, residentNames, showEntry, deliver]);
+	}, [cardView, activity, playerCommandsRef, cardZone, cardObject, playerStateRef, occupiedSpotsRef, residentNames, showEntry, deliver, residentUnderUser]);
 
 	const getUp = useCallback(async () => {
 		if (activity?.kind !== 'resting' || activity.settling || gettingUp.current) return;
 		gettingUp.current = true;
 		try {
+			const partnerId = residentUnderUser(activity.spot.id);
 			await playerCommandsRef.current?.getUp();
 			releaseSpot(activity.spot.id);
 			playerCommandsRef.current?.setActivity({});
 			setActivity(null);
-			deliver({ line: getUpLine(activity.object), observation: observationGetUpLine(activity.object) });
+			deliver({
+				line: (offOf) => getUpLine(activity.object, offOf),
+				observation: (offOf) => observationGetUpLine(activity.object, offOf),
+				partnerId,
+			});
 		} finally {
 			gettingUp.current = false;
 		}
-	}, [activity, playerCommandsRef, releaseSpot, deliver]);
+	}, [activity, playerCommandsRef, releaseSpot, residentUnderUser, deliver]);
 
 	const cancel = useCallback(() => {
 		if (!activity || activity.kind === 'resting' || activity.cancelled) return;
@@ -200,7 +218,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 		if (!activity || activity.cancelled) return;
 		releaseSpot(activity.spot?.id);
 		playerCommandsRef.current?.setActivity({});
-		deliver({ line: actionLine({ activity: activity.activity, object: activity.object }), observation: observationLine({ activity: activity.activity, object: activity.object }) });
+		deliver({ line: () => actionLine({ activity: activity.activity, object: activity.object }), observation: () => observationLine({ activity: activity.activity, object: activity.object }) });
 	}, [activity, releaseSpot, playerCommandsRef, deliver]);
 
 	const finish = useCallback(() => setActivity(null), []);
@@ -251,7 +269,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 	}, [card, cardView?.rows.length, focusedObject, location, highlightedIndex, start, openObjectCard]);
 
 	const releaseAll = useCallback(() => {
-		for (const [spotId, holder] of occupiedSpotsRef.current) if (holder === 'user') occupiedSpotsRef.current.delete(spotId);
+		releaseAllSpots(occupiedSpotsRef.current, 'user');
 	}, [occupiedSpotsRef]);
 
 	useEffect(() => releaseAll, [releaseAll]);

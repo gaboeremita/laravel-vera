@@ -19,6 +19,7 @@ class StoreResidentObservationRequest extends FormRequest
     {
         return [
             'line' => ['required', 'string', 'max:500'],
+            'expression' => ['nullable', 'array'],
         ];
     }
 }

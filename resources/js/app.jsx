@@ -23,6 +23,7 @@ import WorldsPage from './pages/WorldsPage.jsx';
 import CreateWorldPage from './pages/CreateWorldPage.jsx';
 import EditWorldPage from './pages/EditWorldPage.jsx';
 import NpcsPage from './pages/NpcsPage.jsx';
+import AllConversationsPage from './pages/AllConversationsPage.jsx';
 import CreateNpcPage from './pages/CreateNpcPage.jsx';
 import WorldPage from './pages/WorldPage.jsx';
 import WorldSessionsPage from './pages/WorldSessionsPage.jsx';
@@ -48,6 +49,8 @@ createRoot(document.getElementById('root')).render(
 						<Route path="/worlds/:worldId/sessions" element={<WorldSessionsPage />} />
 						<Route path="/worlds/:worldId" element={<WorldPage />} />
                         <Route path="/npcs" element={<NpcsPage />} />
+                        <Route path="/conversations" element={<AllConversationsPage />} />
+                        <Route path="/conversations/:conversationId" element={<AllConversationsPage />} />
                         <Route path="/npcs/create" element={<CreateNpcPage />} />
 						<Route path="/npcs/:assistantId/edit" element={<EditAssistantPage kind="world_npc" />} />
                         <Route path="/assistants/:assistantId/edit" element={<EditAssistantPage />} />

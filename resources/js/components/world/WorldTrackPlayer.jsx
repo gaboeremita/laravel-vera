@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { musicVolume } from './musicVolume.js';
+import { isTypingTarget } from './keyboardFocus.js';
 
 const FADE_MS = 600;
+const DUCK_FADE_MS = 250;
+const DUCK_RELEASE_MS = 1000;
 const RESTART_DELAY_MS = 3000;
 const VOLUME_STORAGE_KEY = 'worldTrackVolume';
 
@@ -27,11 +31,21 @@ function fade(audio, from, to, duration) {
 	return () => clearInterval(interval);
 }
 
-export default function WorldTrackPlayer({ trackUrl, isActive }) {
+/**
+ * The world's music. The slider follows loudness rather than raw volume, and
+ * the music drops while a resident speaks (`voiceUntil`, a timestamp in ms)
+ * so her voice carries over it.
+ */
+export default function WorldTrackPlayer({ trackUrl, isActive, voiceUntil = 0 }) {
 	const audioRef = useRef(null);
 	const [volume, setVolume] = useState(readStoredVolume);
 	const [isMuted, setIsMuted] = useState(false);
+	const [releasedFor, setReleasedFor] = useState(voiceUntil);
+	const ducked = voiceUntil !== releasedFor;
 	const volumeBeforeMute = useRef(volume);
+	const target = musicVolume({ slider: volume, muted: isMuted, ducked });
+	const targetRef = useRef(target);
+	const cancelTargetFade = useRef(null);
 
 	useEffect(() => {
 		const audio = audioRef.current;
@@ -40,7 +54,7 @@ export default function WorldTrackPlayer({ trackUrl, isActive }) {
 		let cancelFade = null;
 		let restartTimeout = null;
 
-		audio.volume = isMuted ? 0 : volume;
+		audio.volume = targetRef.current;
 		audio.play().catch(() => {});
 
 		const restart = () => {
@@ -48,7 +62,7 @@ export default function WorldTrackPlayer({ trackUrl, isActive }) {
 			restartTimeout = setTimeout(() => {
 				audio.currentTime = 0;
 				audio.play().catch(() => {});
-				cancelFade = fade(audio, 0, isMuted ? 0 : volume, FADE_MS);
+				cancelFade = fade(audio, 0, targetRef.current, FADE_MS);
 			}, FADE_MS + RESTART_DELAY_MS);
 		};
 
@@ -60,18 +74,27 @@ export default function WorldTrackPlayer({ trackUrl, isActive }) {
 			if (restartTimeout) clearTimeout(restartTimeout);
 			audio.pause();
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [trackUrl, isActive]);
 
 	useEffect(() => {
+		targetRef.current = target;
 		const audio = audioRef.current;
-		if (audio) audio.volume = isMuted ? 0 : volume;
-	}, [volume, isMuted]);
+		if (!audio) return;
+		cancelTargetFade.current?.();
+		cancelTargetFade.current = fade(audio, audio.volume, target, DUCK_FADE_MS);
+	}, [target]);
+
+	useEffect(() => () => cancelTargetFade.current?.(), []);
+
+	useEffect(() => {
+		const remaining = voiceUntil - Date.now();
+		const timer = setTimeout(() => setReleasedFor(voiceUntil), remaining <= 0 ? 0 : remaining + DUCK_RELEASE_MS);
+		return () => clearTimeout(timer);
+	}, [voiceUntil]);
 
 	useEffect(() => {
 		const keyDown = (event) => {
-			if (event.key !== 'm' && event.key !== 'M') return;
-			if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+			if (event.code !== 'KeyN' || isTypingTarget(event.target)) return;
 			setIsMuted((wasMuted) => {
 				if (!wasMuted) volumeBeforeMute.current = volume;
 				return !wasMuted;
@@ -102,7 +125,7 @@ export default function WorldTrackPlayer({ trackUrl, isActive }) {
 					type="button"
 					onClick={() => setIsMuted((wasMuted) => !wasMuted)}
 					className="text-fg-2 text-[0.7rem] tracking-[0.1em] hover:text-fg-1"
-					title="Toggle mute (M)"
+					title="Toggle mute (N)"
 				>
 					{isMuted ? 'UNMUTE' : 'MUTE'}
 				</button>

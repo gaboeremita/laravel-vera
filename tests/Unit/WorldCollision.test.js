@@ -289,3 +289,50 @@ test('a jump never carries the body past the edge of the ground', (context) => {
 	assert.ok(position.z <= 10.3);
 	assert.ok(Math.abs(position.y) < 0.001);
 });
+
+function slab(width, depth) {
+	const mesh = new Mesh(new BoxGeometry(width, 3, depth), new MeshBasicMaterial());
+	mesh.position.y = 1.5;
+	return mesh;
+}
+
+test('a body standing clear of geometry needs no freeing', (context) => {
+	const world = createWorld(context, slab(10, 1));
+	assert.equal(world.freeBodyPosition(new Vector3(0, 0, 3)), null);
+});
+
+test('a body stuck inside a wall is moved to the nearest open floor', (context) => {
+	const world = createWorld(context, slab(10, 1));
+	const stuck = new Vector3(0, 0, 0.1);
+	const free = world.freeBodyPosition(stuck);
+	assert.ok(free);
+	assert.equal(world.isBodyBlocked(free), false);
+	assert.ok(Math.abs(free.z) >= 0.75);
+	assert.ok(Math.hypot(free.x - stuck.x, free.z - stuck.z) < 2);
+	assert.ok(Math.abs(free.y) < 0.001);
+});
+
+test('a stuck body prefers the nearest walkable navigation point', (context) => {
+	const world = createWorld(context, slab(10, 1));
+	const walkable = { x: 1, y: 0, z: -2 };
+	const free = world.freeBodyPosition(new Vector3(0, 0, 0.1), { nearestPoint: () => walkable });
+	assert.equal(free, walkable);
+});
+
+test('a navigation point that is itself blocked falls back to open floor', (context) => {
+	const world = createWorld(context, slab(10, 1));
+	const free = world.freeBodyPosition(new Vector3(0, 0, 0.1), { nearestPoint: () => ({ x: 0, y: 0, z: 0 }) });
+	assert.ok(free);
+	assert.equal(world.isBodyBlocked(free), false);
+});
+
+test('a body stuck at the edge of the world is freed inside its bounds', (context) => {
+	const edgeWall = slab(20, 1);
+	edgeWall.position.z = 9.5;
+	const world = createWorld(context, edgeWall);
+	const free = world.freeBodyPosition(new Vector3(0, 0, 9.6));
+	assert.ok(free);
+	assert.ok(world.bounds.containsPoint(free));
+	assert.ok(free.z <= 8.75);
+	assert.equal(world.isBodyBlocked(free), false);
+});

@@ -3,9 +3,9 @@ import { useState } from 'react';
 /**
  * A ring that fills while the user does a standing activity. `onComplete`
  * fires when it is full; `onFinished` once it has animated away, whether it
- * filled or was cancelled.
+ * filled or was cancelled. It holds while the world is paused.
  */
-export default function ActivityProgress({ activityName, durationMs, cancelled = false, onComplete, onFinished }) {
+export default function ActivityProgress({ activityName, durationMs, cancelled = false, paused = false, onComplete, onFinished }) {
 	const [filled, setFilled] = useState(false);
 	const leaving = filled || cancelled;
 
@@ -29,7 +29,7 @@ export default function ActivityProgress({ activityName, durationMs, cancelled =
 						pathLength="100"
 						strokeDasharray="100"
 						transform="rotate(-90 50 50)"
-						style={{ animation: `hud-ring-fill ${durationMs}ms linear forwards`, animationPlayState: cancelled ? 'paused' : 'running' }}
+						style={{ animation: `hud-ring-fill ${durationMs}ms linear forwards`, animationPlayState: cancelled || paused ? 'paused' : 'running' }}
 						onAnimationEnd={(event) => {
 							event.stopPropagation();
 							if (cancelled) return;
@@ -37,7 +37,7 @@ export default function ActivityProgress({ activityName, durationMs, cancelled =
 							onComplete();
 						}}
 					/>
-					<g style={{ transformOrigin: '50px 50px', animation: `hud-ring-spin ${durationMs}ms linear forwards`, animationPlayState: cancelled || filled ? 'paused' : 'running' }}>
+					<g style={{ transformOrigin: '50px 50px', animation: `hud-ring-spin ${durationMs}ms linear forwards`, animationPlayState: cancelled || filled || paused ? 'paused' : 'running' }}>
 						<circle cx="50" cy="10" r="3.5" fill="var(--accent)" />
 						<circle cx="50" cy="10" r="8" fill="color-mix(in oklab, var(--accent) 25%, transparent)" />
 					</g>

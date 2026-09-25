@@ -102,7 +102,7 @@ it('gives an unknown place back to her as an error within the same turn', functi
     fakeTurn(toolCallResponse('call_1', 'go_to', ['target' => 'moon']), finalAnswerResponse('I cannot find that.'));
 
     sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', null);
-    expect(toolResultSentBack())->toContain('There is no place or thing called \"moon\"');
+    expect(toolResultSentBack())->toContain('There is no place, thing or spot called \"moon\"');
 });
 
 it('keeps the first action when she tries a second one in the same turn', function () {
@@ -115,6 +115,36 @@ it('keeps the first action when she tries a second one in the same turn', functi
 
     sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action.verb', 'go_to');
     expect(toolResultSentBack(2))->toContain('You already chose an action this turn');
+});
+
+it('walks her to the thing a spot belongs to when she goes to a spot', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    fakeTurn(toolCallResponse('call_1', 'go_to', ['target' => 'pool-lounger-1-seat']), finalAnswerResponse('Over there.'));
+
+    sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', ['verb' => 'go_to', 'target' => 'pool-lounger-1', 'activity' => null]);
+});
+
+it('lists where an activity is available nearest to her first, with the distance', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    $layout = $scenario[3]->layout;
+    $layout['objects'][] = [
+        'id' => 'studio-couch', 'name' => 'Couch', 'description' => 'A low couch by the keyboards.',
+        'position' => ['x' => -6, 'y' => 0, 'z' => 3], 'zoneId' => 'studio',
+        'spots' => [[
+            'id' => 'studio-couch-seat',
+            'position' => ['x' => -6, 'y' => 0, 'z' => 3], 'facing' => 0.0,
+            'approach' => ['x' => -6, 'y' => 0, 'z' => 3.6],
+            'activities' => [['id' => 'recline', 'name' => 'Recline', 'posture' => 'reclining', 'pose' => null]],
+        ]],
+    ];
+    $scenario[3]->update(['layout' => $layout]);
+    fakeTurn(toolCallResponse('call_1', 'where_can_i', ['activity' => 'recline']), finalAnswerResponse('Right here.'));
+
+    sendToolWorldMessage($this, $scenario)->assertSuccessful();
+
+    $matches = json_decode(toolResultSentBack(), true)['matches'];
+    expect(collect($matches)->map(fn (array $match) => [$match['spotId'], $match['metersAway']])->all())
+        ->toBe([['studio-couch-seat', 1], ['pool-lounger-1-seat', 12]]);
 });
 
 it('answers where an activity is available', function () {
@@ -159,7 +189,7 @@ it('gives NPCs the world tools on the default model', function () {
     $user = User::factory()->create();
     $npc = Assistant::factory()->create(['kind' => AssistantKind::WorldNpc, 'mode' => 'assistant']);
     $assistantUser = AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $npc->id]);
-    $conversation = Conversation::factory()->create(['assistant_user_id' => $assistantUser->id]);
+    $conversation = Conversation::factory()->forAssistantUser($assistantUser)->create();
     $world = World::factory()->forUser($user)->withLayout()->create();
     $resident = $world->residents()->create(['assistant_id' => $npc->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
     fakeTurn(toolCallResponse('call_1', 'go_to', ['target' => 'studio']), finalAnswerResponse('This way.'));
@@ -179,7 +209,7 @@ it('returns a plan of several steps, checked before anything starts', function (
         'steps' => [
             ['action' => 'go_to', 'target' => 'pool-terrace'],
             ['action' => 'zone', 'activity' => 'swim'],
-            ['action' => 'use', 'target' => 'pool-lounger-1-seat', 'activity' => 'recline'],
+            ['action' => 'use', 'spot' => 'pool-lounger-1-seat', 'activity' => 'recline'],
             ['action' => 'do', 'description' => 'hums a song with her eyes closed'],
         ],
     ]), finalAnswerResponse('(I need the sun) *heads out for a swim, then the lounger*'));
@@ -204,7 +234,8 @@ it('gives a plan with a bad step back to her with the step number', function (ar
     sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', null);
     expect(toolResultSentBack())->toContain('Step 2:')->toContain($error);
 })->with([
-    'unknown place' => [['action' => 'go_to', 'target' => 'moon'], 'no place or thing called \\"moon\\"'],
+    'unknown place' => [['action' => 'go_to', 'target' => 'moon'], 'no place, thing or spot called \\"moon\\"'],
+    'use step without its spot' => [['action' => 'use', 'target' => 'pool-lounger-1-seat', 'activity' => 'recline'], 'a use step names it in spot'],
     'zone activity of another place' => [['action' => 'zone', 'activity' => 'swim'], 'not something you can do in the place you will be in'],
     'do with no description' => [['action' => 'do'], 'needs a description'],
     'unknown pose' => [['action' => 'pose', 'pose' => 'backflip'], 'no pose called \\"backflip\\"'],
@@ -269,7 +300,7 @@ it('runs an NPC on the model chosen for it instead of the default', function () 
     [$user, , , $world] = worldStateScenario(fakeReply: false);
     $npc = Assistant::factory()->create(['kind' => AssistantKind::WorldNpc, 'mode' => 'assistant']);
     $assistantUser = AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $npc->id]);
-    $conversation = Conversation::factory()->create(['assistant_user_id' => $assistantUser->id]);
+    $conversation = Conversation::factory()->forAssistantUser($assistantUser)->create();
     $world->residents()->create(['assistant_id' => $npc->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
     $this->actingAs($user)->putJson(route('settings.selectModel', ['assistant' => $npc->id]), ['ai_model_id' => AiModel::query()->value('id')])->assertSuccessful();
     Http::fake([

@@ -100,8 +100,35 @@ it('imports floors, zones, objects and spots in world space from an uploaded env
         ->and($spot['facing'])->toEqualWithDelta(M_PI / 2, 0.0001)
         ->and($spot['approach']['x'])->toEqualWithDelta(12.6, 0.0001)
         ->and($spot['approach']['z'])->toEqualWithDelta(0, 0.0001)
-        ->and($spot['activities'])->toBe([['id' => 'recline', 'name' => 'Recline', 'posture' => 'reclining', 'pose' => null]]);
+        ->and($spot['activities'])->toBe([['id' => 'recline', 'name' => 'Recline', 'posture' => 'reclining', 'pose' => null]])
+        ->and($spot['capacity'])->toBe(1);
 });
+
+it('imports how many bodies a spot holds', function () {
+    $user = User::factory()->create();
+    $nodes = penthouseMarkerNodes();
+    $nodes[5]['extras']['vera']['capacity'] = 2;
+
+    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+
+    $response->assertCreated()->assertJsonPath('layoutWarnings', []);
+    expect(World::findOrFail($response->json('id'))->layout['objects'][0]['spots'][0]['capacity'])->toBe(2);
+});
+
+it('falls back to one body with a warning for an invalid spot capacity', function (mixed $capacity) {
+    $user = User::factory()->create();
+    $nodes = penthouseMarkerNodes();
+    $nodes[5]['extras']['vera']['capacity'] = $capacity;
+
+    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+
+    $response->assertCreated()->assertJsonPath('layoutWarnings.0.reason', 'spot capacity must be a whole number of at least 1');
+    expect(World::findOrFail($response->json('id'))->layout['objects'][0]['spots'][0]['capacity'])->toBe(1);
+})->with([
+    'zero' => [0],
+    'fraction' => [1.5],
+    'text' => ['two'],
+]);
 
 it('imports nested zones and custom outlines', function () {
     $user = User::factory()->create();

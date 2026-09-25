@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { defaultPoseFor, findWorldMotionPose, resolvePose } from '../../resources/js/components/world/worldMotionPoses.js';
+import { defaultPoseFor, findWorldMotionPose, isWorldMotionPose, resolvePose } from '../../resources/js/components/world/worldMotionPoses.js';
 
 const poses = [
 	{ name: 'default', posture: 'standing', animationUrl: 'stand.vrma' },
@@ -13,21 +13,20 @@ const poses = [
 ];
 
 test('resolvePose plays the version for her posture', () => {
-	assert.deepEqual(resolvePose(poses, 'laugh', 'sitting'), { pose: poses[3], standUp: false });
-	assert.deepEqual(resolvePose(poses, 'Laugh', 'standing'), { pose: poses[2], standUp: false });
+	assert.equal(resolvePose(poses, 'laugh', 'sitting'), poses[3]);
+	assert.equal(resolvePose(poses, 'Laugh', 'standing'), poses[2]);
 });
 
-test('resolvePose falls back to the standing version and makes her stand up', () => {
-	assert.deepEqual(resolvePose(poses, 'dance', 'sitting'), { pose: poses[4], standUp: true });
-});
-
-test('resolvePose returns null for a pose with neither version', () => {
+test('resolvePose keeps her posture when the pose has no version for it', () => {
+	assert.equal(resolvePose(poses, 'dance', 'sitting'), null);
 	assert.equal(resolvePose(poses, 'stretch', 'sitting'), null);
 	assert.equal(resolvePose(poses, 'backflip', 'standing'), null);
 });
 
 test('resolvePose treats poses without a posture as standing', () => {
-	assert.deepEqual(resolvePose([{ name: 'wave' }], 'wave', 'reclining'), { pose: { name: 'wave' }, standUp: true });
+	const wave = { name: 'wave' };
+	assert.equal(resolvePose([wave], 'wave', 'standing'), wave);
+	assert.equal(resolvePose([wave], 'wave', 'reclining'), null);
 });
 
 test('defaultPoseFor returns the posture default or the standing default', () => {
@@ -48,4 +47,17 @@ test('swim motions come from swimming poses only', () => {
 	];
 	assert.equal(findWorldMotionPose(library, 'swim'), library[1]);
 	assert.equal(findWorldMotionPose(library, 'swimToEdge'), library[2]);
+});
+
+test('talking has a standing and a sitting version', () => {
+	const standing = { name: 'talk', posture: 'standing' };
+	const sitting = { name: 'Talking', posture: 'sitting' };
+	assert.equal(findWorldMotionPose([standing, sitting], 'talk'), standing);
+	assert.equal(findWorldMotionPose([standing, sitting], 'talkSitting'), sitting);
+	assert.equal(findWorldMotionPose([{ name: 'talk', posture: 'lying' }], 'talkSitting'), null);
+});
+
+test('talking poses stay out of the regular pose lists', () => {
+	assert.equal(isWorldMotionPose({ name: 'talk', posture: 'sitting' }), true);
+	assert.equal(isWorldMotionPose({ name: 'talk', posture: 'lying' }), false);
 });

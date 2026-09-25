@@ -1,4 +1,5 @@
 import { floorAt } from './worldLocation.js';
+import { holdersOf, spotCapacity } from './spotOccupancy.js';
 
 export const REACH = 2.5;
 export const GAZE_ANGLE = Math.PI / 6;
@@ -89,7 +90,7 @@ export function objectsWithin(layout, foot, floorId, radius) {
 }
 
 /**
- * How many spots offering an activity are free, and who holds the others.
+ * How many spots offering an activity have room left, and who holds them.
  * `residentNames` maps holder ids to names; the user's own hold reads "YOU".
  */
 export function spotAvailability(object, activityId, occupiedSpots, residentNames) {
@@ -97,9 +98,9 @@ export function spotAvailability(object, activityId, occupiedSpots, residentName
 	const takenBy = [];
 	let free = 0;
 	for (const spot of spots) {
-		const holder = occupiedSpots.get(spot.id);
-		if (holder === undefined) free++;
-		else takenBy.push(holder === 'user' ? 'YOU' : residentNames.get(holder) ?? 'SOMEONE');
+		const holders = holdersOf(occupiedSpots, spot.id);
+		if (holders.length < spotCapacity(spot)) free++;
+		for (const holder of holders) takenBy.push(holder === 'user' ? 'YOU' : residentNames.get(holder) ?? 'SOMEONE');
 	}
 	return { free, total: spots.length, takenBy };
 }

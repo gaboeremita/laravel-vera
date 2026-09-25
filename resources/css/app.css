@@ -170,6 +170,39 @@ button, select, input, textarea {
     .hud-enter-scale { animation: hud-scale-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
     .hud-exit-burst { animation: hud-burst 0.4s ease-out forwards; }
     .hud-exit-fade { animation: hud-fade-out 0.3s ease-in forwards; }
+    .hud-exit-pause { animation: hud-pause-out 0.3s ease-in forwards; }
+
+    .world-pause-backdrop {
+        background:
+            repeating-linear-gradient(
+                to bottom,
+                color-mix(in oklab, var(--accent) 6%, transparent) 0 1px,
+                transparent 1px 4px
+            ),
+            radial-gradient(
+                ellipse at center,
+                color-mix(in oklab, var(--bg-0) 45%, transparent),
+                color-mix(in oklab, var(--bg-0) 82%, transparent)
+            );
+        backdrop-filter: blur(3px) saturate(0.7);
+    }
+
+    .world-pause-title {
+        letter-spacing: 0.32em;
+        padding-left: 0.32em;
+    }
+
+    .world-pause-hint {
+        font-variant: small-caps;
+        text-transform: lowercase;
+        letter-spacing: 0.14em;
+        font-size: 0.95rem;
+        color: var(--fg-2);
+    }
+}
+
+@keyframes hud-pause-out {
+    to { opacity: 0; filter: blur(4px); }
 }
 
 @keyframes hud-wipe-in {

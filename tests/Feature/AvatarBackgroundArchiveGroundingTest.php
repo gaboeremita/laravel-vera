@@ -35,7 +35,7 @@ test('a requested location matching an archive entry grounds the generated promp
         'fake-image.test/*' => Http::response(imageGenHttpResponse()),
     ]);
 
-    GenerateAvatarBackground::dispatch($conversation->assistantUser, $conversation, 'the neon bar');
+    GenerateAvatarBackground::dispatch($conversation->assistantUser(), $conversation, 'the neon bar');
 
     Http::assertSent(function ($request) {
         if ($request->url() !== 'https://fake-llm.test/chat/completions') {

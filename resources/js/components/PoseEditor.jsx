@@ -76,11 +76,21 @@ export function AnimationFileControl({ pose, onUploadAnimation, onDeleteAnimatio
 	);
 }
 
+function HoldCheckbox({ checked, onChange }) {
+	return (
+		<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase flex items-center gap-2 cursor-pointer w-fit">
+			<input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-accent" />
+			Hold pose
+		</label>
+	);
+}
+
 function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation, datalistId }) {
 	const [expanded, setExpanded] = useState(false);
 	const [draft, setDraft] = useState(() => (pose.vrm_blendshapes || []).map((b) => (b.weight <= 1 ? { ...b, weight: Math.round(b.weight * 100) } : b)));
 	const [nameDraft, setNameDraft] = useState(pose.name);
 	const [postureDraft, setPostureDraft] = useState(pose.posture ?? 'standing');
+	const [holdDraft, setHoldDraft] = useState(!!pose.hold);
 	const [syncedPose, setSyncedPose] = useState(pose);
 	const [isSaving, setIsSaving] = useState(false);
 
@@ -89,6 +99,7 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
 		setDraft((pose.vrm_blendshapes || []).map((b) => (b.weight <= 1 ? { ...b, weight: Math.round(b.weight * 100) } : b)));
 		setNameDraft(pose.name);
 		setPostureDraft(pose.posture ?? 'standing');
+		setHoldDraft(!!pose.hold);
 	}
 
 	const handleSave = async () => {
@@ -97,7 +108,7 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
 
 		setIsSaving(true);
 		try {
-			await onSave(trimmedName, draft.filter((b) => b.expression.trim()), postureDraft);
+			await onSave(trimmedName, draft.filter((b) => b.expression.trim()), postureDraft, holdDraft);
 		} finally {
 			setIsSaving(false);
 		}
@@ -145,6 +156,7 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
 						</select>
 					</div>
 					<BlendshapeRows blendshapes={draft} onChange={setDraft} datalistId={datalistId} />
+					<HoldCheckbox checked={holdDraft} onChange={setHoldDraft} />
 					<div className="flex justify-end">
 						<button
 							onClick={handleSave}
@@ -169,10 +181,10 @@ function PoseRow({ pose, onSave, onDelete, onUploadAnimation, onDeleteAnimation,
  * or neither may be configured; they are combinable, not an exclusive
  * toggle.
  *
- * @param {Array} poses - [{id, name, vrm_blendshapes, animation_url}]
- * @param {function} onAdd - (name, blendshapes) => void
+ * @param {Array} poses - [{id, name, hold, vrm_blendshapes, animation_url}]
+ * @param {function} onAdd - (name, blendshapes, file, hold) => void
  * @param {function} onDelete - (pose) => void
- * @param {function} onUpdateBlendshapes - (pose, name, blendshapes, posture) => void
+ * @param {function} onUpdateBlendshapes - (pose, name, blendshapes, posture, hold) => void
  * @param {function} onUploadAnimation - (pose, file) => void
  * @param {function} onDeleteAnimation - (pose) => void
  */
@@ -182,6 +194,7 @@ export default function PoseEditor({ poses, onAdd, onDelete, onUpdateBlendshapes
 	const [newName, setNewName] = useState('');
 	const [newBlendshapes, setNewBlendshapes] = useState([{ expression: '', weight: 100 }]);
 	const [newAnimationFile, setNewAnimationFile] = useState(null);
+	const [newHold, setNewHold] = useState(false);
 	const newFileInputRef = useRef(null);
 	const [deleteTarget, setDeleteTarget] = useState(null);
 	const [isAddingPose, setIsAddingPose] = useState(false);
@@ -192,10 +205,11 @@ export default function PoseEditor({ poses, onAdd, onDelete, onUpdateBlendshapes
 
 		setIsAddingPose(true);
 		try {
-			await onAdd(trimmed, newBlendshapes.filter((b) => b.expression.trim()), newAnimationFile);
+			await onAdd(trimmed, newBlendshapes.filter((b) => b.expression.trim()), newAnimationFile, newHold);
 			setNewName('');
 			setNewBlendshapes([{ expression: '', weight: 100 }]);
 			setNewAnimationFile(null);
+			setNewHold(false);
 			setIsAdding(false);
 		} finally {
 			setIsAddingPose(false);
@@ -206,6 +220,7 @@ export default function PoseEditor({ poses, onAdd, onDelete, onUpdateBlendshapes
 		setNewName('');
 		setNewBlendshapes([{ expression: '', weight: 100 }]);
 		setNewAnimationFile(null);
+		setNewHold(false);
 		setIsAdding(false);
 	};
 
@@ -233,7 +248,7 @@ export default function PoseEditor({ poses, onAdd, onDelete, onUpdateBlendshapes
 					<PoseRow
 						key={pose.id}
 						pose={pose}
-						onSave={(name, blendshapes, posture) => onUpdateBlendshapes(pose, name, blendshapes, posture)}
+						onSave={(name, blendshapes, posture, hold) => onUpdateBlendshapes(pose, name, blendshapes, posture, hold)}
 						onDelete={() => setDeleteTarget(pose)}
 						onUploadAnimation={onUploadAnimation}
 						onDeleteAnimation={onDeleteAnimation}
@@ -259,6 +274,7 @@ export default function PoseEditor({ poses, onAdd, onDelete, onUpdateBlendshapes
 							autoFocus
 						/>
 						<BlendshapeRows blendshapes={newBlendshapes} onChange={setNewBlendshapes} datalistId={datalistId} />
+						<HoldCheckbox checked={newHold} onChange={setNewHold} />
 						<div className="space-y-1.5">
 							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">Animation File (.vrma / .fbx)</label>
 							{newAnimationFile ? (

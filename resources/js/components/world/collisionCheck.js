@@ -17,6 +17,7 @@ const MOVEMENT_STEP = 0.08;
 const CONTACT_MARGIN = 0.005;
 const SPAWN_SPACING = 0.6;
 const MAX_SPAWN_RINGS = 40;
+const INSIDE_PROBES = [new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 0, -1)];
 const COLLISION_NAME = /collision/i;
 const WATER_SEARCH_HEIGHT = 4;
 
@@ -198,12 +199,57 @@ export class WorldCollision {
 						const groundY = getGroundHeight(position.x, position.z, this.octree, this.bounds.min.y, maxY);
 						if (groundY === null) continue;
 						position.y = groundY;
-						if (!this.isBodyBlocked(position)) return position;
+						if (!this.isBodyStuck(position)) return position;
 					}
 				}
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Where a body stuck inside geometry can stand instead: the nearest
+	 * walkable navigation point, or the nearest open ground inside the bounds.
+	 * Null when the body is already clear or there is nowhere to go.
+	 */
+	freeBodyPosition(position, navigation = null) {
+		if (!this.isBodyStuck(position)) return null;
+		const walkable = navigation?.nearestPoint(position);
+		if (walkable && this.bounds.containsPoint(walkable) && !this.isBodyStuck(walkable)) return walkable;
+		return this.findSpawn(position);
+	}
+
+	/**
+	 * Whether a body overlaps geometry or stands wholly inside a solid, where
+	 * it touches no face: rays out from its middle meet only the inside of
+	 * surfaces, at least two of them.
+	 */
+	isBodyStuck(position) {
+		if (this.isBodyBlocked(position)) return true;
+		const middle = new Vector3(position.x, position.y + CHARACTER_HEIGHT / 2, position.z);
+		const facings = INSIDE_PROBES
+			.map((direction) => [direction, this.nearestTriangleAlong(new Ray(middle, direction))])
+			.filter(([, triangle]) => triangle !== null)
+			.map(([direction, triangle]) => triangle.getNormal(new Vector3()).dot(direction));
+		return facings.length >= 2 && facings.every((facing) => facing > 0);
+	}
+
+	/** The first triangle a ray meets, facing either way. */
+	nearestTriangleAlong(ray) {
+		const triangles = [];
+		this.octree.getRayTriangles(ray, triangles);
+		const point = new Vector3();
+		let nearest = null;
+		let nearestDistance = Infinity;
+		for (const triangle of triangles) {
+			if (!ray.intersectTriangle(triangle.a, triangle.b, triangle.c, false, point)) continue;
+			const distance = point.distanceTo(ray.origin);
+			if (distance < nearestDistance) {
+				nearest = triangle;
+				nearestDistance = distance;
+			}
+		}
+		return nearest;
 	}
 
 	hasLineOfSight(from, to) {
