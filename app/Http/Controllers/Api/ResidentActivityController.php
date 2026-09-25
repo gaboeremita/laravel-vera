@@ -30,6 +30,7 @@ class ResidentActivityController extends Controller
             'target' => ['nullable', 'string', 'max:255'],
             'activity' => ['nullable', 'string', 'max:100'],
             'reason' => ['nullable', 'string', 'max:500'],
+            'narration' => ['nullable', 'string', 'max:4000'],
             'source' => ['sometimes', Rule::in(['requested', 'idle'])],
             'position' => ['nullable', 'array:x,y,z'],
             'position.x' => ['required_with:position', 'numeric'],
@@ -49,6 +50,7 @@ class ResidentActivityController extends Controller
             'target' => $validated['target'] ?? null,
             'activity' => $validated['activity'] ?? null,
             'reason' => $validated['reason'] ?? null,
+            'narration' => $validated['narration'] ?? null,
             'zone_id' => $zone['id'] ?? null,
         ]);
 

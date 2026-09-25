@@ -6,6 +6,7 @@ use App\Directors\PromptDirector;
 use App\Exceptions\TelegramApiException;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
+use App\Models\Message;
 use App\Models\User;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\LlmResponseTagParser;
@@ -285,7 +286,7 @@ class TelegramPollCommand extends Command
             'role' => 'assistant',
             'content' => $content,
             'thinking' => $response->thinking,
-            'emotion' => $emotion,
+            'expression' => Message::expressionFrom(['emotion' => $emotion, 'pose' => $parsed['pose'], 'tags' => $parsed['tags']]),
         ]);
 
         if ($conversation->title === 'New conversation') {

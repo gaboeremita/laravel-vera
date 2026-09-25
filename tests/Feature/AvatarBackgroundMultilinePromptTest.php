@@ -25,7 +25,7 @@ test('a multi-line, multi-paragraph LLM response is parsed into full floor and s
         'fake-image.test/*' => Http::response(imageGenHttpResponse()),
     ]);
 
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a ballroom');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a ballroom');
 
     Http::assertSent(function ($request) {
         return $request->url() === 'https://fake-llm.test/chat/completions'

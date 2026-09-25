@@ -131,14 +131,16 @@ it('includes her recent activity, newest first, limited to the last eight', func
     expect(strpos($prompt, 'pool-terrace, from'))->toBeLessThan(strpos($prompt, 'place-1:'));
 });
 
-it('reminds the resident she can use her world tools on her own initiative', function () {
+it('tells the resident her body moves only through her world tools', function () {
     $scenario = worldStateScenario();
 
     sendWorldMessage($this, $scenario, [])->assertSuccessful();
 
     expect(sentSystemPrompt())
         ->toContain('World awareness:')
-        ->toContain('your tools are yours to use whenever you feel like it, on your own initiative');
+        ->toContain('Your body in this world moves only through your tools. Whenever your reply has you go somewhere')
+        ->toContain('A pose tag sets your gesture or expression where you are right now; moving and changing posture come from your tools.')
+        ->toContain('People name things loosely; a couch can mean a sofa or the armchairs. Match what they mean to the closest fitting thing, and prefer what is near you.');
 });
 
 it('tells the resident what the user is doing', function (array $userState, string $phrase) {
@@ -151,11 +153,60 @@ it('tells the resident what the user is doing', function (array $userState, stri
 
     expect(sentSystemPrompt())->toContain("away from you{$phrase}");
 })->with([
-    'reclining on a spot' => [['posture' => 'reclining', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'recline'], ', reclining on the Pool lounger'],
+    'reclining on a spot' => [['posture' => 'reclining', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'recline'], ', reclining on the Pool lounger, doing "Recline"'],
     'doing a zone activity' => [['posture' => 'standing', 'activityId' => 'swim'], ', doing "Swim"'],
     'swimming' => [['posture' => 'swimming'], ', swimming'],
     'crouching' => [['posture' => 'crouching'], ', crouching'],
 ]);
+
+it('tells the resident her own posture and what she is on', function () {
+    $scenario = worldStateScenario();
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -4.4],
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
+    ], ['residentState' => ['posture' => 'reclining', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'recline']])->assertSuccessful();
+
+    expect(sentSystemPrompt())->toContain('Pool terrace, on the Ground floor, reclining on the Pool lounger');
+});
+
+it('tells the resident the pose she holds, why she is doing what she is doing and how she put it', function () {
+    $scenario = worldStateScenario();
+    ResidentActivity::factory()->create([
+        'world_session_id' => $scenario[5]->id,
+        'world_resident_id' => $scenario[4]->id,
+        'source' => 'idle',
+        'verb' => 'plan',
+        'target' => 'get a drink',
+        'reason' => 'I want to forget about today',
+        'narration' => '*mixes a gin tonic, then takes it out to the lounger*',
+    ]);
+    ResidentActivity::factory()->finished()->create([
+        'world_session_id' => $scenario[5]->id,
+        'world_resident_id' => $scenario[4]->id,
+        'source' => 'idle',
+        'verb' => 'use',
+        'target' => 'pool-lounger-1-seat',
+        'activity' => 'recline',
+        'reason' => 'step 2 of 2 of get a drink',
+    ]);
+
+    sendWorldMessage($this, $scenario, [
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
+    ], ['residentState' => ['posture' => 'reclining', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'recline', 'pose' => 'content']])->assertSuccessful();
+
+    expect(sentSystemPrompt())
+        ->toContain('reclining on the Pool lounger, doing "Recline", holding the pose "content"')
+        ->toContain("What you are doing now:\nYou have been in Pool terrace for less than a minute.\nYou have been at it for less than a minute.\nWhy: step 2 of 2 of get a drink\nIn your words when you started: *mixes a gin tonic, then takes it out to the lounger*");
+});
+
+it('rejects a resident state naming a spot the world does not have', function () {
+    $scenario = worldStateScenario();
+
+    sendWorldMessage($this, $scenario, [
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
+    ], ['residentState' => ['posture' => 'sitting', 'spotId' => 'moon-chair']])->assertUnprocessable()->assertJsonValidationErrors('residentState.spotId');
+});
 
 it('adds nothing for a user who is simply standing', function () {
     $scenario = worldStateScenario();
@@ -188,4 +239,40 @@ it('ignores the user state in a world without markers', function () {
         'user' => ['x' => 5, 'y' => 0, 'z' => -4.4],
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
     ], ['userState' => ['posture' => 'sitting', 'spotId' => 'moon-chair']])->assertSuccessful();
+});
+
+it('tells the resident who is lying on top of her and whom she lies on top of', function (array $holders, string $phrase) {
+    $scenario = worldStateScenario();
+    $holders = array_map(fn (string $holder) => $holder === 'resident' ? (string) $scenario[4]->id : $holder, $holders);
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -4.4],
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
+    ], ['stackedSpots' => [['spotId' => 'pool-lounger-1-seat', 'holders' => $holders]]])->assertSuccessful();
+
+    expect(sentSystemPrompt())->toContain("Sharing your spot: {$phrase}");
+})->with([
+    'the user on top of her' => [['resident', 'user'], 'the user is lying on top of you on the Pool lounger'],
+    'her on top of the user' => [['user', 'resident'], 'you are lying on top of the user on the Pool lounger'],
+]);
+
+it('says nothing about a shared spot the resident is not in', function () {
+    $scenario = worldStateScenario();
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -4.4],
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
+    ], ['stackedSpots' => [['spotId' => 'pool-lounger-1-seat', 'holders' => ['user', '999']]]])->assertSuccessful();
+
+    expect(sentSystemPrompt())->not->toContain('Sharing your spot');
+});
+
+it('rejects a shared spot the world does not have', function () {
+    $scenario = worldStateScenario();
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -4.4],
+        'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
+    ], ['stackedSpots' => [['spotId' => 'moon-bed', 'holders' => [(string) $scenario[4]->id, 'user']]]])
+        ->assertUnprocessable()->assertJsonValidationErrors('stackedSpots.0.spotId');
 });

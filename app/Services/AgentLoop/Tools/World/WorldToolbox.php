@@ -4,6 +4,7 @@ namespace App\Services\AgentLoop\Tools\World;
 
 use App\Contracts\AgentTool;
 use App\Models\World;
+use Closure;
 use RuntimeException;
 
 class WorldToolbox
@@ -11,7 +12,7 @@ class WorldToolbox
     public const USER_TARGET = 'user';
 
     /**
-     * @var ?array{verb: string, target: ?string, activity: ?string, steps?: array<int, array<string, ?string>>}
+     * @var ?array{verb: string, target: ?string, activity: ?string, line?: string, steps?: array<int, array<string, ?string>>}
      */
     private ?array $chosenAction = null;
 
@@ -19,12 +20,20 @@ class WorldToolbox
      * @param  array<int, array<string, mixed>>  $residentZoneChain  the zone she stands in and the zones around it; empty when her position is unknown
      * @param  array<int, string>  $occupiedSpots  spot ids other residents are using
      * @param  array<string, array<int, string>>  $posePostures  the postures each of her poses exists in, by pose name
+     * @param  ?array<string, int>  $companions  the other residents she can start talking to, resident id by name; null where she is already talking to someone
+     * @param  bool  $userAvailable  whether the user is free to be talked to
+     * @param  ?array{x: float, y: float, z: float}  $residentPoint  where she is; null when unknown
+     * @param  ?Closure(): ?array{from: string, memory: string}  $recall  brings back one of her memories
      */
     public function __construct(
         public readonly World $world,
         public readonly array $residentZoneChain = [],
         public readonly array $occupiedSpots = [],
         public readonly array $posePostures = [],
+        public readonly ?array $companions = null,
+        public readonly bool $userAvailable = true,
+        public readonly ?array $residentPoint = null,
+        private readonly ?Closure $recall = null,
     ) {
         $this->poseNames = array_keys($posePostures);
     }
@@ -60,11 +69,34 @@ class WorldToolbox
         $tools[] = new WanderTool($this);
         $tools[] = new PlanTool($this);
 
+        if ($this->companions !== null) {
+            $tools[] = new TalkToTool($this);
+        }
+
         return $tools;
     }
 
     /**
-     * @return ?array{verb: string, target: ?string, activity: ?string, steps?: array<int, array<string, ?string>>}
+     * Her tools when she decides on her own what to do next: the world tools,
+     * plus thinking and remembering where she is.
+     *
+     * @return AgentTool[]
+     */
+    public function idleTools(): array
+    {
+        return [...$this->tools(), new ThinkTool($this), new RememberTool($this)];
+    }
+
+    /**
+     * @return ?array{from: string, memory: string}
+     */
+    public function recallMemory(): ?array
+    {
+        return $this->recall !== null ? ($this->recall)() : null;
+    }
+
+    /**
+     * @return ?array{verb: string, target: ?string, activity: ?string, line?: string, steps?: array<int, array<string, ?string>>}
      */
     public function chosenAction(): ?array
     {
@@ -72,7 +104,7 @@ class WorldToolbox
     }
 
     /**
-     * @param  array{verb: string, target: ?string, activity: ?string, steps?: array<int, array<string, ?string>>}  $action
+     * @param  array{verb: string, target: ?string, activity: ?string, line?: string, steps?: array<int, array<string, ?string>>}  $action
      */
     public function choose(array $action): void
     {
@@ -107,7 +139,7 @@ class WorldToolbox
      */
     public function targetIds(): array
     {
-        return collect($this->zones())->merge($this->objects())->pluck('id')->all();
+        return collect($this->zones())->merge($this->objects())->merge($this->spots())->pluck('id')->all();
     }
 
     /**
@@ -197,6 +229,31 @@ class WorldToolbox
     public function findZone(string $written): ?array
     {
         return collect($this->zones())->first(fn (array $zone) => $this->sameName($zone['id'], $written) || $this->sameName($zone['name'], $written));
+    }
+
+    /**
+     * The place or thing she walks to for an id she wrote; a spot takes her
+     * to the thing it belongs to.
+     *
+     * @return ?array<string, mixed>
+     */
+    public function findTarget(string $written): ?array
+    {
+        return $this->findZone($written) ?? $this->findObject($written) ?? $this->findObject($this->findSpot($written)['objectId'] ?? '');
+    }
+
+    /**
+     * How far a point is from her, in meters; null when her position is unknown.
+     *
+     * @param  array{x: float, y: float, z: float}  $point
+     */
+    public function distanceTo(array $point): ?float
+    {
+        if ($this->residentPoint === null) {
+            return null;
+        }
+
+        return sqrt(($point['x'] - $this->residentPoint['x']) ** 2 + ($point['y'] - $this->residentPoint['y']) ** 2 + ($point['z'] - $this->residentPoint['z']) ** 2);
     }
 
     public function findObject(string $written): ?array

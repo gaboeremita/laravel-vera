@@ -5,6 +5,7 @@ import { themeRgb } from '../../utils/themeColor.js';
 import { getGroundHeight } from './groundHeight.js';
 import { RESTING_POSTURES } from './playerPostures.js';
 import { isCompact } from './objectFocus.js';
+import { hasRoomFor } from './spotOccupancy.js';
 
 const FADE_SECONDS = 0.3;
 const RING_SIZE = 0.9;
@@ -137,10 +138,8 @@ function ObjectBeacon({ object, visible, colors, occupiedSpots, collisionWorld, 
 			const { uniforms } = mesh.material;
 			uniforms.uTime.value = time.current;
 			uniforms.uFade.value = fade.current;
-			if (mesh.userData.spotId) {
-				const holder = occupiedSpots.current.get(mesh.userData.spotId);
-				uniforms.uTaken.value = holder !== undefined && holder !== 'user' ? 1 : 0;
-			}
+			const { spot } = mesh.userData;
+			if (spot) uniforms.uTaken.value = hasRoomFor(occupiedSpots.current, spot, 'user') ? 0 : 1;
 		}
 		if (!visible && fade.current === 0) onFaded(object.id);
 	});
@@ -148,7 +147,7 @@ function ObjectBeacon({ object, visible, colors, occupiedSpots, collisionWorld, 
 	return (
 		<group ref={groupRef}>
 			{object.spots.map((spot, index) => (
-				<mesh key={spot.id} userData={{ spotId: spot.id }} geometry={ringGeometry} material={ringMaterials[index]} position={ringPositions[index]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={900} />
+				<mesh key={spot.id} userData={{ spot }} geometry={ringGeometry} material={ringMaterials[index]} position={ringPositions[index]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={900} />
 			))}
 			{showColumn && <mesh geometry={columnGeometry} material={columnMaterial} position={[object.position.x, object.position.y + COLUMN_HEIGHT / 2, object.position.z]} renderOrder={899} />}
 		</group>

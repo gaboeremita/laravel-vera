@@ -19,7 +19,7 @@ class GoToTool extends WorldTool
         return [
             'type' => 'object',
             'properties' => [
-                'target' => ['type' => 'string', 'enum' => [WorldToolbox::USER_TARGET, ...$this->toolbox->targetIds()], 'description' => 'The id of the place or thing to walk to, or "user" to go to the user.'],
+                'target' => ['type' => 'string', 'enum' => [WorldToolbox::USER_TARGET, ...$this->toolbox->targetIds()], 'description' => 'The id of the place, thing or spot to walk to, or "user" to go to the user.'],
             ],
             'required' => ['target'],
         ];
@@ -34,9 +34,9 @@ class GoToTool extends WorldTool
             return ['status' => 'started', 'note' => 'You are going to the user.'];
         }
 
-        $target = $this->toolbox->findZone($written) ?? $this->toolbox->findObject($written);
+        $target = $this->toolbox->findTarget($written);
         if ($target === null) {
-            throw new \RuntimeException(sprintf('There is no place or thing called "%s" here. Use one of the ids from the go_to tool.', $written));
+            throw new \RuntimeException(sprintf('There is no place, thing or spot called "%s" here. Use one of the ids from the go_to tool.', $written));
         }
 
         $this->toolbox->choose(['verb' => 'go_to', 'target' => $target['id'], 'activity' => null]);

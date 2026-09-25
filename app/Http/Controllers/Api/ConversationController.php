@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\AppendExpressionTags;
 use App\Actions\AppendWorldConversationContext;
+use App\Actions\ResolveSpotStacking;
 use App\Actions\ResolveUserActivity;
 use App\Actions\ResolveWorldState;
 use App\Contracts\SttProvider;
@@ -20,6 +22,7 @@ use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\DiscordChannel;
 use App\Models\Image;
+use App\Models\Message;
 use App\Models\Settings;
 use App\Models\WorldUser;
 use App\Services\AgentLoop\AgentLoopRunner;
@@ -192,6 +195,8 @@ class ConversationController extends Controller
             'occupiedSpots' => ['nullable', 'array'],
             'occupiedSpots.*' => ['string', 'max:100'],
             ...ResolveUserActivity::rules(),
+            ...ResolveUserActivity::rules('residentState'),
+            ...ResolveSpotStacking::rules(),
         ]);
 
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
@@ -279,7 +284,7 @@ class ConversationController extends Controller
             $assistantMessage = $conversation->messages()->create([
                 'role' => 'assistant',
                 'content' => $parsed['content'],
-                'emotion' => $parsed['emotion'],
+                'expression' => Message::expressionFrom($parsed),
             ]);
 
             $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
@@ -322,9 +327,10 @@ class ConversationController extends Controller
         }
 
         $userActivity = $world !== null ? app(ResolveUserActivity::class)->handle($world, $validated['userState'] ?? null) : null;
-        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world, $validated['positions'] ?? null, $worldSession, $userActivity);
+        $residentActivity = $world !== null ? app(ResolveUserActivity::class)->handle($world, $validated['residentState'] ?? null, 'residentState') : null;
+        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world, $validated['positions'] ?? null, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], residentActivity: $residentActivity);
         $director = new PromptDirector($prompt);
-        $this->appendExpressionTags($director, $assistantModel, $excludedSections, Posture::from($validated['residentPosture'] ?? Posture::Standing->value));
+        app(AppendExpressionTags::class)->handle($director, $assistantModel, $excludedSections, Posture::from($validated['residentPosture'] ?? Posture::Standing->value));
 
         $director->except($excludedSections);
 
@@ -397,6 +403,7 @@ class ConversationController extends Controller
                     $residentPoint !== null ? app(ResolveWorldState::class)->locate($world->layout, $residentPoint)['zoneChain'] : [],
                     occupiedSpots: $validated['occupiedSpots'] ?? [],
                     posePostures: $assistantModel->posturesByPoseName(),
+                    residentPoint: $residentPoint,
                 );
                 $tools = [...$tools, ...$worldToolbox->tools()];
             }
@@ -414,7 +421,7 @@ class ConversationController extends Controller
                 );
 
                 $agentToolCalls = $agentResult->toolCalls;
-                $response = new LlmResponse(content: $agentResult->content);
+                $response = new LlmResponse(content: $agentResult->content, thinking: $agentResult->thinking);
             } else {
                 $response = $llm->chat(
                     messages: [
@@ -437,13 +444,15 @@ class ConversationController extends Controller
             $ttsInstructions = $result->ttsInstructions;
         }
 
+        $action = $worldToolbox?->chosenAction();
+
         $assistantMessage = $conversation->messages()->create([
             'role' => 'assistant',
             'content' => $content,
             'thinking' => $response->thinking,
+            'tool_calls' => $agentToolCalls,
+            'expression' => Message::expressionFrom(app(LlmResponseTagParser::class)->parse($content, $assistantModel), $action),
         ]);
-
-        $action = $worldToolbox?->chosenAction();
 
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
 
@@ -575,49 +584,6 @@ class ConversationController extends Controller
     }
 
     /**
-     * Appends the assistant's expressive-signal prompt section — pose tags
-     * for 3D avatar assistants (poses are their only expression/action
-     * system, so emotion tags never apply), emotion tags for image-mode
-     * assistants — and excludes whichever section doesn't apply from
-     * $excludedSections, so a stale section baked into the assistant's
-     * stored prompt (e.g. from before it was in this mode) never renders
-     * alongside it and confuses the model with two competing tag formats.
-     */
-    private function appendExpressionTags(PromptDirector $director, Assistant $assistantModel, array &$excludedSections, Posture $posture = Posture::Standing): void
-    {
-        if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
-            $excludedSections[] = 'emotion tags';
-
-            $poses = $assistantModel->promptPoseNames($posture);
-            $hasStandingOnly = $poses['standingOnly']['regular'] !== [] || $poses['standingOnly']['restricted'] !== [];
-
-            if ($poses['available']['regular'] !== [] || $poses['available']['restricted'] !== [] || $hasStandingOnly) {
-                $section = [
-                    'format' => 'Use [pose: <exact pose name>] to select a pose. Use only a name from the available poses list. Control tags may appear in any order and are removed before the reply is shown.',
-                    'available poses' => $poses['available'],
-                ];
-                if ($posture === Posture::Swimming) {
-                    $section['format'] = 'You are swimming. Use [pose: <exact pose name>] to select a pose, from the available poses, which are the ones that fit while you swim. Control tags may appear in any order and are removed before the reply is shown.';
-                } elseif ($posture !== Posture::Standing && $hasStandingOnly) {
-                    $section['format'] = "You are {$posture->value}. Use [pose: <exact pose name>] to select a pose. Poses under available poses fit how you are right now; poses under poses that make you stand up get you up on your feet first, and you stay standing afterwards. Control tags may appear in any order and are removed before the reply is shown.";
-                    $section['poses that make you stand up'] = $poses['standingOnly'];
-                }
-                $director->append('pose tags', $section);
-            }
-
-            return;
-        }
-
-        $excludedSections[] = 'pose tags';
-
-        $emotions = $assistantModel->promptEmotionNames();
-        $director->append('emotion tags', [
-            'format' => 'Use [emotion: <exact emotion name>] to select an emotion. Use only a name from the available emotions list. Control tags may appear in any order and are removed before the reply is shown.',
-            'available emotions' => $emotions,
-        ]);
-    }
-
-    /**
      * Runs the full /create-image pipeline (enhance -> generate -> in-character reaction -> persist),
      * shared by every channel (web, Discord, ...). Callers format their own channel-specific response.
      *
@@ -636,7 +602,7 @@ class ConversationController extends Controller
         $assistantMessage = $conversation->messages()->create([
             'role' => 'assistant',
             'content' => $parsed['content'],
-            'emotion' => $parsed['emotion'],
+            'expression' => Message::expressionFrom($parsed),
         ]);
 
         $storagePath = "messages/{$request->user()->id}/{$conversation->id}";
@@ -680,6 +646,7 @@ class ConversationController extends Controller
             'emotion' => $parsed['emotion'],
             'intimate' => $parsed['intimate'],
             'pose' => $parsed['pose'],
+            'tags' => $parsed['tags'],
         ];
     }
 
@@ -700,7 +667,7 @@ class ConversationController extends Controller
         }
 
         $director = new PromptDirector($assistantModel->prompt);
-        $this->appendExpressionTags($director, $assistantModel, $excludedSections);
+        app(AppendExpressionTags::class)->handle($director, $assistantModel, $excludedSections);
         $director->except($excludedSections);
 
         $archive = $assistantModel->archive;
@@ -749,7 +716,7 @@ class ConversationController extends Controller
         }
 
         $director = new PromptDirector($assistantModel->prompt);
-        $this->appendExpressionTags($director, $assistantModel, $excludedSections);
+        app(AppendExpressionTags::class)->handle($director, $assistantModel, $excludedSections);
         $director->except($excludedSections);
 
         $archive = $assistantModel->archive;
@@ -922,13 +889,13 @@ class ConversationController extends Controller
             ]);
 
         $siblingMessages = Conversation::query()
-            ->whereHas('assistantUser', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->whereMorphedTo('owner', $request->user())
             ->where('discord_channel_id', $validated['channel_id'])
             ->where('id', '!=', $conversation->id)
-            ->with('assistantUser.assistant')
+            ->with('counterpart')
             ->get()
             ->flatMap(function (Conversation $sibling) {
-                $assistantName = $sibling->assistantUser->assistant->name;
+                $assistantName = $sibling->counterpart->name;
 
                 return $sibling->messages()
                     ->get(['role', 'content', 'discord_message_id', 'created_at'])
@@ -984,7 +951,7 @@ class ConversationController extends Controller
             'role' => 'assistant',
             'content' => $parsed['content'],
             'thinking' => $response->thinking,
-            'emotion' => $parsed['emotion'] ?? 'neutral',
+            'expression' => Message::expressionFrom(['emotion' => 'neutral', ...array_filter($parsed, fn (mixed $value) => $value !== null)]),
         ]);
 
         if ($conversation->title === 'New conversation') {

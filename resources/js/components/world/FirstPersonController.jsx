@@ -6,18 +6,19 @@ import { isTypingTarget } from './keyboardFocus.js';
 import { getGroundHeight } from './groundHeight.js';
 import { GRAVITY, canJump, eyeHeightFor, jumpVelocity, landingDip, movementSpeed, nextMovementMode, swimEyeY, targetFov } from './playerMotion.js';
 import { playJump, playLanding } from './worldSounds.js';
-import { clampLook, postureView, yawForDirection } from './playerPostures.js';
+import { MAX_PITCH, clampLook, postureView, yawForDirection } from './playerPostures.js';
 
 const UP = new Vector3(0, 1, 0);
 const MOVEMENT_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
-const RUN_KEYS = ['ShiftLeft', 'ShiftRight'];
+const RUN_KEYS = ['KeyR'];
 const GLIDE_SECONDS = 0.8;
 const FACE_SECONDS = 0.4;
 const EYE_EASE_RATE = 12;
 const FOV_EASE_RATE = 6;
 const MIN_SWIM_EYE_ABOVE_SURFACE = 0.1;
-const MAX_PITCH = 1.35;
 const DIP_RECOVERY_RATE = 8;
+const EMBEDDED_CHECK_SECONDS = 0.25;
+const EMBEDDED_SECONDS = 0.5;
 
 function playSound(play, ...args) {
 	try {
@@ -35,7 +36,7 @@ function lerpAngle(from, to, t) {
 	return from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * t;
 }
 
-export default function FirstPersonController({ collisionWorld, spawnPosition, enabled, onPositionChange, playerState: playerStateRef, playerCommands: playerCommandsRef, onMovementChange, onGetUpIntent, onMoveIntent }) {
+export default function FirstPersonController({ collisionWorld, navigation, spawnPosition, enabled, onPositionChange, playerState: playerStateRef, playerCommands: playerCommandsRef, onMovementChange, onGetUpIntent, onMoveIntent }) {
 	const { camera, gl } = useThree();
 	const keys = useRef(new Set());
 	const runHeld = useRef(false);
@@ -56,6 +57,8 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 	const airborne = useRef(null);
 	const jumpRequested = useRef(false);
 	const dip = useRef(0);
+	const dragging = useRef(false);
+	const embedded = useRef({ since: null, checkAt: 0 });
 	const callbacks = useRef({});
 
 	useEffect(() => {
@@ -92,8 +95,9 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		});
 
 		playerCommandsRef.current = {
-			settleOnSpot: async ({ spot, posture }) => {
-				const view = postureView({ spot, posture });
+			settleOnSpot: async ({ spot, posture, getTier = () => 0 }) => {
+				const tier = getTier();
+				const view = postureView({ spot, posture, tier });
 				// Spot approach points sit at seat height and may face a desk, so
 				// the floor the user stood on to choose the activity is the one
 				// sure place to stand back up on.
@@ -102,7 +106,7 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 				keys.current.clear();
 				crouchToggled.current = false;
 				airborne.current = null;
-				seat.current = { spot, posture, view, exitFoot };
+				seat.current = { spot, posture, view, exitFoot, getTier, tier };
 				activity.current.spotId = spot.id;
 				footPosition.current.copy(exitFoot);
 				await startGlide({ toEye: view.eye, toYaw: view.yaw, toPitch: view.pitch, duration: GLIDE_SECONDS });
@@ -136,7 +140,7 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 			const isMovement = MOVEMENT_KEYS.includes(event.code);
 			const isRun = RUN_KEYS.includes(event.code);
 			if (seat.current) {
-				if (isMovement || isRun || event.code === 'Space') {
+				if (isMovement || event.code === 'Space') {
 					event.preventDefault();
 					if (!glide.current) callbacks.current.onGetUpIntent?.();
 				}
@@ -160,8 +164,20 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 			pressedKeys.delete(event.code);
 			if (RUN_KEYS.includes(event.code)) runHeld.current = false;
 		};
+		const pointerDown = (event) => {
+			if (!enabled || event.button !== 0) return;
+			dragging.current = true;
+			canvas.setPointerCapture(event.pointerId);
+			canvas.style.cursor = 'none';
+		};
+		const pointerUp = (event) => {
+			if (!dragging.current) return;
+			dragging.current = false;
+			if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+			canvas.style.cursor = '';
+		};
 		const mouseMove = (event) => {
-			if (document.pointerLockElement !== canvas || !enabled || glide.current) return;
+			if (!dragging.current || !enabled || glide.current) return;
 			let nextYaw = yaw.current - event.movementX * 0.002;
 			let nextPitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch.current - event.movementY * 0.002));
 			if (seat.current) ({ yaw: nextYaw, pitch: nextPitch } = clampLook({ yaw: nextYaw, pitch: nextPitch }, seat.current.view));
@@ -172,10 +188,13 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		const blur = () => {
 			pressedKeys.clear();
 			runHeld.current = false;
+			dragging.current = false;
+			canvas.style.cursor = '';
 		};
 		const focusIn = (event) => { if (isTypingTarget(event.target)) blur(); };
-		const requestPointerLock = () => { if (enabled) canvas.requestPointerLock(); };
-		canvas.addEventListener('click', requestPointerLock);
+		canvas.addEventListener('pointerdown', pointerDown);
+		canvas.addEventListener('pointerup', pointerUp);
+		canvas.addEventListener('pointercancel', pointerUp);
 		window.addEventListener('keydown', keyDown);
 		window.addEventListener('keyup', keyUp);
 		window.addEventListener('blur', blur);
@@ -183,13 +202,16 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		document.addEventListener('mousemove', mouseMove);
 		return () => {
 			pressedKeys.clear();
-			canvas.removeEventListener('click', requestPointerLock);
+			canvas.removeEventListener('pointerdown', pointerDown);
+			canvas.removeEventListener('pointerup', pointerUp);
+			canvas.removeEventListener('pointercancel', pointerUp);
 			window.removeEventListener('keydown', keyDown);
 			window.removeEventListener('keyup', keyUp);
 			window.removeEventListener('blur', blur);
 			document.removeEventListener('focusin', focusIn);
 			document.removeEventListener('mousemove', mouseMove);
-			if (document.pointerLockElement === canvas) document.exitPointerLock();
+			dragging.current = false;
+			canvas.style.cursor = '';
 		};
 	}, [camera, enabled, gl]);
 
@@ -243,6 +265,14 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		}
 
 		if (seat.current) {
+			const held = seat.current;
+			const tier = held.getTier();
+			if (tier !== held.tier) {
+				held.tier = tier;
+				held.view = postureView({ spot: held.spot, posture: held.posture, tier });
+				const look = clampLook({ yaw: yaw.current, pitch: pitch.current }, held.view);
+				glide.current = { fromEye: activeCamera.position.clone(), toEye: new Vector3(held.view.eye.x, held.view.eye.y, held.view.eye.z), fromYaw: yaw.current, toYaw: look.yaw, fromPitch: pitch.current, toPitch: look.pitch, elapsed: 0, duration: GLIDE_SECONDS, resolve: () => {} };
+			}
 			writePlayerState();
 			reportPosition();
 			return;
@@ -256,7 +286,6 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 			mode.current = nextMode;
 			callbacks.current.onMovementChange?.(nextMode);
 		};
-		if (runHeld.current) crouchToggled.current = false;
 		if (!airborne.current) {
 			const nextMode = nextMovementMode({ current: mode.current, runHeld: runHeld.current, crouchToggled: crouchToggled.current, waterDepth, moving: keys.current.size > 0 });
 			if (nextMode === 'swimming') crouchToggled.current = false;
@@ -278,7 +307,7 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		if (keys.current.has('KeyS')) direction.current.z += 1;
 		if (keys.current.has('KeyA')) direction.current.x -= 1;
 		if (keys.current.has('KeyD')) direction.current.x += 1;
-		if (direction.current.lengthSq() > 0) direction.current.normalize().applyAxisAngle(UP, yaw.current).multiplyScalar(movementSpeed(mode.current, runHeld.current));
+		if (direction.current.lengthSq() > 0) direction.current.normalize().applyAxisAngle(UP, yaw.current).multiplyScalar(movementSpeed(mode.current));
 
 		if (airborne.current) {
 			airborne.current.velocityY -= GRAVITY * step;
@@ -294,6 +323,18 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		} else if (direction.current.lengthSq() > 0) {
 			const result = collisionWorld.move(foot, direction.current.x * step, direction.current.z * step, { canFall: mode.current !== 'swimming' });
 			if (result === 'falling') airborne.current = { velocityY: 0 };
+		}
+
+		if (airborne.current || mode.current === 'swimming') embedded.current.since = null;
+		else if (elapsed.current >= embedded.current.checkAt) {
+			embedded.current.checkAt = elapsed.current + EMBEDDED_CHECK_SECONDS;
+			if (!collisionWorld.isBodyBlocked(foot)) embedded.current.since = null;
+			else if (embedded.current.since === null) embedded.current.since = elapsed.current;
+			else if (elapsed.current - embedded.current.since >= EMBEDDED_SECONDS) {
+				embedded.current.since = null;
+				const free = collisionWorld.freeBodyPosition(foot, navigation?.current);
+				if (free) foot.copy(free);
+			}
 		}
 
 		// The swimming body keeps walking along the pool floor so walls, steps

@@ -15,7 +15,7 @@ test('tool_call messages never reach the conversation message listing', function
         'user_id' => $user->id,
         'assistant_id' => $assistant->id,
     ]);
-    $conversation = Conversation::factory()->create(['assistant_user_id' => $assistantUser->id]);
+    $conversation = Conversation::factory()->forAssistantUser($assistantUser)->create();
 
     $conversation->messages()->create(['role' => 'user', 'content' => 'What time is it?']);
     $conversation->messages()->create([

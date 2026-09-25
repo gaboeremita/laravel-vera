@@ -113,7 +113,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 
 	const isDefaultPoseFor = (posture) => (pose) => pose.name === 'default' && pose.posture === posture;
 
-	const handleAddPose = (poseName, blendshapes, file, posture = 'standing', restricted = false) => {
+	const handleAddPose = (poseName, blendshapes, file, posture = 'standing', restricted = false, hold = false) => {
 		if (stagedPoses.some((p) => p.name === poseName && p.posture === posture)) {
 			addToast(`A ${posture} pose named "${poseName}" already exists`, 'error');
 			return;
@@ -129,6 +129,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 				name: poseName,
 				posture,
 				restricted,
+				hold,
 				vrm_blendshapes: blendshapes,
 				animation_url: file ? URL.createObjectURL(file) : null,
 				animation_original_name: file ? file.name : null,
@@ -142,12 +143,12 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 		delete stagedPoseFilesRef.current[pose.id];
 	};
 
-	const handleUpdatePose = (pose, name, blendshapes, posture = pose.posture) => {
+	const handleUpdatePose = (pose, name, blendshapes, posture = pose.posture, hold = !!pose.hold) => {
 		if (stagedPoses.some((p) => p.id !== pose.id && p.name === name && p.posture === posture)) {
 			addToast(`A ${posture} pose named "${name}" already exists`, 'error');
 			return;
 		}
-		setStagedPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, name, posture, vrm_blendshapes: blendshapes } : p)));
+		setStagedPoses((prev) => prev.map((p) => (p.id === pose.id ? { ...p, name, posture, hold, vrm_blendshapes: blendshapes } : p)));
 	};
 
 	const handleUploadPoseAnimation = (pose, file) => {
@@ -260,6 +261,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 					formData.append(`poses[${i}][name]`, pose.name);
 					formData.append(`poses[${i}][posture]`, pose.posture);
 					formData.append(`poses[${i}][restricted]`, pose.restricted ? '1' : '0');
+					formData.append(`poses[${i}][hold]`, pose.hold ? '1' : '0');
 					(pose.vrm_blendshapes || []).forEach((b, j) => {
 						formData.append(`poses[${i}][vrm_blendshapes][${j}][expression]`, b.expression);
 						formData.append(`poses[${i}][vrm_blendshapes][${j}][weight]`, b.weight);

@@ -29,6 +29,7 @@ class AssistantPoseController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'posture' => ['sometimes', Rule::enum(Posture::class)],
             'restricted' => ['sometimes', 'boolean'],
+            'hold' => ['sometimes', 'boolean'],
             'vrm_blendshapes' => ['sometimes', 'array'],
             'vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -51,6 +52,7 @@ class AssistantPoseController extends Controller
             'name' => $validated['name'],
             'posture' => $posture,
             'restricted' => $validated['restricted'] ?? false,
+            'hold' => $validated['hold'] ?? false,
             'vrm_blendshapes' => Pose::normalizeBlendshapes($validated['vrm_blendshapes'] ?? null),
         ]);
 
@@ -74,6 +76,7 @@ class AssistantPoseController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'posture' => ['sometimes', Rule::enum(Posture::class)],
+            'hold' => ['sometimes', 'boolean'],
             'vrm_blendshapes' => ['sometimes', 'array'],
             'vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -99,6 +102,10 @@ class AssistantPoseController extends Controller
 
         if (array_key_exists('vrm_blendshapes', $validated)) {
             $pose->update(['vrm_blendshapes' => Pose::normalizeBlendshapes($validated['vrm_blendshapes'])]);
+        }
+
+        if (array_key_exists('hold', $validated)) {
+            $pose->update(['hold' => $validated['hold']]);
         }
 
         return response()->json($this->poseJson($pose));
@@ -162,7 +169,7 @@ class AssistantPoseController extends Controller
     }
 
     /**
-     * @return array{id: int, name: string, posture: string, restricted: bool, vrm_blendshapes: ?array, animation_url: ?string, animation_original_name: ?string}
+     * @return array{id: int, name: string, posture: string, restricted: bool, hold: bool, vrm_blendshapes: ?array, animation_url: ?string, animation_original_name: ?string}
      */
     private function poseJson(Pose $pose): array
     {
@@ -173,6 +180,7 @@ class AssistantPoseController extends Controller
             'name' => $pose->name,
             'posture' => $pose->posture->value,
             'restricted' => $pose->restricted,
+            'hold' => $pose->hold,
             'vrm_blendshapes' => $pose->vrm_blendshapes,
             'animation_url' => $pose->animationFile?->url,
             'animation_original_name' => $pose->animationFile?->original_name,

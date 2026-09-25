@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Collection;
 
@@ -52,7 +53,7 @@ class Assistant extends Model
 
     public function poses(): HasMany
     {
-        return $this->hasMany(Pose::class);
+        return $this->hasMany(Pose::class)->orderBy('id');
     }
 
     public function vrm(): MorphOne
@@ -63,6 +64,14 @@ class Assistant extends Model
     public function cardImage(): MorphOne
     {
         return $this->morphOne(Image::class, 'imageable');
+    }
+
+    /**
+     * Conversations this assistant started with another party.
+     */
+    public function ownedConversations(): MorphMany
+    {
+        return $this->morphMany(Conversation::class, 'owner');
     }
 
     public function worldResidents(): HasMany
@@ -82,16 +91,15 @@ class Assistant extends Model
     }
 
     /**
-     * @return array{available: array{regular: array<int, string>, restricted: array<int, string>}, standingOnly: array{regular: array<int, string>, restricted: array<int, string>}}
+     * The poses she can pick in a posture; a pose never changes her posture.
+     *
+     * @return array{regular: array<int, string>, restricted: array<int, string>}
      */
     public function promptPoseNames(Posture $posture = Posture::Standing): array
     {
-        $poses = $this->poses()->orderBy('id')->get(['name', 'posture', 'restricted']);
-        $available = $poses->filter(fn (Pose $pose) => $pose->posture === $posture);
-        $availableNames = $available->pluck('name');
-        $standingOnly = $poses->filter(fn (Pose $pose) => $pose->posture === Posture::Standing && ! $availableNames->contains($pose->name));
-
-        return ['available' => self::splitRestrictedPoses($available), 'standingOnly' => self::splitRestrictedPoses($standingOnly)];
+        return self::splitRestrictedPoses(
+            $this->poses()->where('posture', $posture)->orderBy('id')->get(['name', 'posture', 'restricted'])->filter(fn (Pose $pose) => $pose->isChosen())
+        );
     }
 
     /**

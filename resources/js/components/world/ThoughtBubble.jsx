@@ -32,7 +32,7 @@ function wrapLines(context, text, maxWidth) {
 	return lines;
 }
 
-function makeBubbleTexture(text) {
+function makeBubbleTexture(text, variant) {
 	const canvas = document.createElement('canvas');
 	const context = canvas.getContext('2d');
 	context.font = FONT;
@@ -40,17 +40,25 @@ function makeBubbleTexture(text) {
 	canvas.width = TEXTURE_WIDTH;
 	canvas.height = lines.length * LINE_HEIGHT + PADDING * 2 + 48;
 
-	context.fillStyle = 'rgba(255, 255, 255, 0.95)';
+	const speech = variant === 'speech';
+	context.fillStyle = speech ? 'rgba(17, 17, 17, 0.92)' : 'rgba(255, 255, 255, 0.95)';
 	context.beginPath();
 	context.roundRect(8, 8, TEXTURE_WIDTH - 16, canvas.height - 64, 56);
 	context.fill();
 	context.beginPath();
-	context.arc(TEXTURE_WIDTH / 2 - 48, canvas.height - 36, 20, 0, Math.PI * 2);
-	context.arc(TEXTURE_WIDTH / 2 - 88, canvas.height - 12, 10, 0, Math.PI * 2);
+	if (speech) {
+		context.moveTo(TEXTURE_WIDTH / 2 - 40, canvas.height - 57);
+		context.lineTo(TEXTURE_WIDTH / 2 + 40, canvas.height - 57);
+		context.lineTo(TEXTURE_WIDTH / 2, canvas.height - 4);
+		context.closePath();
+	} else {
+		context.arc(TEXTURE_WIDTH / 2 - 48, canvas.height - 36, 20, 0, Math.PI * 2);
+		context.arc(TEXTURE_WIDTH / 2 - 88, canvas.height - 12, 10, 0, Math.PI * 2);
+	}
 	context.fill();
 
 	context.font = FONT;
-	context.fillStyle = '#111111';
+	context.fillStyle = speech ? '#ffffff' : '#111111';
 	context.textAlign = 'center';
 	context.textBaseline = 'middle';
 	lines.forEach((line, index) => context.fillText(line, TEXTURE_WIDTH / 2, PADDING + LINE_HEIGHT * index + LINE_HEIGHT / 2));
@@ -61,10 +69,11 @@ function makeBubbleTexture(text) {
 }
 
 /**
- * The reason-and-action line of each resident's self-chosen step, shown above
- * her head while that step runs.
+ * A line above each resident's head: by default the reason-and-action line of
+ * her self-chosen step while it runs, or with the speech variant what she
+ * says out loud.
  */
-export default function ThoughtBubble({ thoughts, residentPositions }) {
+export default function ThoughtBubble({ thoughts, residentPositions, variant = 'thought' }) {
 	const { camera, scene } = useThree();
 	const bubbles = useRef(new Map());
 	const worldPoint = useRef(new Vector3());
@@ -86,7 +95,7 @@ export default function ThoughtBubble({ thoughts, residentPositions }) {
 		const created = new Map();
 		for (const [residentId, line] of Object.entries(thoughts)) {
 			if (!line) continue;
-			const { texture, aspect } = makeBubbleTexture(line);
+			const { texture, aspect } = makeBubbleTexture(line, variant);
 			const sprite = new Sprite(new SpriteMaterial({ map: texture, depthTest: false, depthWrite: false, transparent: true }));
 			sprite.renderOrder = 1001;
 			sprite.visible = false;
@@ -101,7 +110,7 @@ export default function ThoughtBubble({ thoughts, residentPositions }) {
 				texture.dispose();
 			}
 		};
-	}, [thoughts, scene]);
+	}, [thoughts, scene, variant]);
 
 	return null;
 }

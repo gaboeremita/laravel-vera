@@ -5,12 +5,13 @@ import { api } from '../../utils/api.js';
  * Records that a resident started an action and resolves with the activity id.
  * Throws with the HTTP status when the server refuses it.
  */
-export async function startActivity({ worldId, sessionId, residentId }, { verb, target = null, activity = null, reason = null, source = 'requested', position = null }) {
+export async function startActivity({ worldId, sessionId, residentId }, { verb, target = null, activity = null, reason = null, narration = null, source = 'requested', position = null }) {
 	const response = await api.post(route('worlds.sessions.residents.activities.store', { world: worldId, session: sessionId, resident: residentId }), {
 		verb,
 		target,
 		activity,
 		reason,
+		narration,
 		source,
 		position: position ? { x: position.x, y: position.y, z: position.z } : null,
 	});

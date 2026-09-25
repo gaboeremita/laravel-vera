@@ -257,7 +257,7 @@ test('[US2] expression tags and action narration are excluded from synthesized s
     );
 
     $response->assertSuccessful();
-    expect($response->json('content'))->toBe($reply);
+    expect($response->json('content'))->toBe('[sheepish smile] **I duck my head, a small smile tugging at my lips.** Thank you for forgiving me. Mistakes get archived too, you know — even mine. Now. Where were we, before my slip?');
     expect($response->json('audioBase64'))->toBe(base64_encode('fake-audio-bytes'));
     expect($response->json('audioError'))->toBeNull();
 });

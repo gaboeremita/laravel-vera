@@ -27,7 +27,7 @@ class ResidentObservationController extends Controller
             ['title' => 'New conversation'],
         );
 
-        $message = $conversation->messages()->create(['role' => 'assistant', 'content' => $request->validated('line')]);
+        $message = $conversation->messages()->create(['role' => 'assistant', 'content' => $request->validated('line'), 'expression' => $request->validated('expression')]);
 
         return response()->json(['messageId' => $message->id], 201);
     }

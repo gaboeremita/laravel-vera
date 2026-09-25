@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Models\Assistant;
+use App\Models\Conversation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -20,7 +21,10 @@ class DeleteAssistantAssets
             ->filter()
             ->map(fn ($file) => ['disk' => $file->disk, 'path' => $file->path]);
 
-        DB::transaction(fn () => $assistant->delete());
+        DB::transaction(function () use ($assistant): void {
+            Conversation::involving($assistant)->delete();
+            $assistant->delete();
+        });
 
         $files->each(fn (array $file) => Storage::disk($file['disk'])->delete($file['path']));
     }

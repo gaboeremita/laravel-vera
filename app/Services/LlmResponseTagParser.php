@@ -7,6 +7,8 @@ use App\Models\Assistant;
 
 class LlmResponseTagParser
 {
+    private const STRAY_TAG = '/\[\s*[\p{L}][\p{L}\'-]*(?:\s+[\p{L}][\p{L}\'-]*){0,2}\s*\]/u';
+
     /**
      * @return array{
      *     content: string,
@@ -141,6 +143,29 @@ class LlmResponseTagParser
     private function isTruthy(string $value): bool
     {
         return in_array(mb_strtolower($value), ['1', 'true', 'yes', 'on', 'intimate'], true);
+    }
+
+    /**
+     * Removes bracketed tags of up to three words that parsing left behind,
+     * such as a mood the model made up ([amused]), for lines spoken aloud in
+     * a world, where brackets have no other use.
+     */
+    public function stripStrayTags(string $content): string
+    {
+        return $this->cleanContent(preg_replace(self::STRAY_TAG, '', $content));
+    }
+
+    /**
+     * The words inside the tags stripStrayTags() removes, so they can be
+     * recorded with the line.
+     *
+     * @return array<int, string>
+     */
+    public function strayTags(string $content): array
+    {
+        preg_match_all(self::STRAY_TAG, $content, $matches);
+
+        return array_map(fn (string $tag) => trim($tag, "[] \t"), $matches[0]);
     }
 
     private function cleanContent(string $content): string

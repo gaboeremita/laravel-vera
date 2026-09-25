@@ -17,22 +17,22 @@ test('crouching ends in deep water and cannot start while swimming', () => {
 	assert.equal(nextMovementMode({ ...dry, current: 'swimming', crouchToggled: true, waterDepth: 1.0 }), 'swimming');
 });
 
-test('holding the run key while crouched runs', () => {
-	assert.equal(nextMovementMode({ ...dry, current: 'crouching', crouchToggled: true, runHeld: true }), 'running');
+test('holding the run key while crouched stays crouched', () => {
+	assert.equal(nextMovementMode({ ...dry, current: 'crouching', crouchToggled: true, runHeld: true }), 'crouching');
 	assert.equal(nextMovementMode({ ...dry, current: 'walking', crouchToggled: true }), 'crouching');
 });
 
-test('the run key only runs while moving', () => {
+test('the run key only runs while moving and standing', () => {
+	assert.equal(nextMovementMode({ ...dry, current: 'swimming', runHeld: true, waterDepth: 1.2 }), 'swimming');
 	assert.equal(nextMovementMode({ ...dry, current: 'walking', runHeld: true, moving: true }), 'running');
 	assert.equal(nextMovementMode({ ...dry, current: 'walking', runHeld: true, moving: false }), 'walking');
 });
 
 test('each mode moves at its own speed', () => {
-	assert.equal(movementSpeed('walking', false), 3.5);
-	assert.equal(movementSpeed('running', true), 7);
-	assert.equal(movementSpeed('crouching', false), 1.75);
-	assert.ok(Math.abs(movementSpeed('swimming', false) - 1.925) < 1e-9);
-	assert.ok(Math.abs(movementSpeed('swimming', true) - 2.975) < 1e-9);
+	assert.equal(movementSpeed('walking'), 3.5);
+	assert.equal(movementSpeed('running'), 7);
+	assert.equal(movementSpeed('crouching'), 1.75);
+	assert.ok(Math.abs(movementSpeed('swimming') - 1.925) < 1e-9);
 });
 
 test('crouching lowers the eye height', () => {

@@ -96,3 +96,22 @@ it('includes a resident walk pose animation for world movement', function () {
         ->assertJsonPath('residents.0.assistant.poses.0.name', 'walk')
         ->assertJsonPath('residents.0.assistant.poses.0.animationUrl', Storage::disk('public')->url($animation->path));
 });
+
+it('tells the world which resident poses hold', function () {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $assistant = Assistant::factory()->create();
+    AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $assistant->id]);
+    $world->residents()->create([
+        'assistant_id' => $assistant->id,
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'behavior' => 'roam',
+    ]);
+    Pose::factory()->for($assistant)->create(['name' => 'wave']);
+    Pose::factory()->for($assistant)->held()->create(['name' => 'sleep']);
+
+    $this->actingAs($user)->getJson(route('worlds.show', $world))
+        ->assertSuccessful()
+        ->assertJsonPath('residents.0.assistant.poses.0.hold', false)
+        ->assertJsonPath('residents.0.assistant.poses.1.hold', true);
+});

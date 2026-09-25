@@ -16,8 +16,8 @@ test('repeated requests for the active description dispatch only one job', funct
 
     Queue::fake();
 
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a futuristic park');
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a futuristic park');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a futuristic park');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a futuristic park');
 
     Queue::assertPushed(GenerateAvatarBackground::class, 1);
 });
@@ -27,9 +27,9 @@ test('each differing request immediately preempts the active one instead of wait
 
     Queue::fake();
 
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a futuristic park');
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a neon bar');
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a penthouse');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a futuristic park');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a neon bar');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a penthouse');
 
     Queue::assertPushed(GenerateAvatarBackground::class, 3);
     expect(Cache::get(GenerateAvatarBackground::activeRequestKeyFor($conversation->id))['description'])
@@ -41,7 +41,7 @@ test('a job superseded mid-generation discards its result instead of caching it'
 
     Queue::fake();
 
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a futuristic park');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a futuristic park');
     $job = Queue::pushed(GenerateAvatarBackground::class)->first();
 
     $service = Mockery::mock(AvatarBackgroundService::class);
@@ -49,7 +49,7 @@ test('a job superseded mid-generation discards its result instead of caching it'
         ->once()
         ->andReturnUsing(function () use ($conversation) {
             // A newer request comes in while this one is still generating.
-            GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a penthouse');
+            GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a penthouse');
 
             return [
                 'floor_url' => '/storage/park-floor.png',
@@ -71,7 +71,7 @@ test('a stale queued request cannot run after a newer request becomes active', f
 
     Queue::fake();
 
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a futuristic park');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a futuristic park');
     $staleJob = Queue::pushed(GenerateAvatarBackground::class)->first();
 
     Cache::put(GenerateAvatarBackground::activeRequestKeyFor($conversation->id), [
@@ -100,8 +100,8 @@ test('legacy queued requests stop after one successfully generates a background'
             'source_description' => 'a futuristic park',
         ]);
 
-    $firstJob = new GenerateAvatarBackground($conversation->assistantUser, $conversation, 'a futuristic park');
-    $duplicateJob = new GenerateAvatarBackground($conversation->assistantUser, $conversation, 'a futuristic park');
+    $firstJob = new GenerateAvatarBackground($conversation->assistantUser(), $conversation, 'a futuristic park');
+    $duplicateJob = new GenerateAvatarBackground($conversation->assistantUser(), $conversation, 'a futuristic park');
 
     $firstJob->handle($service);
     $duplicateJob->handle($service);
@@ -116,7 +116,7 @@ test('starting and finishing a generation broadcasts a status update for the con
     Event::fake([AvatarBackgroundStatusUpdated::class]);
     Queue::fake();
 
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a futuristic park');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a futuristic park');
     $job = Queue::pushed(GenerateAvatarBackground::class)->first();
 
     Event::assertDispatched(
@@ -151,7 +151,7 @@ test('a broadcast failure is logged and does not block generation from starting 
     Queue::fake();
     Log::spy();
 
-    GenerateAvatarBackground::dispatchFor($conversation->assistantUser, $conversation, 'a futuristic park');
+    GenerateAvatarBackground::dispatchFor($conversation->assistantUser(), $conversation, 'a futuristic park');
     $job = Queue::pushed(GenerateAvatarBackground::class)->first();
 
     expect(Cache::get(GenerateAvatarBackground::activeRequestKeyFor($conversation->id))['description'])

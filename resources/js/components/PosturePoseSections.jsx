@@ -9,12 +9,13 @@ const postureOf = (pose) => pose.posture ?? 'standing';
 /**
  * Poses grouped by the posture they are made for. Each posture has its own
  * default pose, held while she is in it. Walking and greeting are standing
- * motion poses; swimming has its own, for moving and resting at the side.
+ * motion poses, talking has a standing and a sitting version, and swimming
+ * has its own, for moving and resting at the side.
  *
- * @param {Array} poses - [{id, name, posture, restricted, vrm_blendshapes, animation_url}]
- * @param {function} onAdd - (name, blendshapes, file, posture, restricted) => void
+ * @param {Array} poses - [{id, name, posture, restricted, hold, vrm_blendshapes, animation_url}]
+ * @param {function} onAdd - (name, blendshapes, file, posture, restricted, hold) => void
  * @param {function} onDelete - (pose) => void
- * @param {function} onUpdatePose - (pose, name, blendshapes, posture) => void
+ * @param {function} onUpdatePose - (pose, name, blendshapes, posture, hold) => void
  * @param {function} onUploadAnimation - (pose, file) => void
  * @param {function} onDeleteAnimation - (pose) => void
  * @param {function} onUpdateDefaultBlendshapes - (blendshapes, posture) => void
@@ -57,7 +58,7 @@ export default function PosturePoseSections({ poses, onAdd, onDelete, onUpdatePo
 				onDeleteAnimation={() => onDeleteDefaultAnimation(posture)}
 			/>
 
-			{(posture === 'standing' || posture === 'swimming') && (
+			{(posture === 'standing' || posture === 'sitting' || posture === 'swimming') && (
 				<WorldMotionPoseEditor
 					key={`motion-${posture}`}
 					posture={posture}
@@ -72,7 +73,7 @@ export default function PosturePoseSections({ poses, onAdd, onDelete, onUpdatePo
 			<PoseEditor
 				label={`${label} Poses`}
 				poses={posturePoses.filter((pose) => pose.name !== 'default' && !pose.restricted && !isWorldMotionPose(pose))}
-				onAdd={(name, blendshapes, file) => onAdd(name, blendshapes, file, posture, false)}
+				onAdd={(name, blendshapes, file, hold) => onAdd(name, blendshapes, file, posture, false, hold)}
 				onDelete={onDelete}
 				onUpdateBlendshapes={onUpdatePose}
 				onUploadAnimation={onUploadAnimation}
@@ -82,7 +83,7 @@ export default function PosturePoseSections({ poses, onAdd, onDelete, onUpdatePo
 			<PoseEditor
 				label={`Restricted ${label} Poses`}
 				poses={posturePoses.filter((pose) => pose.name !== 'default' && pose.restricted && !isWorldMotionPose(pose))}
-				onAdd={(name, blendshapes, file) => onAdd(name, blendshapes, file, posture, true)}
+				onAdd={(name, blendshapes, file, hold) => onAdd(name, blendshapes, file, posture, true, hold)}
 				onDelete={onDelete}
 				onUpdateBlendshapes={onUpdatePose}
 				onUploadAnimation={onUploadAnimation}

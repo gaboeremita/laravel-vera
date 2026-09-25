@@ -34,13 +34,18 @@ class AgentLoopRunner
         $consecutiveFailures = 0;
         $step = 0;
         $toolCallsSummary = [];
+        $thinkingSteps = [];
 
         try {
             while ($step < $stepLimit) {
                 $response = $this->provider->chat($messages, tools: $toolDefinitions);
 
+                if (filled($response->thinking)) {
+                    $thinkingSteps[] = $response->thinking;
+                }
+
                 if ($response->isFinal()) {
-                    return new AgentRunResult($response->content, $toolCallsSummary);
+                    return new AgentRunResult($response->content, $toolCallsSummary, $this->joinThinking($thinkingSteps));
                 }
 
                 $messages[] = [
@@ -88,6 +93,7 @@ class AgentLoopRunner
                             return new AgentRunResult(
                                 "I wasn't able to complete this task after a few different attempts — {$e->getMessage()}",
                                 $toolCallsSummary,
+                                $this->joinThinking($thinkingSteps),
                             );
                         }
                     }
@@ -98,7 +104,7 @@ class AgentLoopRunner
                 }
             }
 
-            return new AgentRunResult($this->requestFinalSummary($messages), $toolCallsSummary);
+            return new AgentRunResult($this->requestFinalSummary($messages), $toolCallsSummary, $this->joinThinking($thinkingSteps));
         } finally {
             $this->clearProgress($conversation->id);
         }
@@ -194,6 +200,14 @@ class AgentLoopRunner
             'description' => $tool->description(),
             'parameters' => $tool->parameters(),
         ], $this->tools);
+    }
+
+    /**
+     * @param  array<int, string>  $thinkingSteps
+     */
+    private function joinThinking(array $thinkingSteps): ?string
+    {
+        return $thinkingSteps === [] ? null : implode("\n\n", $thinkingSteps);
     }
 
     /**

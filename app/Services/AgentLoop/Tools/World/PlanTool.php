@@ -17,7 +17,7 @@ class PlanTool extends WorldTool
 
     public function description(): string
     {
-        return 'Does something that takes several steps, in order, such as getting a drink: go_to the bar, use the back bar to mix a drink, then use a stool to drink it. Each step is go_to (target), use (target spot and activity), zone (activity of the place you are in by then), pose (a pose of yours), do (anything else, described in a few words, such as singing a song or making tea where you stand; your narration carries it) swim_to_edge (to the nearest side of the pool, while in the water), wander (optionally a place as target; roam and explore for a while) or stay. Steps run one after another; if one fails, the rest stop and you decide again.';
+        return 'Does something that takes several steps, in order, such as getting a drink: go_to the bar, use the back bar to mix a drink, then use a stool to drink it. Each step is go_to (target), use (spot and activity), zone (activity of the place you are in by then), pose (a pose of yours), do (anything else, described in a few words, such as singing a song or making tea where you stand; your narration carries it) swim_to_edge (to the nearest side of the pool, while in the water), wander (optionally a place as target; roam and explore for a while) or stay. Steps run one after another; if one fails, the rest stop and you decide again.';
     }
 
     public function parameters(): array
@@ -34,7 +34,8 @@ class PlanTool extends WorldTool
                         'type' => 'object',
                         'properties' => [
                             'action' => ['type' => 'string', 'enum' => self::STEP_ACTIONS],
-                            'target' => ['type' => 'string', 'description' => 'For go_to, a place or thing id, or "user" to go to the user; for use, a spot id.'],
+                            'target' => ['type' => 'string', 'description' => 'For go_to, a place, thing or spot id, or "user" to go to the user; for wander, a place id.'],
+                            'spot' => ['type' => 'string', 'description' => 'For use, the spot id.'],
                             'activity' => ['type' => 'string', 'description' => 'For use and zone, the activity id.'],
                             'pose' => ['type' => 'string', 'description' => 'For pose, one of your poses. For use, zone and do, optionally the pose of yours that fits the step, when an activity\'s own pose is named differently from yours. Your poses: '.($this->toolbox->poseNames === [] ? 'none' : implode(', ', $this->toolbox->poseNames)).'.'],
                             'description' => ['type' => 'string', 'description' => 'For do, what you do, in a few words.'],
@@ -92,17 +93,17 @@ class PlanTool extends WorldTool
                 if ($this->toolbox->sameName(WorldToolbox::USER_TARGET, $target)) {
                     return [[...$normalized, 'target' => WorldToolbox::USER_TARGET], $location];
                 }
-                $zone = $this->toolbox->findZone($target);
-                $object = $zone === null ? $this->toolbox->findObject($target) : null;
-                if ($zone === null && $object === null) {
-                    throw new RuntimeException(sprintf('There is no place or thing called "%s" here.', $target));
+                $place = $this->toolbox->findTarget($target);
+                if ($place === null) {
+                    throw new RuntimeException(sprintf('There is no place, thing or spot called "%s" here.', $target));
                 }
 
-                return [[...$normalized, 'target' => ($zone ?? $object)['id']], $this->toolbox->zoneChainOf($zone['id'] ?? $object['zoneId'])];
+                return [[...$normalized, 'target' => $place['id']], $this->toolbox->zoneChainOf($place['zoneId'] ?? $place['id'])];
             case 'use':
-                $spot = $this->toolbox->findSpot($target);
+                $writtenSpot = trim((string) ($step['spot'] ?? ''));
+                $spot = $this->toolbox->findSpot($writtenSpot);
                 if ($spot === null) {
-                    throw new RuntimeException(sprintf('There is no spot called "%s" here.', $target));
+                    throw new RuntimeException(sprintf('There is no spot called "%s" here; a use step names it in spot.', $writtenSpot));
                 }
                 $activity = collect($spot['activities'])->first(fn (array $candidate) => $this->toolbox->sameName($candidate['id'], $activityId) || $this->toolbox->sameName($candidate['name'], $activityId));
                 if ($activity === null) {

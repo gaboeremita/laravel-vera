@@ -36,3 +36,26 @@ test('observations describe the activity in the resident own voice', () => {
 	assert.equal(observationLine({ activity: activity('Look out at the city') }), '*I see the user look out at the city*');
 	assert.equal(observationGetUpLine(object('Bar counter')), '*I see the user get up from the bar counter*');
 });
+
+test('lying and reclining happen on the object', () => {
+	const lieDown = { name: 'Lie down', posture: 'lying' };
+	assert.equal(actionLine({ activity: lieDown, object: object('Bed') }), '*lies down on the bed*');
+	assert.equal(actionLine({ activity: { name: 'Recline', posture: 'reclining' }, object: object('Pool lounger') }), '*reclines on the pool lounger*');
+	assert.equal(observationLine({ activity: lieDown, object: object('Bed') }), '*I see the user lie down on the bed*');
+	assert.equal(actionLine({ activity: { name: 'Sit down', posture: 'sitting' }, object: object('Bar counter') }), '*sits down at the bar counter*');
+});
+
+test('lying on top of someone names them, or "you" for the one underneath', () => {
+	const lieDown = { name: 'Lie down', posture: 'lying' };
+	assert.equal(actionLine({ activity: lieDown, object: object('Bed'), onTopOf: 'you' }), '*lies down on top of you on the bed*');
+	assert.equal(actionLine({ activity: lieDown, object: object('Bed'), onTopOf: 'Yinlin' }), '*lies down on top of Yinlin on the bed*');
+	assert.equal(observationLine({ activity: lieDown, object: object('Bed'), onTopOf: 'Yinlin' }), '*I see the user lie down on top of Yinlin on the bed*');
+	assert.equal(observationLine({ activity: lieDown, object: object('Bed'), onTopOf: 'me' }), '*I see the user lie down on top of me on the bed*');
+});
+
+test('getting up off someone names them instead of the object', () => {
+	assert.equal(getUpLine(object('Bed'), 'you'), '*gets up off you*');
+	assert.equal(getUpLine(object('Bed'), 'Yinlin'), '*gets up off Yinlin*');
+	assert.equal(observationGetUpLine(object('Bed'), 'Yinlin'), '*I see the user get up off Yinlin*');
+	assert.equal(observationGetUpLine(object('Bed'), 'me'), '*I see the user get up off me*');
+});

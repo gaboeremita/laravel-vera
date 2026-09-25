@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clampLook, postureView } from '../../resources/js/components/world/playerPostures.js';
+import { MAX_PITCH, clampLook, postureView } from '../../resources/js/components/world/playerPostures.js';
+import { STACK_HEIGHT } from '../../resources/js/components/world/spotOccupancy.js';
 
 const DEGREE = Math.PI / 180;
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} ≉ ${expected}`);
@@ -13,6 +14,28 @@ test('each resting posture places the eye above and behind the spot', () => {
 		close(view.eye.x, 2);
 		close(view.eye.z, 3 - back);
 	}
+});
+
+test('the upper tier of a shared spot lies one body higher, toward the feet, looking down', () => {
+	const lower = postureView({ spot, posture: 'lying' });
+	const upper = postureView({ spot, posture: 'lying', tier: 1 });
+	close(upper.eye.y, lower.eye.y + STACK_HEIGHT);
+	close(upper.eye.x, lower.eye.x);
+	close(upper.eye.z, lower.eye.z + 0.25);
+	close(upper.pitch, -MAX_PITCH);
+	close(Math.cos(upper.yaw - lower.yaw), -1);
+	close(lower.pitch, 55 * DEGREE);
+});
+
+test('from the upper tier the user can look all the way around and down', () => {
+	const upper = postureView({ spot, posture: 'lying', tier: 1 });
+	const behind = clampLook({ yaw: upper.yaw + Math.PI, pitch: -MAX_PITCH }, upper);
+	close(Math.cos(behind.yaw - upper.yaw), -1);
+	close(behind.pitch, -MAX_PITCH);
+	const lower = postureView({ spot, posture: 'lying' });
+	close(lower.yawRange, 45 * DEGREE);
+	close(lower.pitchMin, -10 * DEGREE);
+	close(lower.pitchMax, 80 * DEGREE);
 });
 
 test('the eye sits opposite the spot facing', () => {

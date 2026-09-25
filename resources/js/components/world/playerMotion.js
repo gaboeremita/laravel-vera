@@ -10,17 +10,15 @@ const WALKING_FOV = 70;
 const RUNNING_FOV = 76;
 
 const SPEED_FACTORS = { walking: 1, running: 2, crouching: 0.5, swimming: 0.55 };
-const SWIM_RUN_FACTOR = 0.85;
 
 export function nextMovementMode({ current, runHeld, crouchToggled, waterDepth, moving = true }) {
 	const inWater = current === 'swimming' ? waterDepth > LEAVE_WATER_DEPTH : waterDepth > SWIM_DEPTH;
 	if (inWater) return 'swimming';
-	if (crouchToggled && !runHeld && waterDepth <= LEAVE_WATER_DEPTH) return 'crouching';
+	if (crouchToggled && waterDepth <= LEAVE_WATER_DEPTH) return 'crouching';
 	return runHeld && moving ? 'running' : 'walking';
 }
 
-export function movementSpeed(mode, runHeld) {
-	if (mode === 'swimming' && runHeld) return WALK_SPEED * SWIM_RUN_FACTOR;
+export function movementSpeed(mode) {
 	return WALK_SPEED * (SPEED_FACTORS[mode] ?? 1);
 }
 

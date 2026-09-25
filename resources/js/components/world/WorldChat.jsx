@@ -11,9 +11,11 @@ import { joinLines } from './activityLines.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getUserState, getOccupiedSpots, onVoiceAudio, onAction, actionSender: actionSenderRef }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getResidentState, getUserState, getOccupiedSpots, getStackedSpots, onVoiceAudio, onSilentReply, onAction, actionSender: actionSenderRef }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
+	const [pendingImage, setPendingImage] = useState(null);
+	const fileInputRef = useRef(null);
 	const [isTranscribing, setIsTranscribing] = useState(false);
 	const [isResidentSpeaking, setIsResidentSpeaking] = useState(false);
 	const scrollRef = useRef(null);
@@ -97,8 +99,8 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		onVoiceReply: (text, ttsInstructions) => { void speakReply(text, ttsInstructions); },
 		onAction,
 		extraParams: worldSessionId && getPositions
-			? { worldId: world.id, worldSessionId, get positions() { return getPositions(); }, get residentPosture() { return getResidentPosture(resident.id); }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; } }
-			: { worldId: world.id, get residentPosture() { return getResidentPosture(resident.id); }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; } },
+			? { worldId: world.id, worldSessionId, get positions() { return getPositions(); }, get residentPosture() { return getResidentPosture(resident.id); }, get residentState() { return getResidentState?.(resident.id) ?? null; }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; }, get stackedSpots() { return getStackedSpots?.() ?? []; } }
+			: { worldId: world.id, get residentPosture() { return getResidentPosture(resident.id); }, get residentState() { return getResidentState?.(resident.id) ?? null; }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; }, get stackedSpots() { return getStackedSpots?.() ?? []; } },
 	});
 
 	useEffect(() => {
@@ -126,6 +128,16 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 	};
 
 	const { isListening, isSpeaking, error: voiceError, start: startVoiceMode, stop: stopVoiceMode } = useVoiceMode({ onSpeechEnd: handleSpeechEnd });
+
+	// A reply that arrived while voice mode was off is still her speaking;
+	// history loaded when the chat opens has server ids and is skipped.
+	const lastReplyIdRef = useRef(null);
+	useEffect(() => {
+		const last = messages[messages.length - 1];
+		if (!last || last.role !== 'assistant' || last.loading || !String(last.id).startsWith('temp-') || last.id === lastReplyIdRef.current) return;
+		lastReplyIdRef.current = last.id;
+		if (!isListening) onSilentReply?.(last.content);
+	}, [messages, isListening, onSilentReply]);
 
 	useEffect(() => {
 		if (voiceError) addToast(voiceError, 'error');
@@ -180,10 +192,21 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 	const handleSend = (event) => {
 		event.preventDefault();
 		const text = input.trim();
-		if (!text || !conversationId || isLoading) return;
+		if ((!text && !pendingImage) || !conversationId || isLoading) return;
+		const image = pendingImage;
 		setInput('');
-		sendMessage(text);
+		setPendingImage(null);
+		sendMessage(text, { image });
 		inputRef.current?.blur();
+	};
+
+	const handleImageSelect = (event) => {
+		const file = event.target.files?.[0];
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = () => setPendingImage(reader.result);
+		reader.readAsDataURL(file);
+		event.target.value = '';
 	};
 
 	return (
@@ -206,7 +229,17 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 					<ChatMessage key={msg.id} msg={msg} assistantName={resident.assistant.name} />
 				))}
 			</div>
-			<form onSubmit={handleSend} className="flex gap-2 border-t border-line-1 p-3">
+			{pendingImage && (
+				<div className="flex items-center gap-2 border-t border-line-1 px-3 py-2">
+					<img src={pendingImage} alt="Pending upload" className="h-16 w-16 object-cover rounded border border-line-1" />
+					<button type="button" onClick={() => setPendingImage(null)} className="text-danger text-xs hover:text-danger cursor-pointer">✕</button>
+				</div>
+			)}
+			<form onSubmit={handleSend} className="flex items-center gap-2 border-t border-line-1 p-3">
+				<input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+				<button type="button" onClick={() => fileInputRef.current?.click()} disabled={!conversationId || isLoading} title="Attach an image" className="text-fg-3 hover:text-accent transition-colors shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-default">
+					📎
+				</button>
 				<input
 					ref={inputRef}
 					value={input}
@@ -216,7 +249,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 					disabled={!conversationId || isLoading}
 					className="min-w-0 flex-1 bg-bg-1 px-3 py-2 text-sm text-fg-1 outline-none"
 				/>
-				<button disabled={!conversationId || isLoading || !input.trim()} className="button-primary text-[0.7rem]">
+				<button disabled={!conversationId || isLoading || (!input.trim() && !pendingImage)} className="button-primary text-[0.7rem]">
 					{isLoading ? '...' : 'SEND'}
 				</button>
 			</form>
