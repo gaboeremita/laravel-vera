@@ -212,3 +212,80 @@ test('a room does not need a ceiling to provide a valid floor spawn', (context) 
 test('an empty environment fails explicitly', () => {
 	assert.throws(() => new WorldCollision(new Group()), /no geometry for collision/);
 });
+
+function platform(width, height, depth, x = 0, z = 0) {
+	const mesh = new Mesh(new BoxGeometry(width, height, depth), new MeshBasicMaterial());
+	mesh.position.set(x, height / 2, z);
+	return mesh;
+}
+
+function jump(world, position, velocity, seconds = 1.5) {
+	const state = { ...velocity };
+	for (let elapsed = 0; elapsed < seconds; elapsed += 0.02) {
+		state.y -= 20 * 0.02;
+		if (world.airStep(position, state, 0.02).landed) return true;
+	}
+	return false;
+}
+
+test('walking off a ledge is blocked unless falling is allowed', (context) => {
+	const world = createWorld(context, platform(4, 1, 4));
+	const blocked = new Vector3(0, 1, 0);
+	assert.equal(world.move(blocked, 0, 4), 'grounded');
+	assert.ok(blocked.z < 2.1);
+	const falling = new Vector3(0, 1, 0);
+	assert.equal(world.move(falling, 0, 4, { canFall: true }), 'falling');
+	assert.ok(falling.z > 2);
+	assert.ok(Math.abs(falling.y - 1) < 0.001);
+});
+
+test('drops higher than the fall limit stay blocked', (context) => {
+	const world = createWorld(context, platform(4, 3, 4));
+	const position = new Vector3(0, 3, 0);
+	assert.equal(world.move(position, 0, 4, { canFall: true }), 'grounded');
+	assert.ok(position.z < 2.1);
+});
+
+// A lone table would be the tallest thing in the scene, with its top on the
+// octree's outer bound, where ray queries miss it; real rooms have walls above.
+function pillar() {
+	return platform(0.5, 3, 0.5, 8, 8);
+}
+
+test('a jump lands on top of a table', (context) => {
+	const world = createWorld(context, platform(2, 0.8, 1, 0, 0), pillar());
+	const position = new Vector3(0, 0, 1.2);
+	assert.ok(jump(world, position, { x: 0, y: Math.sqrt(2 * 20 * 1.1), z: -2 }));
+	assert.ok(Math.abs(position.y - 0.8) < 0.001);
+	assert.ok(Math.abs(position.z) < 0.5);
+});
+
+test('a falling body lands on the floor below', (context) => {
+	const world = createWorld(context);
+	const position = new Vector3(0, 1.5, 0);
+	assert.ok(jump(world, position, { x: 0, y: 0, z: 0 }));
+	assert.ok(Math.abs(position.y) < 0.001);
+});
+
+test('a jump bumps its head on a low ceiling', (context) => {
+	const ceiling = new Mesh(new BoxGeometry(4, 0.1, 4), new MeshBasicMaterial());
+	ceiling.position.y = 2.2;
+	const world = createWorld(context, ceiling);
+	const position = new Vector3(0, 0, 0);
+	const velocity = { x: 0, y: Math.sqrt(2 * 20 * 1.1), z: 0 };
+	let highest = 0;
+	for (let step = 0; step < 40; step++) {
+		velocity.y -= 20 * 0.02;
+		world.airStep(position, velocity, 0.02);
+		highest = Math.max(highest, position.y);
+	}
+	assert.ok(highest < 0.5);
+});
+
+test('a jump never carries the body past the edge of the ground', (context) => {
+	const world = createWorld(context);
+	const position = new Vector3(0, 0, 9.5);
+	jump(world, position, { x: 0, y: Math.sqrt(2 * 20 * 1.1), z: 6 });
+	assert.ok(position.z <= 10.3);
+	assert.ok(Math.abs(position.y) < 0.001);
+});

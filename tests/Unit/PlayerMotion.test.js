@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { LEAVE_WATER_DEPTH, SWIM_DEPTH } from '../../resources/js/components/world/collisionCheck.js';
-import { eyeHeightFor, movementSpeed, nextMovementMode, swimEyeY, targetFov } from '../../resources/js/components/world/playerMotion.js';
+import { GRAVITY, JUMP_HEIGHT, canJump, eyeHeightFor, jumpVelocity, landingDip, movementSpeed, nextMovementMode, swimEyeY, targetFov } from '../../resources/js/components/world/playerMotion.js';
 
 const dry = { runHeld: false, crouchToggled: false, waterDepth: 0 };
 
@@ -53,4 +53,24 @@ test('running widens the field of view unless motion is reduced', () => {
 	assert.equal(targetFov('running', false), 76);
 	assert.equal(targetFov('running', true), 70);
 	assert.equal(targetFov('walking', false), 70);
+});
+
+test('a jump peaks at the jump height', () => {
+	const velocity = jumpVelocity();
+	assert.ok(Math.abs((velocity * velocity) / (2 * GRAVITY) - JUMP_HEIGHT) < 1e-9);
+	assert.ok(JUMP_HEIGHT >= 1 && JUMP_HEIGHT <= 1.2);
+});
+
+test('the user can jump only on their feet and out of the water', () => {
+	assert.equal(canJump({ mode: 'walking', seated: false, airborne: false }), true);
+	assert.equal(canJump({ mode: 'crouching', seated: false, airborne: false }), true);
+	assert.equal(canJump({ mode: 'swimming', seated: false, airborne: false }), false);
+	assert.equal(canJump({ mode: 'walking', seated: true, airborne: false }), false);
+	assert.equal(canJump({ mode: 'walking', seated: false, airborne: true }), false);
+});
+
+test('landing dips the view more after a longer fall, up to a limit', () => {
+	assert.ok(landingDip(-8, false) > landingDip(-3, false));
+	assert.ok(landingDip(-100, false) <= 0.14);
+	assert.equal(landingDip(-8, true), 0);
 });

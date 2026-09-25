@@ -57,9 +57,34 @@ export function pickFocus({ layout, foot, forward, floorId }) {
 	return looked ?? nearest;
 }
 
+/**
+ * Where the object's label belongs: over its spot nearest the user. One object
+ * can group furniture across a room (two benches either side of an atrium), so
+ * its marker may be metres away from anything the user sees.
+ */
+export function anchorPoint(object, foot) {
+	let nearest = object.position;
+	let nearestDistance = Infinity;
+	for (const spot of object.spots) {
+		const distance = Math.hypot(spot.position.x - foot.x, spot.position.z - foot.z);
+		if (distance < nearestDistance) {
+			nearest = spot.position;
+			nearestDistance = distance;
+		}
+	}
+	return nearest;
+}
+
+export const COMPACT_OBJECT_RADIUS = 1.5;
+
+/** Whether every spot sits close to the object's marker, so the marker stands where the object is seen. */
+export function isCompact(object) {
+	return object.spots.every((spot) => Math.hypot(spot.position.x - object.position.x, spot.position.z - object.position.z) <= COMPACT_OBJECT_RADIUS);
+}
+
 export function objectsWithin(layout, foot, floorId, radius) {
 	return (layout?.objects ?? [])
-		.filter((object) => onFloor(layout, object, floorId) && Math.hypot(object.position.x - foot.x, object.position.z - foot.z) <= radius)
+		.filter((object) => onFloor(layout, object, floorId) && nearestReachPoint(object, foot).distance <= radius)
 		.map((object) => object.id);
 }
 

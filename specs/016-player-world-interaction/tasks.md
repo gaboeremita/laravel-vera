@@ -180,8 +180,31 @@ description: "Task list for Player World Interaction"
 
 - [X] T057 [P] Update `docs/architecture/06-avatar-and-world.md` with the player's movement modes, postures, object discovery, action lines and onlookers, and the residents' conversation facing; add the observations route to the API table in `docs/architecture/02-conversation-runtime.md` if it lists world routes
 - [X] T058 Review every new HUD component against [contracts/player-controls-and-hud.md](contracts/player-controls-and-hud.md): no overlap with the conversation panel, map or each other; every key shown where it applies; token-only colours; entrance and exit animations; reduced-motion fallbacks
-- [ ] T059 Walk through [quickstart.md](quickstart.md) in the penthouse, The Index, the faire and the Connection Node, under all four themes and with reduced motion on (manual, by the user)
-- [ ] T060 Run the gates once, right before the pull request: `vendor/bin/pint --dirty --format agent`, `npm run lint`, `php artisan test --compact`, and `node --test tests/Unit/*.test.js`; fix whatever surfaces in that pass
+- [X] T059 Walk through [quickstart.md](quickstart.md) in the penthouse, The Index, the faire and the Connection Node, under all four themes and with reduced motion on (manual, by the user)
+- [X] T060 Run the gates once, right before the pull request: `vendor/bin/pint --dirty --format agent`, `npm run lint`, `php artisan test --compact`, and `node --test tests/Unit/*.test.js`; fix whatever surfaces in that pass
+
+---
+
+## Phase 9: User Story 2 addition - Jumping (Priority: P2)
+
+**Goal**: Space jumps onto tables, benches and counters; the user can step off ledges up to 2 m ([research R15](research.md)).
+
+**Independent Test**: In The Index reading hall, jump onto a table, walk along it and step off; jump under a low shelf; walk to the penthouse terrace railing and confirm the edge still stops you.
+
+- [X] T061 [P] [US2] Extend `tests/Unit/PlayerMotion.test.js` for `jumpVelocity`, `canJump` and `landingDip`, and `tests/Unit/WorldCollision.test.js` for walking off a ledge with and without `canFall`, drops over the 2 m limit, landing on a table, falling to the floor, a head bump under a low ceiling, and a jump stopped at the edge of the ground
+- [X] T062 [P] [US2] Add `move(…, { canFall })` returning `'grounded'` or `'falling'`, and `airStep(position, velocity, seconds)` to `WorldCollision` in `resources/js/components/world/collisionCheck.js`; add `JUMP_HEIGHT`, `GRAVITY`, `jumpVelocity`, `canJump` and `landingDip` to `resources/js/components/world/playerMotion.js`; move the splash into `resources/js/components/world/worldSounds.js` beside new jump and landing sounds
+- [X] T063 [US2] In `resources/js/components/world/FirstPersonController.jsx`, jump on Space (ignored while typing, swimming or seated; cancels a standing activity), run the airborne state with gravity and `airStep`, start falling when walking off a ledge, dip the view on landing, and ground the stand-up spot when an activity is chosen mid-jump
+- [X] T064 [US2] Add `SPACE — JUMP` to `resources/js/components/world/hud/ControlsLegend.jsx`
+
+---
+
+## Phase 10: User Story 5 change - Facing the user only on opening and posing (Priority: P5)
+
+**Goal**: She turns to the user when a conversation opens and each time she strikes a pose in it, and otherwise keeps her direction.
+
+**Independent Test**: Open a chat from behind her, circle her (she keeps her direction), then ask for a pose (she turns to you first).
+
+- [X] T065 [US5] Give `shouldFaceUser` in `resources/js/components/world/residentMotion.js` a `requested` flag and update `tests/Unit/ResidentMotion.test.js`; in `resources/js/components/world/ResidentController.jsx`, set a one-shot turn request when the conversation opens and when a pose is triggered for her during it, clear it when she faces the user within 0.03 rad or the conversation ends, and turn only while it stands
 
 ---
 

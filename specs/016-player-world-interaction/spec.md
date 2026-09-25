@@ -15,9 +15,10 @@
 - Q: Does the user stay a bodiless first-person view, or gain a visible body? → A: The user stays a first-person view with no body; sitting, lying and reclining change where the view sits and how it is tilted.
 - Q: What happens when the user does an activity with no posture change, like making coffee or looking out at the city? → A: The user faces the spot, a glowing progress ring runs for a few seconds, and an action line such as "*makes coffee at the back counter*" appears on screen.
 - Q: Who learns about the user's activities, and who reacts? → A: Every resident nearby who could reasonably see the user gets the action line (for example `*sits down at the bar*`). The resident in the open conversation replies to it right away; the others get it silently in their own conversation and know it the next time they speak or decide.
-- Q: How do residents behave toward the user during a conversation? → A: Keep it simple: while a conversation is open, the resident turns to face the user. A resident holding a seat, bed or lounger keeps its direction.
+- Q: How do residents behave toward the user during a conversation? → A: She turns to face the user when the conversation opens and each time she strikes a pose in it; otherwise she keeps whatever direction she has, so the user can walk around her. A resident holding a seat, bed or lounger keeps its direction.
 - Q: How does the user choose an activity from a card? → A: The card holds a list of the activities that the user moves through with the arrow keys and starts with Enter.
 - Q: Can the user crouch? → A: Yes. Q toggles crouching; the user can walk while crouched.
+- Q: Can the user jump, and onto what? → A: Yes, a real jump: Space jumps, and the user can land on tables, benches, counters and other surfaces within reach, though nothing roof-high. The user can also step off anything up to about 2 m high and drop to the floor.
 - Q: When the user does something their conversation partner cannot see, does she still get the action line? → A: No. She gets it only when she can see the user, like every other resident; otherwise nothing is added to the chat.
 - Q: How are silently received action lines recorded in that resident's chat? → A: As her own messages, in her voice, as an action between asterisks describing what she sees (for example `*I see the user sit down at the bar counter*`).
 - Q: When a resident silently sees several things in a row, does each become its own message? → A: Yes. Every observation is logged as its own message.
@@ -44,13 +45,13 @@ As the user walks through a world, crossing into a new zone shows a title card: 
 
 ---
 
-### User Story 2 - Run, crouch and swim (Priority: P2)
+### User Story 2 - Run, crouch, jump and swim (Priority: P2)
 
-The user can run by holding a key while moving, covering ground in large worlds like the faire much faster. They can crouch with a key press and walk crouched, slowly and low, until they press it again or start running. In water deeper than about chest height, the user swims: the view floats just above the surface with a gentle bob, movement is slower, and the water surface, light and sound make it clear they are swimming. Leaving deep water, by the pool steps or anywhere the ground rises, returns them to walking.
+The user can run by holding a key while moving, covering ground in large worlds like the faire much faster. They can crouch with a key press and walk crouched, slowly and low, until they press it again or start running. They can jump, landing on tables, benches, counters and anything else within reach, and step off anything up to about 2 m high to drop back to the floor. In water deeper than about chest height, the user swims: the view floats just above the surface with a gentle bob, movement is slower, and the water surface, light and sound make it clear they are swimming. Leaving deep water, by the pool steps or anywhere the ground rises, returns them to walking.
 
-**Why this priority**: Running, crouching and swimming are pure movement and need no world markers, so they work in every world. They make the space nicer to move through, and swimming is the first posture the user shares with residents.
+**Why this priority**: Running, crouching, jumping and swimming are pure movement and need no world markers, so they work in every world. They make the space nicer to move through, and swimming is the first posture the user shares with residents.
 
-**Independent Test**: In the faire, run the length of the Lane and compare the time with walking. Crouch and walk around a table. In the penthouse, walk down the pool steps into the deep end, swim across, and walk back out.
+**Independent Test**: In the faire, run the length of the Lane and compare the time with walking. Crouch and walk around a table. Jump onto a reading hall table and step off it. In the penthouse, walk down the pool steps into the deep end, swim across, and walk back out.
 
 **Acceptance Scenarios**:
 
@@ -65,6 +66,12 @@ The user can run by holding a key while moving, covering ground in large worlds 
 9. **Given** the user is crouched, **When** they press the crouch key again or hold the run key, **Then** they rise smoothly to standing, and running starts if they hold the run key.
 10. **Given** the user is crouched, **When** they walk into water deep enough to swim, **Then** they stop crouching and swim.
 11. **Given** the user is crouched, **When** they ask a resident what they are doing, **Then** she knows the user is crouching.
+12. **Given** the user stands beside a table, **When** they jump toward it, **Then** they land on the table top and can walk around on it.
+13. **Given** the user stands on a table, **When** they walk off its edge, **Then** they drop to the floor and keep walking.
+14. **Given** the user stands at the edge of a drop higher than about 2 m, such as the terrace railing over the city, **When** they walk or jump toward it, **Then** they are stopped at the edge.
+15. **Given** a surface about roof height, **When** the user jumps at it, **Then** they cannot reach it and land back where they jumped from.
+16. **Given** a low ceiling or shelf above the user, **When** they jump, **Then** their head stops against it and they fall back down.
+17. **Given** the user is swimming or seated, **When** they press the jump key, **Then** nothing happens, or, when seated, they get up.
 
 ---
 
@@ -120,21 +127,21 @@ From an object's card, the user highlights one of its activities with the arrow 
 
 ---
 
-### User Story 5 - Residents face the user while talking (Priority: P5)
+### User Story 5 - Residents face the user when talking starts and when posing (Priority: P5)
 
-While a conversation is open, the resident turns to face the user, and keeps facing them as the user moves around her. Whatever she does in the conversation, whether playing a pose or replying, she does toward the user. When she walks somewhere, she faces where she is going, and turns back to the user when she stops.
+When the user opens a conversation with a resident, she turns to face them. Each time she strikes a pose during the conversation, she turns to the user first, so the pose is for them. The rest of the time she keeps the direction she has, so the user can walk around her and see her from any side. When she walks somewhere, she faces where she is going.
 
-**Why this priority**: It is a small change that makes every conversation feel directed at the user, and it needs none of the other stories.
+**Why this priority**: It is a small change that makes conversations and poses feel directed at the user, and it needs none of the other stories.
 
-**Independent Test**: Open a conversation with a resident from behind her, then circle around her while talking and ask her to play a pose.
+**Independent Test**: Open a conversation with a resident from behind her, circle around her while talking, then ask her to play a pose.
 
 **Acceptance Scenarios**:
 
 1. **Given** a resident stands with her back to the user, **When** the user opens a conversation with her, **Then** she turns smoothly to face the user.
-2. **Given** a conversation is open, **When** the user walks around her, **Then** she keeps turning to face them.
-3. **Given** a conversation is open, **When** she plays a pose, **Then** she plays it facing the user.
-4. **Given** she walks to the bar at the user's request during a conversation, **When** she walks, **Then** she faces her direction of travel, and turns to face the user once she arrives.
-5. **Given** the conversation ends, **When** she is standing still, **Then** she stops turning toward the user and goes back to her own activities.
+2. **Given** a conversation is open and she has turned to the user, **When** the user walks around her, **Then** she keeps her direction and the user sees her from the side and behind.
+3. **Given** a conversation is open and the user stands beside her, **When** she plays a pose, **Then** she turns to the user and plays it facing them.
+4. **Given** she walks to the bar at the user's request during a conversation, **When** she walks, **Then** she faces her direction of travel, and keeps the direction she arrives with.
+5. **Given** she is walking when she strikes a pose, **When** she stops, **Then** she turns to the user then.
 
 ---
 
@@ -176,6 +183,9 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 
 - **FR-008**: Holding the run key while moving MUST move the user at about twice walking speed, with the same collision, step and drop rules as walking.
 - **FR-008a**: Pressing the crouch key MUST lower the view smoothly to crouching height, and pressing it again MUST raise it back to standing. While crouched, the user MUST move at about half walking speed. Holding the run key while crouched MUST stand the user up and run. Crouching MUST end on entering water deep enough to swim, and MUST NOT be possible while swimming or holding a spot.
+- **FR-008b**: Pressing the jump key while standing, walking, running or crouching MUST make the user jump about 1.1 m high, keeping their movement in the air, and land on whatever surface is under them, so tables, benches, counters and similar surfaces up to about 1.3 m are reachable. Walls and ceilings MUST stop the user in the air as on the ground. Jumping MUST NOT be possible while swimming or seated.
+- **FR-008c**: The user MUST be able to walk off any ledge up to about 2 m high and drop to the surface below. Ledges higher than that MUST stay blocked, and a jump MUST NOT carry the user beyond the edge of any ground within reach below.
+- **FR-008d**: Jumping and dropping MUST apply to the user only; residents keep to the walkable floor.
 - **FR-009**: The user MUST be swimming whenever the water under them is deeper than the resident swimming threshold (about 1.1 m), and walking again when it is shallower.
 - **FR-010**: While swimming, the user's view MUST float just above the water surface with a gentle bob, movement MUST be slower than walking, and running MUST speed it up while keeping it below walking speed.
 - **FR-011**: While swimming, the view MUST never pass through the water surface, the pool walls or objects in the water.
@@ -222,11 +232,11 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 
 **Residents facing the user**
 
-- **FR-037**: While a conversation is open and the resident is standing still or swimming in place, she MUST turn smoothly to face the user and keep facing them as the user moves.
-- **FR-038**: Poses she plays during the conversation MUST play facing the user.
-- **FR-039**: While walking or swimming somewhere, she MUST face her direction of travel, and turn to face the user again when she stops.
+- **FR-037**: When a conversation opens, the resident MUST turn smoothly to face the user, once. Afterwards she MUST keep her direction while the user moves around her.
+- **FR-038**: Each time she strikes a pose during the conversation, she MUST first turn to face the user, so the pose plays toward them.
+- **FR-039**: While walking or swimming somewhere, she MUST face her direction of travel. A turn to the user that falls while she moves or is being placed MUST wait until she is still.
 - **FR-040**: While she holds a spot in a resting posture (sitting, lying, reclining), she MUST keep the spot's facing, so she stays aligned with the seat, bed or lounger.
-- **FR-041**: When the conversation ends, she MUST stop turning toward the user.
+- **FR-041**: When the conversation ends, any turn toward the user still pending MUST be dropped.
 
 ### Key Entities
 
@@ -258,11 +268,12 @@ While a conversation is open, the resident turns to face the user, and keeps fac
 
 - The user stays a first-person view with no visible body; postures change where the view sits and how far it can turn.
 - The user has no pose library; poses remain a resident-only feature.
-- Default keys: Shift to run, Q to toggle crouching, E to inspect, G to open the zone card, the arrow keys and Enter to choose and start an activity from a card, and a movement key or Space to get up. C, F, X, M and V keep their current meanings.
+- Default keys: Shift to run, Space to jump (or get up when seated), Q to toggle crouching, E to inspect, G to open the zone card, the arrow keys and Enter to choose and start an activity from a card, and a movement key or Space to get up. C, F, X, M and V keep their current meanings.
 - The penthouse, the faire and The Index are the reference worlds; the Connection Node and the café gain these features once their environments carry markers.
 - Swimming uses the same depth thresholds residents use, so the user and residents enter and leave the water at the same depths.
 - Diving below the surface is out of scope.
 - The user's own spot is not saved per session; the user resumes standing beside it.
 - Running has no stamina or limit.
 - Crouching lowers the view and slows the user; it does not let them pass under anything they could not pass standing.
+- Jumps and drops cause no harm; landing only dips the view briefly.
 - The interface reuses the application's four themes and existing world interface styles; no new theme is added.

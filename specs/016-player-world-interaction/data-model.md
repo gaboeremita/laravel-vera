@@ -7,7 +7,8 @@ No schema changes. The user's state lives on the world page for the length of a 
 | Field | Type | Notes |
 |-------|------|-------|
 | `footPosition` | `{x, y, z}` | Standing foot position; on the pool floor while swimming. While holding a spot, the spot's approach point. |
-| `movement` | `walking` \| `running` \| `crouching` \| `swimming` | Derived each frame from Shift, the crouch toggle and water depth. |
+| `movement` | `walking` \| `running` \| `crouching` \| `swimming` | Derived each frame from Shift, the crouch toggle and water depth, while on the ground. |
+| `airborne` | `{ velocityY }` \| null | Set by a jump or by walking off a ledge; cleared on landing. |
 | `posture` | `standing` \| `crouching` \| `sitting` \| `lying` \| `reclining` \| `swimming` | `swimming` whenever `movement` is `swimming` and no spot is held; `crouching` while the crouch toggle is on. |
 | `spotId` | string \| null | Spot held for a resting activity, or during a standing activity's progress ring. |
 | `activityId` | string \| null | Activity being done at that spot or in the zone. |
@@ -24,6 +25,8 @@ walking/running ──depth > 1.1 m──▶ swimming ──depth < 0.9 m──�
 walking ──Q──▶ crouching ──Q──▶ walking
 crouching ──Shift──▶ running
 crouching ──depth > 1.1 m──▶ swimming
+walking/running/crouching ──Space──▶ airborne ──lands──▶ walking/running
+walking/running ──off a ledge ≤ 2 m──▶ airborne
 ```
 
 Rules:

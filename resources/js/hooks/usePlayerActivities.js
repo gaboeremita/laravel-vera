@@ -43,14 +43,14 @@ export function contextLineFor(layout, zone, { withFloor, includeZone = false })
  * The user's side of the world's activities: object and zone cards, starting
  * and leaving activities, and telling the residents who saw it.
  */
-export function usePlayerActivities({ world, worldId, sessionId, location, focusedObject, occupiedSpots, playerState, playerCommands, residentPositions, residentCommands, collisionWorldRef, chatResident, actionSender, addToast }) {
+export function usePlayerActivities({ world, worldId, sessionId, location, focusedObject, occupiedSpots: occupiedSpotsRef, playerState: playerStateRef, playerCommands: playerCommandsRef, residentPositions: residentPositionsRef, residentCommands: residentCommandsRef, collisionWorldRef, chatResident, actionSender: actionSenderRef, addToast }) {
 	const layout = world?.layout;
 	const withFloor = (layout?.floors?.length ?? 0) > 1;
 	const [card, setCard] = useState(null);
 	const [highlightedIndex, setHighlightedIndex] = useState(0);
 	const [activity, setActivity] = useState(null);
 	const [hudEntries, setHudEntries] = useState([]);
-	const [, setOccupancyTick] = useState(0);
+	const [occupancy, setOccupancy] = useState(() => new Map());
 	const gettingUp = useRef(false);
 
 	const cardZone = card?.kind === 'zone' ? layout?.zones?.find((zone) => zone.id === card.id) ?? null : null;
@@ -67,7 +67,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			contextLine: contextLineFor(layout, objectZone, { withFloor, includeZone: true }),
 			description: cardObject.description,
 			rows: uniqueActivities(cardObject).map((candidate) => {
-				const availability = spotAvailability(cardObject, candidate.id, occupiedSpots.current, residentNames);
+				const availability = spotAvailability(cardObject, candidate.id, occupancy, residentNames);
 				return { id: candidate.id, name: candidate.name, posture: candidate.posture ?? 'standing', availability: availabilityText(availability), taken: availability.free === 0 && !availability.takenBy.includes('YOU') };
 			}),
 		};
@@ -83,9 +83,9 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 
 	useEffect(() => {
 		if (!card) return undefined;
-		const interval = setInterval(() => setOccupancyTick((tick) => tick + 1), OCCUPANCY_REFRESH_MS);
+		const interval = setInterval(() => setOccupancy(new Map(occupiedSpotsRef.current)), OCCUPANCY_REFRESH_MS);
 		return () => clearInterval(interval);
-	}, [card]);
+	}, [card, occupiedSpotsRef]);
 
 	const showEntry = useCallback((kind, text) => {
 		setHudEntries((entries) => [...entries, { id: crypto.randomUUID(), kind, text }]);
@@ -94,7 +94,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 
 	const deliver = useCallback(({ line, observation }) => {
 		showEntry('line', line);
-		const foot = playerState.current?.footPosition;
+		const foot = playerStateRef.current?.footPosition;
 		if (!foot) return;
 		const collisionWorld = collisionWorldRef.current;
 		const floorOf = (y) => floorAt(layout, y)?.id ?? null;
@@ -104,15 +104,15 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			userFloorId: floorOf(foot.y),
 			floorOf,
 			residentPose: (residentId) => {
-				const position = residentPositions.current.get(residentId);
-				const yaw = residentCommands.current.get(residentId)?.state()?.rotation?.y;
+				const position = residentPositionsRef.current.get(residentId);
+				const yaw = residentCommandsRef.current.get(residentId)?.state()?.rotation?.y;
 				return position && typeof yaw === 'number' ? { position, yaw } : null;
 			},
 			hasLineOfSight: (from, to) => (collisionWorld ? collisionWorld.hasLineOfSight(from, to) : true),
 		});
 		for (const resident of onlookers) {
 			if (resident.id === chatResident?.id) {
-				actionSender.current?.(line);
+				actionSenderRef.current?.(line);
 				continue;
 			}
 			if (!sessionId) continue;
@@ -127,11 +127,11 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 				}
 			})();
 		}
-	}, [showEntry, playerState, collisionWorldRef, layout, world, residentPositions, residentCommands, chatResident, actionSender, sessionId, worldId, addToast]);
+	}, [showEntry, playerStateRef, collisionWorldRef, layout, world, residentPositionsRef, residentCommandsRef, chatResident, actionSenderRef, sessionId, worldId, addToast]);
 
 	const releaseSpot = useCallback((spotId) => {
-		if (spotId && occupiedSpots.current.get(spotId) === 'user') occupiedSpots.current.delete(spotId);
-	}, [occupiedSpots]);
+		if (spotId && occupiedSpotsRef.current.get(spotId) === 'user') occupiedSpotsRef.current.delete(spotId);
+	}, [occupiedSpotsRef]);
 
 	const start = useCallback(async (index) => {
 		if (!cardView || !cardView.rows[index]) return;
@@ -139,7 +139,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			showEntry('notice', activity.kind === 'resting' ? 'SPACE — GET UP FIRST' : 'FINISH WHAT YOU ARE DOING FIRST');
 			return;
 		}
-		const commands = playerCommands.current;
+		const commands = playerCommandsRef.current;
 		if (!commands) return;
 		const row = cardView.rows[index];
 
@@ -152,15 +152,15 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 		}
 
 		const chosen = uniqueActivities(cardObject).find((candidate) => candidate.id === row.id);
-		const foot = playerState.current?.footPosition ?? cardObject.position;
-		const spot = nearestFreeSpot(cardObject, chosen.id, occupiedSpots.current, foot);
+		const foot = playerStateRef.current?.footPosition ?? cardObject.position;
+		const spot = nearestFreeSpot(cardObject, chosen.id, occupiedSpotsRef.current, foot);
 		if (!spot) {
-			const availability = spotAvailability(cardObject, chosen.id, occupiedSpots.current, residentNames);
+			const availability = spotAvailability(cardObject, chosen.id, occupiedSpotsRef.current, residentNames);
 			showEntry('notice', availability.total > 1 ? `NOTHING FREE — ALL ${availability.total} ARE TAKEN` : `TAKEN BY ${availability.takenBy[0]?.toUpperCase() ?? 'SOMEONE'}`);
 			return;
 		}
 		setCard(null);
-		occupiedSpots.current.set(spot.id, 'user');
+		occupiedSpotsRef.current.set(spot.id, 'user');
 		commands.setActivity({ spotId: spot.id, activityId: chosen.id });
 
 		if (activityKind(chosen, false) === 'resting') {
@@ -173,42 +173,43 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 
 		setActivity({ key: crypto.randomUUID(), kind: 'standing', activity: chosen, object: cardObject, spot, cancelled: false });
 		void commands.faceToward(spot.position);
-	}, [cardView, activity, playerCommands, cardZone, cardObject, playerState, occupiedSpots, residentNames, showEntry, deliver]);
+	}, [cardView, activity, playerCommandsRef, cardZone, cardObject, playerStateRef, occupiedSpotsRef, residentNames, showEntry, deliver]);
 
 	const getUp = useCallback(async () => {
 		if (activity?.kind !== 'resting' || activity.settling || gettingUp.current) return;
 		gettingUp.current = true;
 		try {
-			await playerCommands.current?.getUp();
+			await playerCommandsRef.current?.getUp();
 			releaseSpot(activity.spot.id);
-			playerCommands.current?.setActivity({});
+			playerCommandsRef.current?.setActivity({});
 			setActivity(null);
 			deliver({ line: getUpLine(activity.object), observation: observationGetUpLine(activity.object) });
 		} finally {
 			gettingUp.current = false;
 		}
-	}, [activity, playerCommands, releaseSpot, deliver]);
+	}, [activity, playerCommandsRef, releaseSpot, deliver]);
 
 	const cancel = useCallback(() => {
 		if (!activity || activity.kind === 'resting' || activity.cancelled) return;
 		releaseSpot(activity.spot?.id);
-		playerCommands.current?.setActivity({});
+		playerCommandsRef.current?.setActivity({});
 		setActivity({ ...activity, cancelled: true });
-	}, [activity, releaseSpot, playerCommands]);
+	}, [activity, releaseSpot, playerCommandsRef]);
 
 	const complete = useCallback(() => {
 		if (!activity || activity.cancelled) return;
 		releaseSpot(activity.spot?.id);
-		playerCommands.current?.setActivity({});
+		playerCommandsRef.current?.setActivity({});
 		deliver({ line: actionLine({ activity: activity.activity, object: activity.object }), observation: observationLine({ activity: activity.activity, object: activity.object }) });
-	}, [activity, releaseSpot, playerCommands, deliver]);
+	}, [activity, releaseSpot, playerCommandsRef, deliver]);
 
 	const finish = useCallback(() => setActivity(null), []);
 
 	const openObjectCard = useCallback((objectId) => {
+		setOccupancy(new Map(occupiedSpotsRef.current));
 		setCard({ kind: 'object', id: objectId });
 		setHighlightedIndex(0);
-	}, []);
+	}, [occupiedSpotsRef]);
 	const closeCard = useCallback(() => setCard(null), []);
 
 	useEffect(() => {
@@ -250,8 +251,8 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 	}, [card, cardView?.rows.length, focusedObject, location, highlightedIndex, start, openObjectCard]);
 
 	const releaseAll = useCallback(() => {
-		for (const [spotId, holder] of occupiedSpots.current) if (holder === 'user') occupiedSpots.current.delete(spotId);
-	}, [occupiedSpots]);
+		for (const [spotId, holder] of occupiedSpotsRef.current) if (holder === 'user') occupiedSpotsRef.current.delete(spotId);
+	}, [occupiedSpotsRef]);
 
 	useEffect(() => releaseAll, [releaseAll]);
 

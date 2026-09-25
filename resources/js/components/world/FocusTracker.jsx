@@ -1,10 +1,10 @@
 import { useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Vector3 } from 'three';
-import { isWithinReach, objectsWithin, pickFocus } from './objectFocus.js';
+import { anchorPoint, isWithinReach, objectsWithin, pickFocus } from './objectFocus.js';
 import { floorAt } from './worldLocation.js';
 
-const LABEL_HEIGHT = 1.4;
+const LABEL_HEIGHT = 1.1;
 const NEARBY_RADIUS = 6;
 const NEARBY_INTERVAL_SECONDS = 0.25;
 
@@ -54,7 +54,8 @@ export default function FocusTracker({ layout, playerState, enabled = true, labe
 			label.style.opacity = '0';
 			return;
 		}
-		anchor.current.set(next.position.x, next.position.y + LABEL_HEIGHT, next.position.z).project(camera);
+		const point = anchorPoint(next, foot);
+		anchor.current.set(point.x, point.y + LABEL_HEIGHT, point.z).project(camera);
 		if (anchor.current.z > 1) {
 			label.style.opacity = '0';
 			return;

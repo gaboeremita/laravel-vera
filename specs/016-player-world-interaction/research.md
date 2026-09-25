@@ -81,9 +81,9 @@
 
 ## R10. Residents facing the user
 
-**Decision**: In `ResidentController`'s frame loop, when `inConversation` is true and she is not routing, being placed, holding a resting spot or wandering, her target heading becomes the direction to the user's foot position, and she turns at the existing `TURN_SPEED` with the existing locomotion turning code (`turnTowardsAngle`). The same applies while she treads water. Pose playback is unaffected, since poses animate bones and the heading lives on the scene root, so a pose started during conversation plays facing the user (FR-038). Routing already sets heading from the route, so FR-039 holds, and when the route ends the conversation rule takes over again.
+**Decision**: `ResidentController` keeps a one-shot turn request, set when a conversation with her opens and whenever a pose is triggered for her during it, and cleared when the conversation ends. In the frame loop, while the request stands and she is idle (not routing, being placed, holding a resting spot or wandering; treading water counts as idle), she turns toward the user's foot position at the existing `TURN_SPEED` with `turnTowardsAngle`, and the request clears once she is within 0.03 rad. A request raised while she moves waits until she stops. Pose playback animates bones while the heading lives on the scene root, so the pose plays facing the user as she finishes turning.
 
-**Rationale**: It uses the heading machinery that roaming and routing already use, with one extra condition.
+**Rationale**: Turning at the two moments that are about the user, and leaving her be otherwise, keeps conversations and poses directed at the user while letting the user walk around her. It reuses the heading machinery roaming and routing already use.
 
 ## R11. The world interface's visual language
 
@@ -132,3 +132,15 @@ The silent path is a new endpoint, `POST /api/worlds/{world}/sessions/{session}/
 **Rationale**: Observations are ordinary messages with no marker, so the way to include them is to include recent messages. Six messages covers several observations plus the last few exchanges, which also lets her decisions follow what the user said last, at a bounded prompt size.
 
 **Alternatives considered**: Sending the recent messages as chat turns before `[A moment passes in the world.]` (makes her next reply look like a continuation of that exchange, which the decision instruction is written to avoid).
+
+## R15. Jumping and dropping
+
+**Decision**: The player gains an airborne state. Space starts a jump at `sqrt(2 · g · h)` with a peak `h` of 1.1 m and gravity of 20 m/s², for about 0.7 s in the air; the direction keys keep steering the body at the current movement speed. `WorldCollision.airStep` moves the body one frame through the air:
+
+- sideways, in 8 cm steps that stop at walls (the same body test as walking) and wherever no ground lies within 3.5 m below, so a jump cannot carry the body off a building;
+- upward, until the head's body box would touch something, which zeroes the upward speed;
+- downward, landing on the highest walkable surface crossed during the frame, including surfaces up to the step height above the feet, which lets the body land on an edge it clears only with its lower 25 cm.
+
+Walking, the player moves with `move(…, { canFall: true })`: a step with no ground within the step-down limit but ground within 2 m below is taken and reported as `falling`, which starts the airborne state with no upward speed. Residents keep calling `move` without the option, so their rules are unchanged. Landing dips the view by up to 14 cm in proportion to the fall speed and plays a thump; take-off plays a soft whoosh. Both sounds share `worldSounds.js` with the swim splash.
+
+**Rationale**: A body box that ignores its lowest 25 cm already lets walkers climb steps; reusing it in the air gives jumps the same reach plus the jump height, about 1.3 m in all, which covers tables, benches and counters but not shelves or roofs. The 2 m drop limit makes furniture and low platforms easy to leave while keeping building edges and upper floors blocked. Resolving the ground under the body every frame, rather than simulating a full rigid body, keeps the player on the same walkability rules the navigation grid uses.

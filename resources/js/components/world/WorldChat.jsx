@@ -11,7 +11,7 @@ import { joinLines } from './activityLines.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getUserState, getOccupiedSpots, onVoiceAudio, onAction, actionSender }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getUserState, getOccupiedSpots, onVoiceAudio, onAction, actionSender: actionSenderRef }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
 	const [isTranscribing, setIsTranscribing] = useState(false);
@@ -137,13 +137,13 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 	}, [stopVoiceMode]);
 
 	useEffect(() => {
-		if (!actionSender) return undefined;
-		actionSender.current = (line) => {
+		if (!actionSenderRef) return undefined;
+		actionSenderRef.current = (line) => {
 			queuedLines.current.push(line);
 			setQueueVersion((version) => version + 1);
 		};
-		return () => { actionSender.current = null; };
-	}, [actionSender]);
+		return () => { actionSenderRef.current = null; };
+	}, [actionSenderRef]);
 
 	useEffect(() => {
 		if (queuedLines.current.length === 0 || !conversationId || isLoading) return;

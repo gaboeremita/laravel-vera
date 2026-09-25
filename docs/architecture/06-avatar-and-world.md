@@ -143,7 +143,7 @@ stateDiagram-v2
 - **Discovery**: object markers are points with no mesh, so `SpotBeacons` draws at them: a breathing dot at objects within 6 m, and for the focused object (within 2.5 m, preferring the one looked at) a shader ring per spot and a light column. E opens the object card, G the zone card; arrows and Enter choose an activity.
 - **Activities**: resting activities glide the view onto the spot at that posture's eye height with limited look-around; standing and zone activities fill a 3 s ring. The user holds spots in the same `occupiedSpots` map residents use, so neither can take the other's spot.
 - **Residents knowing**: chat messages and idle decisions carry `userState`, resolved against the layout into the "the user is" line. Each activity becomes an action line for residents who can see the user (same floor, within 15 m, line of sight, within 4 m or facing within 110°): the resident in the open conversation gets it as the user's message and replies; every other onlooker records a first-person observation of her own through `POST /api/worlds/{world}/sessions/{session}/residents/{resident}/observations`. Idle decisions include her last 6 conversation messages, so observations reach them too.
-- **Facing the user**: during a conversation a resident who is standing still or treading water turns toward the user; one holding a seat, bed or lounger keeps its direction.
+- **Facing the user**: a resident turns toward the user once when a conversation opens and again each time she strikes a pose in it, waiting until she is still; otherwise she keeps her direction, and one holding a seat, bed or lounger keeps its direction.
 
 ## Portrait pose lifecycle
 

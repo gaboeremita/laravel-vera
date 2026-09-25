@@ -5,11 +5,14 @@ export default function FocusPrompt({ object, labelRef, hidden = false }) {
 			{object && !hidden && (
 				<div key={object.id} className="hud-enter-wipe flex flex-col items-center">
 					<span className="world-hud-glow whitespace-nowrap font-display text-sm font-semibold uppercase tracking-[0.14em]">{object.name}</span>
-					<span className="mt-1 flex items-center gap-1.5">
-						<span className="world-hud-key">E</span>
-						<span className="world-hud-label">INSPECT</span>
+					<span className="world-hud-panel mt-2 flex items-center gap-2.5 px-3 py-1.5">
+						<span className="relative flex h-8 w-8 items-center justify-center">
+							<span className="world-hud-motion absolute inset-0 animate-ping border border-accent/60" />
+							<span className="world-hud-glow-box relative flex h-8 w-8 items-center justify-center border border-accent bg-accent/20 font-display text-base font-bold text-accent">E</span>
+						</span>
+						<span className="world-hud-label text-fg-1">INSPECT</span>
 					</span>
-					<span className="mt-1 h-5 w-px bg-gradient-to-b from-accent to-transparent" />
+					<span className="mt-1 h-6 w-px bg-gradient-to-b from-accent to-transparent" />
 				</div>
 			)}
 		</div>

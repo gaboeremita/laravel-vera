@@ -36,3 +36,22 @@ export function swimEyeY(surfaceY, timeSeconds, reducedMotion) {
 export function targetFov(mode, reducedMotion) {
 	return mode === 'running' && !reducedMotion ? RUNNING_FOV : WALKING_FOV;
 }
+
+export const JUMP_HEIGHT = 1.1;
+export const GRAVITY = 20;
+const MAX_LANDING_DIP = 0.14;
+const LANDING_DIP_PER_SPEED = 0.014;
+
+export function jumpVelocity() {
+	return Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
+}
+
+export function canJump({ mode, seated, airborne }) {
+	return !seated && !airborne && mode !== 'swimming';
+}
+
+/** How far the view dips on landing, deeper after longer falls. */
+export function landingDip(fallSpeed, reducedMotion) {
+	if (reducedMotion) return 0;
+	return Math.min(MAX_LANDING_DIP, Math.abs(fallSpeed) * LANDING_DIP_PER_SPEED);
+}

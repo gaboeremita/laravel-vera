@@ -6,13 +6,13 @@
 
 ## Summary
 
-The user gains in the world what residents already have: knowing where they are, moving freely, discovering what things are, and using them. Residents also turn to face the user while they talk.
+The user gains in the world what residents already have: knowing where they are, moving freely, discovering what things are, and using them. Residents also turn to face the user when a conversation opens and when they strike a pose.
 
 - **Location**: a client port of the server's zone lookup tracks the user's zone. Crossings show an animated title card, and a readout above the minimap always shows the current zone.
-- **Movement**: Shift runs and Q toggles a slow crouch-walk. In deep water the body keeps moving along the pool floor through the existing collision world, and only the view floats at the surface. The thresholds are the residents' own.
+- **Movement**: Shift runs, Q toggles a slow crouch-walk, and Space jumps onto anything up to about 1.3 m; the user can step off ledges up to 2 m. In deep water the body keeps moving along the pool floor through the existing collision world, and only the view floats at the surface. The thresholds are the residents' own.
 - **Discovery**: objects are marker points with no mesh of their own, so interactivity is drawn at the points: a faint dot at nearby objects, and on focus a glowing ring at each spot with a light column and a label. E opens a card with the object's description and activities, including which spots are free or taken by whom. The activities form a list chosen with the arrow keys and started with Enter. G does the same for the zone.
 - **Using things**: choosing a resting activity glides the view onto the spot at that posture's eye position, with limited look-around. Standing and zone activities run a 3-second progress ring and end with an action line. The user claims spots in the same occupancy map residents use.
-- **Residents**: chat messages and idle decisions carry the user's state and the occupancy list, so she knows what the user is doing and cannot take their spot. Each activity change becomes an `*action line*` for every resident who can see the user: nearby, on the same floor, in line of sight and roughly facing them. The resident in the open conversation replies to it. The others record it silently as their own first-person observation (`*I see the user sit down at the bar counter*`), one message each time, through a new observation endpoint; idle decisions now include her last few conversation messages, so she also knows it when she next decides. During a conversation she turns to face the user whenever she is standing still or treading water; on a seat, bed or lounger she keeps its direction.
+- **Residents**: chat messages and idle decisions carry the user's state and the occupancy list, so she knows what the user is doing and cannot take their spot. Each activity change becomes an `*action line*` for every resident who can see the user: nearby, on the same floor, in line of sight and roughly facing them. The resident in the open conversation replies to it. The others record it silently as their own first-person observation (`*I see the user sit down at the bar counter*`), one message each time, through a new observation endpoint; idle decisions now include her last few conversation messages, so she also knows it when she next decides. She turns to face the user when a conversation opens and each time she strikes a pose in it, otherwise keeping her direction; on a seat, bed or lounger she keeps its direction.
 - **Interface**: DOM overlays share one animated, theme-token HUD language, with a reduced-motion fallback.
 
 ## Technical Context
@@ -96,13 +96,14 @@ resources/js/
 ├── utils/themeColor.js                     # new: moved from NameTags.jsx (second caller)
 └── components/world/
     ├── worldLocation.js                    # new: floorAt, zoneAt, zoneChain (port of ResolveWorldState), crossing debounce
-    ├── playerMotion.js                     # new: movement mode, speeds, swim view height and bob
+    ├── playerMotion.js                     # new: movement mode, speeds, swim view height and bob, jump velocity, landing dip
+    ├── worldSounds.js                      # new: swim splash, jump and landing sounds
     ├── playerPostures.js                   # new: eye position, facing, pitch and look limits per posture
     ├── objectFocus.js                      # new: reach and gaze selection
     ├── playerActivities.js                 # new: nearest free spot, activity kind
     ├── activityLines.js                    # new: action line and observation wording
     ├── onlookers.js                        # new: residents who can see the user; delivers lines (reply or silent)
-    ├── collisionCheck.js                   # changed: exports SWIM_DEPTH, LEAVE_WATER_DEPTH; hasLineOfSight
+    ├── collisionCheck.js                   # changed: exports SWIM_DEPTH, LEAVE_WATER_DEPTH; hasLineOfSight; move() canFall; airStep()
     ├── FirstPersonController.jsx           # changed: run, crouch, swim view, spot glide, look limits, get up, foot position
     ├── WorldScene.jsx                      # changed: mounts LocationTracker, FocusTracker, SpotBeacons; foot-based PlayerViewTracker
     ├── LocationTracker.jsx                 # new: reports zone and floor changes

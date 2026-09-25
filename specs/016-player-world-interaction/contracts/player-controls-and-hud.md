@@ -11,6 +11,7 @@ All keys are ignored while the message box or any text field has focus.
 | W A S D | standing activity in progress | Cancel it. |
 | Shift (hold) | moving | Run; swim faster in the water. Stands up from a crouch. |
 | Q | exploring, not swimming or on a spot | Toggle crouching. |
+| Space | exploring, not swimming | Jump. |
 | E | an object in focus, or its card open | Open its card; press again to close. |
 | G | inside a zone | Open the zone's card; press again to close. |
 | Esc | a card is open | Close it. |

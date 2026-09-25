@@ -4,12 +4,14 @@ import { AdditiveBlending, CanvasTexture, CylinderGeometry, DoubleSide, PlaneGeo
 import { themeRgb } from '../../utils/themeColor.js';
 import { getGroundHeight } from './groundHeight.js';
 import { RESTING_POSTURES } from './playerPostures.js';
+import { isCompact } from './objectFocus.js';
 
 const FADE_SECONDS = 0.3;
 const RING_SIZE = 0.9;
 const COLUMN_HEIGHT = 2.4;
 const COLUMN_RADIUS = 0.32;
 const DOT_HEIGHT = 1.1;
+const SPOT_DOT_HEIGHT = 0.8;
 const DOT_SIZE = 0.16;
 
 const RING_VERTEX = `
@@ -93,6 +95,7 @@ function ringPosition(spot, collisionWorld) {
 }
 
 function ObjectBeacon({ object, visible, colors, occupiedSpots, collisionWorld, reducedMotion, onFaded }) {
+	const groupRef = useRef(null);
 	const fade = useRef(0);
 	const time = useRef(0);
 	const ringGeometry = useMemo(() => new PlaneGeometry(RING_SIZE, RING_SIZE), []);
@@ -116,6 +119,7 @@ function ObjectBeacon({ object, visible, colors, occupiedSpots, collisionWorld, 
 		side: DoubleSide,
 	}), [colors]);
 	const ringPositions = useMemo(() => object.spots.map((spot) => ringPosition(spot, collisionWorld)), [object, collisionWorld]);
+	const showColumn = useMemo(() => isCompact(object), [object]);
 
 	useEffect(() => () => {
 		ringGeometry.dispose();
@@ -129,30 +133,33 @@ function ObjectBeacon({ object, visible, colors, occupiedSpots, collisionWorld, 
 		const target = visible ? 1 : 0;
 		const stepSize = delta / FADE_SECONDS;
 		fade.current = target > fade.current ? Math.min(target, fade.current + stepSize) : Math.max(target, fade.current - stepSize);
-		object.spots.forEach((spot, index) => {
-			const uniforms = ringMaterials[index].uniforms;
+		for (const mesh of groupRef.current?.children ?? []) {
+			const { uniforms } = mesh.material;
 			uniforms.uTime.value = time.current;
 			uniforms.uFade.value = fade.current;
-			const holder = occupiedSpots.current.get(spot.id);
-			uniforms.uTaken.value = holder !== undefined && holder !== 'user' ? 1 : 0;
-		});
-		columnMaterial.uniforms.uTime.value = time.current;
-		columnMaterial.uniforms.uFade.value = fade.current;
+			if (mesh.userData.spotId) {
+				const holder = occupiedSpots.current.get(mesh.userData.spotId);
+				uniforms.uTaken.value = holder !== undefined && holder !== 'user' ? 1 : 0;
+			}
+		}
 		if (!visible && fade.current === 0) onFaded(object.id);
 	});
 
 	return (
-		<group>
+		<group ref={groupRef}>
 			{object.spots.map((spot, index) => (
-				<mesh key={spot.id} geometry={ringGeometry} material={ringMaterials[index]} position={ringPositions[index]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={900} />
+				<mesh key={spot.id} userData={{ spotId: spot.id }} geometry={ringGeometry} material={ringMaterials[index]} position={ringPositions[index]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={900} />
 			))}
-			<mesh geometry={columnGeometry} material={columnMaterial} position={[object.position.x, object.position.y + COLUMN_HEIGHT / 2, object.position.z]} renderOrder={899} />
+			{showColumn && <mesh geometry={columnGeometry} material={columnMaterial} position={[object.position.x, object.position.y + COLUMN_HEIGHT / 2, object.position.z]} renderOrder={899} />}
 		</group>
 	);
 }
 
 function NearbyDot({ object, material }) {
-	return <sprite material={material} position={[object.position.x, object.position.y + DOT_HEIGHT, object.position.z]} scale={[DOT_SIZE, DOT_SIZE, 1]} renderOrder={898} />;
+	const points = isCompact(object)
+		? [[object.position.x, object.position.y + DOT_HEIGHT, object.position.z]]
+		: object.spots.map((spot) => [spot.position.x, spot.position.y + SPOT_DOT_HEIGHT, spot.position.z]);
+	return points.map((point) => <sprite key={point.join(':')} material={material} position={point} scale={[DOT_SIZE, DOT_SIZE, 1]} renderOrder={898} />);
 }
 
 /**
@@ -168,6 +175,7 @@ export default function SpotBeacons({ layout, focusedObjectId, nearbyIds, occupi
 	const dotTexture = useMemo(() => makeDotTexture(), []);
 	const dotMaterial = useMemo(() => new SpriteMaterial({ map: dotTexture, color: `rgb(${colors.accent.map((channel) => Math.round(channel * 255)).join(',')})`, transparent: true, depthWrite: false, blending: AdditiveBlending, opacity: 0.4 }), [dotTexture, colors]);
 	const breath = useRef(0);
+	const dotsRef = useRef(null);
 
 	if (previousFocus !== focusedObjectId) {
 		setPreviousFocus(focusedObjectId);
@@ -181,7 +189,8 @@ export default function SpotBeacons({ layout, focusedObjectId, nearbyIds, occupi
 
 	useFrame((_, delta) => {
 		if (!reducedMotion.current) breath.current += delta;
-		dotMaterial.opacity = reducedMotion.current ? 0.35 : 0.22 + 0.2 * (0.5 + 0.5 * Math.sin(breath.current * 2.6));
+		const material = dotsRef.current?.children[0]?.material;
+		if (material) material.opacity = reducedMotion.current ? 0.35 : 0.22 + 0.2 * (0.5 + 0.5 * Math.sin(breath.current * 2.6));
 	});
 
 	const objectsById = useMemo(() => new Map((layout?.objects ?? []).map((object) => [object.id, object])), [layout]);
@@ -190,7 +199,9 @@ export default function SpotBeacons({ layout, focusedObjectId, nearbyIds, occupi
 
 	return (
 		<>
-			{nearbyIds.filter((id) => id !== focusedObjectId && objectsById.has(id)).map((id) => <NearbyDot key={id} object={objectsById.get(id)} material={dotMaterial} />)}
+			<group ref={dotsRef}>
+				{nearbyIds.filter((id) => id !== focusedObjectId && objectsById.has(id)).map((id) => <NearbyDot key={id} object={objectsById.get(id)} material={dotMaterial} />)}
+			</group>
 			{shown.filter(({ id }) => objectsById.has(id)).map(({ id, visible }) => (
 				<ObjectBeacon key={id} object={objectsById.get(id)} visible={visible} colors={colors} occupiedSpots={occupiedSpots} collisionWorld={collisionWorld} reducedMotion={reducedMotion} onFaded={handleFaded} />
 			))}

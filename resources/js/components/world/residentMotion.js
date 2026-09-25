@@ -37,12 +37,13 @@ export function findWalkPose(poses = []) {
 }
 
 /**
- * During a conversation a resident turns to the user whenever she is still:
- * not walking a route, not being placed, and not holding a seat, bed or
- * lounger, whose direction she keeps.
+ * A resident turns to the user when asked to (as a conversation opens, and
+ * as she strikes a pose in it), once she is still: not walking a route, not
+ * being placed, and not holding a seat, bed or lounger, whose direction she
+ * keeps.
  */
-export function shouldFaceUser({ inConversation, routing = false, placing = false, restingOnSpot = false, wandering = false }) {
-	return inConversation && !routing && !placing && !restingOnSpot && !wandering;
+export function shouldFaceUser({ requested, inConversation, routing = false, placing = false, restingOnSpot = false, wandering = false }) {
+	return requested && inConversation && !routing && !placing && !restingOnSpot && !wandering;
 }
 
 export function headingToward(from, to) {

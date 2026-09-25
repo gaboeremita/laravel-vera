@@ -28,13 +28,14 @@ test('removes root-motion tracks from a walk clip', () => {
 	assert.deepEqual(makeClipInPlace(clip).tracks, [{ name: 'hips.quaternion' }]);
 });
 
-test('a resident faces the user only while talking and still', () => {
-	assert.equal(shouldFaceUser({ inConversation: true }), true);
-	assert.equal(shouldFaceUser({ inConversation: false }), false);
-	assert.equal(shouldFaceUser({ inConversation: true, routing: true }), false);
-	assert.equal(shouldFaceUser({ inConversation: true, placing: true }), false);
-	assert.equal(shouldFaceUser({ inConversation: true, restingOnSpot: true }), false);
-	assert.equal(shouldFaceUser({ inConversation: true, wandering: true }), false);
+test('a resident turns to the user only when asked, while talking and still', () => {
+	assert.equal(shouldFaceUser({ requested: true, inConversation: true }), true);
+	assert.equal(shouldFaceUser({ requested: false, inConversation: true }), false);
+	assert.equal(shouldFaceUser({ requested: true, inConversation: false }), false);
+	assert.equal(shouldFaceUser({ requested: true, inConversation: true, routing: true }), false);
+	assert.equal(shouldFaceUser({ requested: true, inConversation: true, placing: true }), false);
+	assert.equal(shouldFaceUser({ requested: true, inConversation: true, restingOnSpot: true }), false);
+	assert.equal(shouldFaceUser({ requested: true, inConversation: true, wandering: true }), false);
 });
 
 test('the heading toward the user matches the heading for moving toward them', () => {

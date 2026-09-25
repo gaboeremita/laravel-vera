@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { objectsWithin, pickFocus, reachPoints, spotAvailability } from '../../resources/js/components/world/objectFocus.js';
+import { anchorPoint, isCompact, objectsWithin, pickFocus, reachPoints, spotAvailability } from '../../resources/js/components/world/objectFocus.js';
 
 const spot = (id, x, z, activityId = 'sit') => ({ id, position: { x, y: 0.5, z }, approach: { x, y: 0.5, z: z + 0.6 }, facing: 0, activities: [{ id: activityId, name: 'Sit down', posture: 'sitting' }] });
 
@@ -55,4 +55,25 @@ test('availability counts free spots and names the holders', () => {
 	const occupied = new Map([['bench-1', 7], ['bench-3', 'user']]);
 	assert.deepEqual(spotAvailability(bench, 'sit', occupied, new Map([[7, 'Vera']])), { free: 1, total: 3, takenBy: ['Vera', 'YOU'] });
 	assert.deepEqual(spotAvailability(bench, 'sit', new Map(), new Map()), { free: 3, total: 3, takenBy: [] });
+});
+
+const splitBenches = { id: 'atrium-benches', position: { x: 0, y: 0, z: 1 }, spots: [spot('west', -8.55, 1), spot('east', 8.55, 1)] };
+
+test('the label anchors over the spot nearest the user', () => {
+	assert.equal(anchorPoint(splitBenches, { x: 7, y: 0, z: 2 }).x, 8.55);
+	assert.equal(anchorPoint(splitBenches, { x: -7, y: 0, z: 2 }).x, -8.55);
+});
+
+test('an object without spots anchors at its own position', () => {
+	assert.deepEqual(anchorPoint(layout.objects[0], { x: 3, y: 0, z: 3 }), { x: 0, y: 0, z: 0 });
+});
+
+test('an object is compact when all its spots sit close to its marker', () => {
+	assert.equal(isCompact(splitBenches), false);
+	assert.equal(isCompact({ position: { x: 10, y: 0, z: 0 }, spots: [spot('a', 9.5, 0), spot('b', 10.5, 0)] }), true);
+	assert.equal(isCompact(layout.objects[0]), true);
+});
+
+test('a split object counts as nearby from beside one of its seats', () => {
+	assert.deepEqual(objectsWithin({ objects: [splitBenches] }, { x: 8, y: 0, z: 3 }, null, 6), ['atrium-benches']);
 });

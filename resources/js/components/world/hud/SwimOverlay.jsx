@@ -1,27 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-
-let audioContext = null;
-
-function playSplash(entering) {
-	audioContext ??= new AudioContext();
-	const duration = entering ? 0.7 : 0.45;
-	const buffer = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * duration), audioContext.sampleRate);
-	const samples = buffer.getChannelData(0);
-	for (let index = 0; index < samples.length; index++) samples[index] = Math.random() * 2 - 1;
-	const source = audioContext.createBufferSource();
-	source.buffer = buffer;
-	const filter = audioContext.createBiquadFilter();
-	filter.type = 'bandpass';
-	filter.frequency.value = entering ? 900 : 520;
-	filter.Q.value = 0.8;
-	const gain = audioContext.createGain();
-	const now = audioContext.currentTime;
-	gain.gain.setValueAtTime(0.0001, now);
-	gain.gain.exponentialRampToValueAtTime(entering ? 0.35 : 0.2, now + 0.03);
-	gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-	source.connect(filter).connect(gain).connect(audioContext.destination);
-	source.start(now);
-}
+import { playSplash } from '../worldSounds.js';
 
 export default function SwimOverlay({ active }) {
 	const [shown, setShown] = useState(active);

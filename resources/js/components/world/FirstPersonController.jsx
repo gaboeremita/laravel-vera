@@ -3,7 +3,9 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { Vector3 } from 'three';
 import { MAX_MOVEMENT_DELTA, PLAYER_EYE_HEIGHT } from './collisionCheck.js';
 import { isTypingTarget } from './keyboardFocus.js';
-import { eyeHeightFor, movementSpeed, nextMovementMode, swimEyeY, targetFov } from './playerMotion.js';
+import { getGroundHeight } from './groundHeight.js';
+import { GRAVITY, canJump, eyeHeightFor, jumpVelocity, landingDip, movementSpeed, nextMovementMode, swimEyeY, targetFov } from './playerMotion.js';
+import { playJump, playLanding } from './worldSounds.js';
 import { clampLook, postureView, yawForDirection } from './playerPostures.js';
 
 const UP = new Vector3(0, 1, 0);
@@ -15,6 +17,15 @@ const EYE_EASE_RATE = 12;
 const FOV_EASE_RATE = 6;
 const MIN_SWIM_EYE_ABOVE_SURFACE = 0.1;
 const MAX_PITCH = 1.35;
+const DIP_RECOVERY_RATE = 8;
+
+function playSound(play, ...args) {
+	try {
+		play(...args);
+	} catch (error) {
+		console.error('[FirstPersonController] could not play a sound', error);
+	}
+}
 
 function easeInOut(t) {
 	return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
@@ -24,7 +35,7 @@ function lerpAngle(from, to, t) {
 	return from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * t;
 }
 
-export default function FirstPersonController({ collisionWorld, spawnPosition, enabled, onPositionChange, playerState, playerCommands, onMovementChange, onGetUpIntent, onMoveIntent }) {
+export default function FirstPersonController({ collisionWorld, spawnPosition, enabled, onPositionChange, playerState: playerStateRef, playerCommands: playerCommandsRef, onMovementChange, onGetUpIntent, onMoveIntent }) {
 	const { camera, gl } = useThree();
 	const keys = useRef(new Set());
 	const runHeld = useRef(false);
@@ -42,6 +53,9 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 	const seat = useRef(null);
 	const glide = useRef(null);
 	const activity = useRef({ spotId: null, activityId: null });
+	const airborne = useRef(null);
+	const jumpRequested = useRef(false);
+	const dip = useRef(0);
 	const callbacks = useRef({});
 
 	useEffect(() => {
@@ -57,12 +71,12 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 	}, []);
 
 	useEffect(() => {
-		if (!playerState) return;
-		playerState.current = { footPosition: { x: 0, y: 0, z: 0 }, movement: 'walking', posture: 'standing', spotId: null, activityId: null, approach: null };
-	}, [playerState]);
+		if (!playerStateRef) return;
+		playerStateRef.current = { footPosition: { x: 0, y: 0, z: 0 }, movement: 'walking', posture: 'standing', spotId: null, activityId: null, approach: null };
+	}, [playerStateRef]);
 
 	useEffect(() => {
-		if (!playerCommands) return undefined;
+		if (!playerCommandsRef) return undefined;
 		const startGlide = ({ toEye, toYaw, toPitch, duration }) => new Promise((resolve) => {
 			glide.current = {
 				fromEye: camera.position.clone(),
@@ -77,12 +91,17 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 			};
 		});
 
-		playerCommands.current = {
+		playerCommandsRef.current = {
 			settleOnSpot: async ({ spot, posture }) => {
 				const view = postureView({ spot, posture });
-				const exitFoot = collisionWorld.findSpawn(new Vector3(spot.approach.x, spot.approach.y, spot.approach.z)) ?? footPosition.current.clone();
+				// Spot approach points sit at seat height and may face a desk, so
+				// the floor the user stood on to choose the activity is the one
+				// sure place to stand back up on.
+				const exitFoot = footPosition.current.clone();
+				if (airborne.current) exitFoot.y = getGroundHeight(exitFoot.x, exitFoot.z, collisionWorld.octree, exitFoot.y - 4, exitFoot.y) ?? exitFoot.y;
 				keys.current.clear();
 				crouchToggled.current = false;
+				airborne.current = null;
 				seat.current = { spot, posture, view, exitFoot };
 				activity.current.spotId = spot.id;
 				footPosition.current.copy(exitFoot);
@@ -106,8 +125,8 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 				activity.current = { spotId, activityId };
 			},
 		};
-		return () => { playerCommands.current = null; };
-	}, [camera, collisionWorld, playerCommands]);
+		return () => { playerCommandsRef.current = null; };
+	}, [camera, collisionWorld, playerCommandsRef]);
 
 	useEffect(() => {
 		const canvas = gl.domElement;
@@ -128,6 +147,13 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 				if (activity.current.activityId) callbacks.current.onMoveIntent?.();
 			}
 			if (isRun) runHeld.current = true;
+			if (event.code === 'Space') {
+				event.preventDefault();
+				if (!event.repeat) {
+					jumpRequested.current = true;
+					if (activity.current.activityId) callbacks.current.onMoveIntent?.();
+				}
+			}
 			if (event.code === 'KeyQ' && !event.repeat && mode.current !== 'swimming') crouchToggled.current = !crouchToggled.current;
 		};
 		const keyUp = (event) => {
@@ -168,16 +194,15 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 	}, [camera, enabled, gl]);
 
 	const writePlayerState = () => {
-		const state = playerState?.current;
-		if (!state) return;
-		state.footPosition.x = footPosition.current.x;
-		state.footPosition.y = footPosition.current.y;
-		state.footPosition.z = footPosition.current.z;
-		state.movement = mode.current;
-		state.posture = seat.current?.posture ?? (mode.current === 'swimming' || mode.current === 'crouching' ? mode.current : 'standing');
-		state.spotId = activity.current.spotId;
-		state.activityId = activity.current.activityId;
-		state.approach = seat.current ? { x: seat.current.exitFoot.x, y: seat.current.exitFoot.y, z: seat.current.exitFoot.z } : null;
+		if (!playerStateRef?.current) return;
+		playerStateRef.current = {
+			footPosition: { x: footPosition.current.x, y: footPosition.current.y, z: footPosition.current.z },
+			movement: mode.current,
+			posture: seat.current?.posture ?? (mode.current === 'swimming' || mode.current === 'crouching' ? mode.current : 'standing'),
+			spotId: activity.current.spotId,
+			activityId: activity.current.activityId,
+			approach: seat.current ? { x: seat.current.exitFoot.x, y: seat.current.exitFoot.y, z: seat.current.exitFoot.z } : null,
+		};
 	};
 
 	const reportPosition = () => {
@@ -226,12 +251,26 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		const foot = footPosition.current;
 		const surfaceY = collisionWorld.waterSurfaceAbove(foot.x, foot.z, foot.y);
 		const waterDepth = surfaceY === null ? 0 : surfaceY - foot.y;
-		if (runHeld.current) crouchToggled.current = false;
-		const nextMode = nextMovementMode({ current: mode.current, runHeld: runHeld.current, crouchToggled: crouchToggled.current, waterDepth, moving: keys.current.size > 0 });
-		if (nextMode === 'swimming') crouchToggled.current = false;
-		if (nextMode !== mode.current) {
+		const setMode = (nextMode) => {
+			if (nextMode === mode.current) return;
 			mode.current = nextMode;
 			callbacks.current.onMovementChange?.(nextMode);
+		};
+		if (runHeld.current) crouchToggled.current = false;
+		if (!airborne.current) {
+			const nextMode = nextMovementMode({ current: mode.current, runHeld: runHeld.current, crouchToggled: crouchToggled.current, waterDepth, moving: keys.current.size > 0 });
+			if (nextMode === 'swimming') crouchToggled.current = false;
+			setMode(nextMode);
+		}
+
+		if (jumpRequested.current) {
+			jumpRequested.current = false;
+			if (canJump({ mode: mode.current, seated: false, airborne: Boolean(airborne.current) })) {
+				crouchToggled.current = false;
+				if (mode.current === 'crouching') setMode('walking');
+				airborne.current = { velocityY: jumpVelocity() };
+				playSound(playJump);
+			}
 		}
 
 		direction.current.set(0, 0, 0);
@@ -239,9 +278,22 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 		if (keys.current.has('KeyS')) direction.current.z += 1;
 		if (keys.current.has('KeyA')) direction.current.x -= 1;
 		if (keys.current.has('KeyD')) direction.current.x += 1;
-		if (direction.current.lengthSq() > 0) {
-			direction.current.normalize().applyAxisAngle(UP, yaw.current).multiplyScalar(movementSpeed(mode.current, runHeld.current) * step);
-			collisionWorld.move(foot, direction.current.x, direction.current.z);
+		if (direction.current.lengthSq() > 0) direction.current.normalize().applyAxisAngle(UP, yaw.current).multiplyScalar(movementSpeed(mode.current, runHeld.current));
+
+		if (airborne.current) {
+			airborne.current.velocityY -= GRAVITY * step;
+			const velocity = { x: direction.current.x, y: airborne.current.velocityY, z: direction.current.z };
+			const { landed } = collisionWorld.airStep(foot, velocity, step);
+			airborne.current.velocityY = velocity.y;
+			if (landed) {
+				const fallSpeed = airborne.current.velocityY;
+				airborne.current = null;
+				dip.current = landingDip(fallSpeed, reducedMotion.current);
+				playSound(playLanding, fallSpeed);
+			}
+		} else if (direction.current.lengthSq() > 0) {
+			const result = collisionWorld.move(foot, direction.current.x * step, direction.current.z * step, { canFall: mode.current !== 'swimming' });
+			if (result === 'falling') airborne.current = { velocityY: 0 };
 		}
 
 		// The swimming body keeps walking along the pool floor so walls, steps
@@ -251,7 +303,8 @@ export default function FirstPersonController({ collisionWorld, spawnPosition, e
 			? swimEyeY(surfaceY, elapsed.current, reducedMotion.current) - foot.y
 			: eyeHeightFor(mode.current);
 		eyeOffset.current += (targetEye - eyeOffset.current) * (1 - Math.exp(-delta * EYE_EASE_RATE));
-		let eyeY = foot.y + eyeOffset.current;
+		dip.current *= Math.exp(-delta * DIP_RECOVERY_RATE);
+		let eyeY = foot.y + eyeOffset.current - dip.current;
 		if (mode.current === 'swimming' && surfaceY !== null) eyeY = Math.max(eyeY, surfaceY + MIN_SWIM_EYE_ABOVE_SURFACE);
 		activeCamera.position.set(foot.x, eyeY, foot.z);
 
