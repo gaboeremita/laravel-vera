@@ -20,13 +20,13 @@ const idleWait = () => MIN_IDLE_MS + Math.random() * (MAX_IDLE_MS - MIN_IDLE_MS)
  * previous one finishes, skipping while the user talks to her, while the page
  * is hidden, and after five minutes with no input from the user.
  */
-export function useResidentAgency({ enabled, worldId, sessionId, residents, layout, chatResidentId, residentCommands, occupiedSpots, getPositions, getFollowTarget, onThought, addToast }) {
+export function useResidentAgency({ enabled, worldId, sessionId, residents, layout, chatResidentId, residentCommands, occupiedSpots, getPositions, getFollowTarget, getUserState, onThought, addToast }) {
 	const chatResidentRef = useRef(chatResidentId);
 	const runningRef = useRef(new Map());
 	const latestRef = useRef(null);
 
 	useEffect(() => {
-		latestRef.current = { residents, layout, getPositions, getFollowTarget, onThought, addToast };
+		latestRef.current = { residents, layout, getPositions, getFollowTarget, getUserState, onThought, addToast };
 	});
 
 	useEffect(() => {
@@ -88,6 +88,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, layo
 				positions: latest().getPositions(),
 				residentPosture: commands.posture(),
 				occupiedSpots: others,
+				userState: latest().getUserState?.() ?? null,
 			});
 			if (response.status === 429) return { retryIn: RATE_LIMITED_WAIT_MS };
 			if (!response.ok) {

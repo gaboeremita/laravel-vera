@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Actions\ResolveUserActivity;
 use App\Enums\Posture;
 use App\Http\Controllers\Api\ResidentActivityController;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -34,6 +35,7 @@ class StoreResidentDecisionRequest extends FormRequest
             'previous.activityId' => ['required_with:previous', 'integer'],
             'previous.outcome' => ['required_with:previous', Rule::in(ResidentActivityController::OUTCOMES)],
             'previous.reason' => ['nullable', 'string', 'max:500'],
+            ...ResolveUserActivity::rules(),
         ];
     }
 }

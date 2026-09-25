@@ -13,6 +13,16 @@ import { useResidentAgency } from '../hooks/useResidentAgency.js';
 import { finishActivity, startActivity } from '../components/world/activityLog.js';
 import OffscreenIndicator from '../components/world/OffscreenIndicator.jsx';
 import WorldMap from '../components/world/WorldMap.jsx';
+import ZoneTitleCard from '../components/world/hud/ZoneTitleCard.jsx';
+import LocationReadout from '../components/world/hud/LocationReadout.jsx';
+import SwimOverlay from '../components/world/hud/SwimOverlay.jsx';
+import PostureHint from '../components/world/hud/PostureHint.jsx';
+import FocusPrompt from '../components/world/hud/FocusPrompt.jsx';
+import InspectCard from '../components/world/hud/InspectCard.jsx';
+import ActivityProgress from '../components/world/hud/ActivityProgress.jsx';
+import ActionLine from '../components/world/hud/ActionLine.jsx';
+import ControlsLegend from '../components/world/hud/ControlsLegend.jsx';
+import { contextLineFor, usePlayerActivities } from '../hooks/usePlayerActivities.js';
 
 export default function WorldPage() {
 	const { worldId } = useParams();
@@ -38,6 +48,17 @@ export default function WorldPage() {
 	const [floorMaps, setFloorMaps] = useState([]);
 	const [mapExpanded, setMapExpanded] = useState(false);
 	const [conversationRange, setConversationRange] = useState('ok');
+	const playerState = useRef(null);
+	const playerCommands = useRef(null);
+	const collisionWorldRef = useRef(null);
+	const actionSender = useRef(null);
+	const focusLabelRef = useRef(null);
+	const [location, setLocation] = useState(null);
+	const [titleCard, setTitleCard] = useState(null);
+	const [pendingTitleCard, setPendingTitleCard] = useState(null);
+	const [movement, setMovement] = useState('walking');
+	const [focusedObject, setFocusedObject] = useState(null);
+	const [nearbyObjectIds, setNearbyObjectIds] = useState([]);
 
 	useEffect(() => {
 		setHidePortrait(true);
@@ -111,6 +132,7 @@ export default function WorldPage() {
 	}, [sessionId, persistResidentStates]);
 
 	const exit = useCallback(() => {
+		for (const [spotId, holder] of occupiedSpots.current) if (holder === 'user') occupiedSpots.current.delete(spotId);
 		persistPosition();
 		void persistResidentStates();
 		navigate(`/worlds/${worldId}/sessions`);
@@ -121,9 +143,16 @@ export default function WorldPage() {
 	const getPositions = useCallback(() => {
 		const residents = {};
 		for (const [residentId, position] of residentPositions.current) residents[residentId] = { x: position.x, y: position.y, z: position.z };
+		const foot = playerState.current?.footPosition;
+		if (foot) return { user: { x: foot.x, y: foot.y, z: foot.z }, residents };
 		const eye = latestPosition.current;
 		return eye ? { user: { x: eye[0], y: eye[1] - PLAYER_EYE_HEIGHT, z: eye[2] }, residents } : { residents };
 	}, []);
+	const getUserState = useCallback(() => {
+		const state = playerState.current;
+		return state ? { posture: state.posture, spotId: state.spotId, activityId: state.activityId } : null;
+	}, []);
+	const getOccupiedSpots = useCallback((residentId) => [...occupiedSpots.current].filter(([, holder]) => holder !== residentId).map(([spotId]) => spotId), []);
 	const handleWorldReady = useCallback(() => setStatus('ready'), []);
 	const handleWorldError = useCallback((error) => {
 		addToast(error?.message || 'Failed to initialize world', 'error');
@@ -164,6 +193,20 @@ export default function WorldPage() {
 		window.addEventListener('keydown', keyDown);
 		return () => window.removeEventListener('keydown', keyDown);
 	}, []);
+
+	const hasMultipleFloors = (world?.layout?.floors?.length ?? 0) > 1;
+	const handleLocationChange = useCallback(({ floor, zone, zoneChain, announce }) => {
+		setLocation({ floor, zone, zoneChain });
+		if (!announce || !zone) return;
+		const card = { key: crypto.randomUUID(), zoneName: zone.name, contextLine: contextLineFor(world.layout, zone, { withFloor: hasMultipleFloors }) };
+		if (mapExpanded) setPendingTitleCard(card);
+		else setTitleCard(card);
+	}, [world, hasMultipleFloors, mapExpanded]);
+
+	if (!mapExpanded && pendingTitleCard) {
+		setTitleCard(pendingTitleCard);
+		setPendingTitleCard(null);
+	}
 
 	const getResidentPosture = useCallback((residentId) => residentCommands.current.get(residentId)?.posture() ?? 'standing', []);
 
@@ -254,10 +297,34 @@ export default function WorldPage() {
 		occupiedSpots,
 		getPositions,
 		getFollowTarget,
+		getUserState,
 		onThought: handleThought,
 		addToast,
 	});
 	const isRequestedSessionLoaded = sessionId ? activeSession !== null : session === null;
+	const player = usePlayerActivities({
+		world,
+		worldId,
+		sessionId,
+		location,
+		focusedObject,
+		occupiedSpots,
+		playerState,
+		playerCommands,
+		residentPositions,
+		residentCommands,
+		collisionWorldRef,
+		chatResident,
+		actionSender,
+		addToast,
+	});
+	const hasZones = (world?.layout?.zones?.length ?? 0) > 0;
+	const readoutText = location?.zone
+		? [location.zone.name, hasMultipleFloors ? location.floor?.name : null].filter(Boolean).join(' · ')
+		: world?.name;
+	const [lastCardKey, setLastCardKey] = useState(null);
+	if (player.cardKey && player.cardKey !== lastCardKey) setLastCardKey(player.cardKey);
+	const postureHint = player.activity?.kind === 'resting' ? 'SPACE — GET UP' : movement === 'crouching' ? 'Q — STAND UP' : null;
 
 	if (status === 'error') return <div className="flex h-full items-center justify-center bg-bg-0"><button className="button-primary" onClick={exit}>RETURN TO WORLDS</button></div>;
 	if (!world || !isRequestedSessionLoaded) return <div className="flex h-full items-center justify-center bg-bg-0 text-fg-3 text-sm tracking-[0.1em]">LOADING WORLD...</div>;
@@ -267,7 +334,7 @@ export default function WorldPage() {
 			<div className="relative flex-1 min-w-0">
 				{chatResident && (
 					<div className="absolute left-5 top-16 bottom-5 z-20 w-[min(26rem,40%)] min-w-72">
-						<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} getResidentPosture={getResidentPosture} onVoiceAudio={playResidentVoice} onAction={handleChatAction} />
+						<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} getResidentPosture={getResidentPosture} getUserState={getUserState} getOccupiedSpots={getOccupiedSpots} onVoiceAudio={playResidentVoice} onAction={handleChatAction} actionSender={actionSender} />
 					</div>
 				)}
 				{chatResident && conversationRange === 'warning' && (
@@ -276,8 +343,23 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready'} />
-				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready'} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} />
-				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} />}
+				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready'} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} />
+				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} />{hasZones && readoutText && <LocationReadout text={readoutText} />}</div>} />}
+				{status === 'ready' && (
+					<>
+						<SwimOverlay active={movement === 'swimming'} />
+						<FocusPrompt object={focusedObject} labelRef={focusLabelRef} hidden={player.cardView !== null} />
+						{titleCard && <ZoneTitleCard key={titleCard.key} zoneName={titleCard.zoneName} contextLine={titleCard.contextLine} onDone={() => setTitleCard(null)} />}
+						<InspectCard key={player.cardKey ?? lastCardKey ?? 'closed'} card={player.cardView} highlightedIndex={player.highlightedIndex} onHighlight={player.setHighlightedIndex} onChoose={(index) => void player.chooseRow(index)} />
+						{player.activity && player.activity.kind !== 'resting' && (
+							<ActivityProgress key={player.activity.key} activityName={player.activity.activity.name} durationMs={player.activityMs} cancelled={player.activity.cancelled} onComplete={player.complete} onFinished={player.finish} />
+						)}
+						<div className="pointer-events-none absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-3">
+							<ActionLine entries={player.hudEntries} onExpire={player.expireEntry} />
+							<PostureHint hint={postureHint} />
+						</div>
+					</>
+				)}
 				{chatResident && <OffscreenIndicator ref={offscreenIndicator} name={chatResident.assistant.name} />}
 				<div className={`absolute inset-0 z-10 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${status !== 'ready' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
 					{world.cardImageUrl && (

@@ -1,4 +1,4 @@
-import { Box3, Matrix4, Triangle, Vector3 } from 'three';
+import { Box3, Matrix4, Ray, Triangle, Vector3 } from 'three';
 import { Octree } from 'three/addons/math/Octree.js';
 import { getGroundHeight } from './groundHeight.js';
 import { clampToBounds } from './clampToBounds.js';
@@ -9,6 +9,10 @@ export const MAX_MOVEMENT_DELTA = 0.1;
 export const CHARACTER_RADIUS = 0.25;
 export const MAX_STEP_HEIGHT = 0.25;
 export const MAX_DROP_HEIGHT = 0.35;
+export const SWIM_DEPTH = 1.1;
+export const LEAVE_WATER_DEPTH = 0.9;
+export const MAX_FALL_HEIGHT = 2;
+const AIR_GROUND_SEARCH = 3.5;
 const MOVEMENT_STEP = 0.08;
 const CONTACT_MARGIN = 0.005;
 const SPAWN_SPACING = 0.6;
@@ -92,7 +96,7 @@ export class WorldCollision {
 		return this.candidates.some((triangle) => this.bodyBounds.intersectsTriangle(triangle));
 	}
 
-	tryStep(position, dx, dz) {
+	tryStep(position, dx, dz, canFall = false) {
 		const clamped = clampToBounds(position.x + dx, position.y, position.z + dz, this.bounds);
 		this.destination.set(clamped.x, position.y, clamped.z);
 		// Check at the current foot height before probing a higher surface.
@@ -101,26 +105,82 @@ export class WorldCollision {
 			clamped.x, clamped.z, this.octree,
 			position.y - MAX_DROP_HEIGHT, position.y + MAX_STEP_HEIGHT,
 		);
-		if (groundY === null) return false;
+		if (groundY === null) {
+			if (!canFall) return false;
+			const landingY = getGroundHeight(clamped.x, clamped.z, this.octree, position.y - MAX_FALL_HEIGHT, position.y - MAX_DROP_HEIGHT);
+			if (landingY === null) return false;
+			position.copy(this.destination);
+			return 'fall';
+		}
 		this.destination.y = groundY;
 		if (this.isBodyBlocked(position, this.destination)) return false;
 		position.copy(this.destination);
 		return true;
 	}
 
-	move(position, dx, dz) {
+	/**
+	 * Walks along the ground. With `canFall`, stepping off a ledge up to
+	 * MAX_FALL_HEIGHT high is allowed and reported as 'falling'; otherwise
+	 * ledges block like walls.
+	 */
+	move(position, dx, dz, { canFall = false } = {}) {
 		const steps = Math.ceil(Math.hypot(dx, dz) / MOVEMENT_STEP);
-		if (steps === 0) return position;
+		if (steps === 0) return 'grounded';
 		const stepX = dx / steps;
 		const stepZ = dz / steps;
 		for (let step = 0; step < steps; step++) {
-			if (this.tryStep(position, stepX, stepZ)) continue;
+			const moved = this.tryStep(position, stepX, stepZ, canFall);
+			if (moved === 'fall') return 'falling';
+			if (moved) continue;
 			if (stepX === 0 || stepZ === 0) break;
-			const movedX = this.tryStep(position, stepX, 0);
-			const movedZ = this.tryStep(position, 0, stepZ);
+			const movedX = this.tryStep(position, stepX, 0, canFall);
+			if (movedX === 'fall') return 'falling';
+			const movedZ = this.tryStep(position, 0, stepZ, canFall);
+			if (movedZ === 'fall') return 'falling';
 			if (!movedX && !movedZ) break;
 		}
-		return position;
+		return 'grounded';
+	}
+
+	/**
+	 * Moves a body through the air for one frame. `velocity.y` is changed in
+	 * place: zeroed when the head bumps something. Horizontal movement stops
+	 * at walls and wherever there is no ground within reach below, so a jump
+	 * can never carry the body off the edge of the world. Returns whether it
+	 * landed.
+	 */
+	airStep(position, velocity, seconds) {
+		const dx = velocity.x * seconds;
+		const dz = velocity.z * seconds;
+		const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / MOVEMENT_STEP));
+		for (let step = 0; step < steps; step++) {
+			const clamped = clampToBounds(position.x + dx / steps, position.y, position.z + dz / steps, this.bounds);
+			this.destination.set(clamped.x, position.y, clamped.z);
+			if (this.isBodyBlocked(position, this.destination)) break;
+			const groundBelow = getGroundHeight(clamped.x, clamped.z, this.octree, position.y - AIR_GROUND_SEARCH, position.y + MAX_STEP_HEIGHT);
+			if (groundBelow === null) break;
+			position.x = clamped.x;
+			position.z = clamped.z;
+		}
+
+		const nextY = position.y + velocity.y * seconds;
+		if (velocity.y > 0) {
+			this.destination.set(position.x, nextY, position.z);
+			if (this.isBodyBlocked(position, this.destination)) {
+				velocity.y = 0;
+				return { landed: false };
+			}
+			position.y = nextY;
+			return { landed: false };
+		}
+
+		const groundY = getGroundHeight(position.x, position.z, this.octree, nextY, position.y + MAX_STEP_HEIGHT);
+		if (groundY !== null) {
+			position.y = groundY;
+			return { landed: true };
+		}
+		position.y = nextY;
+		return { landed: false };
 	}
 
 	findSpawn(preferred) {
@@ -144,6 +204,15 @@ export class WorldCollision {
 			}
 		}
 		return null;
+	}
+
+	hasLineOfSight(from, to) {
+		const origin = new Vector3(from.x, from.y, from.z);
+		const direction = new Vector3(to.x - from.x, to.y - from.y, to.z - from.z);
+		const distance = direction.length();
+		if (distance === 0) return true;
+		const hit = this.octree.rayIntersect(new Ray(origin, direction.normalize()));
+		return !hit || hit.distance >= distance;
 	}
 
 	/** Height of the water surface over a point standing at `groundY`, or null when it is dry. */

@@ -282,3 +282,17 @@ it('runs an NPC on the model chosen for it instead of the default', function () 
         'worldId' => $world->id,
     ])->assertSuccessful()->assertJsonPath('content', 'Hi.');
 });
+
+it('tells her a spot someone else holds is taken, from the occupied spots sent with the message', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline']), finalAnswerResponse('Someone is already there.'));
+
+    sendWorldMessage($this, $scenario, [
+        'user' => ['x' => 5, 'y' => 0, 'z' => -3],
+        'residents' => [$scenario[4]->id => ['x' => -5, 'y' => 0, 'z' => 2]],
+    ], ['occupiedSpots' => ['pool-lounger-1-seat']])
+        ->assertSuccessful()
+        ->assertJsonPath('action', null);
+
+    expect(toolResultSentBack())->toContain('pool-lounger-1-seat is taken');
+});

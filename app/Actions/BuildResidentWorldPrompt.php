@@ -4,14 +4,22 @@ namespace App\Actions;
 
 use App\Enums\Posture;
 use App\Models\Assistant;
+use App\Models\Conversation;
 use App\Models\ResidentActivity;
 use App\Models\World;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
+use Illuminate\Support\Str;
 
 class BuildResidentWorldPrompt
 {
     private const RECENT_ACTIVITY_LIMIT = 8;
+
+    private const RECENT_CONVERSATION_LIMIT = 6;
+
+    private const RECENT_MESSAGE_LENGTH = 300;
+
+    private const RESTING_POSTURES = ['sitting', 'lying', 'reclining'];
 
     /**
      * Poses the world plays for her (walking, greeting someone who starts a conversation), which are never hers to choose.
@@ -21,9 +29,10 @@ class BuildResidentWorldPrompt
     /**
      * @param  array{floor: ?array, zone: ?array, zoneChain: array<int, array>, distanceToUser?: ?float}  $resident
      * @param  ?array{floor: ?array, zone: ?array, zoneChain: array<int, array>}  $user
+     * @param  ?array{posture: string, object: ?array, activity: ?array}  $userActivity
      * @return array<string, string|array<int, string>>
      */
-    public function worldState(World $world, array $resident, ?array $user): array
+    public function worldState(World $world, array $resident, ?array $user, ?array $userActivity = null): array
     {
         $layout = $world->layout ?? [];
         $state = ['you are in' => $this->placePhrase($resident)];
@@ -44,10 +53,11 @@ class BuildResidentWorldPrompt
 
         if ($user !== null) {
             $state['the user is'] = sprintf(
-                '%sin %s, %s',
+                '%sin %s, %s%s',
                 $this->relativeFloor($resident['floor'], $user['floor']),
                 $this->placePhrase($user),
                 $this->distancePhrase($resident['distanceToUser'] ?? null),
+                $this->userActivityPhrase($userActivity),
             );
         }
 
@@ -148,6 +158,51 @@ class BuildResidentWorldPrompt
         });
 
         return "Your recent activity, newest first:\n".$lines->implode("\n");
+    }
+
+    /**
+     * Her session conversation's last few messages, so her decision knows what was said and what she saw the user do.
+     */
+    public function recentConversation(Conversation $conversation): ?string
+    {
+        $messages = $conversation->messages()
+            ->whereIn('role', ['user', 'assistant'])
+            ->orderByDesc('id')
+            ->limit(self::RECENT_CONVERSATION_LIMIT)
+            ->get(['role', 'content'])
+            ->reverse();
+
+        if ($messages->isEmpty()) {
+            return null;
+        }
+
+        return "Recent conversation, oldest first:\n".$messages
+            ->map(fn ($message) => ($message->role === 'assistant' ? 'you: ' : 'the user: ').Str::limit((string) $message->content, self::RECENT_MESSAGE_LENGTH, ''))
+            ->implode("\n");
+    }
+
+    /**
+     * @param  ?array{posture: string, object: ?array, activity: ?array}  $userActivity
+     */
+    private function userActivityPhrase(?array $userActivity): string
+    {
+        if ($userActivity === null) {
+            return '';
+        }
+
+        ['posture' => $posture, 'object' => $object, 'activity' => $activity] = $userActivity;
+
+        if (in_array($posture, self::RESTING_POSTURES, true) && $object !== null) {
+            return ", {$posture} on the {$object['name']}";
+        }
+
+        if ($activity !== null) {
+            return $object !== null
+                ? ", doing \"{$activity['name']}\" at the {$object['name']}"
+                : ", doing \"{$activity['name']}\"";
+        }
+
+        return in_array($posture, ['swimming', 'crouching'], true) ? ", {$posture}" : '';
     }
 
     private function describeActivity(ResidentActivity $activity): string

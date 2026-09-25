@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\ImageGenProviderController;
 use App\Http\Controllers\Api\NpcController;
 use App\Http\Controllers\Api\ResidentActivityController;
 use App\Http\Controllers\Api\ResidentDecisionController;
+use App\Http\Controllers\Api\ResidentObservationController;
 use App\Http\Controllers\Api\ResidentStateController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\VoiceController;
@@ -66,6 +67,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/worlds/{world}/sessions/{session}/residents/{resident}/activities/{activity}', [ResidentActivityController::class, 'update'])->name('worlds.sessions.residents.activities.update');
     Route::put('/worlds/{world}/sessions/{session}/residents/{resident}/state', [ResidentStateController::class, 'update'])->name('worlds.sessions.residents.state.update');
     Route::post('/worlds/{world}/sessions/{session}/residents/{resident}/decisions', [ResidentDecisionController::class, 'store'])->name('worlds.sessions.residents.decisions.store');
+    Route::post('/worlds/{world}/sessions/{session}/residents/{resident}/observations', [ResidentObservationController::class, 'store'])->name('worlds.sessions.residents.observations.store');
     Route::apiResource('npcs', NpcController::class);
 
     Route::prefix('assistants/{assistant}')->group(function () {

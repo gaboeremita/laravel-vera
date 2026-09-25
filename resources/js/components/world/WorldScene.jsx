@@ -10,6 +10,9 @@ import NameTags from './NameTags.jsx';
 import ThoughtBubble from './ThoughtBubble.jsx';
 import { OffscreenIndicatorTracker } from './OffscreenIndicator.jsx';
 import InteractionSystem from './InteractionSystem.jsx';
+import LocationTracker from './LocationTracker.jsx';
+import FocusTracker from './FocusTracker.jsx';
+import SpotBeacons from './SpotBeacons.jsx';
 import ResidentController from './ResidentController.jsx';
 import WorldEnvironment from './WorldEnvironment.jsx';
 
@@ -30,11 +33,14 @@ function CameraAudioListener({ listenerRef }) {
 	return null;
 }
 
-function PlayerViewTracker({ viewRef }) {
+function PlayerViewTracker({ viewRef, playerState }) {
 	const { camera } = useThree();
 
 	useFrame(() => {
-		viewRef.current = { x: camera.position.x, y: camera.position.y - PLAYER_EYE_HEIGHT, z: camera.position.z, yaw: camera.rotation.y };
+		const foot = playerState.current?.footPosition;
+		viewRef.current = foot
+			? { x: foot.x, y: foot.y, z: foot.z, yaw: camera.rotation.y }
+			: { x: camera.position.x, y: camera.position.y - PLAYER_EYE_HEIGHT, z: camera.position.z, yaw: camera.rotation.y };
 	});
 
 	return null;
@@ -105,7 +111,7 @@ function NavigationBuilder({ layout, environment, navigationRef }) {
 	return null;
 }
 
-export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands, occupiedSpots, residentStates = {}, thoughts = {} }) {
+export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands, occupiedSpots, residentStates = {}, thoughts = {}, playerState, playerCommands, collisionWorldRef, onMovementChange, onGetUpIntent, onMoveIntent, onLocationChange, focusLabelRef, focusEnabled = true, focusedObjectId = null, nearbyObjectIds = [], onFocusChange, onNearbyChange, watchedObjectId = null, onWatchedOutOfReach }) {
 	const [environment, setEnvironment] = useState(null);
 	const audioListener = useRef(null);
 	const [playerPosition, setPlayerPosition] = useState([0, 1.6, 4]);
@@ -116,8 +122,9 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 	}, [onPlayerPositionChange]);
 	const handleReady = useCallback((loadedEnvironment) => {
 		setEnvironment(loadedEnvironment);
+		if (collisionWorldRef) collisionWorldRef.current = loadedEnvironment.collisionWorld;
 		onReady();
-	}, [onReady]);
+	}, [onReady, collisionWorldRef]);
 	const spawnPosition = useMemo(() => {
 		if (!environment) return null;
 		if (!initialPosition) return environment.spawnPosition;
@@ -133,15 +140,18 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 			<WorldEnvironment url={world.environmentUrl} onReady={handleReady} onError={onError} />
 			{environment && (
 				<>
-					<FirstPersonController collisionWorld={environment.collisionWorld} spawnPosition={spawnPosition} enabled={explorationEnabled} onPositionChange={handlePositionChange} />
+					<FirstPersonController collisionWorld={environment.collisionWorld} spawnPosition={spawnPosition} enabled={explorationEnabled} onPositionChange={handlePositionChange} playerState={playerState} playerCommands={playerCommands} onMovementChange={onMovementChange} onGetUpIntent={onGetUpIntent} onMoveIntent={onMoveIntent} />
 					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} savedState={residentStates[resident.id] ?? null} occupiedSpots={occupiedSpots} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} interaction={interaction} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} residentVoices={residentVoices} audioListener={audioListener} inConversation={resident.id === activeResidentId} navigation={navigation} residentCommands={residentCommands} />)}
-					<PlayerViewTracker viewRef={playerView} />
+					<PlayerViewTracker viewRef={playerView} playerState={playerState} />
+					<LocationTracker layout={world.layout} playerState={playerState} onLocationChange={onLocationChange} />
+					<FocusTracker layout={world.layout} playerState={playerState} enabled={explorationEnabled && focusEnabled} labelRef={focusLabelRef} onFocusChange={onFocusChange} onNearbyChange={onNearbyChange} watchedObjectId={watchedObjectId} onWatchedOutOfReach={onWatchedOutOfReach} />
+					<SpotBeacons layout={world.layout} focusedObjectId={focusedObjectId} nearbyIds={nearbyObjectIds} occupiedSpots={occupiedSpots} collisionWorld={environment.collisionWorld} />
 					<NameTags residents={world.residents} residentPositions={residentPositions} activeResidentId={activeResidentId} />
 					<ThoughtBubble thoughts={thoughts} residentPositions={residentPositions} />
 					<OffscreenIndicatorTracker residentPositions={residentPositions} activeResidentId={activeResidentId} indicatorRef={offscreenIndicator} />
 					<NavigationBuilder layout={world.layout} environment={environment} navigationRef={navigation} />
 					<FloorMapRenderer layout={world.layout} environment={environment} onRendered={onFloorMaps} />
-					<InteractionSystem residents={world.residents} residentPositions={residentPositions} onResidentChange={onResidentChange} onInteract={(resident) => { setInteraction({ residentId: resident.id, triggerId: crypto.randomUUID() }); onInteract(resident); }} onEndConversation={onEndConversation} activeResidentId={activeResidentId} enabled={explorationEnabled} />
+					<InteractionSystem residents={world.residents} residentPositions={residentPositions} playerState={playerState} onResidentChange={onResidentChange} onInteract={(resident) => { setInteraction({ residentId: resident.id, triggerId: crypto.randomUUID() }); onInteract(resident); }} onEndConversation={onEndConversation} activeResidentId={activeResidentId} enabled={explorationEnabled} />
 				</>
 			)}
 		</Canvas>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { facingAngleForMovement, makeClipInPlace, turnTowardsAngle } from '../../resources/js/components/world/residentMotion.js';
+import { facingAngleForMovement, headingToward, makeClipInPlace, shouldFaceUser, turnTowardsAngle } from '../../resources/js/components/world/residentMotion.js';
 import { findWorldMotionPose } from '../../resources/js/components/world/worldMotionPoses.js';
 
 test('faces the avatar front in its direction of travel', () => {
@@ -26,4 +26,20 @@ test('removes root-motion tracks from a walk clip', () => {
 	};
 
 	assert.deepEqual(makeClipInPlace(clip).tracks, [{ name: 'hips.quaternion' }]);
+});
+
+test('a resident turns to the user only when asked, while talking and still', () => {
+	assert.equal(shouldFaceUser({ requested: true, inConversation: true }), true);
+	assert.equal(shouldFaceUser({ requested: false, inConversation: true }), false);
+	assert.equal(shouldFaceUser({ requested: true, inConversation: false }), false);
+	assert.equal(shouldFaceUser({ requested: true, inConversation: true, routing: true }), false);
+	assert.equal(shouldFaceUser({ requested: true, inConversation: true, placing: true }), false);
+	assert.equal(shouldFaceUser({ requested: true, inConversation: true, restingOnSpot: true }), false);
+	assert.equal(shouldFaceUser({ requested: true, inConversation: true, wandering: true }), false);
+});
+
+test('the heading toward the user matches the heading for moving toward them', () => {
+	const from = { x: 1, z: 2 };
+	const to = { x: -3, z: 5 };
+	assert.equal(headingToward(from, to), facingAngleForMovement(to.x - from.x, to.z - from.z));
 });

@@ -78,3 +78,200 @@ body {
 button, select, input, textarea {
     border-radius: var(--radius-md);
 }
+
+@layer components {
+    .world-hud-panel {
+        position: relative;
+        background: color-mix(in oklab, var(--bg-0) 78%, transparent);
+        backdrop-filter: blur(10px);
+        border: 1px solid color-mix(in oklab, var(--accent) 35%, var(--border-1));
+        border-radius: 0;
+        box-shadow:
+            0 0 24px color-mix(in oklab, var(--accent) 14%, transparent),
+            inset 0 0 18px color-mix(in oklab, var(--accent) 6%, transparent);
+    }
+
+    .world-hud-panel::before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        pointer-events: none;
+        --hud-corner: color-mix(in oklab, var(--accent) 90%, white);
+        background:
+            linear-gradient(var(--hud-corner), var(--hud-corner)) top left / 12px 2px no-repeat,
+            linear-gradient(var(--hud-corner), var(--hud-corner)) top left / 2px 12px no-repeat,
+            linear-gradient(var(--hud-corner), var(--hud-corner)) top right / 12px 2px no-repeat,
+            linear-gradient(var(--hud-corner), var(--hud-corner)) top right / 2px 12px no-repeat,
+            linear-gradient(var(--hud-corner), var(--hud-corner)) bottom left / 12px 2px no-repeat,
+            linear-gradient(var(--hud-corner), var(--hud-corner)) bottom left / 2px 12px no-repeat,
+            linear-gradient(var(--hud-corner), var(--hud-corner)) bottom right / 12px 2px no-repeat,
+            linear-gradient(var(--hud-corner), var(--hud-corner)) bottom right / 2px 12px no-repeat;
+    }
+
+    .world-hud-panel::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.55;
+        background: repeating-linear-gradient(
+            to bottom,
+            color-mix(in oklab, var(--accent) 9%, transparent) 0 1px,
+            transparent 1px 4px
+        );
+        animation: hud-scan-drift 7s linear infinite;
+    }
+
+    .world-hud-glow {
+        color: color-mix(in oklab, var(--accent) 55%, var(--fg-1));
+        animation: hud-breathe 2.4s ease-in-out infinite;
+    }
+
+    .world-hud-glow-box {
+        animation: hud-breathe-box 2.4s ease-in-out infinite;
+    }
+
+    .world-hud-label {
+        font-size: 0.62rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--fg-2);
+    }
+
+    .world-hud-key {
+        display: inline-block;
+        padding: 0.05rem 0.4rem;
+        border: 1px solid color-mix(in oklab, var(--accent) 60%, transparent);
+        background: color-mix(in oklab, var(--accent) 14%, transparent);
+        color: color-mix(in oklab, var(--accent) 70%, var(--fg-1));
+        font-size: 0.6rem;
+        letter-spacing: 0.12em;
+        box-shadow: 0 0 10px color-mix(in oklab, var(--accent) 25%, transparent);
+    }
+
+    .world-hud-shimmer {
+        background-image: linear-gradient(
+            100deg,
+            transparent 20%,
+            color-mix(in oklab, var(--accent) 16%, transparent) 50%,
+            transparent 80%
+        );
+        background-size: 250% 100%;
+        animation: hud-shimmer 2.8s ease-in-out infinite;
+    }
+
+    .hud-enter-wipe { animation: hud-wipe-in 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .hud-enter-slide-right { animation: hud-slide-in-right 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .hud-enter-rise { animation: hud-rise-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .hud-enter-type { animation: hud-type-in 0.4s steps(24, end) both; }
+    .hud-enter-fade { animation: hud-fade-in 0.3s ease-out both; }
+    .hud-exit-dissolve { animation: hud-dissolve-out 0.6s ease-in forwards; }
+    .hud-enter-rule { animation: hud-rule-draw 0.9s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .hud-enter-scale { animation: hud-scale-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .hud-exit-burst { animation: hud-burst 0.4s ease-out forwards; }
+    .hud-exit-fade { animation: hud-fade-out 0.3s ease-in forwards; }
+}
+
+@keyframes hud-wipe-in {
+    from { clip-path: inset(0 100% 0 0); filter: blur(4px) brightness(1.9); }
+    60% { filter: blur(0) brightness(1.4); }
+    to { clip-path: inset(0 0 0 0); filter: none; }
+}
+
+@keyframes hud-dissolve-out {
+    to { opacity: 0; filter: blur(6px); transform: translateY(-10px); }
+}
+
+@keyframes hud-slide-in-right {
+    from { opacity: 0; transform: translateX(28px); clip-path: inset(0 0 0 100%); }
+    to { opacity: 1; transform: none; clip-path: inset(0 0 0 0); }
+}
+
+@keyframes hud-rise-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes hud-type-in {
+    from { clip-path: inset(0 100% 0 0); }
+    to { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes hud-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes hud-fade-out {
+    to { opacity: 0; }
+}
+
+@keyframes hud-breathe {
+    0%, 100% { text-shadow: 0 0 6px color-mix(in oklab, var(--accent) 45%, transparent); }
+    50% { text-shadow: 0 0 14px color-mix(in oklab, var(--accent) 85%, transparent), 0 0 28px color-mix(in oklab, var(--accent) 35%, transparent); }
+}
+
+@keyframes hud-breathe-box {
+    0%, 100% { box-shadow: 0 0 10px color-mix(in oklab, var(--accent) 18%, transparent); }
+    50% { box-shadow: 0 0 22px color-mix(in oklab, var(--accent) 40%, transparent); }
+}
+
+@keyframes hud-scan-drift {
+    from { background-position: 0 0; }
+    to { background-position: 0 32px; }
+}
+
+@keyframes hud-shimmer {
+    from { background-position: 150% 0; }
+    to { background-position: -100% 0; }
+}
+
+@keyframes hud-rule-draw {
+    from { transform: scaleX(0); opacity: 0; }
+    to { transform: scaleX(1); opacity: 1; }
+}
+
+@keyframes hud-track-in {
+    from { letter-spacing: 0.6em; }
+    to { letter-spacing: 0.14em; }
+}
+
+@keyframes hud-scale-in {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes hud-burst {
+    to { opacity: 0; transform: scale(1.35); filter: blur(3px); }
+}
+
+@keyframes hud-ring-fill {
+    from { stroke-dashoffset: 100; }
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes hud-ring-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes hud-sweep {
+    from { transform: translateX(-100%); opacity: 0; }
+    30% { opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes hud-caustics {
+    from { background-position: 0% 0%, 100% 100%; }
+    to { background-position: 100% 60%, 0% 40%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [class*="hud-enter-"] { animation: hud-fade-in 0.15s ease-out both !important; }
+    [class*="hud-exit-"] { animation: hud-fade-out 0.15s ease-in forwards !important; }
+    .world-hud-glow,
+    .world-hud-glow-box,
+    .world-hud-shimmer,
+    .world-hud-panel::after,
+    .world-hud-motion { animation: none !important; }
+}

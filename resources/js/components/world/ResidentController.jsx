@@ -4,8 +4,8 @@ import { AnimationMixer, LoopOnce, LoopRepeat, PositionalAudio } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { applyBoneQuaternions, captureBoneQuaternions, loadPoseClip } from '../VrmAvatar.jsx';
-import { CHARACTER_RADIUS, MAX_MOVEMENT_DELTA } from './collisionCheck.js';
-import { facingAngleForMovement, makeClipInPlace, turnTowardsAngle } from './residentMotion.js';
+import { CHARACTER_RADIUS, LEAVE_WATER_DEPTH, MAX_MOVEMENT_DELTA, SWIM_DEPTH } from './collisionCheck.js';
+import { facingAngleForMovement, headingToward, makeClipInPlace, shouldFaceUser, turnTowardsAngle } from './residentMotion.js';
 import { defaultPoseFor, findWorldMotionPose, resolvePose } from './worldMotionPoses.js';
 
 const WALK_SPEED = 0.3;
@@ -16,12 +16,11 @@ const MAX_WALK_SECONDS = 7;
 const MIN_IDLE_SECONDS = 2;
 const MAX_IDLE_SECONDS = 4;
 const TURN_SPEED = Math.PI * 4;
+const FACED_USER_TOLERANCE = 0.03;
 const LOCOMOTION_BLEND_SECONDS = 0.2;
 const PLACEMENT_BLEND_SECONDS = 0.4;
 const RESTING_POSTURES = ['sitting', 'lying', 'reclining', 'swimming'];
 const SEAT_CLEARANCE = 0.1;
-const SWIM_DEPTH = 1.1;
-const LEAVE_WATER_DEPTH = 0.9;
 const SWIM_SPEED_FACTOR = 0.6;
 const SWIM_HIPS_BELOW_SURFACE = 0.25;
 const TREAD_HIPS_BELOW_SURFACE = 0.55;
@@ -96,6 +95,15 @@ export default function ResidentController({ resident, savedState = null, player
 	const postureRef = useRef('standing');
 	const spotRef = useRef(null);
 	const placementRef = useRef(null);
+	const faceUserRequested = useRef(false);
+
+	useEffect(() => {
+		faceUserRequested.current = inConversation;
+	}, [inConversation]);
+
+	useEffect(() => {
+		if (inConversation && activePose?.residentId === resident.id) faceUserRequested.current = true;
+	}, [activePose, inConversation, resident.id]);
 	const postureActionsRef = useRef(new Map());
 	const postureHipsHeightRef = useRef(new Map());
 	const playPoseRef = useRef(null);
@@ -798,6 +806,16 @@ export default function ResidentController({ resident, savedState = null, player
 			}
 		}
 		if (locomotion.name === 'idle' && locomotion.endsAt !== 0) activateLocomotionAction(idleAction(), PLACEMENT_BLEND_SECONDS);
+		const restingOnSpot = Boolean(spotRef.current) && ['sitting', 'lying', 'reclining'].includes(postureRef.current);
+		if (locomotion.name === 'idle' && shouldFaceUser({ requested: faceUserRequested.current, inConversation, routing: Boolean(routeRef.current?.moving), placing: Boolean(placementRef.current), restingOnSpot })) {
+			const towardUser = headingToward(currentPosition, { x: playerPosition[0], z: playerPosition[2] });
+			if (towardUser === null) faceUserRequested.current = false;
+			else {
+				vrm.current.scene.rotation.y = turnTowardsAngle(vrm.current.scene.rotation.y, towardUser, TURN_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));
+				const remaining = Math.atan2(Math.sin(towardUser - vrm.current.scene.rotation.y), Math.cos(towardUser - vrm.current.scene.rotation.y));
+				if (Math.abs(remaining) < FACED_USER_TOLERANCE) faceUserRequested.current = false;
+			}
+		}
 		if (locomotion.name === 'turning' && routeMoving && routeRef.current.heading !== null) locomotion.heading = routeRef.current.heading;
 		if (locomotion.name === 'turning') {
 			vrm.current.scene.rotation.y = turnTowardsAngle(vrm.current.scene.rotation.y, locomotion.heading, TURN_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));

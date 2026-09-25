@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\AppendWorldConversationContext;
+use App\Actions\ResolveUserActivity;
 use App\Actions\ResolveWorldState;
 use App\Contracts\SttProvider;
 use App\Directors\PromptDirector;
@@ -188,6 +189,9 @@ class ConversationController extends Controller
             'positions.residents.*.y' => ['required', 'numeric'],
             'positions.residents.*.z' => ['required', 'numeric'],
             'residentPosture' => ['nullable', Rule::enum(Posture::class)],
+            'occupiedSpots' => ['nullable', 'array'],
+            'occupiedSpots.*' => ['string', 'max:100'],
+            ...ResolveUserActivity::rules(),
         ]);
 
         $assistantUser = $this->resolveAssistantUser($request, $assistant);
@@ -317,7 +321,8 @@ class ConversationController extends Controller
                 ->sessions()->findOrFail($validated['worldSessionId']);
         }
 
-        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world, $validated['positions'] ?? null, $worldSession);
+        $userActivity = $world !== null ? app(ResolveUserActivity::class)->handle($world, $validated['userState'] ?? null) : null;
+        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world, $validated['positions'] ?? null, $worldSession, $userActivity);
         $director = new PromptDirector($prompt);
         $this->appendExpressionTags($director, $assistantModel, $excludedSections, Posture::from($validated['residentPosture'] ?? Posture::Standing->value));
 
@@ -390,6 +395,7 @@ class ConversationController extends Controller
                 $worldToolbox = new WorldToolbox(
                     $world,
                     $residentPoint !== null ? app(ResolveWorldState::class)->locate($world->layout, $residentPoint)['zoneChain'] : [],
+                    occupiedSpots: $validated['occupiedSpots'] ?? [],
                     posePostures: $assistantModel->posturesByPoseName(),
                 );
                 $tools = [...$tools, ...$worldToolbox->tools()];

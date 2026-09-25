@@ -10,7 +10,7 @@ function zoneCentroid(outline) {
 	return { x: sum.x / outline.length, z: sum.z / outline.length };
 }
 
-export default function WorldMap({ layout, floorMaps, playerView, residents, residentPositions, activeResidentId, expanded, onClose }) {
+export default function WorldMap({ layout, floorMaps, playerView, residents, residentPositions, activeResidentId, expanded, onClose, header = null }) {
 	const [snapshot, setSnapshot] = useState(null);
 	const [manualFloorId, setManualFloorId] = useState(null);
 	const floors = layout?.floors ?? [];
@@ -41,7 +41,9 @@ export default function WorldMap({ layout, floorMaps, playerView, residents, res
 		return () => cancelAnimationFrame(frame);
 	}, [layout, playerView, residents, residentPositions]);
 
-	if (!snapshot || floorMaps.length === 0) return null;
+	if (!snapshot || floorMaps.length === 0) {
+		return header && !expanded ? <div className="absolute bottom-5 right-5 z-10 flex flex-col items-end gap-1">{header}</div> : null;
+	}
 
 	const shownFloorId = manualFloorId ?? snapshot.playerFloorId;
 	const map = floorMaps.find((floorMap) => floorMap.floorId === shownFloorId) ?? floorMaps[0];
@@ -94,6 +96,7 @@ export default function WorldMap({ layout, floorMaps, playerView, residents, res
 	if (!expanded) {
 		return (
 			<div className="absolute bottom-5 right-5 z-10 flex flex-col items-end gap-1">
+				{header}
 				{floorButtons}
 				{mapView}
 				<span className="text-fg-3 text-[0.55rem] tracking-[0.1em]">M — FULL MAP</span>

@@ -7,10 +7,11 @@ import { useConversationChat } from '../../hooks/useConversationChat.js';
 import { useVoiceMode } from '../../hooks/useVoiceMode.js';
 import { spokenWords, stripForSpeech } from '../../utils/parsers.js';
 import { isTypingTarget } from './keyboardFocus.js';
+import { joinLines } from './activityLines.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, onVoiceAudio, onAction }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getUserState, getOccupiedSpots, onVoiceAudio, onAction, actionSender: actionSenderRef }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
 	const [isTranscribing, setIsTranscribing] = useState(false);
@@ -18,6 +19,8 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 	const scrollRef = useRef(null);
 	const inputRef = useRef(null);
 	const speakingTimeoutRef = useRef(null);
+	const queuedLines = useRef([]);
+	const [queueVersion, setQueueVersion] = useState(0);
 	const { portraitType, fetchEmotions } = useEmotions();
 	const poseNames = [...new Set((resident.assistant.poses ?? []).map((pose) => pose.name))];
 	const { theme, setTheme } = useTheme();
@@ -94,8 +97,8 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		onVoiceReply: (text, ttsInstructions) => { void speakReply(text, ttsInstructions); },
 		onAction,
 		extraParams: worldSessionId && getPositions
-			? { worldId: world.id, worldSessionId, get positions() { return getPositions(); }, get residentPosture() { return getResidentPosture(resident.id); } }
-			: { worldId: world.id, get residentPosture() { return getResidentPosture(resident.id); } },
+			? { worldId: world.id, worldSessionId, get positions() { return getPositions(); }, get residentPosture() { return getResidentPosture(resident.id); }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; } }
+			: { worldId: world.id, get residentPosture() { return getResidentPosture(resident.id); }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; } },
 	});
 
 	useEffect(() => {
@@ -134,8 +137,22 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 	}, [stopVoiceMode]);
 
 	useEffect(() => {
+		if (!actionSenderRef) return undefined;
+		actionSenderRef.current = (line) => {
+			queuedLines.current.push(line);
+			setQueueVersion((version) => version + 1);
+		};
+		return () => { actionSenderRef.current = null; };
+	}, [actionSenderRef]);
+
+	useEffect(() => {
+		if (queuedLines.current.length === 0 || !conversationId || isLoading) return;
+		void sendMessage(joinLines(queuedLines.current.splice(0)), { voiceMode: isListening });
+	}, [queueVersion, conversationId, isLoading, sendMessage, isListening]);
+
+	useEffect(() => {
 		const keyDown = (event) => {
-			if (event.key !== 'Enter' || isTypingTarget(event.target)) return;
+			if (event.key !== 'Enter' || event.defaultPrevented || isTypingTarget(event.target)) return;
 			event.preventDefault();
 			inputRef.current?.focus();
 		};
