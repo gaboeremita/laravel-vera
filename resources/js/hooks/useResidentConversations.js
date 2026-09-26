@@ -3,7 +3,7 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { stripForSpeech } from '../utils/parsers.js';
 import { speakingSeconds } from '../components/world/residentMotion.js';
-import { voicesLine } from '../components/world/worldVoice.js';
+import { deliverLine, voicesLine } from '../components/world/worldVoice.js';
 
 const TURN_GAP_MS = 5000;
 const SPEECH_LINGER_MS = 4000;
@@ -36,25 +36,25 @@ export function useResidentConversations({ enabled, paused = false, voiceEnabled
 
 	const nameOf = (residentId) => latestRef.current.residents?.find((resident) => resident.id === residentId)?.assistant.name ?? 'Someone';
 
-	const speak = useCallback(async (residentId, text) => {
+	const speak = useCallback(async (residentId, text, pose = null) => {
 		latestRef.current.onSpeech(residentId, text);
 		const resident = latestRef.current.residents?.find((candidate) => candidate.id === residentId);
 		const position = residentPositions.current.get(residentId);
 		const user = latestRef.current.getPositions().user;
 		const spoken = stripForSpeech(text);
-		let seconds = 0;
-		if (resident && position && user && spoken && voicesLine({ voiceEnabled: latestRef.current.voiceEnabled, distance: Math.hypot(position.x - user.x, position.z - user.z) })) {
-			try {
+		const commands = residentCommands.current.get(residentId);
+		const seconds = await deliverLine({
+			voiced: Boolean(resident && position && user && spoken && voicesLine({ voiceEnabled: latestRef.current.voiceEnabled, distance: Math.hypot(position.x - user.x, position.z - user.z) })),
+			synthesize: async () => {
 				const response = await api.post(route('voice.synthesize', { assistant: resident.assistant.id }), { text: spoken });
-				if (response.ok) seconds = (await residentVoices.current.get(residentId)?.(await response.blob())) ?? 0;
-			} catch (error) {
-				console.error('[useResidentConversations] could not voice a line', error);
-			}
-		}
-		if (seconds === 0) {
-			seconds = speakingSeconds(spoken);
-			residentCommands.current.get(residentId)?.talk(seconds);
-		}
+				return response.ok ? response.blob() : null;
+			},
+			play: (audio) => residentVoices.current.get(residentId)?.(audio),
+			gesture: () => { if (pose) void commands?.gesture(pose); },
+			estimate: () => speakingSeconds(spoken),
+			talk: (duration) => commands?.talk(duration),
+			onError: (error) => console.error('[useResidentConversations] could not voice a line', error),
+		});
 		setTimeout(() => latestRef.current.onSpeech(residentId, null), seconds * 1000 + SPEECH_LINGER_MS);
 		return seconds;
 	}, [residentPositions, residentVoices, residentCommands]);
@@ -97,8 +97,7 @@ export function useResidentConversations({ enabled, paused = false, voiceEnabled
 			if (data.message) {
 				conversation.lines.push({ id: data.message.id, residentId: data.message.residentId, content: data.message.content });
 				publish();
-				if (data.message.pose) void residentCommands.current.get(data.message.residentId)?.gesture(data.message.pose);
-				seconds = await speak(data.message.residentId, data.message.content);
+				seconds = await speak(data.message.residentId, data.message.content, data.message.pose);
 			}
 			if (data.status === 'paused') {
 				finish(conversation.id);
@@ -123,8 +122,7 @@ export function useResidentConversations({ enabled, paused = false, voiceEnabled
 		};
 		conversationsRef.current.set(conversationId, conversation);
 		publish();
-		if (pose) void residentCommands.current.get(starterId)?.gesture(pose);
-		await speak(starterId, line);
+		await speak(starterId, line, pose);
 		void run(conversation);
 	}, [residentCommands, residentPositions, speak, run, publish]);
 

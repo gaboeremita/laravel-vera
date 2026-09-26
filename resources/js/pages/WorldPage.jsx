@@ -442,8 +442,7 @@ export default function WorldPage() {
 				const response = await api.post(route('worlds.sessions.residents.observations.store', { world: worldId, session: sessionId, resident: residentId }), { line: action.line, expression: action.expression ?? null });
 				if (!response.ok) throw new Error(`HTTP ${response.status}`);
 				setInvite({ residentId, name: resident.assistant.name, key: Date.now() });
-				if (action.pose) void residentCommands.current.get(residentId)?.gesture(action.pose);
-				await speakAloud(residentId, action.line);
+				await speakAloud(residentId, action.line, action.pose ?? null);
 				return true;
 			}
 			const otherId = Number(action.target);

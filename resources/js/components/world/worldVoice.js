@@ -23,3 +23,37 @@ export function storeVoiceEnabled(enabled, storage = globalThis.localStorage) {
 export function voicesLine({ voiceEnabled, distance }) {
 	return voiceEnabled && distance <= EARSHOT;
 }
+
+/**
+ * Says a line: voiced when it can be, otherwise talked for its reading time.
+ * The gesture starts together with the voice, once the audio has arrived, so
+ * it plays while she speaks.
+ *
+ * @returns {Promise<number>} how long she speaks, in seconds
+ */
+export async function deliverLine({ voiced, synthesize, play, gesture, estimate, talk, onError = () => {} }) {
+	let gestured = false;
+	const gestureOnce = () => {
+		if (gestured) return;
+		gestured = true;
+		gesture();
+	};
+	let seconds = 0;
+	if (voiced) {
+		try {
+			const audio = await synthesize();
+			if (audio) {
+				gestureOnce();
+				seconds = (await play(audio)) ?? 0;
+			}
+		} catch (error) {
+			onError(error);
+		}
+	}
+	if (seconds === 0) {
+		gestureOnce();
+		seconds = estimate();
+		talk(seconds);
+	}
+	return seconds;
+}
