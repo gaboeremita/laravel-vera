@@ -73,8 +73,8 @@ export default function WorldMap({ layout, floorMaps, playerView, residents, res
 				const active = marker.id === activeResidentId;
 				return (
 					<div key={marker.id} className={marker.onShownFloor ? '' : 'opacity-40'}>
-						<span className={`absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${active ? 'bg-accent ring-2 ring-accent/50' : 'bg-white'}`} style={{ left: marker.x, top: marker.y }} />
-						<span className={`absolute -translate-x-1/2 translate-y-1.5 whitespace-nowrap px-1 text-[0.6rem] tracking-[0.06em] ${active ? 'bg-accent text-accent-fg' : 'bg-black/60 text-white'}`} style={{ left: marker.labelX, top: marker.labelY }}>
+						<span className={`absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${active ? 'bg-accent ring-2 ring-accent/50' : 'bg-bg-0 ring-2 ring-fg-1'}`} style={{ left: marker.x, top: marker.y }} />
+						<span className={`world-hud-panel world-hud-label absolute -translate-x-1/2 translate-y-1.5 whitespace-nowrap px-1.5 text-[0.6rem] ${active ? 'border-accent text-accent' : 'text-fg-1'}`} style={{ left: marker.labelX, top: marker.labelY }}>
 							{marker.onShownFloor || !marker.floorName ? marker.name : `${marker.name} · ${marker.floorName}`}
 						</span>
 					</div>
