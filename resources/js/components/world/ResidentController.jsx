@@ -437,7 +437,9 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			zone: async ({ activityId, posture, poseName }) => {
 				settle('interrupted', 'a new action replaced it');
 				heldPoseRef.current = null;
-				if (posture !== postureRef.current) {
+				// A zone activity belongs to no spot, so she steps off any spot
+				// she holds even when her posture stays the same.
+				if (spotRef.current?.spotId || posture !== postureRef.current) {
 					await leaveSpot();
 					if (posture !== 'standing') {
 						spotRef.current = { spotId: null, activityId, approach: bodyRef.current.position.clone(), onLeave: null };
