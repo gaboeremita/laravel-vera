@@ -13,6 +13,15 @@ function insideOutline(outline, x, z) {
 }
 
 /** The zone and its ancestors, outermost first. */
+/**
+ * Whether two points are on the same floor; a world without floors, or a
+ * point that isn't known, counts as the same floor.
+ */
+export function onSameFloor(layout, a, b) {
+	if (!a || !b || !(layout?.floors?.length)) return true;
+	return (floorAt(layout, a.y)?.id ?? null) === (floorAt(layout, b.y)?.id ?? null);
+}
+
 export function zoneChain(layout, zone) {
 	const zonesById = new Map((layout?.zones ?? []).map((candidate) => [candidate.id, candidate]));
 	const chain = [zone];

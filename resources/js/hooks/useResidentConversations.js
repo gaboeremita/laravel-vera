@@ -3,7 +3,8 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { stripForSpeech } from '../utils/parsers.js';
 import { speakingSeconds } from '../components/world/residentMotion.js';
-import { deliverLine, voicesLine } from '../components/world/worldVoice.js';
+import { isFar, turnGap } from '../components/world/residentDetail.js';
+import { createLineCache, deliverLine, facesPoint, voicesLine } from '../components/world/worldVoice.js';
 
 const TURN_GAP_MS = 5000;
 const SPEECH_LINGER_MS = 4000;
@@ -16,18 +17,19 @@ const PAUSED_RECHECK_MS = 500;
  * it. Both residents are busy for as long as it runs; a paused world holds
  * it mid-way.
  */
-export function useResidentConversations({ enabled, paused = false, voiceEnabled = false, worldId, sessionId, residents, residentCommands, residentPositions, residentVoices, getPositions, onSpeech, addToast }) {
+export function useResidentConversations({ enabled, paused = false, voiceEnabled = false, worldId, sessionId, residents, residentCommands, residentPositions, residentVoices, getPositions, getView, onSpeech, addToast }) {
 	const conversationsRef = useRef(new Map());
 	const [conversations, setConversations] = useState([]);
 	const latestRef = useRef({});
 	const pausedRef = useRef(paused);
+	const lineCacheRef = useRef(null);
 
 	useEffect(() => {
 		pausedRef.current = paused;
 	}, [paused]);
 
 	useEffect(() => {
-		latestRef.current = { residents, getPositions, onSpeech, addToast, voiceEnabled };
+		latestRef.current = { residents, getPositions, getView, onSpeech, addToast, voiceEnabled };
 	});
 
 	const publish = useCallback(() => {
@@ -36,7 +38,7 @@ export function useResidentConversations({ enabled, paused = false, voiceEnabled
 
 	const nameOf = (residentId) => latestRef.current.residents?.find((resident) => resident.id === residentId)?.assistant.name ?? 'Someone';
 
-	const speak = useCallback(async (residentId, text, pose = null) => {
+	const speak = useCallback(async (residentId, text, pose = null, { toUser = false } = {}) => {
 		latestRef.current.onSpeech(residentId, text);
 		const resident = latestRef.current.residents?.find((candidate) => candidate.id === residentId);
 		const position = residentPositions.current.get(residentId);
@@ -44,10 +46,22 @@ export function useResidentConversations({ enabled, paused = false, voiceEnabled
 		const spoken = stripForSpeech(text);
 		const commands = residentCommands.current.get(residentId);
 		const seconds = await deliverLine({
-			voiced: Boolean(resident && position && user && spoken && voicesLine({ voiceEnabled: latestRef.current.voiceEnabled, distance: Math.hypot(position.x - user.x, position.z - user.z) })),
+			voiced: Boolean(resident && position && user && spoken && voicesLine({
+				voiceEnabled: latestRef.current.voiceEnabled,
+				distance: Math.hypot(position.x - user.x, position.z - user.z),
+				facing: facesPoint(latestRef.current.getView?.(), position),
+				toUser,
+			})),
 			synthesize: async () => {
+				lineCacheRef.current ??= createLineCache();
+				const key = `${resident.assistant.id}:${spoken}`;
+				const cached = lineCacheRef.current.get(key);
+				if (cached) return cached;
 				const response = await api.post(route('voice.synthesize', { assistant: resident.assistant.id }), { text: spoken });
-				return response.ok ? response.blob() : null;
+				if (!response.ok) return null;
+				const audio = await response.blob();
+				lineCacheRef.current.set(key, audio);
+				return audio;
 			},
 			play: (audio) => residentVoices.current.get(residentId)?.(audio),
 			gesture: () => { if (pose) void commands?.gesture(pose); },
@@ -103,9 +117,11 @@ export function useResidentConversations({ enabled, paused = false, voiceEnabled
 				finish(conversation.id);
 				return;
 			}
-			wait = seconds * 1000 + TURN_GAP_MS;
+			const user = latestRef.current.getPositions().user;
+			const farAway = conversation.residentIds.every((residentId) => isFar(residentPositions.current.get(residentId), user));
+			wait = seconds * 1000 + turnGap(TURN_GAP_MS, farAway);
 		}
-	}, [worldId, sessionId, speak, publish, finish, residentCommands]);
+	}, [worldId, sessionId, speak, publish, finish, residentCommands, residentPositions]);
 
 	const start = useCallback(async ({ conversationId, starterId, otherId, line, pose = null }) => {
 		if (conversationsRef.current.has(conversationId)) return;

@@ -18,6 +18,21 @@ export function parseZoneAccess(text) {
 }
 
 /**
+ * Whether a zone is one of the area's zones or lies inside one; any zone is
+ * within an empty area. Mirrors the area rule in ApplyResidentZoneAccess.
+ */
+export function withinArea(layout, zoneId, area) {
+	if (!area || area.length === 0) return true;
+	const zonesById = new Map((layout?.zones ?? []).map((zone) => [zone.id, zone]));
+	const seen = new Set();
+	for (let id = zoneId; id != null && zonesById.has(id) && !seen.has(id); id = zonesById.get(id).parentId ?? null) {
+		if (area.includes(id)) return true;
+		seen.add(id);
+	}
+	return false;
+}
+
+/**
  * Whether a resident may go into a zone on her own. Access granted to a zone
  * covers every zone inside it; a private zone that nothing at or above it
  * opened for her keeps her out. Mirrors ApplyResidentZoneAccess on the server.

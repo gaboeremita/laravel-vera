@@ -1,6 +1,6 @@
 import { claimSpot, releaseSpot } from './spotOccupancy.js';
-import { floorAt } from './worldLocation.js';
-import { canEnterZone } from './zoneAccess.js';
+import { floorAt, zoneAt } from './worldLocation.js';
+import { canEnterZone, withinArea } from './zoneAccess.js';
 
 function resolveTarget(layout, id) {
 	const zone = layout?.zones?.find((candidate) => candidate.id === id);
@@ -19,6 +19,7 @@ const DO_HOLD_MS = 6000;
  */
 export const USER_BUSY = 'the user is busy';
 export const RESIDENT_BUSY = 'they are busy';
+export const OUTSIDE_AREA = 'that is outside the place she keeps to';
 
 /** Walks toward someone who keeps moving before she gives up on reaching them. */
 const TALK_ATTEMPTS = 3;
@@ -74,31 +75,38 @@ async function talkTo(action, toUser, { commands, layout, getFollowTarget, getRe
  * first step that does not complete.
  */
 export async function executeAction(action, context) {
-	const { commands, layout, getFollowTarget, fromUser, zoneAccess, residentId, occupiedSpots, claimTarget, releaseTarget, onStepStart, onStepEnd } = context;
+	const { commands, layout, getFollowTarget, fromUser, zoneAccess, area = [], residentId, occupiedSpots, claimTarget, releaseTarget, onStepStart, onStepEnd } = context;
 	if (!commands) return { outcome: 'failed', reason: 'not ready to move yet' };
+	const keepsToArea = !fromUser && area.length > 0;
 	const keptOut = (zoneId) => !fromUser && zoneId != null && !canEnterZone(layout, zoneId, zoneAccess);
+	const outsideArea = (zoneId) => keepsToArea && !withinArea(layout, zoneId, area);
 
 	switch (action.verb) {
 		case 'go_to': {
 			if (action.target === 'user') {
 				const user = getFollowTarget?.();
 				if (!user) return { outcome: 'failed', reason: 'could not find the user' };
+				if (outsideArea(zoneAt(layout, user)?.id ?? null)) return { outcome: 'failed', reason: OUTSIDE_AREA };
 				return commands.goTo(user, { near: true, towardUser: true });
 			}
 			const target = resolveTarget(layout, action.target);
 			if (!target) return { outcome: 'failed', reason: `there is no place or thing called "${action.target}" here any more` };
 			if (keptOut(target.zoneId)) return { outcome: 'failed', reason: 'that is a private place' };
+			if (outsideArea(target.zoneId)) return { outcome: 'failed', reason: OUTSIDE_AREA };
 			return commands.goTo(target.point, { near: Boolean(target.near) });
 		}
 		case 'follow':
+			if (keepsToArea) return { outcome: 'failed', reason: OUTSIDE_AREA };
 			return commands.follow(getFollowTarget);
 		case 'swim_to_edge':
 			return commands.swimToEdge();
 		case 'wander': {
-			if (!action.target) return commands.wander();
-			const zone = layout?.zones?.find((candidate) => candidate.id === action.target);
-			if (!zone) return { outcome: 'failed', reason: `there is no place called "${action.target}" here any more` };
+			const zoneId = action.target ?? (keepsToArea ? area[0] : null);
+			if (!zoneId) return commands.wander();
+			const zone = layout?.zones?.find((candidate) => candidate.id === zoneId);
+			if (!zone) return { outcome: 'failed', reason: `there is no place called "${zoneId}" here any more` };
 			if (keptOut(zone.id)) return { outcome: 'failed', reason: 'that is a private place' };
+			if (outsideArea(zone.id)) return { outcome: 'failed', reason: OUTSIDE_AREA };
 			return commands.wander({ outline: zone.outline, y: zone.entry.y });
 		}
 		case 'stop':
@@ -110,6 +118,7 @@ export async function executeAction(action, context) {
 			const activity = spot.activities.find((candidate) => candidate.id === action.activity);
 			if (!activity) return { outcome: 'failed', reason: `"${action.activity}" cannot be done at ${spot.id}` };
 			if (keptOut(object.zoneId)) return { outcome: 'failed', reason: 'that is a private place' };
+			if (outsideArea(object.zoneId)) return { outcome: 'failed', reason: OUTSIDE_AREA };
 			if (!claimSpot(occupiedSpots, spot, residentId)) return { outcome: 'failed', reason: 'spot taken' };
 			const release = () => releaseSpot(occupiedSpots, spot.id, residentId);
 			const result = await commands.use({

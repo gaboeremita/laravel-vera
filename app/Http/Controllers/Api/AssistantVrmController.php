@@ -18,6 +18,7 @@ class AssistantVrmController extends Controller
         ]);
 
         $file = $request->file('vrm');
+        $assistant->vrm?->forgetLod();
         $previousPath = $assistant->vrm?->path;
         $previousDisk = $assistant->vrm?->disk;
 
@@ -53,6 +54,7 @@ class AssistantVrmController extends Controller
             return response()->json(['message' => 'No VRM file found.'], 404);
         }
 
+        $vrm->forgetLod();
         Storage::disk($vrm->disk)->delete($vrm->path);
         $vrm->delete();
 

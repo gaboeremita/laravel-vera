@@ -275,6 +275,7 @@ export class WorldCollision {
 	}
 
 	dispose() {
+		this.disposed = true;
 		this.octree.clear();
 		this.waterOctree.clear();
 		this.candidates.length = 0;

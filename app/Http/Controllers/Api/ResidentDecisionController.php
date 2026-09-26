@@ -37,6 +37,9 @@ class ResidentDecisionController extends Controller
 
     private const DECISION_FLOOR_SECONDS = 8;
 
+    /** How long a resident waits after a conversation with an NPC before she starts another one with an NPC. */
+    private const NPC_CONVERSATION_GAP_SECONDS = 300;
+
     public function store(
         StoreResidentDecisionRequest $request,
         int $world,
@@ -152,8 +155,19 @@ class ResidentDecisionController extends Controller
             ->flatMap(fn (Conversation $conversation) => [$conversation->owner_id, $conversation->counterpart_id])
             ->all();
 
+        $assistantMorph = (new Assistant)->getMorphClass();
+        $recentPartnerIds = Conversation::involving($resident->assistant)
+            ->where('world_session_id', $session->id)
+            ->where('owner_type', $assistantMorph)
+            ->where('counterpart_type', $assistantMorph)
+            ->whereRaw('coalesce(resumed_at, created_at) >= ?', [now()->subSeconds(self::NPC_CONVERSATION_GAP_SECONDS)])
+            ->get(['owner_id', 'counterpart_id'])
+            ->flatMap(fn (Conversation $conversation) => [$conversation->owner_id, $conversation->counterpart_id]);
+        $talkedToNpcLately = Assistant::whereIn('id', $recentPartnerIds)->whereKeyNot($resident->assistant_id)->where('kind', AssistantKind::WorldNpc)->exists();
+
         return $world->residents()->with('assistant')->whereKeyNot($resident->id)->get()
             ->reject(fn (WorldResident $other) => in_array($other->assistant_id, $busyAssistantIds, true) || in_array($other->id, $busyResidentIds, true))
+            ->reject(fn (WorldResident $other) => $talkedToNpcLately && $other->assistant->kind === AssistantKind::WorldNpc)
             ->filter(fn (WorldResident $other) => isset($positions['residents'][$other->id]) && $resolveWorldState->sharesRoom($world->layout ?? [], $own, $positions['residents'][$other->id]))
             ->mapWithKeys(fn (WorldResident $other) => [$other->assistant->name => $other->id])
             ->all();

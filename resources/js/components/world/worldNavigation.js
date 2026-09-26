@@ -66,6 +66,28 @@ class NavigationGrid {
 		return this.nextColumn >= this.columns * this.rows;
 	}
 
+	/** Whether any column found ground to stand on; a grid probed against emptied collision has none. */
+	get hasGround() {
+		return this.heights.some((height) => !Number.isNaN(height));
+	}
+
+	/** The probed heights, for keeping between visits. */
+	snapshot() {
+		return { columns: this.columns, rows: this.rows, heights: this.heights.slice() };
+	}
+
+	/**
+	 * Takes the heights probed on an earlier visit instead of probing again;
+	 * false, and nothing changed, when they were probed for a different grid.
+	 */
+	restore(snapshot) {
+		if (!snapshot || snapshot.columns !== this.columns || snapshot.rows !== this.rows || snapshot.heights?.length !== this.heights.length) return false;
+		if (!snapshot.heights.some((height) => !Number.isNaN(height))) return false;
+		this.heights.set(snapshot.heights);
+		this.nextColumn = this.columns * this.rows;
+		return true;
+	}
+
 	/** Probes columns until the time budget runs out; returns true once every column is done. */
 	build(budgetMs = Number.POSITIVE_INFINITY) {
 		const deadline = performance.now() + budgetMs;
@@ -509,6 +531,9 @@ class NavigationGrid {
 		return smoothed;
 	}
 }
+
+/** Raised whenever probing changes, so grids kept from an earlier version are probed again. */
+export const NAVIGATION_VERSION = 2;
 
 export function createNavigationGrid(collisionWorld, options) {
 	return new NavigationGrid(collisionWorld, options);

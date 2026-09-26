@@ -191,7 +191,7 @@ it('gives NPCs the world tools on the default model', function () {
     $assistantUser = AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $npc->id]);
     $conversation = Conversation::factory()->forAssistantUser($assistantUser)->create();
     $world = World::factory()->forUser($user)->withLayout()->create();
-    $resident = $world->residents()->create(['assistant_id' => $npc->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
+    $resident = $world->residents()->create(['assistant_id' => $npc->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'roam']);
     fakeTurn(toolCallResponse('call_1', 'go_to', ['target' => 'studio']), finalAnswerResponse('This way.'));
 
     $this->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $npc->id, 'id' => $conversation->id]), [

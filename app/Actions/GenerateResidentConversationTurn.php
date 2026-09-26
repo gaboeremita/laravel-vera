@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Directors\PromptDirector;
+use App\Enums\AssistantKind;
 use App\Enums\ConversationStatus;
 use App\Enums\Posture;
 use App\Models\Assistant;
@@ -28,6 +29,12 @@ class GenerateResidentConversationTurn
      * to be picked up another time.
      */
     public const LINES_PER_SITTING = 10;
+
+    /**
+     * An NPC is there to make the world feel lived in, so a sitting with one
+     * is short.
+     */
+    public const NPC_LINES_PER_SITTING = 4;
 
     private const HISTORY_LIMIT = 30;
 
@@ -68,7 +75,8 @@ class GenerateResidentConversationTurn
             ->whereMorphedTo('speaker', $speaker)
             ->when($conversation->resumed_at !== null, fn ($query) => $query->where('created_at', '>=', $conversation->resumed_at))
             ->count();
-        if ($spokenThisSitting >= self::LINES_PER_SITTING) {
+        $withNpc = $speaker->kind === AssistantKind::WorldNpc || $other->kind === AssistantKind::WorldNpc;
+        if ($spokenThisSitting >= ($withNpc ? self::NPC_LINES_PER_SITTING : self::LINES_PER_SITTING)) {
             $conversation->update(['status' => ConversationStatus::Paused]);
 
             return ['status' => 'paused'];

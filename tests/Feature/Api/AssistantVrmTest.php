@@ -1,11 +1,13 @@
 <?php
 
 use App\Enums\AssistantPortraitType;
+use App\Http\Resources\WorldResidentResource;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Emotion;
 use App\Models\User;
 use App\Models\VrmFile;
+use App\Models\WorldResident;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -209,4 +211,57 @@ it('emotions index returns envelope with portrait_type and vrm_url', function ()
         ->assertJsonStructure(['portrait_type', 'vrm_url', 'emotions'])
         ->assertJsonPath('portrait_type', 'image')
         ->assertJsonPath('vrm_url', null);
+});
+
+function uploadVrm($test, User $user, Assistant $assistant, string $route = 'assistants.vrm.store'): void
+{
+    $test->actingAs($user)->postJson(route($route, ['id' => $assistant->id]), ['vrm' => UploadedFile::fake()->create('avatar.vrm', 1024)])->assertStatus(201);
+}
+
+it('stores a low-detail version next to the model and replaces it on re-upload', function () {
+    [$user, $assistant] = setUpAssistantForVrm();
+    uploadVrm($this, $user, $assistant);
+
+    uploadVrm($this, $user, $assistant, 'assistants.vrm.lod.store');
+    $first = $assistant->fresh()->vrm->lod_path;
+    uploadVrm($this, $user, $assistant, 'assistants.vrm.lod.store');
+    $vrm = $assistant->fresh()->vrm;
+
+    expect($vrm->lod_path)->not->toBe($first)->and($vrm->lod_url)->toContain($vrm->lod_path);
+    Storage::disk('public')->assertExists($vrm->lod_path);
+    Storage::disk('public')->assertMissing($first);
+});
+
+it('refuses a low-detail version for an assistant without a model', function () {
+    [$user, $assistant] = setUpAssistantForVrm();
+
+    $this->actingAs($user)->postJson(route('assistants.vrm.lod.store', ['id' => $assistant->id]), ['vrm' => UploadedFile::fake()->create('avatar.vrm', 1024)])
+        ->assertStatus(422);
+});
+
+it('drops the low-detail version when the model is replaced, deleted, or when it is deleted itself', function (string $action) {
+    [$user, $assistant] = setUpAssistantForVrm();
+    uploadVrm($this, $user, $assistant);
+    uploadVrm($this, $user, $assistant, 'assistants.vrm.lod.store');
+    $lod = $assistant->fresh()->vrm->lod_path;
+
+    match ($action) {
+        'replace model' => uploadVrm($this, $user, $assistant),
+        'delete model' => $this->actingAs($user)->deleteJson(route('assistants.vrm.destroy', ['id' => $assistant->id]))->assertOk(),
+        'delete low detail' => $this->actingAs($user)->deleteJson(route('assistants.vrm.lod.destroy', ['id' => $assistant->id]))->assertOk(),
+    };
+
+    Storage::disk('public')->assertMissing($lod);
+    expect($assistant->fresh()->vrm?->lod_path)->toBeNull();
+})->with(['replace model', 'delete model', 'delete low detail']);
+
+it('tells the world and the editor where the low-detail version is', function () {
+    [$user, $assistant] = setUpAssistantForVrm();
+    uploadVrm($this, $user, $assistant);
+    uploadVrm($this, $user, $assistant, 'assistants.vrm.lod.store');
+    $lodUrl = $assistant->fresh()->vrm->lod_url;
+
+    $this->actingAs($user)->getJson(route('assistants.show', ['id' => $assistant->id]))->assertJsonPath('vrm_lod_url', $lodUrl);
+    $resident = WorldResident::factory()->create(['assistant_id' => $assistant->id]);
+    expect((new WorldResidentResource($resident->load('assistant.vrm')))->resolve()['assistant']['vrmLodUrl'])->toBe($lodUrl);
 });

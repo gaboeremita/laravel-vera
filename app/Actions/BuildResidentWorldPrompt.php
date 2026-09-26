@@ -6,6 +6,7 @@ use App\Enums\ConversationStatus;
 use App\Enums\Posture;
 use App\Models\Assistant;
 use App\Models\Conversation;
+use App\Models\Message;
 use App\Models\Pose;
 use App\Models\ResidentActivity;
 use App\Models\World;
@@ -16,6 +17,8 @@ use Illuminate\Support\Str;
 class BuildResidentWorldPrompt
 {
     private const RECENT_ACTIVITY_LIMIT = 8;
+
+    public const POST_ACTIVITY_LIMIT = 3;
 
     private const RECENT_CONVERSATION_LIMIT = 6;
 
@@ -36,9 +39,10 @@ class BuildResidentWorldPrompt
      * @param  ?array{posture: string, object: ?array, activity: ?array}  $residentActivity  her own posture and what she is on or doing
      * @param  bool  $userInSight  whether the user is in the same room as her
      * @param  array<int, string>  $withYou  the other residents in the same room as her
+     * @param  bool  $lean  for an NPC who keeps to her post: where she is and who is there, without the place's activities and things
      * @return array<string, string|array<int, string>>
      */
-    public function worldState(World $world, array $resident, ?array $user, ?array $userActivity = null, array $stacking = [], ?string $userTalkingWith = null, ?array $residentActivity = null, bool $userInSight = true, array $withYou = []): array
+    public function worldState(World $world, array $resident, ?array $user, ?array $userActivity = null, array $stacking = [], ?string $userTalkingWith = null, ?array $residentActivity = null, bool $userInSight = true, array $withYou = [], bool $lean = false): array
     {
         $layout = $world->layout ?? [];
         $state = ['you are in' => $this->placePhrase($resident).$this->activityPhrase($residentActivity)];
@@ -46,13 +50,13 @@ class BuildResidentWorldPrompt
         if ($resident['zone'] !== null) {
             $state['here'] = $resident['zone']['description'];
 
-            if ($resident['zone']['activities'] !== []) {
+            if (! $lean && $resident['zone']['activities'] !== []) {
                 $state['things to do here'] = collect($resident['zone']['activities'])
                     ->map(fn (array $activity) => "{$activity['name']} [{$activity['id']}]")->all();
             }
 
             $objects = collect($layout['objects'] ?? [])->where('zoneId', $resident['zone']['id']);
-            if ($objects->isNotEmpty()) {
+            if (! $lean && $objects->isNotEmpty()) {
                 $state['things here'] = $objects->map(fn (array $object) => $this->objectPhrase($object))->values()->all();
             }
         }
@@ -78,14 +82,34 @@ class BuildResidentWorldPrompt
             $state['sharing your spot'] = $stacking;
         }
 
-        $state['available places'] = collect($layout['zones'] ?? [])->map(fn (array $zone) => $this->zoneName($layout, $zone))->all();
-
         return $state;
+    }
+
+    /**
+     * Every place she may know of, by name, id and floor, with a note on the
+     * private ones.
+     *
+     * @return array<int, string>
+     */
+    public function availablePlaces(World $world): array
+    {
+        $layout = $world->layout ?? [];
+
+        return collect($layout['zones'] ?? [])->map(fn (array $zone) => $this->zoneName($layout, $zone))->all();
     }
 
     public function worldAwareness(): string
     {
         return "World awareness:\nYour body in this world moves only through your tools. Whenever your reply has you go somewhere, approach or leave someone, sit, lie down, recline, follow someone or stop, call the matching tool in that same reply, and let your narration describe what the tool does. Reach for your tools on your own initiative, whether or not the user asks: what_is_in shows what a place holds and what you can do there, where_can_i finds where you could do something, describe tells you more about a place or thing, go_to, follow and stop move you, use sits, lies or reclines you on a spot for an activity, zone does an activity of the place you are in, and plan does something that takes several steps, in order. go_to with target 'user' brings you to the user; in the water it swims you to the side of the pool nearest them, where you rest at the edge, and swim_to_edge takes you to the nearest side to rest there on your own. When nothing in particular calls you, wander lets you roam and explore for a while, around a place or around where you are; in the water it swims you around the pool. Reach for them whenever a thought, a mood, a craving or the conversation brings the space to mind, the way anyone glances around a room.\nPeople name things loosely; a couch can mean a sofa or the armchairs. Match what they mean to the closest fitting thing, and prefer what is near you.\nThink in steps: getting a drink is going to the bar, mixing it at the back bar, then sitting on a stool to drink it, so call plan with those steps. Anything you want to do works even with no marked spot or pose for it, such as singing at the microphone or making tea at the counter: go there, then add a do step describing it, and your narration carries it.\nPostures are exact: sitting is upright on a seat, reclining is leaning far back on a lounger, a bed or in a bath, and lying is flat on your back or side on a bed.\nA pose tag sets your gesture or expression where you are right now; moving and changing posture come from your tools.";
+    }
+
+    /**
+     * World awareness for an NPC who keeps to her post: people come to her,
+     * and her tools only tell her about the place.
+     */
+    public function postAwareness(): string
+    {
+        return "World awareness:\nYou keep to your post here, and people come to you. Talk with whoever comes by, from right where you are. Your tools tell you about the place: what_is_in shows what a place holds, where_can_i finds where something can be done, and describe tells you more about a place or thing, so you can point people the right way.\nPeople name things loosely; match what they mean to the closest fitting thing, and prefer what is near you.\nA pose tag sets your gesture or expression where you are right now.";
     }
 
     /**
@@ -159,17 +183,16 @@ class BuildResidentWorldPrompt
         $residents = $world->residents()->with('assistant')->get();
         $names = $residents->mapWithKeys(fn (WorldResident $candidate) => [$candidate->id => $candidate->assistant->name]);
 
-        return $residents
+        $inRoom = $residents
             ->reject(fn (WorldResident $other) => $other->id === $resident->id)
             ->filter(fn (WorldResident $other) => isset($positions['residents'][$other->id]) && $resolveWorldState->sharesRoom($layout, $own, $positions['residents'][$other->id]))
-            ->values()
-            ->map(function (WorldResident $other) use ($resident, $positions, $own, $resolveWorldState, $busyWith, $names): string {
+            ->values();
+        $lastLines = $this->pausedConversationEndings($resident->assistant, $inRoom->pluck('assistant_id')->all());
+
+        return $inRoom
+            ->map(function (WorldResident $other) use ($resident, $positions, $own, $resolveWorldState, $busyWith, $names, $lastLines): string {
                 $where = $this->distancePhrase($resolveWorldState->distance($own, $positions['residents'][$other->id]));
-                $paused = Conversation::between($resident->assistant, $other->assistant)
-                    ->where('status', ConversationStatus::Paused)
-                    ->latest('updated_at')
-                    ->first();
-                $lastLine = $paused?->messages()->latest('id')->value('content');
+                $lastLine = $lastLines[$other->assistant_id] ?? null;
                 $left = $lastLine !== null
                     ? sprintf('; your conversation with them stopped at "%s"', Str::limit((string) $lastLine, self::RECENT_MESSAGE_LENGTH, ''))
                     : '';
@@ -180,6 +203,39 @@ class BuildResidentWorldPrompt
 
                 return "{$other->assistant->name}: {$where}{$busy}{$left}";
             })
+            ->all();
+    }
+
+    /**
+     * The last line of her latest paused conversation with each of the given
+     * assistants, by assistant id, in two queries however many there are.
+     *
+     * @param  array<int, int>  $assistantIds
+     * @return array<int, string>
+     */
+    private function pausedConversationEndings(Assistant $assistant, array $assistantIds): array
+    {
+        if ($assistantIds === []) {
+            return [];
+        }
+
+        $morph = $assistant->getMorphClass();
+        $partnerOf = fn (Conversation $conversation) => $conversation->owner_id === $assistant->id ? $conversation->counterpart_id : $conversation->owner_id;
+        $conversations = Conversation::involving($assistant)
+            ->where('status', ConversationStatus::Paused)
+            ->where('owner_type', $morph)
+            ->where('counterpart_type', $morph)
+            ->where(fn ($query) => $query->whereIn('owner_id', $assistantIds)->orWhereIn('counterpart_id', $assistantIds))
+            ->latest('updated_at')
+            ->get(['id', 'owner_id', 'counterpart_id'])
+            ->unique($partnerOf);
+
+        $endings = Message::whereIn('id', Message::selectRaw('max(id)')->whereIn('conversation_id', $conversations->pluck('id'))->groupBy('conversation_id'))
+            ->pluck('content', 'conversation_id');
+
+        return $conversations
+            ->filter(fn (Conversation $conversation) => $endings->has($conversation->id))
+            ->mapWithKeys(fn (Conversation $conversation) => [$partnerOf($conversation) => (string) $endings[$conversation->id]])
             ->all();
     }
 
@@ -221,13 +277,13 @@ class BuildResidentWorldPrompt
         return "Talking with {$otherName}:\nYou are talking with {$otherName} in person, right where you both are. Their lines come to you as messages starting with their name. Reply with what you say next, in your own voice: one to three sentences, with any action in asterisks. Follow the thread of the conversation; when it has run its course for now, or you want to pick it up another time, say your goodbye and call stop_conversation.";
     }
 
-    public function recentActivity(World $world, WorldSession $session, WorldResident $resident): ?string
+    public function recentActivity(World $world, WorldSession $session, WorldResident $resident, ?int $limit = null): ?string
     {
         $activities = ResidentActivity::where('world_session_id', $session->id)
             ->where('world_resident_id', $resident->id)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
-            ->limit(self::RECENT_ACTIVITY_LIMIT)
+            ->limit($limit ?? self::RECENT_ACTIVITY_LIMIT)
             ->get();
 
         if ($activities->isEmpty()) {

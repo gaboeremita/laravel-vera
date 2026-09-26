@@ -94,10 +94,13 @@ it('keeps the world state under 2,000 characters for a world with 40 zones', fun
     ])->assertSuccessful();
 
     $prompt = sentSystemPrompt();
-    $section = substr($prompt, strpos($prompt, 'World state:'));
-    $section = explode("\n\n", $section)[0];
-    expect($section)->toContain('Guest room number 40')
-        ->and(strlen($section))->toBeLessThan(2000);
+    $places = substr($prompt, strpos($prompt, 'Places in this world:'));
+    $places = explode("\n\n", $places)[0];
+    $state = substr($prompt, strpos($prompt, 'World state:'));
+    $state = explode("\n\n", $state)[0];
+    expect($places)->toContain('Guest room number 40')
+        ->and(strlen($places))->toBeLessThan(2000)
+        ->and($state)->not->toContain('Guest room number 40');
 });
 
 it('rejects a world session that does not belong to the user', function () {

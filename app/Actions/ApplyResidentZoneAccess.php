@@ -16,7 +16,8 @@ class ApplyResidentZoneAccess
     /**
      * The world as one resident knows it: secret zones she has no access to
      * are gone along with everything inside them, and every other zone says
-     * whether she may enter it on her own. The returned world is an unsaved
+     * whether she may enter it on her own. A resident who keeps to an area
+     * knows only the zones of that area. The returned world is an unsaved
      * copy and must never be saved.
      */
     public function handle(World $world, ?WorldResident $resident): World
@@ -27,11 +28,12 @@ class ApplyResidentZoneAccess
         }
 
         $zonesById = collect($layout['zones'])->keyBy('id')->all();
+        $area = $resident->areaZoneIds();
         $zones = [];
         $hiddenZoneIds = [];
         foreach ($layout['zones'] as $zone) {
             $access = $this->evaluate($zonesById, $zone['id'], $resident);
-            if ($access['hidden']) {
+            if ($access['hidden'] || ($area !== [] && ! $this->withinArea($zonesById, $zone['id'], $area))) {
                 $hiddenZoneIds[] = $zone['id'];
 
                 continue;
@@ -64,6 +66,26 @@ class ApplyResidentZoneAccess
             self::PRIVATE => 'private: you go in only when the user asks you to',
             default => null,
         };
+    }
+
+    /**
+     * Whether the zone is one of the area's zones or lies inside one.
+     *
+     * @param  array<string, array<string, mixed>>  $zonesById
+     * @param  array<int, string>  $area
+     */
+    private function withinArea(array $zonesById, string $zoneId, array $area): bool
+    {
+        $seen = [];
+        while ($zoneId !== null && isset($zonesById[$zoneId]) && ! isset($seen[$zoneId])) {
+            if (in_array($zoneId, $area, true)) {
+                return true;
+            }
+            $seen[$zoneId] = true;
+            $zoneId = $zonesById[$zoneId]['parentId'] ?? null;
+        }
+
+        return false;
     }
 
     /**
