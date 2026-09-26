@@ -39,6 +39,7 @@ class WhatIsInTool extends WorldTool
             'description' => $zone['description'],
             'floor' => $this->toolbox->floorName($zone['floorId']),
             'insideOf' => $this->toolbox->placeReference($zone['parentId']),
+            'access' => $this->toolbox->accessNote($zone),
             'activities' => collect($zone['activities'])->map(fn (array $activity) => ['name' => $activity['name'], 'id' => $activity['id']])->all(),
             'placesInside' => collect($this->toolbox->zones())->where('parentId', $zone['id'])->map(fn (array $child) => ['name' => $child['name'], 'id' => $child['id']])->values()->all(),
             'things' => collect($this->toolbox->objects())->where('zoneId', $zone['id'])->map(fn (array $object) => [

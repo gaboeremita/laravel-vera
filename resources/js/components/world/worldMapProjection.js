@@ -9,6 +9,13 @@ export function zonesOnFloor(layout, floorId) {
 	return (layout?.zones ?? []).filter((zone) => floorId === null || zone.floorId === floorId);
 }
 
+/** The rooms named on a floor's map: every zone except those holding other zones on that floor, whose name would cover their rooms. */
+export function labelledZones(layout, floorId) {
+	const zones = zonesOnFloor(layout, floorId);
+	const parentIds = new Set(zones.map((zone) => zone.parentId).filter(Boolean));
+	return zones.filter((zone) => !parentIds.has(zone.id));
+}
+
 export function floorBounds(layout, floorId) {
 	const points = zonesOnFloor(layout, floorId).flatMap((zone) => zone.outline);
 	if (points.length === 0) return null;
@@ -43,6 +50,20 @@ export function spreadLabels(markers, minSpacing) {
 			labelY += minSpacing;
 		}
 		placed.push({ ...marker, labelX: marker.x, labelY });
+	}
+	return placed;
+}
+
+/** Pushes wide labels down until none overlaps another; each label carries its width, all share one height. */
+export function spreadWideLabels(labels, height) {
+	const placed = [];
+	for (const label of [...labels].sort((a, b) => a.y - b.y || a.x - b.x)) {
+		let labelY = label.y;
+		const overlaps = (other) => Math.abs(other.labelX - label.x) < (other.width + label.width) / 2 && Math.abs(other.labelY - labelY) < height;
+		while (placed.some(overlaps)) {
+			labelY += height;
+		}
+		placed.push({ ...label, labelX: label.x, labelY });
 	}
 	return placed;
 }

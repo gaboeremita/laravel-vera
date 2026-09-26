@@ -148,3 +148,47 @@ it('accepts an autonomous resident', function () {
         'behavior' => 'autonomous',
     ])->assertSuccessful()->assertJsonPath('behavior', 'autonomous');
 });
+
+it('persists the groups and private zones a resident may enter', function () {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $assistant = residentAssistantFor($user);
+    $payload = [
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'behavior' => 'stationary',
+        'zoneAccess' => ['tags' => [' deprecated '], 'zones' => ['mona-house']],
+    ];
+
+    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), $payload)
+        ->assertSuccessful()
+        ->assertJsonPath('zoneAccess', ['tags' => ['deprecated'], 'zones' => ['mona-house']]);
+
+    expect(WorldResident::where('world_id', $world->id)->firstOrFail()->zone_access)->toBe(['tags' => ['deprecated'], 'zones' => ['mona-house']]);
+});
+
+it('returns empty zone access for a resident without any', function () {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $assistant = residentAssistantFor($user);
+
+    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), ['position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary'])
+        ->assertSuccessful()
+        ->assertJsonPath('zoneAccess', ['tags' => [], 'zones' => []]);
+});
+
+it('rejects malformed zone access', function (array $zoneAccess, string $error) {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $assistant = residentAssistantFor($user);
+
+    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), [
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'behavior' => 'stationary',
+        'zoneAccess' => $zoneAccess,
+    ])->assertUnprocessable()->assertJsonValidationErrors($error);
+})->with([
+    'unknown key' => [['groups' => ['deprecated']], 'zoneAccess'],
+    'tags not a list' => [['tags' => ['a' => 'deprecated']], 'zoneAccess.tags'],
+    'empty tag' => [['tags' => ['']], 'zoneAccess.tags.0'],
+    'zone id not a slug' => [['zones' => ['Mona House']], 'zoneAccess.zones.0'],
+]);

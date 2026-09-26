@@ -38,6 +38,7 @@ class DescribeTool extends WorldTool
                 'description' => $zone['description'],
                 'floor' => $this->toolbox->floorName($zone['floorId']),
                 'insideOf' => $this->toolbox->placeReference($zone['parentId']),
+                'access' => $this->toolbox->accessNote($zone),
             ];
         }
 

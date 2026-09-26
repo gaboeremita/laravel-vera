@@ -1,5 +1,5 @@
 export default function ControlsLegend({ hasZones }) {
-	const controls = [['R', 'RUN'], ['SPACE', 'JUMP'], ['Q', 'CROUCH'], ...(hasZones ? [['G', 'ABOUT THIS PLACE']] : []), ['P', 'PAUSE']];
+	const controls = [['R', 'RUN'], ['SPACE', 'JUMP'], ['Q', 'CROUCH'], ...(hasZones ? [['G', 'ABOUT THIS PLACE']] : []), ['O', 'VOICE'], ['P', 'PAUSE']];
 
 	return (
 		<div className="hud-enter-fade pointer-events-none flex max-w-[13.75rem] flex-wrap items-center justify-end gap-x-3 gap-y-1">

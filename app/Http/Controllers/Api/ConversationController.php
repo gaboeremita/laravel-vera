@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\AppendExpressionTags;
 use App\Actions\AppendWorldConversationContext;
+use App\Actions\ApplyResidentZoneAccess;
 use App\Actions\ResolveSpotStacking;
 use App\Actions\ResolveUserActivity;
 use App\Actions\ResolveWorldState;
@@ -397,10 +398,11 @@ class ConversationController extends Controller
                 }
 
                 $resident = $world->residents()->where('assistant_id', $assistantModel->id)->firstOrFail();
+                $residentWorld = app(ApplyResidentZoneAccess::class)->handle($world, $resident);
                 $residentPoint = $validated['positions']['residents'][$resident->id] ?? null;
                 $worldToolbox = new WorldToolbox(
-                    $world,
-                    $residentPoint !== null ? app(ResolveWorldState::class)->locate($world->layout, $residentPoint)['zoneChain'] : [],
+                    $residentWorld,
+                    $residentPoint !== null ? app(ResolveWorldState::class)->locate($residentWorld->layout, $residentPoint)['zoneChain'] : [],
                     occupiedSpots: $validated['occupiedSpots'] ?? [],
                     posePostures: $assistantModel->posturesByPoseName(),
                     residentPoint: $residentPoint,

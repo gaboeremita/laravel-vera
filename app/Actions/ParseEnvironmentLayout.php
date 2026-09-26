@@ -191,7 +191,9 @@ class ParseEnvironmentLayout
                 'description' => $vera['description'],
                 'floorId' => $floors === [] ? null : $vera['floor'],
                 'parentId' => $vera['parent'] ?? null,
-                'private' => (bool) ($vera['private'] ?? false),
+                'private' => (bool) ($vera['private'] ?? false) || (bool) ($vera['secret'] ?? false),
+                'secret' => (bool) ($vera['secret'] ?? false),
+                'accessTags' => $this->accessTags($marker, $vera['access'] ?? []),
                 'outline' => $outline,
                 'minY' => min($minY, $maxY),
                 'maxY' => max($minY, $maxY),
@@ -349,6 +351,32 @@ class ParseEnvironmentLayout
         }
 
         return $valid;
+    }
+
+    /**
+     * The resident groups a private zone lets in, from its `access` list.
+     *
+     * @return array<int, string>
+     */
+    private function accessTags(array $marker, mixed $tags): array
+    {
+        if (! is_array($tags) || ! array_is_list($tags)) {
+            $this->warn($marker, 'access must be a list of tags');
+
+            return [];
+        }
+
+        $valid = [];
+        foreach ($tags as $tag) {
+            if (! is_string($tag) || trim($tag) === '') {
+                $this->warn($marker, 'access tags must be non-empty strings');
+
+                continue;
+            }
+            $valid[] = trim($tag);
+        }
+
+        return array_values(array_unique($valid));
     }
 
     private function ofType(array $markers, string $type): array

@@ -29,6 +29,7 @@ import ControlsLegend from '../components/world/hud/ControlsLegend.jsx';
 import PauseOverlay from '../components/world/hud/PauseOverlay.jsx';
 import { contextLineFor, usePlayerActivities } from '../hooks/usePlayerActivities.js';
 import { fullSpotIds, releaseAllSpots, stackedSpots } from '../components/world/spotOccupancy.js';
+import { readVoiceEnabled, storeVoiceEnabled } from '../components/world/worldVoice.js';
 
 const INVITE_MS = 30000;
 const LISTEN_DISTANCE = 12;
@@ -52,6 +53,7 @@ export default function WorldPage() {
 	const [observed, setObserved] = useState(null);
 	const [nearbyConversation, setNearbyConversation] = useState(null);
 	const [paused, setPaused] = useState(false);
+	const [voiceEnabled, setVoiceEnabled] = useState(readVoiceEnabled);
 	const [voiceUntil, setVoiceUntil] = useState(0);
 	const pausedRef = useRef(false);
 	const chatResidentRef = useRef(null);
@@ -256,6 +258,22 @@ export default function WorldPage() {
 		return () => window.removeEventListener('keydown', keyDown);
 	}, []);
 
+	const toggleVoice = useCallback(() => {
+		setVoiceEnabled((enabled) => {
+			storeVoiceEnabled(!enabled);
+			return !enabled;
+		});
+	}, []);
+
+	useEffect(() => {
+		const keyDown = (event) => {
+			if (event.code !== 'KeyO' || event.repeat || isTypingTarget(event.target)) return;
+			toggleVoice();
+		};
+		window.addEventListener('keydown', keyDown);
+		return () => window.removeEventListener('keydown', keyDown);
+	}, [toggleVoice]);
+
 	const hasMultipleFloors = (world?.layout?.floors?.length ?? 0) > 1;
 	const handleLocationChange = useCallback(({ floor, zone, zoneChain, announce }) => {
 		setLocation({ floor, zone, zoneChain });
@@ -308,6 +326,7 @@ export default function WorldPage() {
 			layout: world?.layout,
 			getFollowTarget,
 			fromUser,
+			zoneAccess: resident.zoneAccess,
 			residentId: resident.id,
 			occupiedSpots: occupiedSpots.current,
 			onStepStart: (step, index, total) => record({ verb: step.verb, target: step.verb === 'do' ? step.description : step.target, activity: step.activity, reason: `step ${index + 1} of ${total} of ${action.target}` }),
@@ -367,6 +386,7 @@ export default function WorldPage() {
 	const residentConversations = useResidentConversations({
 		enabled: status === 'ready',
 		paused,
+		voiceEnabled,
 		worldId,
 		sessionId,
 		residents: world?.residents,
@@ -590,6 +610,7 @@ export default function WorldPage() {
 				<div className="absolute left-5 top-5 z-10 flex items-center gap-3">
 					<button type="button" onClick={exit} className="border border-line-1 bg-bg-0/90 px-3 py-2 text-fg-2 text-[0.7rem] tracking-[0.1em] hover:text-fg-1">EXIT WORLD</button>
 					{status === 'ready' && <button type="button" onClick={() => setPaused(true)} className="border border-line-1 bg-bg-0/90 px-3 py-2 text-fg-2 text-[0.7rem] tracking-[0.1em] hover:text-fg-1">P — PAUSE</button>}
+					{status === 'ready' && <button type="button" onClick={toggleVoice} aria-pressed={voiceEnabled} className="border border-line-1 bg-bg-0/90 px-3 py-2 text-fg-2 text-[0.7rem] tracking-[0.1em] hover:text-fg-1">O — VOICE {voiceEnabled ? 'ON' : 'OFF'}</button>}
 					{chatResident && (
 						<>
 							<button type="button" onClick={() => void runResidentAction(chatResident, { verb: 'follow' }, { reason: 'direct control' })} className="border border-line-1 bg-bg-0/90 px-3 py-2 text-fg-2 text-[0.7rem] tracking-[0.1em] hover:text-fg-1">F — FOLLOW ME</button>
