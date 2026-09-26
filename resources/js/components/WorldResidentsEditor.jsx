@@ -6,7 +6,7 @@ import Accordion from './common/Accordion.jsx';
 import { parseZoneAccess } from './world/zoneAccess.js';
 import { behaviorSettingsText, parseBehaviorSettings } from './world/behaviorSettings.js';
 
-const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, behavior: 'stationary', behaviorSettings: null, openingMessage: '', customPrompt: '', zoneAccess: null };
+const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, posture: 'standing', behavior: 'stationary', behaviorSettings: null, openingMessage: '', customPrompt: '', zoneAccess: null };
 const ZONE_ACCESS_EXAMPLE = '{ "tags": ["deprecated"], "zones": ["mona-house"] }';
 const BEHAVIOR_SETTINGS_EXAMPLE = '{ "homeSpot": { "spotId": "toll-booth-stool", "activityId": "man-the-toll-booth" } }';
 const FIELD_LABEL = 'text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1';
@@ -33,6 +33,7 @@ function toDraft(placement) {
 	return {
 		position: placement.position,
 		facing: radiansToDegrees(placement.rotation?.y ?? 0),
+		posture: placement.posture ?? 'standing',
 		behavior: placement.behavior,
 		behaviorSettings: behaviorSettingsText(placement.behaviorSettings),
 		openingMessage: placement.openingMessage ?? '',
@@ -49,6 +50,7 @@ function isDirty(draft, resident) {
 	return draft.behavior !== resident.behavior
 		|| draft.behaviorSettings !== behaviorSettingsText(resident.behaviorSettings)
 		|| draft.facing !== radiansToDegrees(resident.rotation?.y ?? 0)
+		|| draft.posture !== (resident.posture ?? 'standing')
 		|| draft.position.x !== resident.position.x
 		|| draft.position.y !== resident.position.y
 		|| draft.position.z !== resident.position.z
@@ -122,6 +124,20 @@ function ResidentRow({ candidate, resident, privateZones, onAdd, onRemove, onUpd
 						onChange={(event) => setDraft((current) => ({ ...current, facing: Number(event.target.value) }))}
 						className={FIELD_INPUT}
 					/>
+				</div>
+				<div className="col-span-2">
+					<label className={FIELD_LABEL}>Posture</label>
+					<select
+						value={draft.posture}
+						onChange={(event) => setDraft((current) => ({ ...current, posture: event.target.value }))}
+						className={FIELD_INPUT}
+					>
+						<option value="standing">Standing</option>
+						<option value="sitting">Sitting</option>
+						<option value="lying">Lying</option>
+						<option value="reclining">Reclining</option>
+						<option value="swimming">Swimming</option>
+					</select>
 				</div>
 			</div>
 			<div>
@@ -247,7 +263,7 @@ export default function WorldResidentsEditor({ world, onWorldChange, addToast })
 
 	const updateResident = async (assistant, placement) => {
 		if (!world.id) {
-			const resident = { id: `staged-${assistant.id}`, assistant, position: placement.position, rotation: placement.rotation, behavior: placement.behavior, behaviorSettings: placement.behaviorSettings, openingMessage: placement.openingMessage, customPrompt: placement.customPrompt, zoneAccess: placement.zoneAccess };
+			const resident = { id: `staged-${assistant.id}`, assistant, position: placement.position, rotation: placement.rotation, posture: placement.posture ?? 'standing', behavior: placement.behavior, behaviorSettings: placement.behaviorSettings, openingMessage: placement.openingMessage, customPrompt: placement.customPrompt, zoneAccess: placement.zoneAccess };
 			onWorldChange((current) => ({ ...current, residents: [...current.residents.filter((item) => item.assistant.id !== assistant.id), resident] }));
 			return;
 		}
