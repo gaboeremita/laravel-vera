@@ -40,6 +40,9 @@ class WorldResidentController extends Controller
             'behavior_settings' => $validated['behaviorSettings'] ?? null,
             'opening_message' => $validated['openingMessage'] ?? null,
             'custom_prompt' => $validated['customPrompt'] ?? null,
+            'zone_access' => isset($validated['zoneAccess'])
+                ? ['tags' => array_values(array_map(trim(...), $validated['zoneAccess']['tags'] ?? [])), 'zones' => array_values($validated['zoneAccess']['zones'] ?? [])]
+                : null,
         ]);
 
         $resident->load(['assistant.vrm', 'assistant.poses.animationFile']);

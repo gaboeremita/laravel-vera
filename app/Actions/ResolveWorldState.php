@@ -6,6 +6,8 @@ use App\Models\World;
 
 class ResolveWorldState
 {
+    private const SIGHT_DISTANCE = 10.0;
+
     /**
      * @param  array{user?: array{x: float, y: float, z: float}, residents?: array<int|string, array{x: float, y: float, z: float}>}  $positions
      * @return array{user: ?array{floor: ?array, zone: ?array, zoneChain: array<int, array>}, residents: array<int|string, array{floor: ?array, zone: ?array, zoneChain: array<int, array>, distanceToUser: ?float}>}
@@ -121,6 +123,26 @@ class ResolveWorldState
         }
 
         return $inside;
+    }
+
+    /**
+     * Whether two people are in the same room and can see each other: the same
+     * innermost zone, or, outside every zone, the same floor and within sight.
+     *
+     * @param  array{x: float, y: float, z: float}  $a
+     * @param  array{x: float, y: float, z: float}  $b
+     */
+    public function sharesRoom(array $layout, array $a, array $b): bool
+    {
+        $zoneA = $this->zoneAt($layout, $a);
+        $zoneB = $this->zoneAt($layout, $b);
+
+        if ($zoneA !== null || $zoneB !== null) {
+            return $zoneA !== null && $zoneB !== null && $zoneA['id'] === $zoneB['id'];
+        }
+
+        return ($this->floorAt($layout, (float) $a['y'])['id'] ?? null) === ($this->floorAt($layout, (float) $b['y'])['id'] ?? null)
+            && $this->distance($a, $b) <= self::SIGHT_DISTANCE;
     }
 
     /**

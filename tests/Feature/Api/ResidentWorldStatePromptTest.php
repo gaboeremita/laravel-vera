@@ -6,21 +6,33 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('tells the resident her zone, the user\'s zone and their distance', function () {
+it('tells the resident her zone, and the user\'s zone and distance when they share the room', function () {
     $scenario = worldStateScenario();
     $residentId = $scenario[4]->id;
 
     sendWorldMessage($this, $scenario, [
-        'user' => ['x' => 5, 'y' => 0, 'z' => -3],
-        'residents' => [$residentId => ['x' => -2, 'y' => 0, 'z' => 9]],
+        'user' => ['x' => 1, 'y' => 0, 'z' => -1],
+        'residents' => [$residentId => ['x' => 9, 'y' => 0, 'z' => -9]],
     ])->assertSuccessful();
 
     $prompt = sentSystemPrompt();
     expect($prompt)
         ->toContain('World state:')
-        ->toContain('You are in: Vocal booth, inside Music studio, on the Ground floor')
-        ->toContain('The user is: in Pool terrace, on the Ground floor, about 14 m away from you');
+        ->toContain('You are in: Pool terrace, on the Ground floor')
+        ->toContain('The user is: in Pool terrace, on the Ground floor, about 11 m away from you');
 });
+
+it('only knows the user is out of sight when they are in another room', function (array $user, array $resident) {
+    $scenario = worldStateScenario();
+
+    sendWorldMessage($this, $scenario, ['user' => $user, 'residents' => [$scenario[4]->id => $resident]], ['userState' => ['posture' => 'swimming']])->assertSuccessful();
+
+    expect(sentSystemPrompt())->toContain('The user is: somewhere out of sight')->not->toContain('away from you')->not->toContain(', swimming');
+})->with([
+    'another room' => [['x' => 5, 'y' => 0, 'z' => -3], ['x' => -2, 'y' => 0, 'z' => 9]],
+    'a room inside hers' => [['x' => -2, 'y' => 0, 'z' => 8], ['x' => -8, 'y' => 0, 'z' => 2]],
+    'upstairs' => [['x' => 0, 'y' => 5, 'z' => 5], ['x' => -5, 'y' => 0, 'z' => 2]],
+]);
 
 it('describes her own zone in detail and other zones only by name and floor', function () {
     $scenario = worldStateScenario();
@@ -42,17 +54,17 @@ it('describes her own zone in detail and other zones only by name and floor', fu
         ->not->toContain('An upper gallery overlooking the city.');
 });
 
-it('says when the user is on another floor', function () {
+it('sees the user outside every room only on the same floor and within 10 m', function (array $user, bool $inSight) {
     $scenario = worldStateScenario();
-    $residentId = $scenario[4]->id;
 
-    sendWorldMessage($this, $scenario, [
-        'user' => ['x' => 0, 'y' => 5, 'z' => 5],
-        'residents' => [$residentId => ['x' => -5, 'y' => 0, 'z' => 2]],
-    ])->assertSuccessful();
+    sendWorldMessage($this, $scenario, ['user' => $user, 'residents' => [$scenario[4]->id => ['x' => 20, 'y' => 0, 'z' => 20]]])->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain('The user is: upstairs, in Gallery, on the Upper floor');
-});
+    expect(str_contains(sentSystemPrompt(), 'The user is: somewhere out of sight'))->toBe(! $inSight);
+})->with([
+    'close by' => [['x' => 26, 'y' => 0, 'z' => 26], true],
+    'far away' => [['x' => 40, 'y' => 0, 'z' => 20], false],
+    'on the floor above' => [['x' => 20, 'y' => 5, 'z' => 20], false],
+]);
 
 it('keeps today\'s prompt for a world without markers', function () {
     $scenario = worldStateScenario(['layout' => null]);

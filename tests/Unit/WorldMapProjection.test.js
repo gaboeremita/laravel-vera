@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { floorBounds, floorForHeight, floorGroundHeight, projectToMap, spreadLabels } from '../../resources/js/components/world/worldMapProjection.js';
+import { floorBounds, floorForHeight, floorGroundHeight, labelledZones, projectToMap, spreadLabels, spreadWideLabels } from '../../resources/js/components/world/worldMapProjection.js';
 
 const layout = {
 	floors: [
@@ -46,4 +46,30 @@ test('overlapping labels are pushed apart so each stays readable', () => {
 	const c = spread.find((marker) => marker.id === 'c');
 	assert.ok(Math.abs(a.labelY - b.labelY) >= 14);
 	assert.equal(c.labelY, 50);
+});
+
+test('the map names every room and leaves out zones that hold rooms on the same floor', () => {
+	const nested = {
+		zones: [
+			{ id: 'orphanage', floorId: 'basement', parentId: null },
+			{ id: 'mess', floorId: 'basement', parentId: 'orphanage' },
+			{ id: 'radio-null', floorId: 'basement', parentId: 'orphanage' },
+			{ id: 'yard', floorId: 'street', parentId: null },
+			{ id: 'breach', floorId: 'roof', parentId: 'orphanage' },
+		],
+	};
+	assert.deepEqual(labelledZones(nested, 'basement').map((zone) => zone.id), ['mess', 'radio-null']);
+	assert.deepEqual(labelledZones(nested, 'street').map((zone) => zone.id), ['yard']);
+	assert.deepEqual(labelledZones(nested, 'roof').map((zone) => zone.id), ['breach']);
+});
+
+test('wide labels side by side are pushed apart, and labels clear of each other stay put', () => {
+	const [left, right, far] = spreadWideLabels([
+		{ id: 'mess', x: 100, y: 50, width: 80 },
+		{ id: 'idle-loop', x: 150, y: 50, width: 100 },
+		{ id: 'tap', x: 400, y: 50, width: 60 },
+	], 20);
+	assert.deepEqual([left.labelX, left.labelY], [100, 50]);
+	assert.deepEqual([right.labelX, right.labelY], [150, 70]);
+	assert.deepEqual([far.labelX, far.labelY], [400, 50]);
 });

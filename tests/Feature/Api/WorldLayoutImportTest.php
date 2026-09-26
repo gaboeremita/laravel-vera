@@ -215,3 +215,38 @@ it('skips invalid markers with a warning while importing the valid ones', functi
     'unknown posture' => [[6 => markerNode('Bed', ['type' => 'object', 'id' => 'bed', 'name' => 'Bed', 'description' => 'x'], [], [7]), 7 => markerNode('Bed.Side', ['type' => 'spot', 'id' => 'bed-side', 'activities' => [['id' => 'float', 'name' => 'Float', 'posture' => 'floating']]])], 'unknown posture "floating"'],
     'unknown type' => [[6 => markerNode('Mystery', ['type' => 'portal', 'id' => 'portal'])], 'unknown marker type "portal"'],
 ]);
+
+it('imports secret zones and the groups they let in', function () {
+    $user = User::factory()->create();
+    $nodes = [
+        0 => markerNode('Zone.Hideout', [
+            'type' => 'zone', 'id' => 'the-orphanage', 'name' => 'Orphanage', 'description' => 'A hidden vault.',
+            'secret' => true, 'access' => ['deprecated', 'deprecated', ' forks '],
+        ], ['translation' => [0, 2, 0], 'scale' => [5, 2, 5]], [1]),
+        1 => markerNode('Zone.Hideout.Entry', ['type' => 'entry']),
+    ];
+
+    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+
+    $response->assertCreated()->assertJsonPath('layoutWarnings', []);
+    $zone = World::findOrFail($response->json('id'))->layout['zones'][0];
+    expect($zone['private'])->toBeTrue()
+        ->and($zone['secret'])->toBeTrue()
+        ->and($zone['accessTags'])->toBe(['deprecated', 'forks']);
+});
+
+it('warns about access that is not a list of tags', function () {
+    $user = User::factory()->create();
+    $nodes = [
+        0 => markerNode('Zone.House', [
+            'type' => 'zone', 'id' => 'mona-house', 'name' => 'Row house', 'description' => 'A narrow house.',
+            'private' => true, 'access' => 'deprecated',
+        ], ['translation' => [0, 2, 0], 'scale' => [5, 2, 5]], [1]),
+        1 => markerNode('Zone.House.Entry', ['type' => 'entry']),
+    ];
+
+    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+
+    $response->assertCreated()->assertJsonPath('layoutWarnings.0.reason', 'access must be a list of tags');
+    expect(World::findOrFail($response->json('id'))->layout['zones'][0]['accessTags'])->toBe([]);
+});

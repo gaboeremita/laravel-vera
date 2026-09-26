@@ -2,6 +2,7 @@
 
 namespace App\Services\AgentLoop\Tools\World;
 
+use App\Actions\ApplyResidentZoneAccess;
 use App\Contracts\AgentTool;
 use App\Models\World;
 use Closure;
@@ -22,6 +23,7 @@ class WorldToolbox
      * @param  array<string, array<int, string>>  $posePostures  the postures each of her poses exists in, by pose name
      * @param  ?array<string, int>  $companions  the other residents she can start talking to, resident id by name; null where she is already talking to someone
      * @param  bool  $userAvailable  whether the user is free to be talked to
+     * @param  bool  $userInSight  whether the user is in the same room as her
      * @param  ?array{x: float, y: float, z: float}  $residentPoint  where she is; null when unknown
      * @param  ?Closure(): ?array{from: string, memory: string}  $recall  brings back one of her memories
      */
@@ -32,6 +34,7 @@ class WorldToolbox
         public readonly array $posePostures = [],
         public readonly ?array $companions = null,
         public readonly bool $userAvailable = true,
+        public readonly bool $userInSight = true,
         public readonly ?array $residentPoint = null,
         private readonly ?Closure $recall = null,
     ) {
@@ -69,7 +72,7 @@ class WorldToolbox
         $tools[] = new WanderTool($this);
         $tools[] = new PlanTool($this);
 
-        if ($this->companions !== null) {
+        if ($this->companions !== null && ($this->companions !== [] || ($this->userAvailable && $this->userInSight))) {
             $tools[] = new TalkToTool($this);
         }
 
@@ -264,6 +267,16 @@ class WorldToolbox
     public function floorName(?string $floorId): ?string
     {
         return collect($this->world->layout['floors'] ?? [])->firstWhere('id', $floorId)['name'] ?? null;
+    }
+
+    /**
+     * Whether she may enter a place on her own; null when anyone may.
+     *
+     * @param  array<string, mixed>  $zone
+     */
+    public function accessNote(array $zone): ?string
+    {
+        return app(ApplyResidentZoneAccess::class)->note($zone);
     }
 
     /**

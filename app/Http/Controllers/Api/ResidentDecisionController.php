@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\AppendWorldConversationContext;
+use App\Actions\ApplyResidentZoneAccess;
 use App\Actions\BuildResidentWorldPrompt;
 use App\Actions\RecallResidentMemory;
 use App\Actions\ResolveUserActivity;
@@ -47,8 +48,8 @@ class ResidentDecisionController extends Controller
     ): JsonResponse {
         $worldUser = $this->resolveWorldUser($request, $world);
         $worldSession = $worldUser->sessions()->findOrFail($session);
-        $worldModel = $worldUser->world;
-        $worldResident = $worldModel->residents()->with('assistant')->findOrFail($resident);
+        $worldResident = $worldUser->world->residents()->with('assistant')->findOrFail($resident);
+        $worldModel = app(ApplyResidentZoneAccess::class)->handle($worldUser->world, $worldResident);
         $assistant = $worldResident->assistant;
         $validated = $request->validated();
 
@@ -97,14 +98,11 @@ class ResidentDecisionController extends Controller
         $busyWith = isset($validated['userBusyWith']) && $validated['userBusyWith'] !== $worldResident->id
             ? $worldModel->residents()->with('assistant')->find($validated['userBusyWith'])?->assistant->name
             : null;
-        $director = new PromptDirector(app(AppendWorldConversationContext::class)->handle($assistant, $worldModel, $positions, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], $busyWith, $residentActivity));
-        $director->append('available activities', $buildResidentWorldPrompt->availableActivities($worldModel, $assistant, $location, $occupiedSpots, $posture));
         $busyWithOthers = collect($validated['busyResidents'] ?? [])->mapWithKeys(fn (array $busy) => [(int) $busy['id'] => $busy['talkingWith'] ?? null])->all();
-        $companions = $this->companions($worldModel, $worldResident, $worldSession, array_keys($busyWithOthers));
-        $others = $buildResidentWorldPrompt->companions($worldModel, $worldResident, $positions, $busyWithOthers);
-        if ($others !== []) {
-            $director->append('others in this world', "Others in this world:\n".implode("\n", $others));
-        }
+        $director = new PromptDirector(app(AppendWorldConversationContext::class)->handle($assistant, $worldModel, $positions, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], $busyWith, $residentActivity, $busyWithOthers));
+        $director->append('available activities', $buildResidentWorldPrompt->availableActivities($worldModel, $assistant, $location, $occupiedSpots, $posture));
+        $companions = $this->companions($worldModel, $worldResident, $worldSession, $positions, array_keys($busyWithOthers));
+        $userInSight = $residentPoint !== null && isset($positions['user']) && $resolveWorldState->sharesRoom($worldModel->layout ?? [], $residentPoint, $positions['user']);
         $recentConversation = $buildResidentWorldPrompt->recentConversation($conversation);
         if ($recentConversation !== null) {
             $director->append('recent conversation', $recentConversation);
@@ -113,7 +111,7 @@ class ResidentDecisionController extends Controller
         $director->except(['opening_message', 'voice mode', 'image handling', 'OOC mode', 'emotion tags', 'pose tags']);
         $director->withLongTermMemory($conversation);
 
-        $toolbox = new WorldToolbox($worldModel, $location['zoneChain'], $occupiedSpots, $assistant->posturesByPoseName(), $companions, userAvailable: $busyWith === null, residentPoint: $residentPoint, recall: fn () => app(RecallResidentMemory::class)->handle($assistant, $request->user()));
+        $toolbox = new WorldToolbox($worldModel, $location['zoneChain'], $occupiedSpots, $assistant->posturesByPoseName(), $companions, userAvailable: $busyWith === null, userInSight: $userInSight, residentPoint: $residentPoint, recall: fn () => app(RecallResidentMemory::class)->handle($assistant, $request->user()));
 
         try {
             $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
@@ -134,14 +132,21 @@ class ResidentDecisionController extends Controller
 
     /**
      * The residents she can start talking to, resident id by name: everyone
-     * else in the world who is not talking with someone, on the way to talk
-     * to someone, or being walked over to.
+     * in the same room as her who is not talking with someone, on the way to
+     * talk to someone, or being walked over to.
      *
+     * @param  ?array{user?: array{x: float, y: float, z: float}, residents?: array<int|string, array{x: float, y: float, z: float}>}  $positions
      * @param  array<int, int>  $busyResidentIds  residents the world reports busy
      * @return array<string, int>
      */
-    private function companions(World $world, WorldResident $resident, WorldSession $session, array $busyResidentIds): array
+    private function companions(World $world, WorldResident $resident, WorldSession $session, ?array $positions, array $busyResidentIds): array
     {
+        $own = $positions['residents'][$resident->id] ?? null;
+        if ($own === null) {
+            return [];
+        }
+        $resolveWorldState = new ResolveWorldState;
+
         $busyAssistantIds = Conversation::liveInSession($session->id)
             ->get(['owner_id', 'counterpart_id'])
             ->flatMap(fn (Conversation $conversation) => [$conversation->owner_id, $conversation->counterpart_id])
@@ -149,6 +154,7 @@ class ResidentDecisionController extends Controller
 
         return $world->residents()->with('assistant')->whereKeyNot($resident->id)->get()
             ->reject(fn (WorldResident $other) => in_array($other->assistant_id, $busyAssistantIds, true) || in_array($other->id, $busyResidentIds, true))
+            ->filter(fn (WorldResident $other) => isset($positions['residents'][$other->id]) && $resolveWorldState->sharesRoom($world->layout ?? [], $own, $positions['residents'][$other->id]))
             ->mapWithKeys(fn (WorldResident $other) => [$other->assistant->name => $other->id])
             ->all();
     }

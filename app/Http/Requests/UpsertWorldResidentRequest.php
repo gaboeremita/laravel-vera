@@ -32,6 +32,11 @@ class UpsertWorldResidentRequest extends FormRequest
             'behaviorSettings.radius' => ['nullable', 'numeric', 'min:0.1', 'max:3'],
             'openingMessage' => ['nullable', 'string'],
             'customPrompt' => ['nullable', 'string'],
+            'zoneAccess' => ['nullable', 'array:tags,zones'],
+            'zoneAccess.tags' => ['sometimes', 'array', 'list'],
+            'zoneAccess.tags.*' => ['required', 'string', 'distinct:ignore_case', 'max:64'],
+            'zoneAccess.zones' => ['sometimes', 'array', 'list'],
+            'zoneAccess.zones.*' => ['required', 'string', 'distinct', 'regex:/^[a-z0-9-]+$/'],
         ];
     }
 }

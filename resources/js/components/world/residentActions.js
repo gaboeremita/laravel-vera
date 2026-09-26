@@ -1,14 +1,14 @@
 import { claimSpot, releaseSpot } from './spotOccupancy.js';
 import { floorAt } from './worldLocation.js';
+import { canEnterZone } from './zoneAccess.js';
 
 function resolveTarget(layout, id) {
 	const zone = layout?.zones?.find((candidate) => candidate.id === id);
-	if (zone) return { point: zone.entry, isPrivate: zone.private };
+	if (zone) return { point: zone.entry, zoneId: zone.id };
 
 	const object = layout?.objects?.find((candidate) => candidate.id === id);
 	if (!object) return null;
-	const objectZone = layout.zones.find((candidate) => candidate.id === object.zoneId);
-	return { point: object.spots[0]?.approach ?? object.position, near: true, isPrivate: Boolean(objectZone?.private) };
+	return { point: object.spots[0]?.approach ?? object.position, near: true, zoneId: object.zoneId ?? null };
 }
 
 const DO_HOLD_MS = 6000;
@@ -74,8 +74,9 @@ async function talkTo(action, toUser, { commands, layout, getFollowTarget, getRe
  * first step that does not complete.
  */
 export async function executeAction(action, context) {
-	const { commands, layout, getFollowTarget, fromUser, residentId, occupiedSpots, claimTarget, releaseTarget, onStepStart, onStepEnd } = context;
+	const { commands, layout, getFollowTarget, fromUser, zoneAccess, residentId, occupiedSpots, claimTarget, releaseTarget, onStepStart, onStepEnd } = context;
 	if (!commands) return { outcome: 'failed', reason: 'not ready to move yet' };
+	const keptOut = (zoneId) => !fromUser && zoneId != null && !canEnterZone(layout, zoneId, zoneAccess);
 
 	switch (action.verb) {
 		case 'go_to': {
@@ -86,7 +87,7 @@ export async function executeAction(action, context) {
 			}
 			const target = resolveTarget(layout, action.target);
 			if (!target) return { outcome: 'failed', reason: `there is no place or thing called "${action.target}" here any more` };
-			if (target.isPrivate && !fromUser) return { outcome: 'failed', reason: 'that is a private place' };
+			if (keptOut(target.zoneId)) return { outcome: 'failed', reason: 'that is a private place' };
 			return commands.goTo(target.point, { near: Boolean(target.near) });
 		}
 		case 'follow':
@@ -97,7 +98,7 @@ export async function executeAction(action, context) {
 			if (!action.target) return commands.wander();
 			const zone = layout?.zones?.find((candidate) => candidate.id === action.target);
 			if (!zone) return { outcome: 'failed', reason: `there is no place called "${action.target}" here any more` };
-			if (zone.private && !fromUser) return { outcome: 'failed', reason: 'that is a private place' };
+			if (keptOut(zone.id)) return { outcome: 'failed', reason: 'that is a private place' };
 			return commands.wander({ outline: zone.outline, y: zone.entry.y });
 		}
 		case 'stop':
@@ -108,8 +109,7 @@ export async function executeAction(action, context) {
 			const { object, spot } = found;
 			const activity = spot.activities.find((candidate) => candidate.id === action.activity);
 			if (!activity) return { outcome: 'failed', reason: `"${action.activity}" cannot be done at ${spot.id}` };
-			const objectZone = layout.zones.find((candidate) => candidate.id === object.zoneId);
-			if (objectZone?.private && !fromUser) return { outcome: 'failed', reason: 'that is a private place' };
+			if (keptOut(object.zoneId)) return { outcome: 'failed', reason: 'that is a private place' };
 			if (!claimSpot(occupiedSpots, spot, residentId)) return { outcome: 'failed', reason: 'spot taken' };
 			const release = () => releaseSpot(occupiedSpots, spot.id, residentId);
 			const result = await commands.use({

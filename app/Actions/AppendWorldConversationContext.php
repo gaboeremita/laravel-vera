@@ -13,6 +13,7 @@ class AppendWorldConversationContext
         private readonly ResolveWorldState $resolveWorldState = new ResolveWorldState,
         private readonly BuildResidentWorldPrompt $buildResidentWorldPrompt = new BuildResidentWorldPrompt,
         private readonly ResolveSpotStacking $resolveSpotStacking = new ResolveSpotStacking,
+        private readonly ApplyResidentZoneAccess $applyResidentZoneAccess = new ApplyResidentZoneAccess,
     ) {}
 
     /**
@@ -21,8 +22,9 @@ class AppendWorldConversationContext
      * @param  array<int, array{spotId: string, holders: array<int, string>}>  $stackedSpots
      * @param  ?string  $userTalkingWith  the name of whoever the user is busy talking with
      * @param  ?array{posture: string, object: ?array, activity: ?array}  $residentActivity
+     * @param  array<int, ?int>  $busyResidents  for each resident who is busy, the resident they are talking with or on their way to
      */
-    public function handle(Assistant $assistant, ?World $world, ?array $positions = null, ?WorldSession $session = null, ?array $userActivity = null, array $stackedSpots = [], ?string $userTalkingWith = null, ?array $residentActivity = null): array
+    public function handle(Assistant $assistant, ?World $world, ?array $positions = null, ?WorldSession $session = null, ?array $userActivity = null, array $stackedSpots = [], ?string $userTalkingWith = null, ?array $residentActivity = null, array $busyResidents = []): array
     {
         if ($world === null) {
             return $assistant->prompt;
@@ -34,6 +36,8 @@ class AppendWorldConversationContext
             throw new AuthorizationException('The assistant is not a resident of this world.');
         }
 
+        $world = $this->applyResidentZoneAccess->handle($world, $resident);
+
         $prompt = $assistant->prompt;
         $prompt['world_context'] = array_filter([$world->contextPromptFor($assistant->kind), $resident->custom_prompt]);
 
@@ -43,7 +47,9 @@ class AppendWorldConversationContext
             $state = $this->resolveWorldState->handle($world, $positions);
             $residentZone = $state['residents'][$resident->id]['zone'];
             $stacking = $this->resolveSpotStacking->handle($world, $resident, $stackedSpots);
-            $prompt['world_state'] = $this->buildResidentWorldPrompt->worldState($world, $state['residents'][$resident->id], $state['user'], $userActivity, $stacking, $userTalkingWith, $residentActivity);
+            $userInSight = isset($positions['user']) && $this->resolveWorldState->sharesRoom($world->layout, $residentPosition, $positions['user']);
+            $withYou = $this->buildResidentWorldPrompt->companions($world, $resident, $positions, $busyResidents);
+            $prompt['world_state'] = $this->buildResidentWorldPrompt->worldState($world, $state['residents'][$resident->id], $state['user'], $userActivity, $stacking, $userTalkingWith, $residentActivity, $userInSight, $withYou);
         }
 
         if (! empty($world->layout['zones'])) {

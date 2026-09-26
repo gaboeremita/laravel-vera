@@ -34,9 +34,11 @@ class BuildResidentWorldPrompt
      * @param  array<int, string>  $stacking  who lies on top of her and whom she lies on top of
      * @param  ?string  $userTalkingWith  the name of whoever the user is busy talking with
      * @param  ?array{posture: string, object: ?array, activity: ?array}  $residentActivity  her own posture and what she is on or doing
+     * @param  bool  $userInSight  whether the user is in the same room as her
+     * @param  array<int, string>  $withYou  the other residents in the same room as her
      * @return array<string, string|array<int, string>>
      */
-    public function worldState(World $world, array $resident, ?array $user, ?array $userActivity = null, array $stacking = [], ?string $userTalkingWith = null, ?array $residentActivity = null): array
+    public function worldState(World $world, array $resident, ?array $user, ?array $userActivity = null, array $stacking = [], ?string $userTalkingWith = null, ?array $residentActivity = null, bool $userInSight = true, array $withYou = []): array
     {
         $layout = $world->layout ?? [];
         $state = ['you are in' => $this->placePhrase($resident).$this->activityPhrase($residentActivity)];
@@ -55,7 +57,9 @@ class BuildResidentWorldPrompt
             }
         }
 
-        if ($user !== null) {
+        if ($user !== null && ! $userInSight) {
+            $state['the user is'] = 'somewhere out of sight';
+        } elseif ($user !== null) {
             $state['the user is'] = sprintf(
                 '%sin %s, %s%s%s',
                 $this->relativeFloor($resident['floor'], $user['floor']),
@@ -64,6 +68,10 @@ class BuildResidentWorldPrompt
                 $this->activityPhrase($userActivity),
                 $userTalkingWith !== null ? ", busy talking with {$userTalkingWith}" : '',
             );
+        }
+
+        if ($withYou !== []) {
+            $state['here with you'] = $withYou;
         }
 
         if ($stacking !== []) {
@@ -133,8 +141,8 @@ class BuildResidentWorldPrompt
     }
 
     /**
-     * The other residents of the world, where they are from her, and the
-     * conversation she has with each of them, where it stopped.
+     * The other residents in the same room as her, how far away they are, who
+     * they are busy with and where her conversation with each of them stopped.
      *
      * @param  ?array{user?: array{x: float, y: float, z: float}, residents?: array<int|string, array{x: float, y: float, z: float}>}  $positions
      * @param  array<int, ?int>  $busyWith  for each resident who is busy, the resident she is talking with or on her way to
@@ -143,16 +151,20 @@ class BuildResidentWorldPrompt
     public function companions(World $world, WorldResident $resident, ?array $positions, array $busyWith = []): array
     {
         $resolveWorldState = new ResolveWorldState;
+        $layout = $world->layout ?? [];
         $own = $positions['residents'][$resident->id] ?? null;
+        if ($own === null) {
+            return [];
+        }
         $residents = $world->residents()->with('assistant')->get();
         $names = $residents->mapWithKeys(fn (WorldResident $candidate) => [$candidate->id => $candidate->assistant->name]);
 
-        return $residents->reject(fn (WorldResident $other) => $other->id === $resident->id)->values()
-            ->map(function (WorldResident $other) use ($world, $resident, $positions, $own, $resolveWorldState, $busyWith, $names): string {
-                $point = $positions['residents'][$other->id] ?? null;
-                $where = $point === null
-                    ? 'somewhere in the world'
-                    : sprintf('in %s, %s', $this->placePhrase($resolveWorldState->locate($world->layout ?? [], $point)), $this->distancePhrase($own === null ? null : $resolveWorldState->distance($own, $point)));
+        return $residents
+            ->reject(fn (WorldResident $other) => $other->id === $resident->id)
+            ->filter(fn (WorldResident $other) => isset($positions['residents'][$other->id]) && $resolveWorldState->sharesRoom($layout, $own, $positions['residents'][$other->id]))
+            ->values()
+            ->map(function (WorldResident $other) use ($resident, $positions, $own, $resolveWorldState, $busyWith, $names): string {
+                $where = $this->distancePhrase($resolveWorldState->distance($own, $positions['residents'][$other->id]));
                 $paused = Conversation::between($resident->assistant, $other->assistant)
                     ->where('status', ConversationStatus::Paused)
                     ->latest('updated_at')
@@ -377,8 +389,10 @@ class BuildResidentWorldPrompt
     private function zoneName(array $layout, array $zone): string
     {
         $floor = collect($layout['floors'] ?? [])->firstWhere('id', $zone['floorId']);
+        $name = $floor !== null ? "{$zone['name']} [{$zone['id']}] ({$floor['name']})" : "{$zone['name']} [{$zone['id']}]";
+        $access = (new ApplyResidentZoneAccess)->note($zone);
 
-        return $floor !== null ? "{$zone['name']} [{$zone['id']}] ({$floor['name']})" : "{$zone['name']} [{$zone['id']}]";
+        return $access !== null ? "{$name}, {$access}" : $name;
     }
 
     private function objectPhrase(array $object): string

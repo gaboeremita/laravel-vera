@@ -3,8 +3,10 @@ import { route } from 'ziggy-js';
 import { Square, SquareCheck } from 'lucide-react';
 import { api } from '../utils/api.js';
 import Accordion from './common/Accordion.jsx';
+import { parseZoneAccess } from './world/zoneAccess.js';
 
-const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, behavior: 'stationary', openingMessage: '', customPrompt: '' };
+const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, behavior: 'stationary', openingMessage: '', customPrompt: '', zoneAccess: null };
+const ZONE_ACCESS_EXAMPLE = '{ "tags": ["deprecated"], "zones": ["mona-house"] }';
 const FIELD_LABEL = 'text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1';
 const FIELD_INPUT = 'w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors';
 const GROUP_INDENT = 'ml-4 border-l border-line-1 pl-3 space-y-2';
@@ -19,6 +21,12 @@ function radiansToDegrees(radians) {
 	return Math.round((radians * 180) / Math.PI * 100) / 100;
 }
 
+function zoneAccessText(zoneAccess) {
+	const tags = zoneAccess?.tags ?? [];
+	const zones = zoneAccess?.zones ?? [];
+	return tags.length === 0 && zones.length === 0 ? '' : JSON.stringify({ tags, zones });
+}
+
 function toDraft(placement) {
 	return {
 		position: placement.position,
@@ -26,11 +34,12 @@ function toDraft(placement) {
 		behavior: placement.behavior,
 		openingMessage: placement.openingMessage ?? '',
 		customPrompt: placement.customPrompt ?? '',
+		zoneAccess: zoneAccessText(placement.zoneAccess),
 	};
 }
 
-function toPlacement({ facing, ...draft }) {
-	return { ...draft, rotation: { x: 0, y: (facing * Math.PI) / 180, z: 0 } };
+function toPlacement({ facing, zoneAccess, ...draft }) {
+	return { ...draft, rotation: { x: 0, y: (facing * Math.PI) / 180, z: 0 }, zoneAccess: parseZoneAccess(zoneAccess).zoneAccess };
 }
 
 function isDirty(draft, resident) {
@@ -40,10 +49,11 @@ function isDirty(draft, resident) {
 		|| draft.position.y !== resident.position.y
 		|| draft.position.z !== resident.position.z
 		|| draft.openingMessage !== (resident.openingMessage ?? '')
-		|| draft.customPrompt !== (resident.customPrompt ?? '');
+		|| draft.customPrompt !== (resident.customPrompt ?? '')
+		|| draft.zoneAccess !== zoneAccessText(resident.zoneAccess);
 }
 
-function ResidentRow({ candidate, resident, onAdd, onRemove, onUpdate }) {
+function ResidentRow({ candidate, resident, privateZones, onAdd, onRemove, onUpdate }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [draft, setDraft] = useState(toDraft(resident ?? DEFAULT_PLACEMENT));
 	const [isSaving, setIsSaving] = useState(false);
@@ -64,6 +74,7 @@ function ResidentRow({ candidate, resident, onAdd, onRemove, onUpdate }) {
 	}
 
 	const dirty = isDirty(draft, resident);
+	const zoneAccessError = parseZoneAccess(draft.zoneAccess).error;
 	const save = async () => {
 		setIsSaving(true);
 		await onUpdate(candidate, toPlacement(draft));
@@ -137,13 +148,30 @@ function ResidentRow({ candidate, resident, onAdd, onRemove, onUpdate }) {
 					className={`${FIELD_INPUT} resize-none`}
 				/>
 			</div>
+			<div>
+				<label className={FIELD_LABEL}>Zone Access <span className="normal-case text-fg-3">(JSON: the groups she belongs to and the private places she may enter on her own)</span></label>
+				<textarea
+					value={draft.zoneAccess}
+					onChange={(event) => setDraft((current) => ({ ...current, zoneAccess: event.target.value }))}
+					placeholder={ZONE_ACCESS_EXAMPLE}
+					rows={2}
+					spellCheck={false}
+					className={`${FIELD_INPUT} resize-none font-mono`}
+				/>
+				{zoneAccessError && <p className="text-danger text-xs mt-1">{zoneAccessError}</p>}
+				{privateZones.length > 0 && (
+					<p className="text-fg-3 text-xs mt-1">
+						Private places: {privateZones.map((zone) => `${zone.id}${zone.accessTags?.length ? ` (${zone.accessTags.join(', ')})` : ''}${zone.secret ? ' [secret]' : ''}`).join(', ')}
+					</p>
+				)}
+			</div>
 			<div className="flex justify-end">
 				<button
 					type="button"
 					onClick={save}
-					disabled={!dirty || isSaving}
+					disabled={!dirty || isSaving || zoneAccessError !== null}
 					className={`text-[0.7rem] tracking-[0.1em] px-4 py-1.5 transition-colors ${
-						!dirty || isSaving ? 'bg-bg-3 text-fg-3 cursor-default' : 'button-success cursor-pointer'
+						!dirty || isSaving || zoneAccessError !== null ? 'bg-bg-3 text-fg-3 cursor-default' : 'button-success cursor-pointer'
 					}`}
 				>
 					{isSaving ? 'SAVING...' : 'SAVE'}
@@ -153,7 +181,7 @@ function ResidentRow({ candidate, resident, onAdd, onRemove, onUpdate }) {
 	);
 }
 
-function KindList({ label, candidates, residentsByAssistantId, onAdd, onRemove, onUpdate }) {
+function KindList({ label, candidates, residentsByAssistantId, privateZones, onAdd, onRemove, onUpdate }) {
 	const rows = candidates.filter((candidate) => isEligible(candidate) || residentsByAssistantId.has(candidate.id));
 	if (rows.length === 0) return null;
 
@@ -166,6 +194,7 @@ function KindList({ label, candidates, residentsByAssistantId, onAdd, onRemove, 
 						key={candidate.id}
 						candidate={candidate}
 						resident={residentsByAssistantId.get(candidate.id) ?? null}
+						privateZones={privateZones}
 						onAdd={onAdd}
 						onRemove={onRemove}
 						onUpdate={onUpdate}
@@ -182,6 +211,7 @@ export default function WorldResidentsEditor({ world, onWorldChange, addToast })
 	const [collapsed, setCollapsed] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 	const residentsByAssistantId = useMemo(() => new Map(world.residents.map((resident) => [resident.assistant.id, resident])), [world.residents]);
+	const privateZones = useMemo(() => (world.layout?.zones ?? []).filter((zone) => zone.private), [world.layout]);
 
 	useEffect(() => {
 		const load = async () => {
@@ -198,7 +228,7 @@ export default function WorldResidentsEditor({ world, onWorldChange, addToast })
 
 	const updateResident = async (assistant, placement) => {
 		if (!world.id) {
-			const resident = { id: `staged-${assistant.id}`, assistant, position: placement.position, rotation: placement.rotation, behavior: placement.behavior, openingMessage: placement.openingMessage, customPrompt: placement.customPrompt };
+			const resident = { id: `staged-${assistant.id}`, assistant, position: placement.position, rotation: placement.rotation, behavior: placement.behavior, openingMessage: placement.openingMessage, customPrompt: placement.customPrompt, zoneAccess: placement.zoneAccess };
 			onWorldChange((current) => ({ ...current, residents: [...current.residents.filter((item) => item.assistant.id !== assistant.id), resident] }));
 			return;
 		}
@@ -236,8 +266,8 @@ export default function WorldResidentsEditor({ world, onWorldChange, addToast })
 					<p className="text-fg-3 text-xs">Loading eligible characters...</p>
 				) : (
 					<>
-						<KindList label="Assistants" candidates={assistantCandidates} residentsByAssistantId={residentsByAssistantId} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} />
-						<KindList label="NPCs" candidates={npcCandidates} residentsByAssistantId={residentsByAssistantId} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} />
+						<KindList label="Assistants" candidates={assistantCandidates} residentsByAssistantId={residentsByAssistantId} privateZones={privateZones} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} />
+						<KindList label="NPCs" candidates={npcCandidates} residentsByAssistantId={residentsByAssistantId} privateZones={privateZones} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} />
 					</>
 				)}
 			</div>

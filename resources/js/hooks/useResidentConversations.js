@@ -3,9 +3,9 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { stripForSpeech } from '../utils/parsers.js';
 import { speakingSeconds } from '../components/world/residentMotion.js';
+import { voicesLine } from '../components/world/worldVoice.js';
 
 const TURN_GAP_MS = 5000;
-const EARSHOT = 12;
 const SPEECH_LINGER_MS = 4000;
 const PAUSED_RECHECK_MS = 500;
 
@@ -16,7 +16,7 @@ const PAUSED_RECHECK_MS = 500;
  * it. Both residents are busy for as long as it runs; a paused world holds
  * it mid-way.
  */
-export function useResidentConversations({ enabled, paused = false, worldId, sessionId, residents, residentCommands, residentPositions, residentVoices, getPositions, onSpeech, addToast }) {
+export function useResidentConversations({ enabled, paused = false, voiceEnabled = false, worldId, sessionId, residents, residentCommands, residentPositions, residentVoices, getPositions, onSpeech, addToast }) {
 	const conversationsRef = useRef(new Map());
 	const [conversations, setConversations] = useState([]);
 	const latestRef = useRef({});
@@ -27,7 +27,7 @@ export function useResidentConversations({ enabled, paused = false, worldId, ses
 	}, [paused]);
 
 	useEffect(() => {
-		latestRef.current = { residents, getPositions, onSpeech, addToast };
+		latestRef.current = { residents, getPositions, onSpeech, addToast, voiceEnabled };
 	});
 
 	const publish = useCallback(() => {
@@ -43,7 +43,7 @@ export function useResidentConversations({ enabled, paused = false, worldId, ses
 		const user = latestRef.current.getPositions().user;
 		const spoken = stripForSpeech(text);
 		let seconds = 0;
-		if (resident && position && user && spoken && Math.hypot(position.x - user.x, position.z - user.z) <= EARSHOT) {
+		if (resident && position && user && spoken && voicesLine({ voiceEnabled: latestRef.current.voiceEnabled, distance: Math.hypot(position.x - user.x, position.z - user.z) })) {
 			try {
 				const response = await api.post(route('voice.synthesize', { assistant: resident.assistant.id }), { text: spoken });
 				if (response.ok) seconds = (await residentVoices.current.get(residentId)?.(await response.blob())) ?? 0;

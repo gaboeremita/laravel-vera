@@ -35,7 +35,7 @@ function requestDecision($test, array $scenario, array $payload = []): TestRespo
 
     return $test->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->id, $session->id, $resident->id]), [
         'positions' => [
-            'user' => ['x' => -5, 'y' => 0, 'z' => 2],
+            'user' => ['x' => 8, 'y' => 0, 'z' => -8],
             'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]],
         ],
         ...$payload,

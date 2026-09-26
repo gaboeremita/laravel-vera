@@ -238,3 +238,23 @@ test('a resident who turns out busy on arrival fails with the reason given', asy
 
 	assert.deepEqual(result, { outcome: 'failed', reason: 'they are busy' });
 });
+
+test('she keeps out of a private place on her own unless it is open to her, and goes in when the user asks', async () => {
+	const privateLayout = {
+		zones: [{ id: 'hideout', entry: { x: 4, y: 0, z: 4 }, parentId: null, private: true, accessTags: ['deprecated'], activities: [] }],
+		objects: [],
+	};
+
+	const outsider = fakeCommands();
+	const refused = await executeAction({ verb: 'go_to', target: 'hideout' }, { commands: outsider, layout: privateLayout, fromUser: false, zoneAccess: { tags: [], zones: [] } });
+	assert.deepEqual(refused, { outcome: 'failed', reason: 'that is a private place' });
+	assert.equal(outsider.calls.length, 0);
+
+	const member = fakeCommands();
+	const entered = await executeAction({ verb: 'go_to', target: 'hideout' }, { commands: member, layout: privateLayout, fromUser: false, zoneAccess: { tags: ['deprecated'], zones: [] } });
+	assert.equal(entered.outcome, 'completed');
+
+	const asked = fakeCommands();
+	const sent = await executeAction({ verb: 'go_to', target: 'hideout' }, { commands: asked, layout: privateLayout, fromUser: true });
+	assert.equal(sent.outcome, 'completed');
+});

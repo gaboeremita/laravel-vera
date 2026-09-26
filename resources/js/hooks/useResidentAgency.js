@@ -142,6 +142,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, layo
 						claimTarget: (target) => latest().claimTarget?.(resident.id, target) ?? true,
 						releaseTarget: (target) => latest().releaseTarget?.(resident.id, target),
 						fromUser: false,
+						zoneAccess: resident.zoneAccess,
 						residentId: resident.id,
 						occupiedSpots: occupiedSpots.current,
 						onStepStart: (step, index, total) => {

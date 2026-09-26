@@ -47,7 +47,7 @@ function say(Conversation $conversation, Assistant $speaker, string $content, in
 function residentPositions(array $scenario): array
 {
     return [
-        'user' => ['x' => -5, 'y' => 0, 'z' => 2],
+        'user' => ['x' => 8, 'y' => 0, 'z' => -8],
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -3], $scenario[6]->id => ['x' => 6, 'y' => 0, 'z' => -3]],
     ];
 }
@@ -66,13 +66,40 @@ function takeTurn($test, array $scenario, Conversation $conversation): TestRespo
     return $test->actingAs($user)->postJson(route('worlds.sessions.conversations.turns.store', [$world->id, $session->id, $conversation->id]), ['positions' => residentPositions($scenario)]);
 }
 
-it('tells her who else is in the world before she decides', function () {
+it('tells her who is in the room with her before she decides', function () {
     $scenario = twoResidentScenario();
     fakeTurn(finalAnswerResponse('(Quiet) *stays put*'));
 
     decide($this, $scenario)->assertCreated();
 
-    expect(sentSystemPrompt())->toContain("Others in this world:\nVera: in Pool terrace")->toContain('about 1 m away from you');
+    expect(sentSystemPrompt())->toContain('Here with you: Vera: about 1 m away from you');
+});
+
+it('keeps residents and the user in other rooms out of what she knows and whom she can talk to', function () {
+    $scenario = twoResidentScenario();
+    [$user, , , $world, $resident, $session, $vera] = $scenario;
+    fakeTurn(finalAnswerResponse('(Quiet) *stays put*'));
+
+    $this->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->id, $session->id, $resident->id]), ['positions' => [
+        'user' => ['x' => -5, 'y' => 0, 'z' => 2],
+        'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3], $vera->id => ['x' => -2, 'y' => 0, 'z' => 8]],
+    ]])->assertCreated();
+
+    expect(collect(Http::recorded()[0][0]['tools'])->firstWhere('function.name', 'talk_to'))->toBeNull()
+        ->and(sentSystemPrompt())->toContain('The user is: somewhere out of sight')
+        ->not->toContain('Here with you')
+        ->not->toContain('Music studio, on the Ground floor, about');
+});
+
+it('tells both residents who is in the room on a conversation turn', function () {
+    $scenario = twoResidentScenario();
+    [, $assistant, , , , $session, $vera] = $scenario;
+    $conversation = Conversation::factory()->betweenAssistants($vera->assistant, $assistant)->forWorldSession($session)->create();
+    fakeTurn(finalAnswerResponse('Nice view.'));
+
+    takeTurn($this, $scenario, $conversation)->assertSuccessful();
+
+    expect(sentSystemPrompt())->toContain('Here with you: Yinlin: about 1 m away from you')->toContain('The user is: in Pool terrace');
 });
 
 it('decides to talk to the user without saving the line before she gets there', function () {
@@ -181,7 +208,7 @@ it('leaves residents the world reports busy out of talk_to and says who they are
 
     $talkTo = collect(Http::recorded()[0][0]['tools'])->firstWhere('function.name', 'talk_to');
     expect($talkTo['function']['parameters']['properties']['target']['enum'])->not->toContain('Vera')
-        ->and(sentSystemPrompt())->toContain('Vera: in Pool terrace')->toContain(', busy with you');
+        ->and(sentSystemPrompt())->toContain('Vera: about 1 m away from you, busy with you');
 });
 
 it('answers with the resident who did not speak last', function () {

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { floorForHeight, projectToMap, spreadLabels, zonesOnFloor } from './worldMapProjection.js';
+import { floorForHeight, labelledZones, projectToMap, spreadLabels, spreadWideLabels } from './worldMapProjection.js';
 
 const SNAPSHOT_INTERVAL_MS = 100;
 const MINIMAP_WIDTH = 220;
 const LABEL_SPACING = 14;
+const ZONE_LABEL_HEIGHT = 22;
+const ZONE_LABEL_CHARACTER_WIDTH = 9;
+const ZONE_LABEL_PADDING = 16;
 
 function zoneCentroid(outline) {
 	const sum = outline.reduce((total, [x, z]) => ({ x: total.x + x, z: total.z + z }), { x: 0, z: 0 });
@@ -58,13 +61,13 @@ export default function WorldMap({ layout, floorMaps, playerView, residents, res
 		return { ...resident, ...project(resident), floorName: floor?.name ?? null, onShownFloor };
 	}), LABEL_SPACING);
 	const player = snapshot.player && (floors.length === 0 || snapshot.playerFloorId === map.floorId) ? { ...project(snapshot.player), yaw: snapshot.player.yaw } : null;
-	const zoneLabels = expanded ? zonesOnFloor(layout, map.floorId).filter((zone) => !zone.parentId).map((zone) => ({ id: zone.id, name: zone.name, ...project(zoneCentroid(zone.outline)) })) : [];
+	const zoneLabels = expanded ? spreadWideLabels(labelledZones(layout, map.floorId).map((zone) => ({ id: zone.id, name: zone.name, width: zone.name.length * ZONE_LABEL_CHARACTER_WIDTH + ZONE_LABEL_PADDING, ...project(zoneCentroid(zone.outline)) })), ZONE_LABEL_HEIGHT) : [];
 
 	const mapView = (
 		<div className="relative overflow-hidden border border-line-1 bg-black" style={size}>
 			<img src={map.url} alt="" className="absolute inset-0 h-full w-full opacity-80" draggable={false} />
 			{zoneLabels.map((zone) => (
-				<span key={zone.id} className="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-fg-2 text-[0.6rem] tracking-[0.1em]" style={{ left: zone.x, top: zone.y }}>{zone.name.toUpperCase()}</span>
+				<span key={zone.id} className="world-hud-panel world-hud-label absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap px-2 py-0.5 text-fg-1 text-[0.7rem]" style={{ left: zone.labelX, top: zone.labelY }}>{zone.name.toUpperCase()}</span>
 			))}
 			{residentMarkers.map((marker) => {
 				const active = marker.id === activeResidentId;
