@@ -36,6 +36,7 @@ class WorldResidentController extends Controller
         $resident = $world->residents()->updateOrCreate(['assistant_id' => $assistant->id], [
             'position' => $validated['position'],
             'rotation' => $validated['rotation'] ?? null,
+            'posture' => $validated['posture'] ?? 'standing',
             'behavior' => $validated['behavior'],
             'behavior_settings' => $validated['behaviorSettings'] ?? null,
             'opening_message' => $validated['openingMessage'] ?? null,

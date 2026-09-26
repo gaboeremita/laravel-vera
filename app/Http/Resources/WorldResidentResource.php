@@ -35,6 +35,7 @@ class WorldResidentResource extends JsonResource
             ],
             'position' => $this->position,
             'rotation' => $this->rotation,
+            'posture' => $this->posture->value,
             'behavior' => $this->behavior->value,
             'behaviorSettings' => $this->behavior_settings,
             'openingMessage' => $this->opening_message,
