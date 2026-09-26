@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
-import { RESIDENT_BUSY, USER_BUSY, describeStep, executeAction } from '../components/world/residentActions.js';
+import { OUTSIDE_AREA, RESIDENT_BUSY, USER_BUSY, describeStep, executeAction } from '../components/world/residentActions.js';
 import { finishActivity, startActivity } from '../components/world/activityLog.js';
 import { fullSpotIds, stackedSpots } from '../components/world/spotOccupancy.js';
 import { idleWait } from '../components/world/residentMotion.js';
+import { onSameFloor } from '../components/world/worldLocation.js';
+import { decisionPace, isFar } from '../components/world/residentDetail.js';
 
 const STAGGER_MS = 2000;
 const RECHECK_MS = 5000;
@@ -15,9 +17,11 @@ const USER_INPUT_EVENTS = ['keydown', 'mousedown', 'mousemove', 'wheel', 'touchs
 /**
  * Runs the self-chosen activities of the world's autonomous residents while
  * the user is in the world: each one decides her next step 10–30 s after the
- * previous one finishes, skipping while the user talks to her, while she is
- * in a conversation with another resident, while the world is paused or the
- * page is hidden, and after five minutes with no input from the user.
+ * previous one finishes (or at her own pace; one to two minutes when she is
+ * more than 30 m from the user), skipping while the user talks
+ * to her, while she is in a conversation with another resident, while she is
+ * on another floor from the user, while the world is paused or the page is
+ * hidden, and after five minutes with no input from the user.
  */
 export function useResidentAgency({ enabled, worldId, sessionId, residents, layout, chatResidentId, residentCommands, occupiedSpots, getPositions, getFollowTarget, getResidentPosition, getUserState, getUserBusyWith, getBusyResidents, claimTarget, releaseTarget, isBusy, isPaused, onSpeak, onThought, addToast }) {
 	const chatResidentRef = useRef(chatResidentId);
@@ -102,13 +106,20 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, layo
 		};
 
 		const live = async (resident, index) => {
-			let wait = idleWait() + index * STAGGER_MS;
+			const ownPace = resident.behaviorSettings?.decisionSeconds ?? null;
+			const paceNow = () => {
+				const positions = latest().getPositions();
+				return decisionPace(ownPace, isFar(positions.residents?.[resident.id], positions.user));
+			};
+			let wait = idleWait('standing', Math.random, paceNow()) + index * STAGGER_MS;
 			while (!cancelled) {
 				await sleep(wait);
 				if (cancelled) return;
 				const commands = residentCommands.current.get(resident.id);
 				const userAway = Date.now() - lastInputAt > USER_AWAY_MS;
-				if (!commands || userAway || document.visibilityState === 'hidden' || chatResidentRef.current === resident.id || latest().isBusy?.(resident.id) || latest().isPaused?.()) {
+				const positions = latest().getPositions();
+				const otherFloor = !onSameFloor(latest().layout, positions.user, positions.residents?.[resident.id]);
+				if (!commands || userAway || otherFloor || document.visibilityState === 'hidden' || chatResidentRef.current === resident.id || latest().isBusy?.(resident.id) || latest().isPaused?.()) {
 					wait = RECHECK_MS;
 					continue;
 				}
@@ -119,7 +130,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, layo
 				} catch (error) {
 					console.error(`[useResidentAgency] ${resident.assistant.name} could not decide what to do`, error);
 					latest().addToast(`${resident.assistant.name} couldn't decide what to do: ${error.message}`, 'error');
-					wait = idleWait();
+					wait = idleWait('standing', Math.random, paceNow());
 					continue;
 				}
 				if (cancelled) return;
@@ -143,6 +154,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, layo
 						releaseTarget: (target) => latest().releaseTarget?.(resident.id, target),
 						fromUser: false,
 						zoneAccess: resident.zoneAccess,
+						area: resident.behaviorSettings?.area ?? [],
 						residentId: resident.id,
 						occupiedSpots: occupiedSpots.current,
 						onStepStart: (step, index, total) => {
@@ -158,12 +170,12 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, layo
 				}
 				running.delete(resident.id);
 				latest().onThought(resident.id, null);
-				if (result.outcome === 'failed' && ![USER_BUSY, RESIDENT_BUSY].includes(result.reason)) {
+				if (result.outcome === 'failed' && ![USER_BUSY, RESIDENT_BUSY, OUTSIDE_AREA].includes(result.reason)) {
 					console.error(`[useResidentAgency] ${resident.assistant.name}'s step failed: ${result.reason}`);
 					latest().addToast(`${resident.assistant.name} couldn't do what she chose: ${result.reason}`, 'error');
 				}
 				await reportOutcome(resident.id, decision.activityId, result);
-				wait = decision.action?.verb === 'plan' && result.outcome === 'failed' ? RATE_LIMITED_WAIT_MS : idleWait(commands.posture());
+				wait = decision.action?.verb === 'plan' && result.outcome === 'failed' ? RATE_LIMITED_WAIT_MS : idleWait(commands.posture(), Math.random, paceNow());
 			}
 		};
 

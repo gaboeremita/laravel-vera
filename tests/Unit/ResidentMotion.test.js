@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { facingAngleForMovement, fadesIdleForPose, headingToward, idleWait, makeClipInPlace, shouldFaceUser, speakingSeconds, turnTowardsAngle } from '../../resources/js/components/world/residentMotion.js';
+import { facingAngleForMovement, fadesIdleForPose, headingToward, idleWait, makeClipInPlace, modelYaw, shouldFaceUser, speakingSeconds, turnTowardsAngle } from '../../resources/js/components/world/residentMotion.js';
 import { findWorldMotionPose } from '../../resources/js/components/world/worldMotionPoses.js';
 
 test('faces the avatar front in its direction of travel', () => {
@@ -68,4 +68,11 @@ test('she settles in and decides half as often while resting on something', () =
 	assert.equal(idleWait('reclining', middle), 40000);
 	assert.equal(idleWait('lying', middle), 40000);
 	assert.equal(idleWait('swimming', middle), 20000);
+});
+
+test('a model faces -Z inside her body whichever VRM version it was exported as', () => {
+	const frontOf = (metaVersion, nativeFrontZ) => Math.round(Math.cos(modelYaw(metaVersion)) * nativeFrontZ);
+
+	assert.equal(frontOf('0', -1), -1);
+	assert.equal(frontOf('1', 1), -1);
 });

@@ -58,7 +58,7 @@ function renderPlan(renderer, scene, bounds, cutHeight) {
 		image.data.set(pixels.subarray(source, source + pixelWidth * 4), row * pixelWidth * 4);
 	}
 	context.putImageData(image, 0, 0);
-	return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : null), 'image/jpeg', 0.85));
+	return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob ?? null), 'image/jpeg', 0.85));
 }
 
 /**
@@ -74,8 +74,8 @@ export async function renderFloorMaps({ renderer, scene, layout, environmentRoot
 		const bounds = floorBounds(layout, floor.id) ?? fallback;
 		if (!bounds) continue;
 		const cutHeight = floorGroundHeight(layout, floor.id, fallbackGroundY) + PLAN_CUT_HEIGHT;
-		const url = await renderPlan(renderer, scene, bounds, cutHeight);
-		if (url) maps.push({ floorId: floor.id, name: floor.name, bounds, url });
+		const blob = await renderPlan(renderer, scene, bounds, cutHeight);
+		if (blob) maps.push({ floorId: floor.id, name: floor.name, bounds, blob });
 	}
 
 	return maps;

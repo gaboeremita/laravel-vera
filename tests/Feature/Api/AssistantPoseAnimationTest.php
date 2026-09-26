@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\DeleteAssistantAssets;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Pose;
@@ -155,3 +156,39 @@ it('deleting a pose also deletes its animation file', function () {
     expect(PoseAnimationFile::where('pose_id', $pose->id)->count())->toBe(0);
     Storage::disk('public')->assertMissing($animationPath);
 });
+
+/**
+ * A second assistant whose pose plays the same stored animation file as the given pose, as copied poses do.
+ */
+function shareAnimationWith(Pose $pose): Pose
+{
+    $other = Assistant::factory()->create(['portrait_type' => 'avatar3d']);
+    $copy = Pose::factory()->create(['assistant_id' => $other->id, 'name' => $pose->name]);
+    $file = $pose->fresh()->animationFile;
+    $copy->animationFile()->create(['path' => $file->path, 'disk' => $file->disk, 'mime_type' => $file->mime_type, 'size' => $file->size, 'original_name' => $file->original_name]);
+
+    return $copy;
+}
+
+it('keeps a stored animation another pose still plays when a pose, its animation or its assistant goes', function (string $removal) {
+    [$user, $assistant, $pose] = setUpPoseForAnimation();
+    $this->actingAs($user)
+        ->postJson(route('assistants.poses.animation.store', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['animation' => UploadedFile::fake()->create('spin.fbx', 512)])
+        ->assertStatus(201);
+    $path = $pose->fresh()->animationFile->path;
+    $copy = shareAnimationWith($pose);
+
+    match ($removal) {
+        'pose' => $this->actingAs($user)->deleteJson(route('assistants.poses.destroy', ['assistant' => $assistant->id, 'pose' => $pose->id]))->assertOk(),
+        'animation' => $this->actingAs($user)->deleteJson(route('assistants.poses.animation.destroy', ['assistant' => $assistant->id, 'pose' => $pose->id]))->assertOk(),
+        'replacement' => $this->actingAs($user)->postJson(route('assistants.poses.animation.store', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['animation' => UploadedFile::fake()->create('spin2.fbx', 512)])->assertStatus(201),
+        'assistant' => app(DeleteAssistantAssets::class)->handle($assistant),
+    };
+
+    Storage::disk('public')->assertExists($path);
+    expect($copy->fresh()->animationFile->path)->toBe($path);
+
+    $copy->animationFile->delete();
+    PoseAnimationFile::releaseStorage('public', $path);
+    Storage::disk('public')->assertMissing($path);
+})->with(['pose', 'animation', 'replacement', 'assistant']);

@@ -1,18 +1,18 @@
 import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Vector3 } from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMUtils } from '@pixiv/three-vrm';
 import { WorldCollision } from './collisionCheck.js';
+import { createGltfLoader } from '../../utils/vrmLoader.js';
 
 export default function WorldEnvironment({ url, onReady, onError }) {
-	const { scene } = useThree();
+	const { scene, gl } = useThree();
 
 	useEffect(() => {
 		let disposed = false;
 		let loadedAsset = null;
 		let collisionWorld = null;
-		const loader = new GLTFLoader();
+		const loader = createGltfLoader(gl);
 
 		loader.load(url, (gltf) => {
 			if (disposed) { VRMUtils.deepDispose(gltf.scene); return; }
@@ -39,7 +39,7 @@ export default function WorldEnvironment({ url, onReady, onError }) {
 				VRMUtils.deepDispose(loadedAsset);
 			}
 		};
-	}, [onError, onReady, scene, url]);
+	}, [gl, onError, onReady, scene, url]);
 
 	return null;
 }

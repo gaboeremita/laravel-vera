@@ -6,6 +6,7 @@ use App\Enums\AssistantPortraitType;
 use App\Enums\Posture;
 use App\Http\Controllers\Controller;
 use App\Models\Pose;
+use App\Models\PoseAnimationFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -115,7 +116,7 @@ class AssistantPoseAnimationController extends Controller
         }
 
         if ($previousPath) {
-            Storage::disk($previousDisk)->delete($previousPath);
+            PoseAnimationFile::releaseStorage($previousDisk, $previousPath);
         }
 
         return response()->json([
@@ -134,8 +135,8 @@ class AssistantPoseAnimationController extends Controller
             return response()->json(['message' => 'No pose animation file found.'], 404);
         }
 
-        Storage::disk($animationFile->disk)->delete($animationFile->path);
         $animationFile->delete();
+        PoseAnimationFile::releaseStorage($animationFile->disk, $animationFile->path);
 
         return response()->json(['message' => 'Pose animation deleted']);
     }

@@ -21,6 +21,7 @@ class WorldResidentResource extends JsonResource
                 'name' => $this->assistant->name,
                 'kind' => $this->assistant->kind->value,
                 'vrmUrl' => $this->assistant->vrm?->url,
+                'vrmLodUrl' => $this->assistant->vrm?->lod_url,
                 'openingMessage' => $this->assistant->opening_message,
                 'poses' => $this->assistant->relationLoaded('poses')
                     ? $this->assistant->poses->map(fn ($pose) => [

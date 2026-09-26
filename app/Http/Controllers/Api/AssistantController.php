@@ -122,6 +122,7 @@ class AssistantController extends Controller
             'portrait_type' => $assistant->portrait_type->value,
             'vrm_url' => $assistant->vrm?->url,
             'vrm_original_name' => $assistant->vrm?->original_name,
+            'vrm_lod_url' => $assistant->vrm?->lod_url,
             'image_url' => $assistant->cardImage?->url,
             'emotions' => $emotions,
             'restricted_emotions' => $restrictedEmotions,

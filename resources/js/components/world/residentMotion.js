@@ -1,7 +1,15 @@
 /**
- * VRMUtils.rotateVRM0() normalizes an avatar so its own front points down
- * local -Z. This converts horizontal travel into the rotation that puts that
- * front in the travel direction; it deliberately has no camera dependency.
+ * The turn that makes a VRM model face -Z inside her body: VRM 0.x files
+ * already face -Z, VRM 1.0 files face +Z.
+ */
+export function modelYaw(metaVersion) {
+	return metaVersion === '0' ? 0 : Math.PI;
+}
+
+/**
+ * A resident's body faces local -Z once modelYaw() has turned her model. This
+ * converts horizontal travel into the rotation that puts that front in the
+ * travel direction; it deliberately has no camera dependency.
  */
 export function facingAngleForMovement(dx, dz) {
 	if (dx === 0 && dz === 0) return null;
@@ -75,9 +83,11 @@ const RESTING_POSTURES = ['sitting', 'reclining', 'lying'];
 
 /**
  * How long she waits before deciding her next step; resting on something she
- * settles in, so she decides half as often.
+ * settles in, so she decides half as often. A resident with her own pace,
+ * { min, max } in seconds, waits within it wherever she is.
  */
-export function idleWait(posture = 'standing', random = Math.random) {
+export function idleWait(posture = 'standing', random = Math.random, pace = null) {
+	if (pace) return (pace.min + random() * (pace.max - pace.min)) * 1000;
 	const wait = MIN_IDLE_MS + random() * (MAX_IDLE_MS - MIN_IDLE_MS);
 	return RESTING_POSTURES.includes(posture) ? wait * 2 : wait;
 }

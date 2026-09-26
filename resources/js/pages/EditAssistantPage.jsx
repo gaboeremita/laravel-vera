@@ -35,6 +35,10 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 	const [vrmFilename, setVrmFilename] = useState(null);
 	const [isUploadingVrm, setIsUploadingVrm] = useState(false);
 	const [isDeletingVrm, setIsDeletingVrm] = useState(false);
+	const [hasLod, setHasLod] = useState(false);
+	const [isUploadingLod, setIsUploadingLod] = useState(false);
+	const [isDeletingLod, setIsDeletingLod] = useState(false);
+	const lodInputRef = useRef(null);
 	const [confirmingVrmDelete, setConfirmingVrmDelete] = useState(false);
 	const vrmInputRef = useRef(null);
 	const [cardImagePreview, setCardImagePreview] = useState(null);
@@ -105,6 +109,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				setMode(data.mode || 'assistant');
 				setPortraitType(data.portrait_type || 'image');
 				setVrmFilename(data.vrm_url ? (data.vrm_original_name || 'avatar.vrm') : null);
+				setHasLod(Boolean(data.vrm_lod_url));
 				setCardImagePreview(data.image_url || null);
 				const loadedEmotions = data.emotions || [];
 				setEmotions(loadedEmotions);
@@ -166,6 +171,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				throw new Error(error.message || 'Upload failed');
 			}
 			setVrmFilename(file.name);
+			setHasLod(false);
 			addToast('VRM file uploaded', 'success');
 		} catch (e) {
 			addToast(e.message || 'Failed to upload VRM file', 'error');
@@ -182,11 +188,48 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 			const res = await api.delete(route('assistants.vrm.destroy', { id }));
 			if (!res.ok) throw new Error('Delete failed');
 			setVrmFilename(null);
+			setHasLod(false);
 			addToast('VRM file deleted', 'success');
 		} catch {
 			addToast('Failed to delete VRM file', 'error');
 		} finally {
 			setIsDeletingVrm(false);
+		}
+	};
+
+	const handleLodUpload = async (e) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+		setIsUploadingLod(true);
+		try {
+			const formData = new FormData();
+			formData.append('vrm', file);
+			const res = await api.postForm(route('assistants.vrm.lod.store', { id }), formData);
+			if (!res.ok) {
+				const error = await res.json().catch(() => ({}));
+				throw new Error(error.message || 'Upload failed');
+			}
+			setHasLod(true);
+			addToast('Low-detail model uploaded', 'success');
+		} catch (e) {
+			addToast(e.message || 'Failed to upload the low-detail model', 'error');
+		} finally {
+			setIsUploadingLod(false);
+			if (lodInputRef.current) lodInputRef.current.value = '';
+		}
+	};
+
+	const handleLodDelete = async () => {
+		setIsDeletingLod(true);
+		try {
+			const res = await api.delete(route('assistants.vrm.lod.destroy', { id }));
+			if (!res.ok) throw new Error('Delete failed');
+			setHasLod(false);
+			addToast('Low-detail model deleted', 'success');
+		} catch {
+			addToast('Failed to delete the low-detail model', 'error');
+		} finally {
+			setIsDeletingLod(false);
 		}
 	};
 
@@ -617,6 +660,34 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 									className="hidden"
 								/>
 							</div>
+
+							{vrmFilename && (
+								<div className="space-y-2">
+									<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
+										Low-Detail Model <span className="text-fg-3 normal-case">(optional; drawn in worlds when she is far away)</span>
+									</label>
+									<div className="flex items-center gap-2">
+										{hasLod && <span className="text-accent text-sm truncate flex-1">Uploaded</span>}
+										<button
+											onClick={() => lodInputRef.current?.click()}
+											disabled={isUploadingLod}
+											className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-line-1 text-fg-3 hover:border-fg-3 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
+										>
+											{isUploadingLod ? 'UPLOADING...' : hasLod ? 'REPLACE' : 'UPLOAD .VRM'}
+										</button>
+										{hasLod && (
+											<button
+												onClick={handleLodDelete}
+												disabled={isDeletingLod}
+												className="text-[0.65rem] tracking-[0.1em] px-3 py-1 border border-danger text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default"
+											>
+												{isDeletingLod ? 'DELETING...' : 'DELETE'}
+											</button>
+										)}
+									</div>
+									<input ref={lodInputRef} type="file" accept=".vrm" onChange={handleLodUpload} className="hidden" />
+								</div>
+							)}
 
 							<div className="space-y-2">
 								<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">

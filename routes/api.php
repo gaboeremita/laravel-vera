@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\AssistantPoseAnimationController;
 use App\Http\Controllers\Api\AssistantPoseController;
 use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\AssistantVrmController;
+use App\Http\Controllers\Api\AssistantVrmLodController;
 use App\Http\Controllers\Api\AvatarBackgroundController;
 use App\Http\Controllers\Api\ConversationBrowserController;
 use App\Http\Controllers\Api\ConversationController;
@@ -48,6 +49,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/assistants/{id}', [AssistantController::class, 'destroy'])->name('assistants.destroy');
     Route::post('/assistants/{id}/vrm', [AssistantVrmController::class, 'store'])->name('assistants.vrm.store');
     Route::delete('/assistants/{id}/vrm', [AssistantVrmController::class, 'destroy'])->name('assistants.vrm.destroy');
+    Route::post('/assistants/{id}/vrm/lod', [AssistantVrmLodController::class, 'store'])->name('assistants.vrm.lod.store');
+    Route::delete('/assistants/{id}/vrm/lod', [AssistantVrmLodController::class, 'destroy'])->name('assistants.vrm.lod.destroy');
     Route::post('/assistants/{id}/image', [AssistantImageController::class, 'store'])->name('assistants.image.store');
     Route::delete('/assistants/{id}/image', [AssistantImageController::class, 'destroy'])->name('assistants.image.destroy');
 

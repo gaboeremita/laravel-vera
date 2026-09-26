@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AssistantKind;
 use App\Enums\WorldResidentBehavior;
 use Database\Factories\WorldResidentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -38,6 +39,27 @@ class WorldResident extends Model
     public function accessZoneIds(): array
     {
         return array_values($this->zone_access['zones'] ?? []);
+    }
+
+    /**
+     * The zones she keeps to, by id, zones inside them included; empty when
+     * she may go anywhere.
+     *
+     * @return array<int, string>
+     */
+    public function areaZoneIds(): array
+    {
+        return array_values($this->behavior_settings['area'] ?? []);
+    }
+
+    /**
+     * An NPC that stays put or walks its route keeps to it when someone talks
+     * to her, so she is given no tools that move her.
+     */
+    public function staysAtPost(): bool
+    {
+        return $this->assistant?->kind === AssistantKind::WorldNpc
+            && in_array($this->behavior, [WorldResidentBehavior::Stationary, WorldResidentBehavior::Route], true);
     }
 
     public function world(): BelongsTo

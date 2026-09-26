@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { AnimationMixer, LoopOnce, LoopRepeat, PositionalAudio } from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { AnimationMixer, Frustum, Group, LoopOnce, LoopRepeat, Matrix4, PositionalAudio, Sphere, Vector3 } from 'three';
+import { VRMUtils } from '@pixiv/three-vrm';
 import { applyBoneQuaternions, captureBoneQuaternions, loadPoseClip } from '../VrmAvatar.jsx';
 import { CHARACTER_RADIUS, LEAVE_WATER_DEPTH, MAX_MOVEMENT_DELTA, SWIM_DEPTH } from './collisionCheck.js';
-import { facingAngleForMovement, fadesIdleForPose, headingToward, makeClipInPlace, shouldFaceUser, turnTowardsAngle } from './residentMotion.js';
+import { facingAngleForMovement, fadesIdleForPose, headingToward, makeClipInPlace, modelYaw, shouldFaceUser, turnTowardsAngle } from './residentMotion.js';
 import { defaultPoseFor, findWorldMotionPose, resolvePose } from './worldMotionPoses.js';
 import { inTalkingReach } from './talkingReach.js';
 import { STACK_HEIGHT, claimSpot, releaseSpot, stackTier } from './spotOccupancy.js';
+import { shouldLoad, shouldUnload, updateVrm, visualDetail, wantsLod } from './residentDetail.js';
+import { createVrmLoader } from '../../utils/vrmLoader.js';
 
 const WALK_SPEED = 0.3;
 const WALK_ACCELERATION = 0.18;
@@ -75,10 +76,13 @@ const EMBEDDED_SECONDS = 0.5;
 const VOICE_HEIGHT = 1.5;
 const VOICE_REF_DISTANCE = 2;
 const VOICE_ROLLOFF = 1.2;
+const MAX_VISUAL_DELTA = 1;
+const VIEW_SPHERE_RADIUS = 1.2;
 
-export default function ResidentController({ resident, layout = null, onVoice, savedState = null, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions, residentVoices, audioListener, inConversation = false, navigation, residentCommands, occupiedSpots }) {
-	const { scene } = useThree();
+export default function ResidentController({ resident, layout = null, onVoice, savedState = null, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions, residentVoices, audioListener, inConversation = false, navigation, residentCommands, occupiedSpots, residentDetails = null }) {
+	const { scene, gl } = useThree();
 	const vrm = useRef(null);
+	const bodyRef = useRef(null);
 	const mixer = useRef(null);
 	const lastPoseTriggerRef = useRef(null);
 	const restPoseRef = useRef(null);
@@ -127,11 +131,22 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 	const swimToEdgeActionRef = useRef(null);
 	const motionHipsHeightRef = useRef(new Map());
 	const floatOffsetRef = useRef(0);
+	const viewRef = useRef(null);
+	const resumeStateRef = useRef(null);
+	const waterRef = useRef({ x: null, y: null, z: null, surface: null });
 	const swimmingRef = useRef(false);
 	const restAtEdgeRef = useRef(false);
 	const { x = 0, y = 0, z = 0 } = resident.position ?? {};
 	const position = useMemo(() => collisionWorld.findSpawn({ x, y, z }), [collisionWorld, x, y, z]);
 	const distance = position ? Math.hypot(playerPosition[0] - position.x, playerPosition[1] - position.y, playerPosition[2] - position.z) : Infinity;
+	const inLoadRange = shouldLoad({ behavior: resident.behavior, distance });
+	const pastUnloadRange = shouldUnload({ behavior: resident.behavior, distance });
+	const lodUrl = resident.assistant.vrmLodUrl ?? null;
+	const [wearingLod, setWearingLod] = useState(() => wantsLod({ hasLod: Boolean(lodUrl), distance, wearingLod: false }));
+	const wearingLodRef = useRef(wearingLod);
+	const bodyUrl = wearingLod && lodUrl ? lodUrl : resident.assistant.vrmUrl;
+	const loadedUrlRef = useRef(null);
+	const poseResolveRef = useRef(null);
 	const walkAnimationUrl = findWorldMotionPose(resident.assistant.poses, 'walk')?.animationUrl ?? null;
 	const walkStartAnimationUrl = findWorldMotionPose(resident.assistant.poses, 'walkStart')?.animationUrl ?? null;
 	const walkStopAnimationUrl = findWorldMotionPose(resident.assistant.poses, 'walkStop')?.animationUrl ?? null;
@@ -157,32 +172,35 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 	}, [position, resident.id]);
 
 	useEffect(() => {
-		if (loaded || !position || distance > 30 || !resident.assistant.vrmUrl) return;
+		if (loaded || !position || !inLoadRange || !bodyUrl) return;
+		// Coming back into range she picks up where she was when she was unloaded.
+		const startState = resumeStateRef.current ?? savedState;
 		let cancelled = false;
-		const loader = new GLTFLoader();
-		loader.register((parser) => new VRMLoaderPlugin(parser));
-		loader.load(resident.assistant.vrmUrl, (gltf) => {
+		const loader = createVrmLoader(gl);
+		loader.load(bodyUrl, (gltf) => {
 			if (cancelled) { VRMUtils.deepDispose(gltf.scene); return; }
 			vrm.current = gltf.userData.vrm;
-			VRMUtils.rotateVRM0(vrm.current);
-			const start = savedState?.position ?? position;
-			vrm.current.scene.position.set(start.x, start.y, start.z);
-			vrm.current.scene.rotation.y = savedState?.rotation?.y ?? resident.rotation?.y ?? 0;
-			if (savedState?.spotId && savedState.posture !== 'standing') {
-				const spotId = savedState.spotId;
+			vrm.current.scene.rotation.y = modelYaw(vrm.current.meta?.metaVersion);
+			bodyRef.current = new Group();
+			bodyRef.current.add(vrm.current.scene);
+			const start = startState?.position ?? position;
+			bodyRef.current.position.set(start.x, start.y, start.z);
+			bodyRef.current.rotation.y = startState?.rotation?.y ?? resident.rotation?.y ?? 0;
+			if (startState?.spotId && startState.posture !== 'standing') {
+				const spotId = startState.spotId;
 				// She was already there when the session was saved, so the spot
 				// takes her back whatever its capacity.
 				if (occupiedSpots) claimSpot(occupiedSpots.current, { id: spotId, capacity: Infinity }, resident.id);
 				const tier = occupiedSpots ? stackTier(occupiedSpots.current, spotId, resident.id) : 0;
 				const savedSpot = (layout?.objects ?? []).flatMap((object) => object.spots).find((spot) => spot.id === spotId);
-				postureRef.current = savedState.posture;
+				postureRef.current = startState.posture;
 				// The saved height only fits the clip she was in when it was
 				// saved, so on a spot it is worked out again from the spot once
 				// her posture's clip has loaded.
 				spotRef.current = {
 					spotId,
-					activityId: savedState.activityId ?? null,
-					approach: savedState.exitPosition ?? null,
+					activityId: startState.activityId ?? null,
+					approach: startState.exitPosition ?? null,
 					surfaceY: savedSpot ? savedSpot.position.y + SEAT_CLEARANCE : undefined,
 					restY: savedSpot ? undefined : start.y - tier * STACK_HEIGHT,
 					holdOffset: 0,
@@ -192,8 +210,8 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 					},
 				};
 			}
-			scene.add(vrm.current.scene);
-			residentPositions.current.set(resident.id, vrm.current.scene.position);
+			scene.add(bodyRef.current);
+			residentPositions.current.set(resident.id, bodyRef.current.position);
 
 			// VRM models load in T-pose; lower the arms to a relaxed stance
 			// before capturing it as the rest pose a triggered animation
@@ -205,10 +223,62 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			if (rightUpperArm) rightUpperArm.rotation.z = -1.2;
 
 			restPoseRef.current = captureBoneQuaternions(vrm.current);
+			loadedUrlRef.current = bodyUrl;
 			setLoaded(true);
 		});
 		return () => { cancelled = true; };
-	}, [distance, loaded, position, resident.id, resident.assistant.vrmUrl, resident.rotation?.y, residentPositions, scene, savedState, occupiedSpots, layout]);
+	}, [inLoadRange, loaded, position, resident.id, bodyUrl, gl, resident.rotation?.y, residentPositions, scene, savedState, occupiedSpots, layout]);
+
+	// Lets go of her body, remembering where and how she was so the next
+	// body she is loaded into picks up from there. Anything waiting on this
+	// body — a walk, a placement, a pose — is let go too.
+	// eslint-disable-next-line react-hooks/preserve-manual-memoization
+	const releaseBody = useCallback(() => {
+		const body = bodyRef.current;
+		const spot = spotRef.current;
+		resumeStateRef.current = {
+			position: { x: body.position.x, y: body.position.y - floatOffsetRef.current, z: body.position.z },
+			rotation: { x: 0, y: body.rotation.y, z: 0 },
+			spotId: spot?.spotId ?? null,
+			activityId: spot?.activityId ?? null,
+			posture: postureRef.current,
+			exitPosition: spot?.approach ?? null,
+		};
+		routeRef.current?.resolve?.({ outcome: 'interrupted', reason: 'her model changed' });
+		placementRef.current?.resolve?.();
+		poseResolveRef.current?.({ played: false });
+		poseResolveRef.current = null;
+		mixer.current?.stopAllAction();
+		mixer.current = null;
+		for (const ref of [walkActionRef, walkStartActionRef, walkStopActionRef, defaultActionRef, locomotionActionRef, swimActionRef, swimToEdgeActionRef, heldPoseRef, restPoseRef, spotRef, placementRef, routeRef]) ref.current = null;
+		for (const map of [talkActionsRef, postureActionsRef, postureHipsHeightRef, motionHipsHeightRef]) map.current.clear();
+		locomotionPhaseRef.current = { name: 'idle', endsAt: 0, velocity: 0, heading: null };
+		posePlayingRef.current = false;
+		floatOffsetRef.current = 0;
+		scene.remove(body);
+		VRMUtils.deepDispose(body);
+		vrm.current = null;
+		bodyRef.current = null;
+		loadedUrlRef.current = null;
+		residentDetails?.current.delete(resident.id);
+		setLoaded(false);
+	}, [resident.id, residentDetails, scene]);
+
+	// A resident who stays put is let go once the user is far away, and
+	// loaded again, where she was, when they come back.
+	useEffect(() => {
+		if (loaded && vrm.current && pastUnloadRange) releaseBody();
+	}, [pastUnloadRange, loaded, releaseBody]);
+
+	// Crossing into or out of low-detail range swaps her model in place.
+	useEffect(() => {
+		if (loaded && vrm.current && loadedUrlRef.current !== bodyUrl) releaseBody();
+	}, [bodyUrl, loaded, releaseBody]);
+
+	useEffect(() => {
+		const details = residentDetails?.current;
+		return () => details?.delete(resident.id);
+	}, [residentDetails, resident.id]);
 
 	useEffect(() => {
 		if (!loaded || !residentVoices || !audioListener) return undefined;
@@ -223,7 +293,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				voice.setRefDistance(VOICE_REF_DISTANCE);
 				voice.setRolloffFactor(VOICE_ROLLOFF);
 				voice.position.set(0, VOICE_HEIGHT, 0);
-				vrm.current.scene.add(voice);
+				bodyRef.current.add(voice);
 			}
 			if (voice.isPlaying) voice.stop();
 			voice.setBuffer(buffer);
@@ -277,14 +347,14 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 		const planTo = (target, near, towardUser) => {
 			const grid = navigation.current;
 			if (!grid) return { reason: 'still mapping this place' };
-			const from = vrm.current.scene.position;
+			const from = bodyRef.current.position;
 			const path = towardUser && swimmingRef.current
 				? grid.findPathNear(from, target, FOLLOW_EDGE_RADIUS, FOLLOW_EDGE_DEPTH)
 				: near ? grid.findPathNear(from, target) : grid.findPath(from, target);
 			return path ? { path } : { reason: 'there is no way to get there from here' };
 		};
 		const placeAt = (target, rotation) => new Promise((resolve) => {
-			const scene = vrm.current.scene;
+			const scene = bodyRef.current;
 			placementRef.current = { elapsed: 0, fromPosition: scene.position.clone(), toPosition: target, fromRotation: scene.rotation.y, toRotation: rotation, resolve };
 		});
 		const leaveSpot = async () => {
@@ -294,7 +364,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			postureRef.current = 'standing';
 			heldPoseRef.current = null;
 			spot.onLeave?.();
-			if (spot.approach) await placeAt(spot.approach, vrm.current.scene.rotation.y);
+			if (spot.approach) await placeAt(spot.approach, bodyRef.current.rotation.y);
 		};
 		const routeTo = (target, { near = false, towardUser = false } = {}) => new Promise((resolve) => {
 			const plan = planTo(target, near, towardUser);
@@ -328,7 +398,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			talk: (seconds) => {
 				talkingUntilRef.current = Math.max(talkingUntilRef.current, performance.now() / 1000 + seconds);
 			},
-			inTalkingReach: (target) => inTalkingReach(vrm.current.scene.position, target, (from, to) => collisionWorld.hasLineOfSight(from, to)),
+			inTalkingReach: (target) => inTalkingReach(bodyRef.current.position, target, (from, to) => collisionWorld.hasLineOfSight(from, to)),
 			// Walks to the nearest spot close to someone that also has a clear
 			// view of them, so she goes around what stands between them.
 			approach: async (target) => {
@@ -336,7 +406,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				await leaveSpot();
 				const grid = navigation.current;
 				if (!grid) return { outcome: 'failed', reason: 'still mapping this place' };
-				const path = grid.findPathWhere(vrm.current.scene.position, (point) => inTalkingReach(point, target, (from, to) => collisionWorld.hasLineOfSight(from, to)));
+				const path = grid.findPathWhere(bodyRef.current.position, (point) => inTalkingReach(point, target, (from, to) => collisionWorld.hasLineOfSight(from, to)));
 				if (!path) return { outcome: 'failed', reason: 'there is no way to get close to them' };
 				return new Promise((resolve) => {
 					routeRef.current = { mode: 'goto', target, near: true, towardUser: false, waypoints: path, index: Math.min(1, path.length - 1), moving: true, heading: null, replans: 0, progressAt: null, bestDistance: Infinity, resolve };
@@ -352,12 +422,12 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 					if (arrival.outcome !== 'completed') return arrival;
 					// A spot marks the surface she sits or lies on; her root goes
 					// where the posture clip's hips land just above that surface.
-					const ground = vrm.current.scene.position.clone();
+					const ground = bodyRef.current.position.clone();
 					const hipsHeight = posture === 'standing' ? undefined : postureHipsHeightRef.current.get(posture);
 					const restY = hipsHeight === undefined ? undefined : spotPosition.y + SEAT_CLEARANCE - hipsHeight;
 					const tier = restY === undefined || !occupiedSpots ? 0 : stackTier(occupiedSpots.current, spotId, resident.id);
 					const placement = restY === undefined ? ground : { x: spotPosition.x, y: restY + tier * STACK_HEIGHT, z: spotPosition.z };
-					await placeAt(placement, facingAngleForMovement(Math.sin(facing), Math.cos(facing)) ?? vrm.current.scene.rotation.y);
+					await placeAt(placement, facingAngleForMovement(Math.sin(facing), Math.cos(facing)) ?? bodyRef.current.rotation.y);
 					spotRef.current = { spotId, activityId, approach: ground, restY, holdOffset: 0, appliedY: placement.y, onLeave };
 				}
 				postureRef.current = posture;
@@ -370,7 +440,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				if (posture !== postureRef.current) {
 					await leaveSpot();
 					if (posture !== 'standing') {
-						spotRef.current = { spotId: null, activityId, approach: vrm.current.scene.position.clone(), onLeave: null };
+						spotRef.current = { spotId: null, activityId, approach: bodyRef.current.position.clone(), onLeave: null };
 						postureRef.current = posture;
 					}
 				}
@@ -386,7 +456,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 					const surface = collisionWorld.waterSurfaceAbove(point.x, point.z, point.y);
 					return surface !== null && surface - point.y > SWIM_DEPTH && collisionWorld.isBodyBlocked(point, point, CHARACTER_RADIUS + EDGE_REACH);
 				};
-				const path = grid.findPathWhere(vrm.current.scene.position, deepAtEdge);
+				const path = grid.findPathWhere(bodyRef.current.position, deepAtEdge);
 				if (!path) return { outcome: 'failed', reason: 'there is no side of the pool within reach' };
 				restAtEdgeRef.current = true;
 				return new Promise((resolve) => {
@@ -400,7 +470,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				await leaveSpot();
 				const grid = navigation.current;
 				if (!grid) return { outcome: 'failed', reason: 'still mapping this place' };
-				const origin = vrm.current.scene.position.clone();
+				const origin = bodyRef.current.position.clone();
 				const inWater = swimmingRef.current;
 				const pickSpot = () => {
 					for (let attempt = 0; attempt < WANDER_ATTEMPTS; attempt++) {
@@ -468,7 +538,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				pose: heldPoseRef.current?.name ?? null,
 			}),
 			state: () => {
-				const scene = vrm.current.scene;
+				const scene = bodyRef.current;
 				const spot = spotRef.current;
 				const point = (vector) => (vector ? { x: vector.x, y: vector.y, z: vector.z } : null);
 				return {
@@ -492,8 +562,8 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 	useEffect(() => () => {
 		residentPositions.current.delete(resident.id);
 		if (vrm.current) {
-			scene.remove(vrm.current.scene);
-			VRMUtils.deepDispose(vrm.current.scene);
+			scene.remove(bodyRef.current);
+			VRMUtils.deepDispose(bodyRef.current);
 		}
 		mixer.current?.stopAllAction();
 	}, [resident.id, residentPositions, scene]);
@@ -703,8 +773,10 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			// captured rest pose over POSE_RETURN_SECONDS instead of
 			// snapping to it instantly (see the blend loop in useFrame).
 			return new Promise((resolve) => {
+				poseResolveRef.current = resolve;
 				const onFinished = (event) => {
 					if (event.action !== action) return;
+					poseResolveRef.current = null;
 					mixer.current?.removeEventListener('finished', onFinished);
 					posePlayingRef.current = false;
 					const resting = locomotionActionRef.current;
@@ -740,9 +812,18 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 
 	useFrame((state, delta) => {
 		if (!vrm.current) return;
-		const currentPosition = vrm.current.scene.position;
+		const currentPosition = bodyRef.current.position;
 		currentPosition.y -= floatOffsetRef.current;
-		const waterSurface = collisionWorld.waterSurfaceAbove(currentPosition.x, currentPosition.z, currentPosition.y);
+		// A resident who stands still keeps her last answer, so one who stays
+		// put costs no water raycast per frame.
+		const water = waterRef.current;
+		if (water.x !== currentPosition.x || water.y !== currentPosition.y || water.z !== currentPosition.z) {
+			water.surface = collisionWorld.waterSurfaceAbove(currentPosition.x, currentPosition.z, currentPosition.y);
+			water.x = currentPosition.x;
+			water.y = currentPosition.y;
+			water.z = currentPosition.z;
+		}
+		const waterSurface = water.surface;
 		const waterDepth = waterSurface === null ? 0 : waterSurface - currentPosition.y;
 		const edgeResting = locomotionPhaseRef.current.name === 'edge';
 		const swimming = edgeResting || waterDepth > (swimmingRef.current ? LEAVE_WATER_DEPTH : SWIM_DEPTH);
@@ -763,7 +844,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				placement.fromPosition.y + (placement.toPosition.y - placement.fromPosition.y) * t,
 				placement.fromPosition.z + (placement.toPosition.z - placement.fromPosition.z) * t,
 			);
-			vrm.current.scene.rotation.y = placement.fromRotation + Math.atan2(Math.sin(placement.toRotation - placement.fromRotation), Math.cos(placement.toRotation - placement.fromRotation)) * t;
+			bodyRef.current.rotation.y = placement.fromRotation + Math.atan2(Math.sin(placement.toRotation - placement.fromRotation), Math.cos(placement.toRotation - placement.fromRotation)) * t;
 			if (t >= 1) {
 				placementRef.current = null;
 				placement.resolve();
@@ -791,11 +872,16 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			const restingY = heldSpot.restY + tier * STACK_HEIGHT + poseOffset;
 			if (Math.abs(restingY - heldSpot.appliedY) > 0.001) {
 				heldSpot.appliedY = restingY;
-				const rotation = vrm.current.scene.rotation.y;
+				const rotation = bodyRef.current.rotation.y;
 				placementRef.current = { elapsed: 0, fromPosition: currentPosition.clone(), toPosition: { x: currentPosition.x, y: restingY, z: currentPosition.z }, fromRotation: rotation, toRotation: rotation, resolve: () => {} };
 			}
 		}
 		const currentDistance = Math.hypot(playerPosition[0] - currentPosition.x, playerPosition[1] - currentPosition.y, playerPosition[2] - currentPosition.z);
+		const lodWanted = wantsLod({ hasLod: Boolean(lodUrl), distance: currentDistance, wearingLod: wearingLodRef.current });
+		if (lodWanted !== wearingLodRef.current) {
+			wearingLodRef.current = lodWanted;
+			setWearingLod(lodWanted);
+		}
 		let didMove = false;
 		const elapsed = state.clock.elapsedTime;
 		const embedded = embeddedRef.current;
@@ -885,7 +971,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 						let path = null;
 						if (route.mode === 'goto' && grid && route.replans < MAX_REPLANS) {
 							if (route.replans === 0) {
-								const facing = vrm.current.scene.rotation.y;
+								const facing = bodyRef.current.rotation.y;
 								const backOff = grid.nearestPoint({ x: currentPosition.x + Math.sin(facing) * BACK_OFF_DISTANCE, y: currentPosition.y, z: currentPosition.z + Math.cos(facing) * BACK_OFF_DISTANCE });
 								const onward = backOff ? plan(backOff) : null;
 								if (onward) path = [{ x: currentPosition.x, y: currentPosition.y, z: currentPosition.z }, backOff, ...onward.slice(1)];
@@ -984,7 +1070,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				locomotion.heading = routeRef.current.heading;
 			} else if (wantsToRoam && state.clock.elapsedTime >= locomotion.endsAt) {
 				locomotion.name = 'turning';
-				locomotion.heading = vrm.current.scene.rotation.y + (Math.random() - 0.5) * 1.4;
+				locomotion.heading = bodyRef.current.rotation.y + (Math.random() - 0.5) * 1.4;
 			}
 		}
 		if (locomotion.name === 'idle' && locomotion.endsAt !== 0 && !posePlayingRef.current) activateLocomotionAction(idleAction(), PLACEMENT_BLEND_SECONDS);
@@ -993,8 +1079,8 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			const towardUser = headingToward(currentPosition, { x: playerPosition[0], z: playerPosition[2] });
 			if (towardUser === null) faceUserRequested.current = false;
 			else {
-				vrm.current.scene.rotation.y = turnTowardsAngle(vrm.current.scene.rotation.y, towardUser, TURN_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));
-				const remaining = Math.atan2(Math.sin(towardUser - vrm.current.scene.rotation.y), Math.cos(towardUser - vrm.current.scene.rotation.y));
+				bodyRef.current.rotation.y = turnTowardsAngle(bodyRef.current.rotation.y, towardUser, TURN_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));
+				const remaining = Math.atan2(Math.sin(towardUser - bodyRef.current.rotation.y), Math.cos(towardUser - bodyRef.current.rotation.y));
 				if (Math.abs(remaining) < FACED_USER_TOLERANCE) faceUserRequested.current = false;
 			}
 		}
@@ -1003,15 +1089,15 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			const toward = headingToward(currentPosition, faceTarget);
 			if (toward === null) faceTargetRef.current = null;
 			else {
-				vrm.current.scene.rotation.y = turnTowardsAngle(vrm.current.scene.rotation.y, toward, TURN_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));
-				const remaining = Math.atan2(Math.sin(toward - vrm.current.scene.rotation.y), Math.cos(toward - vrm.current.scene.rotation.y));
+				bodyRef.current.rotation.y = turnTowardsAngle(bodyRef.current.rotation.y, toward, TURN_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));
+				const remaining = Math.atan2(Math.sin(toward - bodyRef.current.rotation.y), Math.cos(toward - bodyRef.current.rotation.y));
 				if (Math.abs(remaining) < FACED_USER_TOLERANCE) faceTargetRef.current = null;
 			}
 		}
 		if (locomotion.name === 'turning' && routeMoving && routeRef.current.heading !== null) locomotion.heading = routeRef.current.heading;
 		if (locomotion.name === 'turning') {
-			vrm.current.scene.rotation.y = turnTowardsAngle(vrm.current.scene.rotation.y, locomotion.heading, TURN_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));
-			const headingError = locomotion.heading - vrm.current.scene.rotation.y;
+			bodyRef.current.rotation.y = turnTowardsAngle(bodyRef.current.rotation.y, locomotion.heading, TURN_SPEED * Math.min(delta, MAX_MOVEMENT_DELTA));
+			const headingError = locomotion.heading - bodyRef.current.rotation.y;
 			if (Math.abs(Math.sin(headingError)) < 0.05 && Math.cos(headingError) > 0) playTransition(swimming ? noTransition : walkStartActionRef, 'starting');
 		}
 		if (locomotion.name === 'starting' && state.clock.elapsedTime >= locomotion.endsAt) {
@@ -1028,7 +1114,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			const step = locomotion.velocity * Math.min(delta, MAX_MOVEMENT_DELTA);
 			const previousX = currentPosition.x;
 			const previousZ = currentPosition.z;
-			collisionWorld.move(currentPosition, -Math.sin(vrm.current.scene.rotation.y) * step, -Math.cos(vrm.current.scene.rotation.y) * step);
+			collisionWorld.move(currentPosition, -Math.sin(bodyRef.current.rotation.y) * step, -Math.cos(bodyRef.current.rotation.y) * step);
 			const movedX = currentPosition.x - previousX;
 			const movedZ = currentPosition.z - previousZ;
 			didMove = Math.hypot(movedX, movedZ) > 0.0001;
@@ -1037,19 +1123,19 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 		if (routeMoving && locomotion.name === 'walking') {
 			const activeRoute = routeRef.current;
 			const step = Math.min(delta, MAX_MOVEMENT_DELTA);
-			if (activeRoute.heading !== null) vrm.current.scene.rotation.y = turnTowardsAngle(vrm.current.scene.rotation.y, activeRoute.heading, ROUTE_TURN_SPEED * step);
+			if (activeRoute.heading !== null) bodyRef.current.rotation.y = turnTowardsAngle(bodyRef.current.rotation.y, activeRoute.heading, ROUTE_TURN_SPEED * step);
 			const finalWaypoint = activeRoute.waypoints[activeRoute.waypoints.length - 1];
 			const toEnd = activeRoute.mode === 'goto' ? Math.hypot(finalWaypoint.x - currentPosition.x, finalWaypoint.z - currentPosition.z) : Infinity;
 			// She turns toward the next point before walking, so she does not
 			// swing wide into door frames at corners.
-			const headingError = activeRoute.heading === null ? 0 : activeRoute.heading - vrm.current.scene.rotation.y;
+			const headingError = activeRoute.heading === null ? 0 : activeRoute.heading - bodyRef.current.rotation.y;
 			const alignment = Math.max(0, Math.cos(headingError)) ** 2;
 			const targetVelocity = ROUTE_WALK_SPEED * (swimming ? SWIM_SPEED_FACTOR : 1) * alignment * Math.min(1, Math.max(0.3, toEnd / ROUTE_ARRIVAL_SLOWDOWN));
 			locomotion.velocity += Math.sign(targetVelocity - locomotion.velocity) * Math.min(Math.abs(targetVelocity - locomotion.velocity), ROUTE_ACCELERATION * step);
 			const distance = locomotion.velocity * step;
 			const previousX = currentPosition.x;
 			const previousZ = currentPosition.z;
-			collisionWorld.move(currentPosition, -Math.sin(vrm.current.scene.rotation.y) * distance, -Math.cos(vrm.current.scene.rotation.y) * distance);
+			collisionWorld.move(currentPosition, -Math.sin(bodyRef.current.rotation.y) * distance, -Math.cos(bodyRef.current.rotation.y) * distance);
 			didMove = Math.hypot(currentPosition.x - previousX, currentPosition.z - previousZ) > 0.0001;
 		}
 		walkingRef.current = didMove;
@@ -1074,8 +1160,19 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 		floatOffsetRef.current += (floatTarget - floatOffsetRef.current) * Math.min(1, delta * FLOAT_RATE);
 		currentPosition.y += floatOffsetRef.current;
 
-		if (currentDistance < 30) {
-			mixer.current?.update(delta);
+		viewRef.current ??= { frustum: new Frustum(), matrix: new Matrix4(), sphere: new Sphere(new Vector3(), VIEW_SPHERE_RADIUS), pendingDelta: 0, frame: 0, springBones: false };
+		const view = viewRef.current;
+		view.matrix.multiplyMatrices(state.camera.projectionMatrix, state.camera.matrixWorldInverse);
+		view.frustum.setFromProjectionMatrix(view.matrix);
+		view.sphere.center.set(currentPosition.x, currentPosition.y + 0.9, currentPosition.z);
+		const detail = visualDetail({ distance: currentDistance, visible: view.frustum.intersectsSphere(view.sphere) });
+		residentDetails?.current.set(resident.id, detail);
+		view.pendingDelta = Math.min(view.pendingDelta + delta, MAX_VISUAL_DELTA);
+		view.frame += 1;
+		if (detail.animate && view.frame % detail.frameStride === 0) {
+			const visualDelta = view.pendingDelta;
+			view.pendingDelta = 0;
+			mixer.current?.update(visualDelta);
 
 			// In a resting posture the return blend eases into her posture's
 			// default clip as the mixer poses it this frame, since blending to
@@ -1084,7 +1181,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			const heldAction = heldPoseRef.current?.posture === postureRef.current ? heldPoseRef.current.action : null;
 			const restingAction = heldAction ?? (postureRef.current === 'standing' ? null : postureActionsRef.current.get(postureRef.current));
 			if (blend.active && blend.from && restPoseRef.current) {
-				blend.elapsed += delta;
+				blend.elapsed += visualDelta;
 				const t = Math.min(blend.elapsed / POSE_RETURN_SECONDS, 1);
 				for (const [name, fromQuat] of blend.from) {
 					const node = vrm.current.humanoid.getNormalizedBoneNode(name);
@@ -1101,7 +1198,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			// A pose's facial expression rides along with its body animation
 			// while that's playing; a blendshapes-only pose instead holds for
 			// a fixed duration — same rule VrmAvatar applies to the portrait.
-			if (!posePlayingRef.current) poseExpressionHoldRef.current += delta;
+			if (!posePlayingRef.current) poseExpressionHoldRef.current += visualDelta;
 			const expressionActive = heldPoseRef.current
 				|| (poseHasAnimationRef.current ? posePlayingRef.current : poseExpressionHoldRef.current < POSE_EXPRESSION_HOLD_SECONDS);
 			const targets = expressionActive ? activeBlendshapesRef.current : [];
@@ -1110,12 +1207,16 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			for (const expr of activeExpressions) {
 				const target = targetMap[expr] ?? 0;
 				const current = currentWeightsRef.current[expr] ?? 0;
-				const lerped = current + (target - current) * Math.min(delta / 0.3, 1);
+				const lerped = current + (target - current) * Math.min(visualDelta / 0.3, 1);
 				currentWeightsRef.current[expr] = lerped;
 				vrm.current.expressionManager?.setValue(expr, lerped);
 			}
 
-			vrm.current.update(delta);
+			// Springs left still while she was far away would snap on the first
+			// frame back, so they start again from rest.
+			if (detail.springBones && !view.springBones) vrm.current.springBoneManager?.reset();
+			view.springBones = detail.springBones;
+			updateVrm(vrm.current, visualDelta, detail.springBones);
 		}
 	});
 

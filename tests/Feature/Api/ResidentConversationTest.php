@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\GenerateResidentConversationTurn;
+use App\Enums\AssistantKind;
 use App\Enums\ConversationStatus;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
@@ -348,3 +349,35 @@ it('reminds her of her conversations with others when she talks to the user', fu
 
     expect(sentSystemPrompt())->toContain("With Vera:\nVera: The keytars are his.");
 });
+
+it('stops a conversation with an NPC after four lines each', function () {
+    $scenario = twoResidentScenario();
+    [, $yinlin, , , , $session, $vera] = $scenario;
+    $vera->assistant->update(['kind' => AssistantKind::WorldNpc]);
+    $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera->assistant)->forWorldSession($session)->create(['resumed_at' => now()->subHour()]);
+    foreach (range(1, GenerateResidentConversationTurn::NPC_LINES_PER_SITTING * 2) as $index) {
+        say($conversation, $index % 2 === 1 ? $yinlin : $vera->assistant, "Line {$index}", 1800);
+    }
+    Http::fake();
+
+    takeTurn($this, $scenario, $conversation)->assertSuccessful()->assertJsonPath('status', 'paused');
+
+    Http::assertNothingSent();
+});
+
+it('waits five minutes after talking with an NPC before offering NPCs to talk to again', function (int $minutesAgo, bool $offered) {
+    $scenario = twoResidentScenario();
+    [, $yinlin, , , , $session, $vera] = $scenario;
+    $vera->assistant->update(['kind' => AssistantKind::WorldNpc]);
+    $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera->assistant)->forWorldSession($session)->create(['status' => ConversationStatus::Paused]);
+    $conversation->forceFill(['created_at' => now()->subMinutes($minutesAgo), 'updated_at' => now()->subMinutes($minutesAgo)])->save();
+    fakeTurn(finalAnswerResponse('(Quiet) *stays put*'));
+
+    decide($this, $scenario)->assertCreated();
+
+    $talkTo = collect(Http::recorded()[0][0]['tools'])->firstWhere('function.name', 'talk_to');
+    expect(in_array('Vera', $talkTo['function']['parameters']['properties']['target']['enum'], true))->toBe($offered);
+})->with([
+    'a minute ago' => [1, false],
+    'ten minutes ago' => [10, true],
+]);

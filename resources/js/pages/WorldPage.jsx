@@ -30,6 +30,8 @@ import PauseOverlay from '../components/world/hud/PauseOverlay.jsx';
 import { contextLineFor, usePlayerActivities } from '../hooks/usePlayerActivities.js';
 import { fullSpotIds, releaseAllSpots, stackedSpots } from '../components/world/spotOccupancy.js';
 import { readVoiceEnabled, storeVoiceEnabled } from '../components/world/worldVoice.js';
+import { useResidentRoutes } from '../hooks/useResidentRoutes.js';
+import PerformanceOverlay from '../components/world/hud/PerformanceOverlay.jsx';
 
 const INVITE_MS = 30000;
 const LISTEN_DISTANCE = 12;
@@ -54,6 +56,9 @@ export default function WorldPage() {
 	const [nearbyConversation, setNearbyConversation] = useState(null);
 	const [paused, setPaused] = useState(false);
 	const [voiceEnabled, setVoiceEnabled] = useState(readVoiceEnabled);
+	const [showPerformance, setShowPerformance] = useState(false);
+	const performanceStats = useRef(null);
+	const residentDetails = useRef(new Map());
 	const [voiceUntil, setVoiceUntil] = useState(0);
 	const pausedRef = useRef(false);
 	const chatResidentRef = useRef(null);
@@ -267,6 +272,15 @@ export default function WorldPage() {
 
 	useEffect(() => {
 		const keyDown = (event) => {
+			if (event.code !== 'KeyI' || event.repeat || isTypingTarget(event.target)) return;
+			setShowPerformance((shown) => !shown);
+		};
+		window.addEventListener('keydown', keyDown);
+		return () => window.removeEventListener('keydown', keyDown);
+	}, []);
+
+	useEffect(() => {
+		const keyDown = (event) => {
 			if (event.code !== 'KeyO' || event.repeat || isTypingTarget(event.target)) return;
 			toggleVoice();
 		};
@@ -327,6 +341,7 @@ export default function WorldPage() {
 			getFollowTarget,
 			fromUser,
 			zoneAccess: resident.zoneAccess,
+			area: resident.behaviorSettings?.area ?? [],
 			residentId: resident.id,
 			occupiedSpots: occupiedSpots.current,
 			onStepStart: (step, index, total) => record({ verb: step.verb, target: step.verb === 'do' ? step.description : step.target, activity: step.activity, reason: `step ${index + 1} of ${total} of ${action.target}` }),
@@ -394,6 +409,7 @@ export default function WorldPage() {
 		residentPositions,
 		residentVoices,
 		getPositions,
+		getView: () => playerView.current,
 		onSpeech: handleSpeech,
 		addToast,
 	});
@@ -442,7 +458,7 @@ export default function WorldPage() {
 				const response = await api.post(route('worlds.sessions.residents.observations.store', { world: worldId, session: sessionId, resident: residentId }), { line: action.line, expression: action.expression ?? null });
 				if (!response.ok) throw new Error(`HTTP ${response.status}`);
 				setInvite({ residentId, name: resident.assistant.name, key: Date.now() });
-				await speakAloud(residentId, action.line, action.pose ?? null);
+				await speakAloud(residentId, action.line, action.pose ?? null, { toUser: true });
 				return true;
 			}
 			const otherId = Number(action.target);
@@ -480,6 +496,17 @@ export default function WorldPage() {
 		onSpeak: handleSpeak,
 		onThought: handleThought,
 		addToast,
+	});
+
+	useResidentRoutes({
+		enabled: status === 'ready',
+		residents: world?.residents,
+		layout: world?.layout,
+		chatResidentId: chatResident?.id ?? null,
+		residentCommands,
+		occupiedSpots,
+		isBusy: isResidentBusy,
+		isPaused: () => pausedRef.current,
 	});
 
 	useEffect(() => {
@@ -580,7 +607,7 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready' && !paused} voiceUntil={voiceUntil} />
-				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready' && !paused} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} />
+				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready' && !paused} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
 				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} />{hasZones && readoutText && <LocationReadout text={readoutText} />}</div>} />}
 				{status === 'ready' && (
 					<>
@@ -606,6 +633,7 @@ export default function WorldPage() {
 					<div className="absolute inset-0 bg-bg-0/60" />
 					<span className="relative text-fg-2 text-sm tracking-[0.12em] animate-fade-in">INITIALIZING {world.name.toUpperCase()}...</span>
 				</div>
+				{showPerformance && <div className="absolute right-5 top-20 z-10"><PerformanceOverlay statsRef={performanceStats} /></div>}
 				<div className="absolute left-5 top-5 z-10 flex items-center gap-3">
 					<button type="button" onClick={exit} className="border border-line-1 bg-bg-0/90 px-3 py-2 text-fg-2 text-[0.7rem] tracking-[0.1em] hover:text-fg-1">EXIT WORLD</button>
 					{status === 'ready' && <button type="button" onClick={() => setPaused(true)} className="border border-line-1 bg-bg-0/90 px-3 py-2 text-fg-2 text-[0.7rem] tracking-[0.1em] hover:text-fg-1">P — PAUSE</button>}

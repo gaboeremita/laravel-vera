@@ -41,6 +41,18 @@ class AppendWorldConversationContext
         $prompt = $assistant->prompt;
         $prompt['world_context'] = array_filter([$world->contextPromptFor($assistant->kind), $resident->custom_prompt]);
 
+        // The parts that stay the same from one call to the next come first, so
+        // the model provider can reuse them as a cached prefix.
+        $atPost = $resident->staysAtPost();
+        if (! empty($world->layout['zones'])) {
+            $prompt['world_awareness'] = $atPost
+                ? $this->buildResidentWorldPrompt->postAwareness()
+                : $this->buildResidentWorldPrompt->worldAwareness();
+            if (! $atPost) {
+                $prompt['world_places'] = ['title' => 'Places in this world', 'available places' => $this->buildResidentWorldPrompt->availablePlaces($world)];
+            }
+        }
+
         $residentPosition = $positions['residents'][$resident->id] ?? null;
         $residentZone = null;
         if ($residentPosition !== null && ! empty($world->layout['zones'])) {
@@ -49,11 +61,7 @@ class AppendWorldConversationContext
             $stacking = $this->resolveSpotStacking->handle($world, $resident, $stackedSpots);
             $userInSight = isset($positions['user']) && $this->resolveWorldState->sharesRoom($world->layout, $residentPosition, $positions['user']);
             $withYou = $this->buildResidentWorldPrompt->companions($world, $resident, $positions, $busyResidents);
-            $prompt['world_state'] = $this->buildResidentWorldPrompt->worldState($world, $state['residents'][$resident->id], $state['user'], $userActivity, $stacking, $userTalkingWith, $residentActivity, $userInSight, $withYou);
-        }
-
-        if (! empty($world->layout['zones'])) {
-            $prompt['world_awareness'] = $this->buildResidentWorldPrompt->worldAwareness();
+            $prompt['world_state'] = $this->buildResidentWorldPrompt->worldState($world, $state['residents'][$resident->id], $state['user'], $userActivity, $stacking, $userTalkingWith, $residentActivity, $userInSight, $withYou, lean: $atPost);
         }
 
         if ($session !== null) {
@@ -62,7 +70,7 @@ class AppendWorldConversationContext
                 $prompt['current_activity'] = $currentActivity;
             }
 
-            $recentActivity = $this->buildResidentWorldPrompt->recentActivity($world, $session, $resident);
+            $recentActivity = $this->buildResidentWorldPrompt->recentActivity($world, $session, $resident, $atPost ? BuildResidentWorldPrompt::POST_ACTIVITY_LIMIT : null);
             if ($recentActivity !== null) {
                 $prompt['recent_activity'] = $recentActivity;
             }

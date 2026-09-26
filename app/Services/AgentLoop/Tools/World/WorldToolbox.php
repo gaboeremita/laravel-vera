@@ -24,6 +24,7 @@ class WorldToolbox
      * @param  ?array<string, int>  $companions  the other residents she can start talking to, resident id by name; null where she is already talking to someone
      * @param  bool  $userAvailable  whether the user is free to be talked to
      * @param  bool  $userInSight  whether the user is in the same room as her
+     * @param  bool  $staysAtPost  whether she keeps to her post, with no tools that move her
      * @param  ?array{x: float, y: float, z: float}  $residentPoint  where she is; null when unknown
      * @param  ?Closure(): ?array{from: string, memory: string}  $recall  brings back one of her memories
      */
@@ -35,6 +36,7 @@ class WorldToolbox
         public readonly ?array $companions = null,
         public readonly bool $userAvailable = true,
         public readonly bool $userInSight = true,
+        public readonly bool $staysAtPost = false,
         public readonly ?array $residentPoint = null,
         private readonly ?Closure $recall = null,
     ) {
@@ -55,6 +57,14 @@ class WorldToolbox
             new WhereCanITool($this),
             new WhatIsInTool($this),
             new DescribeTool($this),
+        ];
+
+        if ($this->staysAtPost) {
+            return $tools;
+        }
+
+        $tools = [
+            ...$tools,
             new GoToTool($this),
             new FollowTool($this),
             new StopTool($this),

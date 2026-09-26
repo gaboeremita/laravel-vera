@@ -406,6 +406,7 @@ class ConversationController extends Controller
                     occupiedSpots: $validated['occupiedSpots'] ?? [],
                     posePostures: $assistantModel->posturesByPoseName(),
                     residentPoint: $residentPoint,
+                    staysAtPost: $resident->staysAtPost(),
                 );
                 $tools = [...$tools, ...$worldToolbox->tools()];
             }

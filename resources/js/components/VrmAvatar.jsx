@@ -1,15 +1,13 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { AnimationMixer, Box3, BackSide, LoopOnce, LoopRepeat, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3 } from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
-import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
+import { VRMUtils } from '@pixiv/three-vrm';
 import veraAvatar from '../../images/vera-avatar.png';
 import defaultFloor from '../../images/avatar-background-default-floor.png';
 import defaultSurroundings from '../../images/avatar-background-default-surroundings.png';
 import useAvatarBackground from '../hooks/useAvatarBackground.js';
-import { retargetMixamoAnimation } from '../utils/mixamoRetargeting.js';
+import { loadPoseClip } from '../utils/poseClipCache.js';
+import { createVrmLoader } from '../utils/vrmLoader.js';
 
 const EXPRESSION_HOLD_SECONDS = 3.5;
 const BACKGROUND_FADE_SECONDS = 0.4;
@@ -49,18 +47,7 @@ export function applyBoneQuaternions(vrm, quatMap) {
 // Shared by the one-shot triggered-pose loader and the looping default-pose
 // loader — parses a .vrma or .fbx animation URL into a THREE.AnimationClip
 // targeting this vrm's normalized bones.
-export async function loadPoseClip(url, vrm) {
-	if (url.toLowerCase().endsWith('.fbx')) {
-		const fbxAsset = await new FBXLoader().loadAsync(url);
-		return retargetMixamoAnimation(fbxAsset, vrm);
-	}
-
-	const loader = new GLTFLoader();
-	loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
-	const gltf = await loader.loadAsync(url);
-	const vrmAnimation = gltf.userData.vrmAnimations?.[0];
-	return vrmAnimation ? createVRMAnimationClip(vrmAnimation, vrm) : null;
-}
+export { loadPoseClip };
 
 // The backdrop is a *partial* cylinder arc, not a full 360° wrap — wrapping a
 // single non-tileable image around a full circumference stretches it by
@@ -93,7 +80,7 @@ const BACKDROP_THETA_START = Math.PI - BACKDROP_THETA_LENGTH / 2;
 const BACKDROP_Y = BACKDROP_HEIGHT / 2;
 
 function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimationUrl, poseTriggerId, defaultPoseBlendshapes, defaultPoseAnimationUrl, onLoaded, onError }) {
-	const { scene, camera } = useThree();
+	const { scene, camera, gl } = useThree();
 	const vrmRef = useRef(null);
 	const currentWeightsRef = useRef({});
 	const blinkRef = useRef({ phase: 'waiting', phaseElapsed: 0, threshold: 3 });
@@ -236,8 +223,7 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 
 	useEffect(() => {
 		let cancelled = false;
-		const loader = new GLTFLoader();
-		loader.register((parser) => new VRMLoaderPlugin(parser));
+		const loader = createVrmLoader(gl);
 
 		loader.load(
 			vrmUrl,

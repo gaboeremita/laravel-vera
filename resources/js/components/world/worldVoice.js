@@ -20,8 +20,44 @@ export function storeVoiceEnabled(enabled, storage = globalThis.localStorage) {
 	}
 }
 
-export function voicesLine({ voiceEnabled, distance }) {
-	return voiceEnabled && distance <= EARSHOT;
+const FACING_COS = Math.cos(Math.PI / 3);
+const CACHED_LINES = 30;
+
+/** Whether the user is looking toward a point: within 60° of where they face. A missing view counts as facing it. */
+export function facesPoint(view, point) {
+	if (!view || !point) return true;
+	const dx = point.x - view.x;
+	const dz = point.z - view.z;
+	const length = Math.hypot(dx, dz);
+	if (length < 0.001) return true;
+	return (-Math.sin(view.yaw) * dx - Math.cos(view.yaw) * dz) / length >= FACING_COS;
+}
+
+/**
+ * A line is voiced with voices on, within earshot, and when the user is
+ * facing the speaker or the line is said to them.
+ */
+export function voicesLine({ voiceEnabled, distance, facing = true, toUser = false }) {
+	return voiceEnabled && distance <= EARSHOT && (facing || toUser);
+}
+
+/** Recently voiced lines by speaker and text, so a repeated line is played again without paying for it twice. */
+export function createLineCache(limit = CACHED_LINES) {
+	const lines = new Map();
+	return {
+		get(key) {
+			if (!lines.has(key)) return null;
+			const audio = lines.get(key);
+			lines.delete(key);
+			lines.set(key, audio);
+			return audio;
+		},
+		set(key, audio) {
+			lines.delete(key);
+			lines.set(key, audio);
+			if (lines.size > limit) lines.delete(lines.keys().next().value);
+		},
+	};
 }
 
 /**

@@ -8,6 +8,7 @@ export default [
 		ignores: [
 			"**/vendor/**",
 			"**/public/build/**",
+			"**/public/basis/**",
 			".claude/**",
 			"resources/js/ziggy.js",
 			"storage/**",

@@ -192,3 +192,43 @@ it('rejects malformed zone access', function (array $zoneAccess, string $error) 
     'empty tag' => [['tags' => ['']], 'zoneAccess.tags.0'],
     'zone id not a slug' => [['zones' => ['Mona House']], 'zoneAccess.zones.0'],
 ]);
+
+it('persists a route, a home spot, the area she keeps to and her decision pace', function () {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $npc = residentAssistantFor($user, null, AssistantKind::WorldNpc);
+    $settings = [
+        'homeSpot' => ['spotId' => 'toll-booth-stool', 'activityId' => 'man-the-toll-booth'],
+        'route' => [['target' => 'the-heap', 'pause' => 20], ['point' => ['x' => 1, 'y' => 0, 'z' => 2]], ['target' => 'hot-swap-tacos-stool-1', 'activity' => 'eat-tacos']],
+        'area' => ['fork-yard'],
+        'decisionSeconds' => ['min' => 30, 'max' => 60],
+    ];
+
+    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $npc]), [
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'behavior' => 'route',
+        'behaviorSettings' => $settings,
+    ])->assertSuccessful()->assertJsonPath('behavior', 'route')->assertJsonPath('behaviorSettings.area', ['fork-yard']);
+
+    expect(WorldResident::where('world_id', $world->id)->firstOrFail()->behavior_settings)->toBe($settings);
+});
+
+it('rejects malformed behavior settings', function (string $behavior, array $settings, string $error) {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $npc = residentAssistantFor($user, null, AssistantKind::WorldNpc);
+
+    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $npc]), [
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'behavior' => $behavior,
+        'behaviorSettings' => $settings,
+    ])->assertUnprocessable()->assertJsonValidationErrors($error);
+})->with([
+    'unknown key' => ['stationary', ['speed' => 2], 'behaviorSettings'],
+    'route resident without a route' => ['route', ['area' => ['fork-yard']], 'behaviorSettings.route'],
+    'route of one stop' => ['route', ['route' => [['target' => 'the-heap']]], 'behaviorSettings.route'],
+    'stop with neither target nor point' => ['route', ['route' => [['pause' => 5], ['target' => 'the-heap']]], 'behaviorSettings.route.0.target'],
+    'home spot without an activity' => ['stationary', ['homeSpot' => ['spotId' => 'toll-booth-stool']], 'behaviorSettings.homeSpot.activityId'],
+    'pace slower at its minimum than its maximum' => ['autonomous', ['decisionSeconds' => ['min' => 60, 'max' => 30]], 'behaviorSettings.decisionSeconds.max'],
+    'pace faster than ten seconds' => ['autonomous', ['decisionSeconds' => ['min' => 2, 'max' => 30]], 'behaviorSettings.decisionSeconds.min'],
+]);
