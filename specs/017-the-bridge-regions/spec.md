@@ -1,6 +1,6 @@
 # Feature Specification: The Bridge — One World Made of Connected Regions
 
-**Feature Branch**: `claude/sharp-allen-un3agj`
+**Feature Branch**: `017-the-bridge-regions`
 
 **Created**: 2026-09-27
 
