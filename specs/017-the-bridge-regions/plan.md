@@ -8,7 +8,7 @@
 
 Today's `World` becomes `Region`, and a new `World` groups regions, holds the World Prompts, images and a spawn passage, and owns residents and sessions.
 
-- **Schema**: the `worlds` table is renamed to `regions`, and a new `worlds` table is created. Residents keep their table and get a home `region_id`, and the existing unique `(world_id, assistant_id)` index now enforces one resident per world. Sessions and resident session states record their current region ([research.md](research.md) R1, R2, R8).
+- **Schema**: the `worlds` table is renamed to `regions`, and a new `worlds` table is created. Residents keep their table and get a `region_id`, and the existing unique `(world_id, assistant_id)` index now enforces one resident per world. Sessions and resident session states record their current region ([research.md](research.md) R1, R2, R8).
 - **Passages**: `ParseEnvironmentLayout` reads a new `passage` marker, stored in `layout.passages` with facing, radius and a precomputed arrival point. Links are two rows in `passage_links`, one per direction, kept consistent by a `LinkPassages` action. A `ReconcilePassages` action removes links and the spawn when a re-uploaded environment drops a passage (R4–R6).
 - **Travel**: the client triggers a passage when the player enters its radius after having left it once. A `travel` endpoint resolves the link, moves the session and its followers, and returns the arrival. The world page then unmounts the region and mounts the destination (R9).
 - **AI context**: prompt building and world tools receive the resident's current `Region` for layout. Prompts combine the world's and the region's, and location names the region (R11).
@@ -109,7 +109,7 @@ database/
 │   ├── ..._create_worlds_table.php                      # new: container + spawn columns
 │   ├── ..._add_world_id_to_regions_table.php            # new
 │   ├── ..._repoint_world_user_to_worlds.php             # new: world_id references the new worlds table
-│   ├── ..._add_region_id_to_world_residents_table.php   # new: home region; world_id references the new worlds table
+│   ├── ..._add_region_id_to_world_residents_table.php   # new: the resident's region; world_id references the new worlds table
 │   ├── ..._add_region_id_to_world_sessions_tables.php   # new: world_sessions and world_session_residents
 │   └── ..._create_passage_links_table.php               # new
 └── factories/

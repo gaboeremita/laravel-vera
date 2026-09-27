@@ -79,7 +79,7 @@ Errors: 422 when the passage has no link or a follower is not in the region.
 
 ## Session-scoped resident endpoints
 
-Paths unchanged (`/worlds/{world}/sessions/{session}/residents/{resident}/...`, conversations, decisions, observations, activities, state). Each resolves the resident's current region (state row `region_id`, else home `region_id`) and uses that region's layout. 422 when the resident is not in the session's current region.
+Paths unchanged (`/worlds/{world}/sessions/{session}/residents/{resident}/...`, conversations, decisions, observations, activities, state). Each resolves the resident's current region (state row `region_id`, else the resident's `region_id`) and uses that region's layout. 422 when the resident is not in the session's current region.
 
 ## Chat (`ConversationController`)
 

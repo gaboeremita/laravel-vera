@@ -50,7 +50,7 @@ The user opens a world's configuration. The World tab holds the world's name, de
 
 ### User Story 3 - Residents belong to one region of the world (Priority: P2)
 
-Each assistant or NPC can live in at most one region per world. In a region's residents list, residents who already live in another region of the same world appear grayed out with the name of the region they live in, and a "Bring here" action moves their home to the current region. During play, residents following the player travel with them through passages.
+Each assistant or NPC can live in at most one region per world. In a region's residents list, residents who already live in another region of the same world appear grayed out with the name of the region they live in, and a "Bring here" action assigns them to the current region. During play, residents following the player travel with them through passages.
 
 **Why this priority**: Keeps each character unique within a world and lets the user rearrange where characters live without deleting and re-creating their setup, but travel and configuration work without it.
 
@@ -90,7 +90,7 @@ While playing, the player's location shows the current region's name. Each regio
 - A new environment keeps a passage's identifier but changes its name or position: the link is kept and the new name and position are used.
 - A region is deleted: every link to its passages is removed, its residents are removed from the world, and if the spawn passage was in it the spawn point is cleared.
 - A session whose current region was deleted is entered: it resumes in front of the world's spawn passage; while no spawn passage is chosen, it cannot be entered.
-- A resident's current region in a session is deleted while their home region still exists: the next visit finds them back in their home region.
+- A resident's current region in a session is deleted while the region they belong to still exists: the next visit finds them back in that region.
 - Travelling while a conversation with a resident is open: the conversation ends as when walking out of conversation range.
 
 ## Requirements *(mandatory)*
@@ -133,8 +133,8 @@ While playing, the player's location shows the current region's name. Each regio
 
 - **FR-021**: An assistant or NPC MUST live in at most one region per world.
 - **FR-022**: A region's residents list MUST show residents living in another region of the same world as unselectable, with the name of the region they live in, and MUST offer a "Bring here" action.
-- **FR-023**: "Bring here" MUST, after confirmation, move the resident's home to the current region and reset their placement to the default.
-- **FR-024**: Residents following the player MUST travel through passages with the player and remain in the destination region, across visits of the same session, until they move again; other residents MUST stay in their current region. A resident's home region decides where they start in a new session, and where they return when their current region is deleted.
+- **FR-023**: "Bring here" MUST, after confirmation, assign the resident to the current region and reset their placement to the default.
+- **FR-024**: Residents following the player MUST travel through passages with the player and remain in the destination region, across visits of the same session, until they move again; other residents MUST stay in their current region. The region a resident belongs to decides where they start in a new session, and where they return when their current region is deleted.
 
 **Prompts and music**
 

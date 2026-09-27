@@ -24,5 +24,5 @@ Per CLAUDE.md, Pint, ESLint and the full test suite run once, right before pushi
 4. **Residents** (US3): with Luna living in region B, open region A's residents: Luna is grayed out with "lives in B". Use BRING HERE and confirm; she is now listed in A with the default placement.
 5. **Followers and visits** (US3): in a session, ask a resident to follow you, walk through a passage, then leave the world and enter the same session again: you and the resident are in the destination region.
 6. **Music and prompts** (US4): each region plays its own track on arrival. The resident's context containing the World Prompt, the region's prompt and the region's name is covered by `WorldConversationContextTest`.
-7. **Deletion** (edge cases): delete region B while a session is in it; entering that session starts at the spawn passage, and residents who had followed you into B are back in their home regions.
+7. **Deletion** (edge cases): delete region B while a session is in it; entering that session starts at the spawn passage, and residents who had followed you into B are back in the regions they belong to.
 8. **Re-upload** (edge cases): upload a new GLB for region A without `lobby-door`; its link and the spawn are removed and the ⚠ warnings return.

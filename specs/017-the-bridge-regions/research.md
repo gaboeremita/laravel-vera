@@ -8,11 +8,11 @@
 
 **Alternatives considered**: Keeping the `worlds` table for regions and naming the container something else (e.g. `universes`) avoids a rename but leaves the code saying "world" for what the product calls a region, in every controller, tool and prompt.
 
-## R2. Residents: one per world, with a home region
+## R2. Residents: one per world, with a region
 
-**Decision**: Keep `world_residents` and `WorldResident`. Its `world_id` points at the new `worlds` table, and a new `region_id` column holds the home region (`cascadeOnDelete`). The existing unique index on `(world_id, assistant_id)` enforces "at most once per world" in the database.
+**Decision**: Keep `world_residents` and `WorldResident`. Its `world_id` points at the new `worlds` table, and a new `region_id` column holds the region the resident belongs to (`cascadeOnDelete`). The existing unique index on `(world_id, assistant_id)` enforces "at most once per world" in the database.
 
-**Rationale**: The existing unique index already expresses FR-021 once `world_id` means the container. Deleting a region deletes the residents whose home it is, which matches the region deletion rule.
+**Rationale**: The existing unique index already expresses FR-021 once `world_id` means the container. Deleting a region deletes its residents, which matches the region deletion rule.
 
 **Alternatives considered**: Uniqueness checked only in the request layer; rejected because a database constraint cannot be bypassed by a second code path.
 
@@ -50,9 +50,9 @@
 
 ## R8. Session state across visits
 
-**Decision**: `world_sessions` gains `region_id` (nullable, `nullOnDelete`); `position` stays. `world_session_residents` gains `region_id` (required, `cascadeOnDelete`). A resident without a state row is in their home region at their configured placement.
+**Decision**: `world_sessions` gains `region_id` (nullable, `nullOnDelete`); `position` stays. `world_session_residents` gains `region_id` (required, `cascadeOnDelete`). A resident without a state row is in their region at their configured placement.
 
-**Rationale**: A session already persists player and resident state between visits; recording the region makes that state complete. A session whose region was deleted has `region_id = null` and resumes at the spawn arrival (FR-020). Deleting a region deletes the state rows of residents who were in it, so they reappear at their home placement (resident edge case), with no special-case code.
+**Rationale**: A session already persists player and resident state between visits; recording the region makes that state complete. A session whose region was deleted has `region_id = null` and resumes at the spawn arrival (FR-020). Deleting a region deletes the state rows of residents who were in it, so they reappear at their configured placement (resident edge case), with no special-case code.
 
 ## R9. Travel
 

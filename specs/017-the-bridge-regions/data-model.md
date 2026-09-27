@@ -40,7 +40,7 @@ Relations: `world()` BelongsTo, `residents()` HasMany `WorldResident` via `regio
 
 Rules: passage ids unique within a region; `arrival` is 1.0 m in front of `position` along `facing`.
 
-Deleting a region: residents whose home it is, passage links from or to it, and session resident states in it are deleted by foreign keys; sessions in it get `region_id = null`; the world's spawn is cleared if it pointed here.
+Deleting a region: its residents, passage links from or to it, and session resident states in it are deleted by foreign keys; sessions in it get `region_id = null`; the world's spawn is cleared if it pointed here.
 
 ## passage_links (new table, model `PassageLink`)
 
@@ -60,9 +60,9 @@ Unique `(region_id, passage_id)`. Every link is two rows, one per direction, alw
 | Column | Change |
 |---|---|
 | world_id | now references the new `worlds` table |
-| region_id | new, FK regions, `cascadeOnDelete`; the home region |
+| region_id | new, FK regions, `cascadeOnDelete`; the region the resident belongs to |
 
-Unique `(world_id, assistant_id)` is kept and now means "once per world". Placement (`position`, `rotation`, `posture`, `behavior`, `behavior_settings`, `zone_access`) refers to the home region's layout.
+Unique `(world_id, assistant_id)` is kept and now means "once per world". Placement (`position`, `rotation`, `posture`, `behavior`, `behavior_settings`, `zone_access`) refers to that region's layout.
 
 ## world_user (existing pivot)
 
@@ -82,12 +82,12 @@ Unique `(world_id, assistant_id)` is kept and now means "once per world". Placem
 |---|---|
 | region_id | new, FK regions, `cascadeOnDelete`; the resident's current region in this session |
 
-No row means the resident is in their home region at their configured placement.
+No row means the resident is in their region at their configured placement.
 
 ## State transitions
 
 - **Start session**: requires a valid spawn → session `region_id` = spawn region, `position` = spawn passage `arrival`.
 - **Travel through passage P in region R**: requires a link from `(R, P)` → session moves to the target region at the target passage's `arrival`; each follower's state row moves to the target region next to the arrival point.
 - **Enter session**: `region_id` set → load that region at `position`; `region_id` null → spawn arrival (422 while no valid spawn).
-- **Bring here**: resident `region_id` → target region, placement reset to defaults; their session state rows are deleted so they start at the new home placement.
+- **Bring here**: resident `region_id` → target region, placement reset to defaults; their session state rows are deleted so they start at the new placement.
 - **Environment re-upload**: links and spawn pointing at passage ids missing from the new layout are removed.
