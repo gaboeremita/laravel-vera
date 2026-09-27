@@ -11,7 +11,7 @@ interface LlmProvider
      * Send a chat request to the LLM and return a unified response.
      *
      * A message may additionally carry `tool_calls` (assistant turn requesting
-     * one or more tools, shape `array{id: string, name: string, arguments: array}[]`)
+     * one or more tools, shape `array{id: string, name: string, arguments: array, thoughtSignature?: string|null}[]`)
      * or, for `role: 'tool'`, `tool_call_id` and `content` holding that call's result.
      * Each provider translates these normalized turns into its own wire format.
      *

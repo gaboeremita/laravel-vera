@@ -55,6 +55,7 @@ class AgentLoopRunner
                         'id' => $call->id,
                         'name' => $call->name,
                         'arguments' => $call->arguments,
+                        'thoughtSignature' => $call->thoughtSignature,
                     ], $response->toolCalls),
                 ];
 

@@ -111,6 +111,7 @@ export default function ProviderAccordion({
 									>
 										<option value="generic">Generic (OpenAI-compatible)</option>
 										<option value="anthropic">Anthropic</option>
+										<option value="gemini">Google Gemini</option>
 									</select>
 								</div>
 
