@@ -182,6 +182,10 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - NEVER edit existing migration files. Always create a new migration to modify the database schema.
 
+## Commit Authorship
+
+- Author every commit as `Gabriel <gabrieleremita@gmail.com>`, with Claude credited through a `Co-Authored-By` trailer. Pass the identity per command (`git -c user.name=... -c user.email=... commit`) when the environment's git config names someone else.
+
 ## Naming Convention
 
 - camelCase everywhere: PHP variables, JS/JSX variables, JSON/API keys, JS object properties. The one exception is database columns and Eloquent model attributes, which stay snake_case per Laravel convention (and PHP arrays mapping directly to those columns).
