@@ -186,6 +186,11 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - Author every commit as `Gabriel <gabrieleremita@gmail.com>`, with Claude credited through a `Co-Authored-By` trailer. Pass the identity per command (`git -c user.name=... -c user.email=... commit`) when the environment's git config names someone else.
 
+## Shipping Scope
+
+- A request to commit, push, open a PR, or open an issue ships EVERYTHING: every modified and untracked file in the tree, every fix proposed or offered earlier in the conversation, and every fix the gates (Pint, ESLint, Pest) surface, including failures that predate the change or sit in unrelated code.
+- Never ask whether something goes in, goes in a separate PR, or is left out, and never leave anything out on your own judgement. "A PR and an issue" means exactly one PR and one issue containing all of it.
+
 ## Naming Convention
 
 - camelCase everywhere: PHP variables, JS/JSX variables, JSON/API keys, JS object properties. The one exception is database columns and Eloquent model attributes, which stay snake_case per Laravel convention (and PHP arrays mapping directly to those columns).
