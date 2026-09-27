@@ -336,3 +336,28 @@ test('a body stuck at the edge of the world is freed inside its bounds', (contex
 	assert.ok(free.z <= 8.75);
 	assert.equal(world.isBodyBlocked(free), false);
 });
+
+function pallet() {
+	const mesh = new Mesh(new BoxGeometry(1.1, 0.3, 0.9), new MeshBasicMaterial());
+	mesh.position.set(0, 0.15, 0.7);
+	return mesh;
+}
+
+test('a seat-height point in front of a raised seat drops to the floor', (context) => {
+	const world = createWorld(context, pallet());
+	const ground = world.groundBelow({ x: 0, y: 0.72, z: -0.1 });
+	assert.ok(Math.abs(ground.y) < 0.001);
+	assert.equal(ground.x, 0);
+	assert.equal(ground.z, -0.1);
+});
+
+test('a point above a raised surface drops onto that surface', (context) => {
+	const world = createWorld(context, pallet());
+	assert.ok(Math.abs(world.groundBelow({ x: 0, y: 0.72, z: 0.7 }).y - 0.3) < 0.001);
+});
+
+test('a point with no ground within reach below stays where it is', (context) => {
+	const world = createWorld(context);
+	const point = { x: 50, y: 1, z: 50 };
+	assert.equal(world.groundBelow(point), point);
+});

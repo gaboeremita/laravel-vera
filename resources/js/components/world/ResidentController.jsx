@@ -200,7 +200,9 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				spotRef.current = {
 					spotId,
 					activityId: startState.activityId ?? null,
-					approach: startState.exitPosition ?? null,
+					// A layout's spot approach sits at seat height, so she stands up
+					// onto the ground beneath it.
+					approach: startState.exitPosition ? collisionWorld.groundBelow(startState.exitPosition) : null,
 					surfaceY: savedSpot ? savedSpot.position.y + SEAT_CLEARANCE : undefined,
 					restY: savedSpot ? undefined : start.y - tier * STACK_HEIGHT,
 					holdOffset: 0,
@@ -227,7 +229,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			setLoaded(true);
 		});
 		return () => { cancelled = true; };
-	}, [inLoadRange, loaded, position, resident.id, bodyUrl, gl, resident.rotation?.y, residentPositions, scene, savedState, occupiedSpots, layout]);
+	}, [inLoadRange, loaded, position, resident.id, bodyUrl, gl, resident.rotation?.y, residentPositions, scene, savedState, occupiedSpots, layout, collisionWorld]);
 
 	// Lets go of her body, remembering where and how she was so the next
 	// body she is loaded into picks up from there. Anything waiting on this
