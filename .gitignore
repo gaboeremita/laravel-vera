@@ -8,7 +8,9 @@
 /.codex
 /.ai/
 /.agents/
-/.claude/
+/.claude/settings.local.json
+/.claude/agent-memory-local/
+/.claude/worktrees/
 /.cursor/
 /.idea/
 /.junie/
