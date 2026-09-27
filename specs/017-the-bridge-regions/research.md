@@ -16,7 +16,7 @@
 
 **Alternatives considered**: Uniqueness checked only in the request layer; rejected because a database constraint cannot be bypassed by a second code path.
 
-## R3. Moving a resident to another region ("Bring here")
+## R3. Moving a resident to another region
 
 **Decision**: A dedicated endpoint moves an existing resident's `region_id` to the target region and resets placement fields to the defaults used by `WorldResidentController::upsert` today. Upserting a resident who lives in another region of the same world returns 409.
 

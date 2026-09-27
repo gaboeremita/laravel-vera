@@ -15,7 +15,7 @@ Today's `World` becomes `Region`, and a new `World` groups regions, holds the Wo
 - **Configuration UI**:
   - **World tab**: world fields and the spawn passage.
   - **Regions tab**: a region list, and today's world form reused as the region form with a passages editor.
-  - **Residents editor**: gains grayed-out rows and "Bring here".
+  - **Residents editor**: gains grayed-out rows and the option to move a resident to the region being edited.
 
 ## Technical Context
 
@@ -143,7 +143,7 @@ app/
 │   │   ├── WorldImageController.php       # changed: world images; shared store/destroy
 │   │   ├── RegionImageController.php      # new: region images via the shared logic
 │   │   ├── RegionTrackController.php      # renamed from WorldTrackController
-│   │   ├── WorldResidentController.php    # changed: nested under region; bring()
+│   │   ├── WorldResidentController.php    # changed: nested under region; move()
 │   │   ├── PassageLinkController.php      # new
 │   │   ├── WorldSessionController.php     # changed: spawn on store; resume(); travel()
 │   │   ├── ConversationController.php, ResidentDecisionController.php, ResidentActivityController.php,
@@ -161,7 +161,7 @@ app/
 ├── Services/AgentLoop/Tools/World/*.php  # changed: WorldToolbox and tools take Region
 └── Traits/ResolvesWorldUser.php   # unchanged
 
-routes/api.php                     # changed: region routes, passage links, bring, travel, resume
+routes/api.php                     # changed: region routes, passage links, resident move, travel, resume
 resources/js/ziggy.js              # regenerated
 
 resources/js/
@@ -179,7 +179,7 @@ resources/js/
 │   ├── PassageSelect.jsx          # new: dropdown grouped by region name
 │   ├── WorldImagesEditor.jsx      # changed: route names as props
 │   ├── WorldTrackEditor.jsx       # changed: region routes
-│   ├── WorldResidentsEditor.jsx   # changed: region routes, grayed rows, BRING HERE
+│   ├── WorldResidentsEditor.jsx   # changed: region routes, grayed rows, move option
 │   ├── WorldCard.jsx              # changed: region count, spawn warning
 │   ├── WorldSessionList.jsx       # changed: disabled start without spawn
 │   └── world/
@@ -195,7 +195,7 @@ tests/
 │   ├── RegionControllerTest.php           # new: from today's world tests; reconcile on re-upload; delete rules
 │   ├── WorldLayoutImportTest.php          # extended: passage markers and warnings
 │   ├── PassageLinkControllerTest.php      # new: two-way, relink, same region, cross-world 422
-│   ├── WorldResidentControllerTest.php    # extended: 409 conflict, bring
+│   ├── WorldResidentControllerTest.php    # extended: 409 conflict, move
 │   ├── WorldSessionControllerTest.php     # extended: spawn required, resume, travel with followers
 │   ├── WorldConversationContextTest.php   # extended: world + region prompts, region name
 │   └── (other World* / Resident* tests)   # changed: factories and routes
@@ -216,7 +216,7 @@ tests/
    - The passages editor and `PassageSelect`.
    - The spawn setting, and session start requiring the spawn.
 3. **Travel (US1)**: `passageTrigger`, `PassageTracker`, the travel and resume endpoints, and region remounting on the world page.
-4. **Residents per world (US3)**: the 409 conflict, bring, grayed rows, followers on travel, and resident region in session state.
+4. **Residents per world (US3)**: the 409 conflict, moving residents, grayed rows, followers on travel, and resident region in session state.
 5. **Region location and music (US4)**: the location readout, the track switch on remount, and the region name in the AI location line.
 
 ## Complexity Tracking

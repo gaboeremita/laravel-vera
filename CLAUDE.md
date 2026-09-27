@@ -212,6 +212,10 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - If the task is research, doc-checking, planning, thinking, or answering a question — take the action requested. Do not infer that a code change is also needed.
 - Only take action when explicitly requested.
 
+## Naming Approval
+
+- Never introduce a new name on your own: UI labels, button text, terms for concepts, or names in specs and docs. Suggest the name, explain what it refers to, and use it only after the user approves it. Until then, describe the thing plainly.
+
 ## Comments
 
 - Default to zero comments. Only comment when the WHY is non-obvious (a hidden constraint, workaround, or gotcha).

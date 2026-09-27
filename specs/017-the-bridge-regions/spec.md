@@ -50,16 +50,16 @@ The user opens a world's configuration. The World tab holds the world's name, de
 
 ### User Story 3 - Residents belong to one region of the world (Priority: P2)
 
-Each assistant or NPC can live in at most one region per world. In a region's residents list, residents who already live in another region of the same world appear grayed out with the name of the region they live in, and a "Bring here" action assigns them to the current region. During play, residents following the player travel with them through passages.
+Each assistant or NPC can live in at most one region per world. In a region's residents list, residents who already live in another region of the same world appear grayed out with the name of the region they live in, and an option moves them to the region being edited. During play, residents following the player travel with them through passages.
 
 **Why this priority**: Keeps each character unique within a world and lets the user rearrange where characters live without deleting and re-creating their setup, but travel and configuration work without it.
 
-**Independent Test**: Place an assistant in region A, open region B's residents list, verify the grayed-out row, use "Bring here", then start a session, have the resident follow the player, and walk through a passage.
+**Independent Test**: Place an assistant in region A, open region B's residents list, verify the grayed-out row, use the option to move them there, then start a session, have the resident follow the player, and walk through a passage.
 
 **Acceptance Scenarios**:
 
 1. **Given** assistant Luna lives in region "Harbor", **When** the user opens the residents list of region "Lua Building" in the same world, **Then** Luna appears grayed out, cannot be selected, and reads "lives in Harbor".
-2. **Given** that grayed-out row, **When** the user chooses "Bring here" and confirms, **Then** Luna lives in "Lua Building" with the default placement, and "Harbor" no longer lists her as a resident.
+2. **Given** that grayed-out row, **When** the user chooses to move Luna there and confirms, **Then** Luna lives in "Lua Building" with the default placement, and "Harbor" no longer lists her as a resident.
 3. **Given** an assistant living in a region of world X, **When** the user opens a region of a different world Y, **Then** the assistant is available to add there as normal.
 4. **Given** a resident is following the player, **When** the player walks through a passage, **Then** the resident arrives in the destination region near the player and remains in that region, across later visits of the same session, until they move again.
 5. **Given** a resident is not following the player, **When** the player walks through a passage, **Then** the resident stays in their current region and is not present in the destination region.
@@ -132,8 +132,8 @@ While playing, the player's location shows the current region's name. Each regio
 **Residents**
 
 - **FR-021**: An assistant or NPC MUST live in at most one region per world.
-- **FR-022**: A region's residents list MUST show residents living in another region of the same world as unselectable, with the name of the region they live in, and MUST offer a "Bring here" action.
-- **FR-023**: "Bring here" MUST, after confirmation, assign the resident to the current region and reset their placement to the default.
+- **FR-022**: A region's residents list MUST show residents living in another region of the same world as unselectable, with the name of the region they live in, and MUST offer an option to move them to this region.
+- **FR-023**: Moving a resident from the residents list MUST, after confirmation, make the region being edited their region and reset their placement to the default.
 - **FR-024**: Residents following the player MUST travel through passages with the player and remain in the destination region, across visits of the same session, until they move again; other residents MUST stay in their current region. The region a resident belongs to decides where they start in a new session, and where they return when their current region is deleted.
 
 **Prompts and music**
@@ -170,5 +170,5 @@ While playing, the player's location shows the current region's name. Each regio
 ## Assumptions
 
 - The trigger radius defaults to about one metre and the arrival distance in front of a passage to about one metre when the marker does not specify them.
-- "Bring along" during play uses the existing behaviour where a resident follows the player; no new command is introduced.
+- A resident travels with the player when they are following the player through the existing follow behaviour; no new command is introduced.
 - The theme setting stays with the region, alongside the rest of the configuration a world has today.
