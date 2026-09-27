@@ -2,7 +2,7 @@
 
 namespace App\Actions;
 
-use App\Models\World;
+use App\Models\Region;
 use App\Models\WorldResident;
 
 class ApplyResidentZoneAccess
@@ -20,11 +20,11 @@ class ApplyResidentZoneAccess
      * knows only the zones of that area. The returned world is an unsaved
      * copy and must never be saved.
      */
-    public function handle(World $world, ?WorldResident $resident): World
+    public function handle(Region $region, ?WorldResident $resident): Region
     {
-        $layout = $world->layout ?? [];
+        $layout = $region->layout ?? [];
         if ($resident === null || empty($layout['zones'])) {
-            return $world;
+            return $region;
         }
 
         $zonesById = collect($layout['zones'])->keyBy('id')->all();
@@ -41,7 +41,7 @@ class ApplyResidentZoneAccess
             $zones[] = [...$zone, 'residentAccess' => $access['state']];
         }
 
-        $visible = clone $world;
+        $visible = clone $region;
         $visible->layout = [
             ...$layout,
             'zones' => $zones,

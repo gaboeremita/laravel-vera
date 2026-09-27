@@ -4,7 +4,7 @@ use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\User;
-use App\Models\World;
+use App\Models\Region;
 use App\Models\WorldSession;
 use App\Models\WorldUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,8 +14,8 @@ uses(RefreshDatabase::class);
 function setUpWorldSessionAssistant(): array
 {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
-    $worldUser = WorldUser::where('world_id', $world->id)->where('user_id', $user->id)->firstOrFail();
+    $world = Region::factory()->forUser($user)->create();
+    $worldUser = WorldUser::where('world_id', $world->world_id)->where('user_id', $user->id)->firstOrFail();
     $assistant = Assistant::factory()->create();
     AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $assistant->id]);
     $world->residents()->create(['assistant_id' => $assistant->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
@@ -28,7 +28,7 @@ it('creates a conversation scoped to a world session', function () {
     $session = WorldSession::factory()->for($worldUser)->create();
 
     $response = $this->actingAs($user)->postJson(route('conversations.store', $assistant), [
-        'worldId' => $world->id,
+        'worldId' => $world->world_id, 'regionId' => $world->id,
         'worldSessionId' => $session->id,
     ])->assertCreated();
 
@@ -41,12 +41,12 @@ it('finds the same session-scoped conversation on a repeat store call', function
     $session = WorldSession::factory()->for($worldUser)->create();
 
     $first = $this->actingAs($user)->postJson(route('conversations.store', $assistant), [
-        'worldId' => $world->id,
+        'worldId' => $world->world_id, 'regionId' => $world->id,
         'worldSessionId' => $session->id,
     ])->assertCreated();
 
     $second = $this->actingAs($user)->postJson(route('conversations.store', $assistant), [
-        'worldId' => $world->id,
+        'worldId' => $world->world_id, 'regionId' => $world->id,
         'worldSessionId' => $session->id,
     ])->assertCreated();
 
@@ -59,12 +59,12 @@ it('creates a separate conversation for a different session with the same reside
     $sessionTwo = WorldSession::factory()->for($worldUser)->create();
 
     $first = $this->actingAs($user)->postJson(route('conversations.store', $assistant), [
-        'worldId' => $world->id,
+        'worldId' => $world->world_id, 'regionId' => $world->id,
         'worldSessionId' => $sessionOne->id,
     ])->assertCreated();
 
     $second = $this->actingAs($user)->postJson(route('conversations.store', $assistant), [
-        'worldId' => $world->id,
+        'worldId' => $world->world_id, 'regionId' => $world->id,
         'worldSessionId' => $sessionTwo->id,
     ])->assertCreated();
 

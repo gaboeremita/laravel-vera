@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['title', 'position'])]
+#[Fillable(['title', 'region_id', 'position'])]
 class WorldSession extends Model
 {
     /** @use HasFactory<WorldSessionFactory> */
@@ -33,5 +33,10 @@ class WorldSession extends Model
     public function residentStates(): HasMany
     {
         return $this->hasMany(WorldSessionResident::class);
+    }
+
+    public function region(): BelongsTo
+    {
+        return $this->belongsTo(Region::class);
     }
 }

@@ -4,7 +4,7 @@ namespace App\Services\AgentLoop\Tools\World;
 
 use App\Actions\ApplyResidentZoneAccess;
 use App\Contracts\AgentTool;
-use App\Models\World;
+use App\Models\Region;
 use Closure;
 use RuntimeException;
 
@@ -29,7 +29,7 @@ class WorldToolbox
      * @param  ?Closure(): ?array{from: string, memory: string}  $recall  brings back one of her memories
      */
     public function __construct(
-        public readonly World $world,
+        public readonly Region $region,
         public readonly array $residentZoneChain = [],
         public readonly array $occupiedSpots = [],
         public readonly array $posePostures = [],
@@ -136,7 +136,7 @@ class WorldToolbox
      */
     public function zones(): array
     {
-        return $this->world->layout['zones'] ?? [];
+        return $this->region->layout['zones'] ?? [];
     }
 
     /**
@@ -144,7 +144,7 @@ class WorldToolbox
      */
     public function objects(): array
     {
-        return $this->world->layout['objects'] ?? [];
+        return $this->region->layout['objects'] ?? [];
     }
 
     /**
@@ -276,7 +276,7 @@ class WorldToolbox
 
     public function floorName(?string $floorId): ?string
     {
-        return collect($this->world->layout['floors'] ?? [])->firstWhere('id', $floorId)['name'] ?? null;
+        return collect($this->region->layout['floors'] ?? [])->firstWhere('id', $floorId)['name'] ?? null;
     }
 
     /**

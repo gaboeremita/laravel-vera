@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\ResolveResidentRegion;
 use App\Actions\ResolveWorldState;
 use App\Http\Controllers\Controller;
 use App\Models\ResidentActivity;
@@ -39,7 +40,7 @@ class ResidentActivityController extends Controller
         ]);
 
         $zone = isset($validated['position'])
-            ? $resolveWorldState->zoneAt($worldUser->world->layout ?? [], $validated['position'])
+            ? $resolveWorldState->zoneAt(app(ResolveResidentRegion::class)->inCurrentRegion($worldSession, $worldResident)->layout ?? [], $validated['position'])
             : null;
 
         $activity = ResidentActivity::create([

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Image;
+use App\Models\Region;
 use App\Models\User;
 use App\Models\World;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -99,4 +100,17 @@ it('returns 404/403 uploading an image for a world the user has no access to', f
     $this->actingAs($user)->postJson(route('worlds.image.card.store', $world), [
         'image' => UploadedFile::fake()->image('card.png'),
     ])->assertForbidden();
+});
+
+it('uploads and deletes region images separately from the world images', function () {
+    [$user, $world] = setUpWorldForImage();
+    $region = Region::factory()->create(['world_id' => $world->id]);
+
+    $this->actingAs($user)->postJson(route('worlds.regions.image.card.store', [$world, $region]), ['image' => UploadedFile::fake()->image('region.png')])->assertCreated();
+
+    expect($region->fresh()->cardImage->original_name)->toBe('region.png')
+        ->and($world->fresh()->cardImage)->toBeNull();
+
+    $this->actingAs($user)->deleteJson(route('worlds.regions.image.card.destroy', [$world, $region]))->assertSuccessful();
+    expect($region->fresh()->cardImage)->toBeNull();
 });

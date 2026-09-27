@@ -51,7 +51,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 					}
 				}
 
-				const created = await api.post(route('conversations.store', { assistant: resident.assistant.id }), { worldId: world.id, worldSessionId });
+				const created = await api.post(route('conversations.store', { assistant: resident.assistant.id }), { worldId: world.id, regionId: world.regionId, worldSessionId });
 				if (!created.ok) throw new Error('Unable to start a conversation');
 				const conversation = await created.json();
 				if (active) setConversationId(conversation.id);
@@ -99,8 +99,8 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		onVoiceReply: (text, ttsInstructions) => { void speakReply(text, ttsInstructions); },
 		onAction,
 		extraParams: worldSessionId && getPositions
-			? { worldId: world.id, worldSessionId, get positions() { return getPositions(); }, get residentPosture() { return getResidentPosture(resident.id); }, get residentState() { return getResidentState?.(resident.id) ?? null; }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; }, get stackedSpots() { return getStackedSpots?.() ?? []; } }
-			: { worldId: world.id, get residentPosture() { return getResidentPosture(resident.id); }, get residentState() { return getResidentState?.(resident.id) ?? null; }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; }, get stackedSpots() { return getStackedSpots?.() ?? []; } },
+			? { worldId: world.id, regionId: world.regionId, worldSessionId, get positions() { return getPositions(); }, get residentPosture() { return getResidentPosture(resident.id); }, get residentState() { return getResidentState?.(resident.id) ?? null; }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; }, get stackedSpots() { return getStackedSpots?.() ?? []; } }
+			: { worldId: world.id, regionId: world.regionId, get residentPosture() { return getResidentPosture(resident.id); }, get residentState() { return getResidentState?.(resident.id) ?? null; }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; }, get stackedSpots() { return getStackedSpots?.() ?? []; } },
 	});
 
 	useEffect(() => {

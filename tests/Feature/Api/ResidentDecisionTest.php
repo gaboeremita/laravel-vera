@@ -8,7 +8,7 @@ use App\Models\Conversation;
 use App\Models\Pose;
 use App\Models\ResidentActivity;
 use App\Models\User;
-use App\Models\World;
+use App\Models\Region;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,7 +19,7 @@ use Illuminate\Testing\TestResponse;
 uses(RefreshDatabase::class);
 
 /**
- * @return array{0: User, 1: Assistant, 2: Conversation, 3: World, 4: WorldResident, 5: WorldSession}
+ * @return array{0: User, 1: Assistant, 2: Conversation, 3: Region, 4: WorldResident, 5: WorldSession}
  */
 function autonomousScenario(): array
 {
@@ -33,7 +33,7 @@ function requestDecision($test, array $scenario, array $payload = []): TestRespo
 {
     [$user, , , $world, $resident, $session] = $scenario;
 
-    return $test->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->id, $session->id, $resident->id]), [
+    return $test->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->world_id, $session->id, $resident->id]), [
         'positions' => [
             'user' => ['x' => 8, 'y' => 0, 'z' => -8],
             'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]],

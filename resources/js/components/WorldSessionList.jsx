@@ -15,7 +15,7 @@ function timeAgo(dateString) {
 	return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-export default function WorldSessionList({ worldId, sessions, onSelect, onNew, onDelete, onRename }) {
+export default function WorldSessionList({ worldId, sessions, canStartNew = true, onSelect, onNew, onDelete, onRename }) {
 	const [activeRow, setActiveRow] = useState(0);
 	const [activeColumn, setActiveColumn] = useState("select");
 	const [pendingDeleteId, setPendingDeleteId] = useState(null);
@@ -67,7 +67,7 @@ export default function WorldSessionList({ worldId, sessions, onSelect, onNew, o
 				} else {
 					onSelect(sessions[activeRow].id);
 				}
-			} else {
+			} else if (canStartNew) {
 				onNew();
 			}
 		}
@@ -220,11 +220,12 @@ export default function WorldSessionList({ worldId, sessions, onSelect, onNew, o
 
 			<button
 				onClick={onNew}
+				disabled={!canStartNew}
 				onMouseEnter={() => {
 					setActiveRow(sessions.length);
 					setActiveColumn("select");
 				}}
-				className={`w-full text-left px-2 py-1.5 flex items-center gap-3 text-[0.8rem] cursor-pointer transition-colors duration-150 mt-2 ${
+				className={`w-full text-left px-2 py-1.5 flex items-center gap-3 text-[0.8rem] cursor-pointer transition-colors duration-150 mt-2 disabled:opacity-40 disabled:cursor-default ${
 					activeRow === sessions.length
 						? "text-success"
 						: "text-success/40"

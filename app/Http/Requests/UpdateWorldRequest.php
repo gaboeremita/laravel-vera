@@ -2,10 +2,10 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\Theme;
+use App\Models\World;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Validator;
 
 class UpdateWorldRequest extends FormRequest
 {
@@ -15,13 +15,6 @@ class UpdateWorldRequest extends FormRequest
     public function authorize(): bool
     {
         return $this->user() !== null;
-    }
-
-    protected function prepareForValidation(): void
-    {
-        if (is_string($this->input('settings'))) {
-            $this->merge(['settings' => json_decode($this->input('settings'), true)]);
-        }
     }
 
     /**
@@ -37,9 +30,29 @@ class UpdateWorldRequest extends FormRequest
             'description' => ['required', 'string'],
             'assistantContextPrompt' => ['required', 'string'],
             'npcContextPrompt' => ['required', 'string'],
-            'settings' => ['required', 'array'],
-            'settings.theme' => ['required', new Enum(Theme::class)],
-            'environment' => ['sometimes', 'file', 'extensions:glb', 'max:51200'],
+            'spawnRegionId' => ['nullable', 'integer', 'required_with:spawnPassageId'],
+            'spawnPassageId' => ['nullable', 'string', 'required_with:spawnRegionId'],
+        ];
+    }
+
+    /**
+     * @return array<int, callable>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($validator->errors()->isNotEmpty() || $this->input('spawnRegionId') === null) {
+                    return;
+                }
+
+                /** @var World $world */
+                $world = $this->route('world');
+                $region = $world->regions()->find($this->integer('spawnRegionId'));
+                if ($region?->passage($this->string('spawnPassageId')->toString()) === null) {
+                    $validator->errors()->add('spawnPassageId', 'The spawn point must be a passage of a region of this world.');
+                }
+            },
         ];
     }
 }

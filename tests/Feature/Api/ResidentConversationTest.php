@@ -10,7 +10,7 @@ use App\Models\Message;
 use App\Models\Pose;
 use App\Models\Settings;
 use App\Models\User;
-use App\Models\World;
+use App\Models\Region;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +22,7 @@ uses(RefreshDatabase::class);
 /**
  * The autonomous scenario plus a second resident, Vera, on the same model.
  *
- * @return array{0: User, 1: Assistant, 2: Conversation, 3: World, 4: WorldResident, 5: WorldSession, 6: WorldResident}
+ * @return array{0: User, 1: Assistant, 2: Conversation, 3: Region, 4: WorldResident, 5: WorldSession, 6: WorldResident}
  */
 function twoResidentScenario(): array
 {
@@ -57,14 +57,14 @@ function decide($test, array $scenario): TestResponse
 {
     [$user, , , $world, $resident, $session] = $scenario;
 
-    return $test->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->id, $session->id, $resident->id]), ['positions' => residentPositions($scenario)]);
+    return $test->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->world_id, $session->id, $resident->id]), ['positions' => residentPositions($scenario)]);
 }
 
 function takeTurn($test, array $scenario, Conversation $conversation): TestResponse
 {
     [$user, , , $world, , $session] = $scenario;
 
-    return $test->actingAs($user)->postJson(route('worlds.sessions.conversations.turns.store', [$world->id, $session->id, $conversation->id]), ['positions' => residentPositions($scenario)]);
+    return $test->actingAs($user)->postJson(route('worlds.sessions.conversations.turns.store', [$world->world_id, $session->id, $conversation->id]), ['positions' => residentPositions($scenario)]);
 }
 
 it('tells her who is in the room with her before she decides', function () {
@@ -81,7 +81,7 @@ it('keeps residents and the user in other rooms out of what she knows and whom s
     [$user, , , $world, $resident, $session, $vera] = $scenario;
     fakeTurn(finalAnswerResponse('(Quiet) *stays put*'));
 
-    $this->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->id, $session->id, $resident->id]), ['positions' => [
+    $this->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->world_id, $session->id, $resident->id]), ['positions' => [
         'user' => ['x' => -5, 'y' => 0, 'z' => 2],
         'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3], $vera->id => ['x' => -2, 'y' => 0, 'z' => 8]],
     ]])->assertCreated();
@@ -129,7 +129,7 @@ it('starts a conversation she owns once she reaches the other resident', functio
     $scenario = twoResidentScenario();
     [$user, $yinlin, , $world, $resident, $session, $vera] = $scenario;
 
-    $response = $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->id, $session->id, $resident->id]), ['with' => $vera->id, 'line' => 'Did you hear the organ earlier?'])
+    $response = $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->world_id, $session->id, $resident->id]), ['with' => $vera->id, 'line' => 'Did you hear the organ earlier?'])
         ->assertCreated();
 
     $conversation = Conversation::findOrFail($response->json('conversationId'));
@@ -144,7 +144,7 @@ it('keeps a resident from starting a conversation with herself', function () {
     $scenario = twoResidentScenario();
     [$user, , , $world, $resident, $session] = $scenario;
 
-    $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->id, $session->id, $resident->id]), ['with' => $resident->id, 'line' => 'Hello, me.'])->assertNotFound();
+    $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->world_id, $session->id, $resident->id]), ['with' => $resident->id, 'line' => 'Hello, me.'])->assertNotFound();
 });
 
 it('resumes the pair\'s one conversation whoever starts talking', function () {
@@ -152,7 +152,7 @@ it('resumes the pair\'s one conversation whoever starts talking', function () {
     [$user, $yinlin, , $world, $resident, $session, $vera] = $scenario;
     $stopped = Conversation::factory()->betweenAssistants($vera->assistant, $yinlin)->forWorldSession($session)->create(['status' => ConversationStatus::Paused]);
 
-    $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->id, $session->id, $resident->id]), ['with' => $vera->id, 'line' => 'About earlier…'])
+    $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->world_id, $session->id, $resident->id]), ['with' => $vera->id, 'line' => 'About earlier…'])
         ->assertCreated()
         ->assertJsonPath('conversationId', $stopped->id);
 
@@ -176,7 +176,7 @@ it('keeps her from talking to the user while the user is busy with someone else'
     [$user, , , $world, $resident, $session, $vera] = $scenario;
     fakeTurn(finalAnswerResponse('(He is busy) *waits*'));
 
-    $this->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->id, $session->id, $resident->id]), [
+    $this->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->world_id, $session->id, $resident->id]), [
         'positions' => residentPositions($scenario),
         'userBusyWith' => $vera->id,
     ])->assertCreated();
@@ -191,7 +191,7 @@ it('refuses to start a conversation with a resident who is talking with someone 
     [$user, , , $world, $resident, $session, $vera] = $scenario;
     Conversation::factory()->betweenAssistants($vera->assistant, Assistant::factory()->create())->forWorldSession($session)->create();
 
-    $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->id, $session->id, $resident->id]), ['with' => $vera->id, 'line' => 'Vera?'])
+    $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->world_id, $session->id, $resident->id]), ['with' => $vera->id, 'line' => 'Vera?'])
         ->assertStatus(409);
 
     expect(Conversation::whereMorphedTo('owner', $resident->assistant)->exists())->toBeFalse();
@@ -202,7 +202,7 @@ it('leaves residents the world reports busy out of talk_to and says who they are
     [$user, , , $world, $resident, $session, $vera] = $scenario;
     fakeTurn(finalAnswerResponse('(Busy room) *stays put*'));
 
-    $this->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->id, $session->id, $resident->id]), [
+    $this->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$world->world_id, $session->id, $resident->id]), [
         'positions' => residentPositions($scenario),
         'busyResidents' => [['id' => $vera->id, 'talkingWith' => $resident->id]],
     ])->assertCreated();
@@ -266,7 +266,7 @@ it('records how she said the line she opens with once she has said it', function
     [$user, , , $world, $resident, $session, $vera] = $scenario;
     $expression = ['pose' => 'greeting', 'action' => ['verb' => 'talk_to', 'target' => (string) $vera->id]];
 
-    $response = $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->id, $session->id, $resident->id]), ['with' => $vera->id, 'line' => 'Vera!', 'expression' => $expression])
+    $response = $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->world_id, $session->id, $resident->id]), ['with' => $vera->id, 'line' => 'Vera!', 'expression' => $expression])
         ->assertCreated();
 
     expect(Conversation::findOrFail($response->json('conversationId'))->messages()->sole()->expression)->toBe($expression);
@@ -317,7 +317,7 @@ it('lets the user stop a conversation and listen in on one', function () {
     [$user, $yinlin, , $world, , $session, $vera] = $scenario;
     $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera->assistant)->forWorldSession($session)->create();
     say($conversation, $yinlin, 'Hi.');
-    $params = [$world->id, $session->id, $conversation->id];
+    $params = [$world->world_id, $session->id, $conversation->id];
 
     $this->actingAs($user)->postJson(route('worlds.sessions.conversations.observers.store', $params))->assertCreated();
     $this->actingAs($user)->getJson(route('worlds.sessions.conversations.show', $params))
@@ -335,7 +335,7 @@ it('keeps other users out of a world conversation', function () {
     [, $yinlin, , $world, , $session, $vera] = $scenario;
     $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera->assistant)->forWorldSession($session)->create();
 
-    $this->actingAs(User::factory()->create())->postJson(route('worlds.sessions.conversations.pause', [$world->id, $session->id, $conversation->id]))->assertNotFound();
+    $this->actingAs(User::factory()->create())->postJson(route('worlds.sessions.conversations.pause', [$world->world_id, $session->id, $conversation->id]))->assertNotFound();
 });
 
 it('reminds her of her conversations with others when she talks to the user', function () {

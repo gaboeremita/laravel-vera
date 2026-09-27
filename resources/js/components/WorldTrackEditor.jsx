@@ -3,7 +3,7 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { FIELD_LABEL, FIELD_INPUT } from '../utils/formFieldStyles.js';
 
-export default function WorldTrackEditor({ worldId, trackOriginalName, addToast }) {
+export default function WorldTrackEditor({ worldId, regionId, trackOriginalName, addToast }) {
 	const inputRef = useRef(null);
 	const [currentName, setCurrentName] = useState(trackOriginalName ?? null);
 	const [isUploading, setIsUploading] = useState(false);
@@ -13,7 +13,7 @@ export default function WorldTrackEditor({ worldId, trackOriginalName, addToast 
 		try {
 			const formData = new FormData();
 			formData.append('track', file);
-			const res = await api.postForm(route('worlds.track.store', { world: worldId }), formData);
+			const res = await api.postForm(route('worlds.regions.track.store', { world: worldId, region: regionId }), formData);
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
 				throw new Error(error.message || 'Upload failed');
@@ -30,7 +30,7 @@ export default function WorldTrackEditor({ worldId, trackOriginalName, addToast 
 	const remove = async (event) => {
 		event.stopPropagation();
 		try {
-			const res = await api.delete(route('worlds.track.destroy', { world: worldId }));
+			const res = await api.delete(route('worlds.regions.track.destroy', { world: worldId, region: regionId }));
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
 				throw new Error(error.message || 'Failed to remove track');

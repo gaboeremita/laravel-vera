@@ -5,7 +5,7 @@ use App\Models\Assistant;
 use App\Models\Conversation;
 use App\Models\Pose;
 use App\Models\User;
-use App\Models\World;
+use App\Models\Region;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -13,7 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 /**
- * @return array{0: User, 1: Assistant, 2: Conversation, 3: World, 4: WorldResident, 5: WorldSession}
+ * @return array{0: User, 1: Assistant, 2: Conversation, 3: Region, 4: WorldResident, 5: WorldSession}
  */
 function postureScenario(): array
 {

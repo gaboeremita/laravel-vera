@@ -2,7 +2,7 @@
 
 use App\Models\ResidentActivity;
 use App\Models\User;
-use App\Models\World;
+use App\Models\Region;
 use App\Models\WorldSession;
 use App\Models\WorldUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -13,7 +13,7 @@ function activityRoute(string $name, array $scenario, array $extra = []): string
 {
     [, , , $world, $resident, $session] = $scenario;
 
-    return route($name, ['world' => $world->id, 'session' => $session->id, 'resident' => $resident->id, ...$extra]);
+    return route($name, ['world' => $world->world_id, 'session' => $session->id, 'resident' => $resident->id, ...$extra]);
 }
 
 it('records a requested action with the zone the resident is in', function () {
@@ -98,11 +98,11 @@ it('does not reach activities through another user\'s session, world or resident
     $this->actingAs($otherUser)->patchJson(activityRoute('worlds.sessions.residents.activities.update', $scenario, ['activity' => $activity->id]), ['outcome' => 'completed'])->assertNotFound();
 
     $foreignSession = WorldSession::factory()->create();
-    $this->actingAs($user)->postJson(route('worlds.sessions.residents.activities.store', ['world' => $world->id, 'session' => $foreignSession->id, 'resident' => $resident->id]), ['verb' => 'stop'])->assertNotFound();
+    $this->actingAs($user)->postJson(route('worlds.sessions.residents.activities.store', ['world' => $world->world_id, 'session' => $foreignSession->id, 'resident' => $resident->id]), ['verb' => 'stop'])->assertNotFound();
 
-    $otherWorld = World::factory()->forUser($user)->create();
+    $otherWorld = Region::factory()->forUser($user)->create();
     $otherResident = $otherWorld->residents()->create(['assistant_id' => $resident->assistant_id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
-    $this->actingAs($user)->postJson(route('worlds.sessions.residents.activities.store', ['world' => $world->id, 'session' => $session->id, 'resident' => $otherResident->id]), ['verb' => 'stop'])->assertNotFound();
+    $this->actingAs($user)->postJson(route('worlds.sessions.residents.activities.store', ['world' => $world->world_id, 'session' => $session->id, 'resident' => $otherResident->id]), ['verb' => 'stop'])->assertNotFound();
 
     $otherActivity = ResidentActivity::factory()->create();
     $this->actingAs($user)->patchJson(activityRoute('worlds.sessions.residents.activities.update', $scenario, ['activity' => $otherActivity->id]), ['outcome' => 'completed'])->assertNotFound();

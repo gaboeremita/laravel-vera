@@ -36,7 +36,7 @@ function lerpAngle(from, to, t) {
 	return from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * t;
 }
 
-export default function FirstPersonController({ collisionWorld, navigation, spawnPosition, enabled, onPositionChange, playerState: playerStateRef, playerCommands: playerCommandsRef, onMovementChange, onGetUpIntent, onMoveIntent }) {
+export default function FirstPersonController({ collisionWorld, navigation, spawnPosition, spawnYaw = null, enabled, onPositionChange, playerState: playerStateRef, playerCommands: playerCommandsRef, onMovementChange, onGetUpIntent, onMoveIntent }) {
 	const { camera, gl } = useThree();
 	const keys = useRef(new Set());
 	const runHeld = useRef(false);
@@ -242,6 +242,11 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 			spawnedWorld.current = collisionWorld;
 			footPosition.current.copy(spawnPosition);
 			activeCamera.position.set(spawnPosition.x, spawnPosition.y + PLAYER_EYE_HEIGHT, spawnPosition.z);
+			if (spawnYaw !== null) {
+				yaw.current = spawnYaw;
+				pitch.current = 0;
+				activeCamera.rotation.set(0, spawnYaw, 0, 'YXZ');
+			}
 			lastReportedFoot.current.copy(footPosition.current);
 			callbacks.current.onPositionChange?.([spawnPosition.x, spawnPosition.y + PLAYER_EYE_HEIGHT, spawnPosition.z]);
 		}

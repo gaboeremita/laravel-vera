@@ -22,6 +22,7 @@ class WorldSessionResidentFactory extends Factory
         return [
             'world_session_id' => WorldSession::factory(),
             'world_resident_id' => WorldResident::factory(),
+            'region_id' => fn (array $attributes) => WorldResident::findOrFail($attributes['world_resident_id'])->region_id,
             'position' => ['x' => 0, 'y' => 0, 'z' => 0],
             'rotation' => ['y' => 0],
         ];

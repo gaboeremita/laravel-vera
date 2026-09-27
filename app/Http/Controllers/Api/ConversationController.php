@@ -181,6 +181,7 @@ class ConversationController extends Controller
             'messages.*.images' => ['sometimes', 'array'],
             'voice_mode' => ['sometimes', 'boolean'],
             'worldId' => ['nullable', 'integer', 'exists:worlds,id'],
+            'regionId' => ['nullable', 'integer', 'required_with:worldId'],
             'worldSessionId' => ['nullable', 'integer', 'required_with:positions'],
             'positions' => ['nullable', 'array'],
             'positions.user' => ['sometimes', 'array:x,y,z'],
@@ -321,15 +322,18 @@ class ConversationController extends Controller
             ? $request->user()->worlds()->findOrFail($validated['worldId'])
             : null;
 
+        $region = $world?->regions()->findOrFail($validated['regionId']);
+
         $worldSession = null;
         if ($world !== null && isset($validated['worldSessionId'])) {
             $worldSession = WorldUser::where('world_id', $world->id)->where('user_id', $request->user()->id)->firstOrFail()
                 ->sessions()->findOrFail($validated['worldSessionId']);
+            abort_if($worldSession->region_id !== null && $worldSession->region_id !== $region->id, 422, 'The session is not in this region.');
         }
 
-        $userActivity = $world !== null ? app(ResolveUserActivity::class)->handle($world, $validated['userState'] ?? null) : null;
-        $residentActivity = $world !== null ? app(ResolveUserActivity::class)->handle($world, $validated['residentState'] ?? null, 'residentState') : null;
-        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $world, $validated['positions'] ?? null, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], residentActivity: $residentActivity);
+        $userActivity = $region !== null ? app(ResolveUserActivity::class)->handle($region, $validated['userState'] ?? null) : null;
+        $residentActivity = $region !== null ? app(ResolveUserActivity::class)->handle($region, $validated['residentState'] ?? null, 'residentState') : null;
+        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $region, $validated['positions'] ?? null, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], residentActivity: $residentActivity);
         $director = new PromptDirector($prompt);
         app(AppendExpressionTags::class)->handle($director, $assistantModel, $excludedSections, Posture::from($validated['residentPosture'] ?? Posture::Standing->value));
 
@@ -392,17 +396,17 @@ class ConversationController extends Controller
             }
 
             $worldToolbox = null;
-            if ($world !== null && ! empty($world->layout['zones'])) {
+            if ($region !== null && ! empty($region->layout['zones'])) {
                 if ($assistantModel->kind !== AssistantKind::WorldNpc && ! $aiModel?->supports_tools) {
                     return response()->json(['message' => 'Assistants living in a world need a model that supports tool calling. Choose one in this assistant\'s settings.'], 422);
                 }
 
                 $resident = $world->residents()->where('assistant_id', $assistantModel->id)->firstOrFail();
-                $residentWorld = app(ApplyResidentZoneAccess::class)->handle($world, $resident);
+                $residentRegion = app(ApplyResidentZoneAccess::class)->handle($region, $resident);
                 $residentPoint = $validated['positions']['residents'][$resident->id] ?? null;
                 $worldToolbox = new WorldToolbox(
-                    $residentWorld,
-                    $residentPoint !== null ? app(ResolveWorldState::class)->locate($residentWorld->layout, $residentPoint)['zoneChain'] : [],
+                    $residentRegion,
+                    $residentPoint !== null ? app(ResolveWorldState::class)->locate($residentRegion->layout, $residentPoint)['zoneChain'] : [],
                     occupiedSpots: $validated['occupiedSpots'] ?? [],
                     posePostures: $assistantModel->posturesByPoseName(),
                     residentPoint: $residentPoint,

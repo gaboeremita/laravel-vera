@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { route } from 'ziggy-js';
 import Header from '../components/Header.jsx';
@@ -11,6 +11,7 @@ export default function WorldSessionsPage() {
 	const navigate = useNavigate();
 	const { addToast, setWorldPortraitUrl } = useOutletContext();
 	const { sessions, setSessions, isLoading } = useWorldSessions(worldId, addToast);
+	const [hasSpawn, setHasSpawn] = useState(true);
 
 	useEffect(() => {
 		const load = async () => {
@@ -18,6 +19,7 @@ export default function WorldSessionsPage() {
 			if (!response.ok) return;
 			const world = await response.json();
 			setWorldPortraitUrl(world.portraitImageUrl || null);
+			setHasSpawn(world.hasSpawn);
 		};
 		void load();
 		return () => setWorldPortraitUrl(null);
@@ -31,6 +33,7 @@ export default function WorldSessionsPage() {
 		try {
 			const res = await api.post(route('worlds.sessions.store', { world: worldId }));
 			const data = await res.json();
+			if (!res.ok) return addToast(data.message || 'Failed to start a new session', 'error');
 			setSessions((prev) => [data, ...prev]);
 			navigate(`/worlds/${worldId}?session=${data.id}`);
 		} catch {
@@ -65,9 +68,11 @@ export default function WorldSessionsPage() {
 			</Header>
 
 			<div className="flex-1 overflow-y-auto">
+				{!hasSpawn && <p className="text-warning text-xs px-4 pt-4">⚠ This world has no spawn point yet. Choose one in the world's configuration to start a session.</p>}
 				<WorldSessionList
 					worldId={worldId}
 					sessions={sessions}
+					canStartNew={hasSpawn}
 					onSelect={handleSelect}
 					onNew={handleNew}
 					onDelete={handleDelete}

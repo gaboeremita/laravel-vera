@@ -1,7 +1,7 @@
 <?php
 
 use App\Actions\ApplyResidentZoneAccess;
-use App\Models\World;
+use App\Models\Region;
 use App\Models\WorldResident;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -15,7 +15,7 @@ uses(RefreshDatabase::class);
  */
 function layoutWithPrivateZones(): array
 {
-    $layout = World::factory()->withLayout()->make()->layout;
+    $layout = Region::factory()->withLayout()->make()->layout;
     $zone = fn (string $id, string $name, array $extra) => [
         'id' => $id, 'name' => $name, 'description' => "The {$name}.",
         'floorId' => 'ground', 'parentId' => null, 'private' => false, 'secret' => false, 'accessTags' => [],
@@ -40,9 +40,9 @@ function residentWith(?array $zoneAccess): WorldResident
     return WorldResident::factory()->make(['zone_access' => $zoneAccess]);
 }
 
-function worldWithPrivateZones(): World
+function worldWithPrivateZones(): Region
 {
-    return World::factory()->make(['layout' => layoutWithPrivateZones()]);
+    return Region::factory()->make(['layout' => layoutWithPrivateZones()]);
 }
 
 it('hides a secret zone, the zones inside it and their things from a resident outside its group', function () {
