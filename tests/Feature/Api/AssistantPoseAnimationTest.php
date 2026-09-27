@@ -181,7 +181,7 @@ it('keeps a stored animation another pose still plays when a pose, its animation
     match ($removal) {
         'pose' => $this->actingAs($user)->deleteJson(route('assistants.poses.destroy', ['assistant' => $assistant->id, 'pose' => $pose->id]))->assertOk(),
         'animation' => $this->actingAs($user)->deleteJson(route('assistants.poses.animation.destroy', ['assistant' => $assistant->id, 'pose' => $pose->id]))->assertOk(),
-        'replacement' => $this->actingAs($user)->postJson(route('assistants.poses.animation.store', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['animation' => UploadedFile::fake()->create('spin2.fbx', 512)])->assertStatus(201),
+        'replacement' => $this->actingAs($user)->postJson(route('assistants.poses.animation.store', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['animation' => UploadedFile::fake()->createWithContent('spin2.fbx', 'another animation')])->assertStatus(201),
         'assistant' => app(DeleteAssistantAssets::class)->handle($assistant),
     };
 
@@ -192,3 +192,73 @@ it('keeps a stored animation another pose still plays when a pose, its animation
     PoseAnimationFile::releaseStorage('public', $path);
     Storage::disk('public')->assertMissing($path);
 })->with(['pose', 'animation', 'replacement', 'assistant']);
+
+/**
+ * @return array{User, Assistant, Pose}
+ */
+function secondAssistantPoseFor(User $user): array
+{
+    $assistant = Assistant::factory()->create(['portrait_type' => 'avatar3d']);
+    AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $assistant->id]);
+
+    return [$user, $assistant, Pose::factory()->create(['assistant_id' => $assistant->id, 'name' => 'wave'])];
+}
+
+it('shares one stored file between poses given identical animations', function () {
+    [$user, $assistant, $pose] = setUpPoseForAnimation();
+    [, $otherAssistant, $otherPose] = secondAssistantPoseFor($user);
+
+    $first = $this->actingAs($user)
+        ->postJson(route('assistants.poses.animation.store', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['animation' => UploadedFile::fake()->createWithContent('wave.fbx', 'wave animation')])
+        ->assertStatus(201);
+    $second = $this->actingAs($user)
+        ->postJson(route('assistants.poses.animation.store', ['assistant' => $otherAssistant->id, 'pose' => $otherPose->id]), ['animation' => UploadedFile::fake()->createWithContent('wave-copy.fbx', 'wave animation')])
+        ->assertStatus(201);
+
+    expect($second->json('animation_url'))->toBe($first->json('animation_url'));
+    expect(Storage::disk('public')->allFiles())->toBe([$pose->fresh()->animationFile->path]);
+    expect($otherPose->fresh()->animationFile->original_name)->toBe('wave-copy.fbx');
+});
+
+it('stores different animations as different files', function () {
+    [$user, $assistant, $pose] = setUpPoseForAnimation();
+    [, $otherAssistant, $otherPose] = secondAssistantPoseFor($user);
+
+    $first = $this->actingAs($user)
+        ->postJson(route('assistants.poses.animation.store', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['animation' => UploadedFile::fake()->createWithContent('wave.fbx', 'wave animation')])
+        ->assertStatus(201);
+    $second = $this->actingAs($user)
+        ->postJson(route('assistants.poses.animation.store', ['assistant' => $otherAssistant->id, 'pose' => $otherPose->id]), ['animation' => UploadedFile::fake()->createWithContent('wave.fbx', 'another wave')])
+        ->assertStatus(201);
+
+    expect($second->json('animation_url'))->not->toBe($first->json('animation_url'));
+    expect(Storage::disk('public')->allFiles())->toHaveCount(2);
+});
+
+it('keeps a shared upload until the last pose using it lets it go', function () {
+    [$user, $assistant, $pose] = setUpPoseForAnimation();
+    [, $otherAssistant, $otherPose] = secondAssistantPoseFor($user);
+    foreach ([[$assistant, $pose], [$otherAssistant, $otherPose]] as [$owner, $target]) {
+        $this->actingAs($user)
+            ->postJson(route('assistants.poses.animation.store', ['assistant' => $owner->id, 'pose' => $target->id]), ['animation' => UploadedFile::fake()->createWithContent('wave.vrma', 'wave animation')])
+            ->assertStatus(201);
+    }
+    $path = $pose->fresh()->animationFile->path;
+
+    $this->actingAs($user)->deleteJson(route('assistants.poses.animation.destroy', ['assistant' => $assistant->id, 'pose' => $pose->id]))->assertOk();
+    Storage::disk('public')->assertExists($path);
+
+    $this->actingAs($user)->deleteJson(route('assistants.poses.animation.destroy', ['assistant' => $otherAssistant->id, 'pose' => $otherPose->id]))->assertOk();
+    Storage::disk('public')->assertMissing($path);
+});
+
+it('keeps the file when a pose is given the same animation again', function () {
+    [$user, $assistant, $pose] = setUpPoseForAnimation();
+    foreach (['wave.fbx', 'wave-again.fbx'] as $name) {
+        $this->actingAs($user)
+            ->postJson(route('assistants.poses.animation.store', ['assistant' => $assistant->id, 'pose' => $pose->id]), ['animation' => UploadedFile::fake()->createWithContent($name, 'wave animation')])
+            ->assertStatus(201);
+    }
+
+    Storage::disk('public')->assertExists($pose->fresh()->animationFile->path);
+});
