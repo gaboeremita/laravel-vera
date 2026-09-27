@@ -17,6 +17,9 @@ class WorldResident extends Model
     /** @use HasFactory<WorldResidentFactory> */
     use HasFactory;
 
+    /** @var array<string, string> */
+    protected $attributes = ['posture' => 'standing'];
+
     protected function casts(): array
     {
         return ['position' => 'array', 'rotation' => 'array', 'posture' => Posture::class, 'behavior' => WorldResidentBehavior::class, 'behavior_settings' => 'array', 'zone_access' => 'array'];
