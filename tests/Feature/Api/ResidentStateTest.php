@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\User;
 use App\Models\Region;
+use App\Models\User;
 use App\Models\WorldSessionResident;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -25,13 +25,13 @@ it('stores a resident state and returns it with the sessions', function () {
 
     $this->actingAs($user)->getJson(route('worlds.sessions.index', $world->world_id))
         ->assertSuccessful()
-        ->assertJsonPath("0.residentStates.{$resident->id}", $state);
+        ->assertJsonPath("0.residentStates.{$resident->id}", ['regionId' => $world->id, ...$state]);
 });
 
 it('keeps other users out of a session state', function () {
     [, , , $world, $resident, $session] = worldStateScenario();
     $stranger = User::factory()->create();
-    $world->users()->attach($stranger);
+    $world->world->users()->attach($stranger);
 
     $this->actingAs($stranger)->putJson(route('worlds.sessions.residents.state.update', [$world->world_id, $session->id, $resident->id]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],

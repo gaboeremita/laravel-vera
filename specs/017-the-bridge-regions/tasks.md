@@ -183,7 +183,7 @@ description: "Task list for The Bridge — One World Made of Connected Regions"
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [X] T069 Remove leftover references to world-level environment, layout, track or region images from `resources/js/` and `app/`
-- [ ] T070 Run the gates once: `vendor/bin/pint`, `npm run lint`, `php artisan test`, `node --test tests/Unit/PassageTrigger.test.js`; fix everything that surfaces
+- [X] T070 Run the gates once: `vendor/bin/pint`, `npm run lint`, `php artisan test`, `node --test tests/Unit/PassageTrigger.test.js`; fix everything that surfaces
 - [ ] T071 Walk through [quickstart.md](quickstart.md) manual scenarios
 
 ---

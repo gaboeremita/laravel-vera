@@ -1,7 +1,14 @@
 <?php
 
+use Illuminate\Support\Facades\File;
+
 test('serves an existing .mjs file with the correct content type', function () {
-    $response = $this->get('/vendor/vad/ort-wasm-simd-threaded.mjs');
+    $path = storage_path('app/vad/test-asset.mjs');
+    File::ensureDirectoryExists(dirname($path));
+    File::put($path, 'export default {};');
+    $this->beforeApplicationDestroyed(fn () => File::delete($path));
+
+    $response = $this->get('/vendor/vad/test-asset.mjs');
 
     $response->assertSuccessful();
     $response->assertHeader('Content-Type', 'text/javascript; charset=UTF-8');

@@ -73,12 +73,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/worlds/{world}/regions/{region}/portrait-image', [RegionImageController::class, 'destroyPortrait'])->name('worlds.regions.image.portrait.destroy');
         Route::post('/worlds/{world}/regions/{region}/track', [RegionTrackController::class, 'store'])->name('worlds.regions.track.store');
         Route::delete('/worlds/{world}/regions/{region}/track', [RegionTrackController::class, 'destroy'])->name('worlds.regions.track.destroy');
-        Route::put('/worlds/{world}/regions/{region}/residents/{assistant}', [WorldResidentController::class, 'upsert'])->name('worlds.regions.residents.upsert');
-        Route::delete('/worlds/{world}/regions/{region}/residents/{assistant}', [WorldResidentController::class, 'destroy'])->name('worlds.regions.residents.destroy');
-        Route::post('/worlds/{world}/regions/{region}/residents/{assistant}/move', [WorldResidentController::class, 'move'])->name('worlds.regions.residents.move');
         Route::put('/worlds/{world}/regions/{region}/passages/{passage}/link', [PassageLinkController::class, 'update'])->name('worlds.regions.passages.link.update');
         Route::delete('/worlds/{world}/regions/{region}/passages/{passage}/link', [PassageLinkController::class, 'destroy'])->name('worlds.regions.passages.link.destroy');
     });
+    Route::put('/worlds/{world}/regions/{region:id}/residents/{assistant}', [WorldResidentController::class, 'upsert'])->name('worlds.regions.residents.upsert');
+    Route::delete('/worlds/{world}/regions/{region:id}/residents/{assistant}', [WorldResidentController::class, 'destroy'])->name('worlds.regions.residents.destroy');
+    Route::post('/worlds/{world}/regions/{region:id}/residents/{assistant}/move', [WorldResidentController::class, 'move'])->name('worlds.regions.residents.move');
     Route::get('/worlds/{world}/sessions', [WorldSessionController::class, 'index'])->name('worlds.sessions.index');
     Route::post('/worlds/{world}/sessions', [WorldSessionController::class, 'store'])->name('worlds.sessions.store');
     Route::patch('/worlds/{world}/sessions/{session}', [WorldSessionController::class, 'update'])->name('worlds.sessions.update');

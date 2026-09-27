@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\LinkPassages;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\PassageLink;
@@ -94,7 +95,7 @@ it('deletes a region with its environment, residents, links and session states',
     AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $assistant->id]);
     $resident = $region->residents()->create(['assistant_id' => $assistant->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
     $visitor = $other->residents()->create(['assistant_id' => Assistant::factory()->create()->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
-    app(App\Actions\LinkPassages::class)->link($region, 'studio-door', $other, 'terrace-gate');
+    app(LinkPassages::class)->link($region, 'studio-door', $other, 'terrace-gate');
     $worldUser = WorldUser::where('world_id', $region->world_id)->where('user_id', $user->id)->firstOrFail();
     $session = WorldSession::factory()->for($worldUser)->create(['region_id' => $region->id]);
     WorldSessionResident::factory()->create(['world_session_id' => $session->id, 'world_resident_id' => $visitor->id, 'region_id' => $region->id]);
@@ -119,7 +120,7 @@ it('removes links and the spawn point when a new environment drops their passage
     $region = Region::factory()->forUser($user)->withLayout()->create(['slug' => 'connection-node']);
     $other = Region::factory()->withLayout()->create(['world_id' => $region->world_id]);
     $region->world->update(['spawn_region_id' => $region->id, 'spawn_passage_id' => 'studio-door']);
-    app(App\Actions\LinkPassages::class)->link($region, 'studio-door', $other, 'terrace-gate');
+    app(LinkPassages::class)->link($region, 'studio-door', $other, 'terrace-gate');
 
     $this->actingAs($user)->withHeader('Accept', 'application/json')
         ->patch(route('worlds.regions.update', [$region->world_id, $region]), regionPayload(['environment' => UploadedFile::fake()->createWithContent('empty.glb', 'not a glb file')]))
@@ -135,7 +136,7 @@ it('keeps links and the spawn point when the passages stay', function () {
     $region = Region::factory()->forUser($user)->withLayout()->create(['slug' => 'connection-node']);
     $other = Region::factory()->withLayout()->create(['world_id' => $region->world_id]);
     $region->world->update(['spawn_region_id' => $region->id, 'spawn_passage_id' => 'studio-door']);
-    app(App\Actions\LinkPassages::class)->link($region, 'studio-door', $other, 'terrace-gate');
+    app(LinkPassages::class)->link($region, 'studio-door', $other, 'terrace-gate');
 
     $payload = regionPayload();
     unset($payload['environment']);

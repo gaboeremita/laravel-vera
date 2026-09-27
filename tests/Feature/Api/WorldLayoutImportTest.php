@@ -272,7 +272,7 @@ it('imports passages with their facing, radius, arrival point and zone', functio
         ->and($gate['arrival']['x'])->toEqualWithDelta(13, 0.0001)
         ->and($gate['arrival']['z'])->toEqualWithDelta(0, 0.0001)
         ->and($gate['zoneId'])->toBe('pool-terrace');
-    expect($door['radius'])->toBe(1.0)
+    expect($door['radius'])->toEqual(1.0)
         ->and($door['arrival']['z'])->toEqualWithDelta(21, 0.0001)
         ->and($door['zoneId'])->toBeNull();
 });

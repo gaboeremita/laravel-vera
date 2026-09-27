@@ -1,8 +1,8 @@
 <?php
 
+use App\Models\Region;
 use App\Models\ResidentActivity;
 use App\Models\User;
-use App\Models\Region;
 use App\Models\WorldSession;
 use App\Models\WorldUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;

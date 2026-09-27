@@ -1,10 +1,12 @@
 <?php
 
-use App\Models\Conversation;
+use App\Actions\LinkPassages;
 use App\Models\Assistant;
+use App\Models\Conversation;
 use App\Models\Region;
 use App\Models\User;
 use App\Models\World;
+use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Models\WorldSessionResident;
 use App\Models\WorldUser;
@@ -185,14 +187,14 @@ it('returns 404 deleting a session the requester does not own', function () {
 /**
  * Two linked regions of one world, a session in the first, and a resident there.
  *
- * @return array{0: User, 1: Region, 2: Region, 3: WorldSession, 4: \App\Models\WorldResident}
+ * @return array{0: User, 1: Region, 2: Region, 3: WorldSession, 4: WorldResident}
  */
 function linkedRegionsScenario(): array
 {
     $user = User::factory()->create();
     $lobby = Region::factory()->forUser($user)->withLayout()->create();
     $penthouse = Region::factory()->withLayout()->create(['world_id' => $lobby->world_id]);
-    app(App\Actions\LinkPassages::class)->link($lobby, 'studio-door', $penthouse, 'terrace-gate');
+    app(LinkPassages::class)->link($lobby, 'studio-door', $penthouse, 'terrace-gate');
     $worldUser = WorldUser::where('world_id', $lobby->world_id)->where('user_id', $user->id)->firstOrFail();
     $session = WorldSession::factory()->for($worldUser)->create(['region_id' => $lobby->id, 'position' => ['x' => -5, 'y' => 0, 'z' => 3]]);
     $resident = $lobby->residents()->create(['assistant_id' => Assistant::factory()->create()->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);

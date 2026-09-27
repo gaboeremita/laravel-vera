@@ -6,14 +6,14 @@ use App\Models\AiModel;
 use App\Models\AiProvider;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
+use App\Models\Region;
 use App\Models\Settings;
 use App\Models\User;
 use App\Models\VrmFile;
-use App\Models\Region;
+use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Models\WorldSessionResident;
 use App\Models\WorldUser;
-use App\Models\WorldResident;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

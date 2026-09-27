@@ -3,8 +3,8 @@
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
-use App\Models\User;
 use App\Models\Region;
+use App\Models\User;
 use App\Models\WorldSession;
 use App\Models\WorldUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;

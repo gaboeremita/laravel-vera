@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Resources\RegionResource;
-use App\Models\User;
 use App\Models\Region;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
