@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,5 +31,4 @@
 
 ## Notes
 
-- FR-026 holds one open clarification: which placement migration keeps when an assistant or NPC is a resident of several former worlds.
-- Blender and environment-file markers are named because they are the owner's authoring workflow, not an implementation choice.
+- Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`

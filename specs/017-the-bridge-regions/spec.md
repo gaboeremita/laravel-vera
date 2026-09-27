@@ -29,7 +29,7 @@ The owner opens the Worlds page and sees a single world card, The Bridge. Every 
 
 ### User Story 2 - Link passages and travel between regions (Priority: P1)
 
-The owner adds passage markers to region environments in Blender and uploads them. In a region's configuration, each passage found in the environment is listed by its descriptive name, and the owner picks which other passage it connects to from a dropdown grouped by region. In play, walking into a passage unloads the current region and loads the destination region, placing the player in front of the linked passage.
+Region environments contain passage markers. In a region's configuration, each passage found in the environment is listed by its descriptive name, and the owner picks which other passage it connects to from a dropdown grouped by region. In play, walking into a passage unloads the current region and loads the destination region, placing the player in front of the linked passage.
 
 **Why this priority**: Connecting regions is the core purpose of the feature; without travel, regions are just separate maps again.
 
@@ -108,7 +108,6 @@ While playing, the player's location reads as a path such as "Zenith District â€
 - The spawn passage exists but its region has no environment uploaded: the session starts at the origin of that region.
 - The player is in a region when an active session is resumed after the region was deleted: the session resumes at the world's spawn point.
 - Travelling while a conversation with a resident is open: the conversation ends as when walking out of conversation range.
-- Migration finds the same assistant or NPC placed in more than one former world: see FR-026.
 
 ## Requirements *(mandatory)*
 
@@ -159,7 +158,7 @@ While playing, the player's location reads as a path such as "Zenith District â€
 
 **Migration**
 
-- **FR-026**: The migration MUST create a world named "The Bridge" and turn every existing world into a top-level region of it, keeping environment, layout, images, music, prompts and residents. When the same assistant or NPC is a resident of more than one former world, the migration MUST [NEEDS CLARIFICATION: which placement is kept â€” the one in the most recently updated former world, the oldest one, or should migration stop and report the conflicts for manual resolution?].
+- **FR-026**: The migration MUST create a world named "The Bridge" and turn every existing world into a top-level region of it, keeping environment, layout, images, music, prompts and residents.
 - **FR-027**: The migration MUST delete all existing world sessions and their resident states.
 - **FR-028**: The migration MUST give every user who had access to any former world access to The Bridge.
 
@@ -192,7 +191,6 @@ While playing, the player's location reads as a path such as "Zenith District â€
 
 ## Assumptions
 
-- Passage markers are added to environment files by the owner in Blender using the same custom-property convention as existing markers; migrated regions have no passages until their environments are updated.
 - The trigger radius defaults to about one metre and the arrival distance in front of a passage to about one metre when the marker does not specify them.
 - "Bring along" during play uses the existing behaviour where a resident follows the player; no new command is introduced.
 - A resident that travelled with the player returns to its home region at the start of the next session.
