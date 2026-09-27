@@ -133,7 +133,7 @@ While playing, the player's location shows the current region's name. Each regio
 
 - **FR-021**: An assistant or NPC MUST live in at most one region per world.
 - **FR-022**: A region's residents list MUST show residents living in another region of the same world as unselectable, with the name of the region they live in, and MUST offer an option to move them to this region.
-- **FR-023**: Moving a resident from the residents list MUST, after confirmation, make the region being edited their region and reset their placement to the default.
+- **FR-023**: Moving a resident from the residents list MUST, after confirmation, make the region being edited their region and reset their placement to the default. Existing sessions MUST keep the resident where they were; only new sessions start them in the new region.
 - **FR-024**: Residents following the player MUST travel through passages with the player and remain in the destination region, across visits of the same session, until they move again; other residents MUST stay in their current region. The region a resident belongs to decides where they start in a new session, and where they return when their current region is deleted.
 
 **Prompts and music**

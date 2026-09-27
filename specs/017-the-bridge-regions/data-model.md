@@ -89,5 +89,5 @@ No row means the resident is in their region at their configured placement.
 - **Start session**: requires a valid spawn → session `region_id` = spawn region, `position` = spawn passage `arrival`.
 - **Travel through passage P in region R**: requires a link from `(R, P)` → session moves to the target region at the target passage's `arrival`; each follower's state row moves to the target region next to the arrival point.
 - **Enter session**: `region_id` set → load that region at `position`; `region_id` null → spawn arrival (422 while no valid spawn).
-- **Moving a resident to another region**: resident `region_id` → target region, placement reset to defaults; their session state rows are deleted so they start at the new placement.
+- **Moving a resident to another region**: resident `region_id` → target region, placement reset to defaults. In existing sessions where the resident has no state row, one is created with their previous region and placement, so those sessions keep them where they were; only new sessions start them in the new region.
 - **Environment re-upload**: links and spawn pointing at passage ids missing from the new layout are removed.

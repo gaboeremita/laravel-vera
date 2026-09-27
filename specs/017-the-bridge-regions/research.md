@@ -18,7 +18,7 @@
 
 ## R3. Moving a resident to another region
 
-**Decision**: A dedicated endpoint moves an existing resident's `region_id` to the target region and resets placement fields to the defaults used by `WorldResidentController::upsert` today. Upserting a resident who lives in another region of the same world returns 409.
+**Decision**: A dedicated endpoint moves an existing resident's `region_id` to the target region and resets placement fields to the defaults used by `WorldResidentController::upsert` today. Existing sessions keep the resident where they were: sessions without a state row for the resident get one holding the previous region and placement. Upserting a resident who lives in another region of the same world returns 409.
 
 **Rationale**: Moving is a distinct, confirmed action with a destructive side effect (placement reset), so it gets its own endpoint instead of an implicit flag on upsert.
 

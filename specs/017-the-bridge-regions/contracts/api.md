@@ -41,7 +41,7 @@ All routes are under `/api`, behind the existing `auth:sanctum` group. A world i
 |---|---|---|---|
 | PUT | /worlds/{world}/regions/{region}/residents/{assistant} | worlds.regions.residents.upsert | today's placement payload; 409 `{ regionId, regionName }` if the assistant lives in another region of this world |
 | DELETE | /worlds/{world}/regions/{region}/residents/{assistant} | worlds.regions.residents.destroy | as today |
-| POST | /worlds/{world}/regions/{region}/residents/{assistant}/move | worlds.regions.residents.move | moves the resident here with default placement; deletes their session state rows; 404 if not a resident of this world |
+| POST | /worlds/{world}/regions/{region}/residents/{assistant}/move | worlds.regions.residents.move | moves the resident here with default placement; existing sessions keep the resident where they were; 404 if not a resident of this world |
 
 ## Sessions
 
