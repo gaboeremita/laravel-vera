@@ -207,6 +207,12 @@ export class WorldCollision {
 		return null;
 	}
 
+	/** The first ground at or below a point, or the point itself when there is none within reach. */
+	groundBelow(point) {
+		const groundY = getGroundHeight(point.x, point.z, this.octree, point.y - AIR_GROUND_SEARCH, point.y);
+		return groundY === null ? point : { x: point.x, y: groundY, z: point.z };
+	}
+
 	/**
 	 * Where a body stuck inside geometry can stand instead: the nearest
 	 * walkable navigation point, or the nearest open ground inside the bounds.

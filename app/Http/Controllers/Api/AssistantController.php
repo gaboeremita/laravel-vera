@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\DeleteAssistantAssets;
+use App\Actions\StorePoseAnimation;
 use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
@@ -16,8 +17,6 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Enum;
 
 class AssistantController extends Controller
@@ -268,24 +267,7 @@ class AssistantController extends Controller
                 ]);
 
                 if (isset($poseData['animation'])) {
-                    // See AssistantPoseAnimationController::store for why the
-                    // extension must come from the client's filename, not
-                    // store()'s MIME-guessed one.
-                    $filename = Str::random(40).'.'.$poseData['animation']->getClientOriginalExtension();
-                    $path = $poseData['animation']->storeAs("poses/{$assistant->id}/{$pose->id}", $filename, 'public');
-
-                    try {
-                        $pose->animationFile()->create([
-                            'path' => $path,
-                            'disk' => 'public',
-                            'mime_type' => 'application/octet-stream',
-                            'size' => $poseData['animation']->getSize(),
-                            'original_name' => $poseData['animation']->getClientOriginalName(),
-                        ]);
-                    } catch (\Throwable $e) {
-                        Storage::disk('public')->delete($path);
-                        throw $e;
-                    }
+                    app(StorePoseAnimation::class)->handle($pose, $poseData['animation']);
                 }
             }
 

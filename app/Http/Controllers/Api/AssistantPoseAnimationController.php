@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\StorePoseAnimation;
 use App\Enums\AssistantPortraitType;
 use App\Enums\Posture;
 use App\Http\Controllers\Controller;
@@ -9,13 +10,11 @@ use App\Models\Pose;
 use App\Models\PoseAnimationFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class AssistantPoseAnimationController extends Controller
 {
-    public function store(Request $request, int $assistantId, int $poseId): JsonResponse
+    public function store(Request $request, StorePoseAnimation $storePoseAnimation, int $assistantId, int $poseId): JsonResponse
     {
         $assistant = $request->user()
             ->assistants()
@@ -29,14 +28,14 @@ class AssistantPoseAnimationController extends Controller
 
         $pose = $assistant->poses()->findOrFail($poseId);
 
-        return $this->storeAnimation($request, $pose);
+        return $this->storeAnimation($request, $pose, $storePoseAnimation);
     }
 
     /**
      * Uploads (creating the default pose first if it doesn't exist yet) the
      * assistant's default pose animation — see AssistantPoseController::updateDefault.
      */
-    public function storeDefault(Request $request, int $assistantId): JsonResponse
+    public function storeDefault(Request $request, StorePoseAnimation $storePoseAnimation, int $assistantId): JsonResponse
     {
         $assistant = $request->user()
             ->assistants()
@@ -50,7 +49,7 @@ class AssistantPoseAnimationController extends Controller
 
         $pose = $assistant->poses()->firstOrCreate(['name' => 'default', 'posture' => $this->requestedPosture($request)]);
 
-        return $this->storeAnimation($request, $pose);
+        return $this->storeAnimation($request, $pose, $storePoseAnimation);
     }
 
     public function destroy(Request $request, int $assistantId, int $poseId): JsonResponse
@@ -84,40 +83,13 @@ class AssistantPoseAnimationController extends Controller
         return $request->validate(['posture' => ['sometimes', Rule::enum(Posture::class)]])['posture'] ?? Posture::Standing->value;
     }
 
-    private function storeAnimation(Request $request, Pose $pose): JsonResponse
+    private function storeAnimation(Request $request, Pose $pose, StorePoseAnimation $storePoseAnimation): JsonResponse
     {
         $request->validate([
             'animation' => ['required', 'file', 'extensions:vrma,fbx', 'max:10240'],
         ]);
 
-        $file = $request->file('animation');
-        $previousPath = $pose->animationFile?->path;
-        $previousDisk = $pose->animationFile?->disk;
-
-        // store()'s auto-generated filename guesses the extension from MIME
-        // sniffing, not the uploaded file's actual extension — a .vrma file
-        // (a glTF-binary container) gets misdetected and saved as .glb. Since
-        // playback branches on the stored file's extension to pick a loader,
-        // the extension must be taken from what the client actually uploaded.
-        $filename = Str::random(40).'.'.$file->getClientOriginalExtension();
-        $path = $file->storeAs("poses/{$pose->assistant_id}/{$pose->id}", $filename, 'public');
-
-        try {
-            $animationFile = $pose->animationFile()->updateOrCreate([], [
-                'path' => $path,
-                'disk' => 'public',
-                'mime_type' => 'application/octet-stream',
-                'size' => $file->getSize(),
-                'original_name' => $file->getClientOriginalName(),
-            ]);
-        } catch (\Throwable $e) {
-            Storage::disk('public')->delete($path);
-            throw $e;
-        }
-
-        if ($previousPath) {
-            PoseAnimationFile::releaseStorage($previousDisk, $previousPath);
-        }
+        $animationFile = $storePoseAnimation->handle($pose, $request->file('animation'));
 
         return response()->json([
             'id' => $pose->id,
