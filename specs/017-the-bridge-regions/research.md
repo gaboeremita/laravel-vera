@@ -1,6 +1,6 @@
 # Research: The Bridge — One World Made of Connected Regions
 
-## R1. Where regions live in the schema
+## R1. Where regions are stored in the schema
 
 **Decision**: Rename the `worlds` table to `regions` (model `Region`) and create a new `worlds` table (model `World`) for the container. A region keeps every column a world has today and gains `world_id`.
 
@@ -18,7 +18,7 @@
 
 ## R3. Moving a resident to another region
 
-**Decision**: A dedicated endpoint moves an existing resident's `region_id` to the target region and resets placement fields to the defaults used by `WorldResidentController::upsert` today. Existing sessions keep the resident where they were: sessions without a state row for the resident get one holding the previous region and placement. Upserting a resident who lives in another region of the same world returns 409.
+**Decision**: A dedicated endpoint moves an existing resident's `region_id` to the target region and resets placement fields to the defaults used by `WorldResidentController::upsert` today. Existing sessions keep the resident where they were: sessions without a state row for the resident get one holding the previous region and placement. Upserting a resident of another region of the same world returns 409.
 
 **Rationale**: Moving is a distinct, confirmed action with a destructive side effect (placement reset), so it gets its own endpoint instead of an implicit flag on upsert.
 
@@ -32,7 +32,7 @@
 
 **Decision**: A `passage_links` table stores one row per direction: `(region_id, passage_id) → (target_region_id, target_passage_id)`, unique on `(region_id, passage_id)`. A `LinkPassages` action writes or removes both rows in one transaction, and removes any existing link of either endpoint first. Both region foreign keys cascade on delete.
 
-**Rationale**: The unique index guarantees at most one partner per passage (FR-010) at the database level, lookups during travel are a single indexed read, and region deletion removes both directions automatically. Two-way consistency lives in one action class.
+**Rationale**: The unique index guarantees at most one partner per passage (FR-010) at the database level, lookups during travel are a single indexed read, and region deletion removes both directions automatically. Two-way consistency is handled by one action class.
 
 **Alternatives considered**: One row per link with two endpoint pairs; uniqueness of an endpoint across both column pairs cannot be expressed with a plain unique index, and every lookup needs an `OR`.
 

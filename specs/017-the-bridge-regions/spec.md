@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "The Bridge — one world made of connected regions. Today each World is a single explorable map: one GLB environment whose Blender marker nodes (floor, zone, entry, object, spot) are parsed into a layout. Residents, sessions, images, music and AI prompts all belong to that one World. Maps cannot be connected to each other. A World becomes a container of connected Regions. The player moves between regions through passages. Passages are markers in a region's GLB with a descriptive name; in the UI each passage is linked to any other passage, in the same region or another one, through a dropdown grouped by region. Passages are two-way. The world's spawn point is one of its passages. Any number of worlds can be created. Residents stay configured per region; residents living in another region of the same world are grayed out, show where they live, and can be brought here."
+**Input**: User description: "The Bridge — one world made of connected regions. Today each World is a single explorable map: one GLB environment whose Blender marker nodes (floor, zone, entry, object, spot) are parsed into a layout. Residents, sessions, images, music and AI prompts all belong to that one World. Maps cannot be connected to each other. A World becomes a container of connected Regions. The player moves between regions through passages. Passages are markers in a region's GLB with a descriptive name; in the UI each passage is linked to any other passage, in the same region or another one, through a dropdown grouped by region. Passages are two-way. The world's spawn point is one of its passages. Any number of worlds can be created. Residents stay configured per region; residents of another region of the same world are grayed out, show which region they are a resident of, and can be moved here."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -50,17 +50,17 @@ The user opens a world's configuration. The World tab holds the world's name, de
 
 ### User Story 3 - Residents belong to one region of the world (Priority: P2)
 
-Each assistant or NPC can live in at most one region per world. In a region's residents list, residents who already live in another region of the same world appear grayed out with the name of the region they live in, and an option moves them to the region being edited. During play, residents following the player travel with them through passages.
+Each assistant or NPC can be a resident of at most one region per world. In a region's residents list, residents of another region of the same world appear grayed out with the name of that region, and an option moves them to the region being edited. During play, residents following the player travel with them through passages.
 
-**Why this priority**: Keeps each character unique within a world and lets the user rearrange where characters live without deleting and re-creating their setup, but travel and configuration work without it.
+**Why this priority**: Keeps each character unique within a world and lets the user rearrange which region characters are residents of without deleting and re-creating their setup, but travel and configuration work without it.
 
 **Independent Test**: Place an assistant in region A, open region B's residents list, verify the grayed-out row, use the option to move them there, then start a session, have the resident follow the player, and walk through a passage.
 
 **Acceptance Scenarios**:
 
-1. **Given** assistant Luna lives in region "Harbor", **When** the user opens the residents list of region "Lua Building" in the same world, **Then** Luna appears grayed out, cannot be selected, and reads "lives in Harbor".
-2. **Given** that grayed-out row, **When** the user chooses to move Luna there and confirms, **Then** Luna lives in "Lua Building" with the default placement, and "Harbor" no longer lists her as a resident.
-3. **Given** an assistant living in a region of world X, **When** the user opens a region of a different world Y, **Then** the assistant is available to add there as normal.
+1. **Given** assistant Luna is a resident of region "Harbor", **When** the user opens the residents list of region "Lua Building" in the same world, **Then** Luna appears grayed out, cannot be selected, and reads "resident of Harbor".
+2. **Given** that grayed-out row, **When** the user chooses to move Luna there and confirms, **Then** Luna is a resident of "Lua Building" with the default placement, and "Harbor" no longer lists her as a resident.
+3. **Given** an assistant is a resident of a region of world X, **When** the user opens a region of a different world Y, **Then** the assistant is available to add there as normal.
 4. **Given** a resident is following the player, **When** the player walks through a passage, **Then** the resident arrives in the destination region near the player and remains in that region, across later visits of the same session, until they move again.
 5. **Given** a resident is not following the player, **When** the player walks through a passage, **Then** the resident stays in their current region and is not present in the destination region.
 
@@ -131,8 +131,8 @@ While playing, the player's location shows the current region's name. Each regio
 
 **Residents**
 
-- **FR-021**: An assistant or NPC MUST live in at most one region per world.
-- **FR-022**: A region's residents list MUST show residents living in another region of the same world as unselectable, with the name of the region they live in, and MUST offer an option to move them to this region.
+- **FR-021**: An assistant or NPC MUST be a resident of at most one region per world.
+- **FR-022**: A region's residents list MUST show residents of another region of the same world as unselectable, with the name of that region, and MUST offer an option to move them to this region.
 - **FR-023**: Moving a resident from the residents list MUST, after confirmation, make the region being edited their region and reset their placement to the default. Existing sessions MUST keep the resident where they were; only new sessions start them in the new region.
 - **FR-024**: Residents following the player MUST travel through passages with the player and remain in the destination region, across visits of the same session, until they move again; other residents MUST stay in their current region. The region a resident belongs to decides where they start in a new session, and where they return when their current region is deleted.
 
@@ -154,7 +154,7 @@ While playing, the player's location shows the current region's name. Each regio
 - **Region**: One explorable map belonging to a world. Has an environment file and parsed layout, images, music, prompts, theme, its passages and its residents.
 - **Passage**: A marker inside a region's environment with an identifier, a descriptive name, a position, a facing direction and an optional trigger radius. Linked to at most one other passage in the same world.
 - **Passage Link**: A two-way connection between two passages of the same world.
-- **Resident**: An assistant or NPC living in exactly one region of a world, with its placement and behaviour settings.
+- **Resident**: An assistant or NPC that is a resident of exactly one region of a world, with its placement and behaviour settings.
 - **World Session**: A saved state of a world that persists across visits. Records the player's current region and position, and the state of each resident, including the region each resident is currently in. A world can have several sessions.
 - **Visit**: One period of play in a session, from entering the world until leaving it.
 

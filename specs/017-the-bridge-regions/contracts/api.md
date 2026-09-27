@@ -39,7 +39,7 @@ All routes are under `/api`, behind the existing `auth:sanctum` group. A world i
 
 | Method | Path | Name | Notes |
 |---|---|---|---|
-| PUT | /worlds/{world}/regions/{region}/residents/{assistant} | worlds.regions.residents.upsert | today's placement payload; 409 `{ regionId, regionName }` if the assistant lives in another region of this world |
+| PUT | /worlds/{world}/regions/{region}/residents/{assistant} | worlds.regions.residents.upsert | today's placement payload; 409 `{ regionId, regionName }` if the assistant is a resident of another region of this world |
 | DELETE | /worlds/{world}/regions/{region}/residents/{assistant} | worlds.regions.residents.destroy | as today |
 | POST | /worlds/{world}/regions/{region}/residents/{assistant}/move | worlds.regions.residents.move | moves the resident here with default placement; existing sessions keep the resident where they were; 404 if not a resident of this world |
 
