@@ -4,7 +4,7 @@
 
 **Decision**: Rename the `worlds` table to `regions` (model `Region`) and create a new `worlds` table (model `World`) for the container. A region keeps every column a world has today and gains `world_id`.
 
-**Rationale**: Everything the current `World` holds (environment, layout, settings/theme, prompts, images, track) is exactly what a region holds, so a rename keeps row ids, file paths and relations intact. Image and track rows keep pointing at the same ids. The new `World` only holds what is shared across regions.
+**Rationale**: Everything the current `World` holds (environment, layout, settings/theme, prompts, images, track) is exactly what a region holds, so the model, controllers, layout code and tests carry over as `Region` with a type rename. The new `World` only holds what is shared across regions.
 
 **Alternatives considered**: Keeping the `worlds` table for regions and naming the container something else (e.g. `universes`) avoids a rename but leaves the code saying "world" for what the product calls a region, in every controller, tool and prompt.
 
@@ -74,13 +74,8 @@
 
 **Rationale**: FR-024/FR-025. The layout-reading code is unchanged apart from receiving a `Region`; only prompt assembly learns about two levels.
 
-## R12. Migration from single-map worlds
 
-**Decision**: A sequence of new migrations: rename `worlds` to `regions`; create `worlds`; insert "The Bridge"; add `regions.world_id` and assign every region to it; update `imageable_type` and `trackable_type` from `App\Models\World` to `App\Models\Region`; repoint `world_user` to The Bridge (one row per user); add `world_residents.region_id` from the old `world_id` and repoint `world_id`; delete all `world_sessions` (the existing foreign keys cascade this to resident states, resident activities and the conversations held in those sessions); add the new session and passage columns and tables. Each migration defines `down()`.
-
-**Rationale**: Principle II (append-only). Keeping each step small keeps failures easy to locate. Tests run on PostgreSQL, where a table rename keeps foreign keys attached by OID; MySQL behaves the same.
-
-## R13. Routes
+## R12. Routes
 
 **Decision**: Keep `/worlds/...` for the container and its sessions, and nest region endpoints under `/worlds/{world}/regions/{region}` (CRUD, images, track, residents, passage links). Session-scoped resident endpoints keep their paths and resolve the resident's region from session state. `resources/js/ziggy.js` is regenerated.
 

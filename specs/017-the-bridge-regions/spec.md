@@ -6,28 +6,11 @@
 
 **Status**: Draft
 
-**Input**: User description: "The Bridge — one world made of connected regions. Today each World is a single explorable map: one GLB environment whose Blender marker nodes (floor, zone, entry, object, spot) are parsed into a layout. Residents, sessions, images, music and AI prompts all belong to that one World. Maps cannot be connected to each other. A World becomes a container of connected Regions. The player moves between regions through passages. The first world is 'The Bridge'. Passages are markers in a region's GLB with a descriptive name; in the UI each passage is linked to any other passage, in the same region or another one, through a dropdown grouped by region. Passages are two-way. The world's spawn point is one of its passages. Any number of worlds can be created. Residents stay configured per region; residents living in another region of the same world are grayed out, show where they live, and can be brought here. Every existing world becomes a region of The Bridge; existing world sessions are deleted."
+**Input**: User description: "The Bridge — one world made of connected regions. Today each World is a single explorable map: one GLB environment whose Blender marker nodes (floor, zone, entry, object, spot) are parsed into a layout. Residents, sessions, images, music and AI prompts all belong to that one World. Maps cannot be connected to each other. A World becomes a container of connected Regions. The player moves between regions through passages. Passages are markers in a region's GLB with a descriptive name; in the UI each passage is linked to any other passage, in the same region or another one, through a dropdown grouped by region. Passages are two-way. The world's spawn point is one of its passages. Any number of worlds can be created. Residents stay configured per region; residents living in another region of the same world are grayed out, show where they live, and can be brought here."
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Existing maps live on as regions of The Bridge (Priority: P1)
-
-The user opens the Worlds page and sees The Bridge as a world card. Every map that used to be its own world is now a region inside The Bridge, with its environment, layout, images, music and prompts intact. Once a spawn passage is chosen, starting a new session in The Bridge places the player at it.
-
-**Why this priority**: Nothing else works until the world/region structure exists and the existing content has been carried over without loss.
-
-**Independent Test**: Run the migration against data containing several existing worlds, then open the Worlds page, open The Bridge's configuration, and start a session.
-
-**Acceptance Scenarios**:
-
-1. **Given** three existing worlds with environments, images, music, prompts and residents, **When** the migration runs, **Then** the Worlds page shows one card, The Bridge, and its Regions tab lists three regions carrying each former world's environment, layout, images, music and prompts unchanged.
-2. **Given** existing world sessions and their resident states, **When** the migration runs, **Then** those sessions and states no longer exist and the session list for The Bridge is empty.
-3. **Given** The Bridge has no spawn passage chosen, **When** the user views the world, **Then** it shows a warning and starting a new session is not possible.
-4. **Given** The Bridge has a spawn passage configured, **When** the player starts a new session, **Then** the player appears in that passage's region, in front of that passage.
-
----
-
-### User Story 2 - Link passages and travel between regions (Priority: P1)
+### User Story 1 - Link passages and travel between regions (Priority: P1)
 
 Region environments contain passage markers. In a region's configuration, each passage found in the environment is listed by its descriptive name, and the user picks which other passage it connects to from a dropdown grouped by region. In play, walking into a passage unloads the current region and loads the destination region, placing the player in front of the linked passage.
 
@@ -46,7 +29,7 @@ Region environments contain passage markers. In a region's configuration, each p
 
 ---
 
-### User Story 3 - Configure the world and its regions (Priority: P1)
+### User Story 2 - Configure the world and its regions (Priority: P1)
 
 The user opens a world's configuration. The World tab holds the world's name, description, images, World Prompts and spawn passage. The Regions tab lists the world's regions; selecting a region shows the same configuration a world has today (environment upload, layout, images, music, prompts, theme, residents), plus its passages.
 
@@ -58,12 +41,14 @@ The user opens a world's configuration. The World tab holds the world's name, de
 
 1. **Given** a world with regions, **When** the user opens the World tab and chooses a spawn passage, **Then** the dropdown lists every passage in the world grouped under its region's name, and the chosen passage is marked as the spawn point in its region's passage list.
 2. **Given** a region with an unlinked passage or an environment without passages, **When** the user views the regions list, **Then** that region shows a warning indicator.
-3. **Given** the Worlds page, **When** the user creates a new world, **Then** it appears as a card and can be given regions of its own.
-4. **Given** a world with several regions, **When** the user deletes a region, **Then** its residents and every link to its passages are removed, and the spawn passage is cleared if it was in that region.
+3. **Given** a world has no spawn passage chosen, **When** the user views the world, **Then** it shows a warning and starting a new session is not possible.
+4. **Given** a world has a spawn passage chosen, **When** the player starts a new session, **Then** the player appears in that passage's region, in front of that passage.
+5. **Given** the Worlds page, **When** the user creates a new world, **Then** it appears as a card and can be given regions of its own.
+6. **Given** a world with several regions, **When** the user deletes a region, **Then** its residents and every link to its passages are removed, and the spawn passage is cleared if it was in that region.
 
 ---
 
-### User Story 4 - Residents belong to one region of the world (Priority: P2)
+### User Story 3 - Residents belong to one region of the world (Priority: P2)
 
 Each assistant or NPC can live in at most one region per world. In a region's residents list, residents who already live in another region of the same world appear grayed out with the name of the region they live in, and a "Bring here" action moves their home to the current region. During play, residents following the player travel with them through passages.
 
@@ -81,7 +66,7 @@ Each assistant or NPC can live in at most one region per world. In a region's re
 
 ---
 
-### User Story 5 - Regional location, music and layered prompts (Priority: P2)
+### User Story 4 - Regional location, music and layered prompts (Priority: P2)
 
 While playing, the player's location shows the current region's name. Each region plays its own music. AI characters receive the world's World Prompts together with the current region's prompts and the region's name.
 
@@ -156,17 +141,12 @@ While playing, the player's location shows the current region's name. Each regio
 - **FR-025**: AI characters MUST receive the world's World Prompts, the current region's prompts and the current region's name as context.
 - **FR-026**: Each region MUST play its own music, switching when the player travels.
 
-**Migration**
-
-- **FR-027**: The migration MUST create a world named "The Bridge" and turn every existing world into a top-level region of it, keeping environment, layout, images, music, prompts and theme.
-- **FR-028**: The migration MUST delete all existing world sessions and their resident states.
-
 **Configuration UI**
 
-- **FR-029**: The Worlds page MUST list worlds as cards.
-- **FR-030**: A world's configuration MUST have a World tab (name, description, images, World Prompts, spawn passage) and a Regions tab (regions list plus the selected region's configuration).
-- **FR-031**: Passage destination and spawn passage dropdowns MUST group options under each region's name and show each passage by its descriptive name.
-- **FR-032**: The regions list MUST mark the region holding the spawn passage and show a warning on regions with unlinked passages or without passages.
+- **FR-027**: The Worlds page MUST list worlds as cards.
+- **FR-028**: A world's configuration MUST have a World tab (name, description, images, World Prompts, spawn passage) and a Regions tab (regions list plus the selected region's configuration).
+- **FR-029**: Passage destination and spawn passage dropdowns MUST group options under each region's name and show each passage by its descriptive name.
+- **FR-030**: The regions list MUST mark the region holding the spawn passage and show a warning on regions with unlinked passages or without passages.
 
 ### Key Entities
 
@@ -182,11 +162,10 @@ While playing, the player's location shows the current region's name. Each regio
 
 ### Measurable Outcomes
 
-- **SC-001**: 100% of existing worlds appear as regions of The Bridge after migration, with environment, images, music and prompts unchanged.
-- **SC-002**: A user can link a passage to another passage in under 30 seconds from opening the region's configuration.
-- **SC-003**: Travelling between two regions of typical size completes, from entering the passage to control returning to the player, in under 5 seconds.
-- **SC-004**: In 100% of travels the player arrives in front of the linked passage and does not immediately travel back.
-- **SC-005**: No assistant or NPC is ever resident in more than one region of the same world.
+- **SC-001**: A user can link a passage to another passage in under 30 seconds from opening the region's configuration.
+- **SC-002**: Travelling between two regions of typical size completes, from entering the passage to control returning to the player, in under 5 seconds.
+- **SC-003**: In 100% of travels the player arrives in front of the linked passage and does not immediately travel back.
+- **SC-004**: No assistant or NPC is ever resident in more than one region of the same world.
 
 ## Assumptions
 

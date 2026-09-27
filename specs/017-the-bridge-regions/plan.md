@@ -16,7 +16,6 @@ Today's `World` becomes `Region`, and a new `World` groups regions, holds the Wo
   - **World tab**: world fields and the spawn passage.
   - **Regions tab**: a region list, and today's world form reused as the region form with a passages editor.
   - **Residents editor**: gains grayed-out rows and "Bring here".
-- **Migration**: new migrations carry every existing world into The Bridge as a region and delete old sessions (R12).
 
 ## Technical Context
 
@@ -27,7 +26,7 @@ Today's `World` becomes `Region`, and a new `World` groups regions, holds the Wo
 **Storage**: PostgreSQL in tests, MySQL locally. New `worlds` and `passage_links` tables, `worlds` renamed to `regions`, new columns on `regions`, `world_residents`, `world_sessions` and `world_session_residents` ([data-model.md](data-model.md)).
 
 **Testing**:
-- **Pest feature tests** for the API, layout parsing, links, travel, sessions, prompts and the migration.
+- **Pest feature tests** for the API, layout parsing, links, travel, sessions and prompts.
 - **`node --test`** for the pure passage trigger logic.
 - **Manually**, following [quickstart.md](quickstart.md): the configuration UI and the travel feel.
 
@@ -43,7 +42,7 @@ Today's `World` becomes `Region`, and a new `World` groups regions, holds the Wo
 - Session URLs stay stable.
 
 **Scale/Scope**: A handful of worlds, tens of regions per world, up to a few dozen passages per region.
-- **Backend**: about 30 files renamed or retyped from `World` to `Region`, about 12 new files, 8 migrations.
+- **Backend**: about 30 files renamed or retyped from `World` to `Region`, about 12 new files, and the schema migrations.
 - **Frontend**: about 8 new and 12 changed modules.
 
 ## Constitution Check
@@ -51,7 +50,7 @@ Today's `World` becomes `Region`, and a new `World` groups regions, holds the Wo
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 - **I. Lint-Enforced Code Style**: Pint and ESLint run once at push or PR time per CLAUDE.md. PASS.
-- **II. Append-Only Migrations**: every schema and data change is a new migration. No existing migration is edited. PASS.
+- **II. Append-Only Migrations**: every schema change is a new migration. No existing migration is edited. PASS.
 - **III. Comments Justify Only Non-Obvious Decisions**: comments only where the reason is hidden, for example why a passage must be left before it can trigger, or why links are stored as two rows. PASS.
 - **IV. Data Isolation by Ownership**:
   - Worlds are resolved through `$request->user()->worlds()`, and regions through scoped nested route bindings under that world.
@@ -61,7 +60,6 @@ Today's `World` becomes `Region`, and a new `World` groups regions, holds the Wo
 - **V. Errors Fail Loudly**:
   - An unlinked passage or an invalid follower on travel returns 422. Starting a session without a spawn returns 422. A resident conflict returns 409.
   - The client shows a toast for every failure.
-  - Migration steps throw on unexpected state.
   - PASS.
 - **VI. Feature-Test-First, Factory-Backed**:
   - `WorldFactory` becomes `RegionFactory` (keeping `withLayout()`, which gains passages).
@@ -109,10 +107,9 @@ database/
 ├── migrations/
 │   ├── ..._rename_worlds_to_regions.php                 # new
 │   ├── ..._create_worlds_table.php                      # new: container + spawn columns
-│   ├── ..._add_world_id_to_regions_table.php            # new: creates The Bridge, assigns regions, moves morph types
-│   ├── ..._repoint_world_user_to_worlds.php             # new
-│   ├── ..._add_region_id_to_world_residents_table.php   # new: home region, repoints world_id
-│   ├── ..._delete_world_sessions.php                    # new
+│   ├── ..._add_world_id_to_regions_table.php            # new
+│   ├── ..._repoint_world_user_to_worlds.php             # new: world_id references the new worlds table
+│   ├── ..._add_region_id_to_world_residents_table.php   # new: home region; world_id references the new worlds table
 │   ├── ..._add_region_id_to_world_sessions_tables.php   # new: world_sessions and world_session_residents
 │   └── ..._create_passage_links_table.php               # new
 └── factories/
@@ -201,7 +198,6 @@ tests/
 │   ├── WorldResidentControllerTest.php    # extended: 409 conflict, bring
 │   ├── WorldSessionControllerTest.php     # extended: spawn required, resume, travel with followers
 │   ├── WorldConversationContextTest.php   # extended: world + region prompts, region name
-│   ├── RegionsMigrationTest.php           # new: former worlds become regions of The Bridge
 │   └── (other World* / Resident* tests)   # changed: factories and routes
 └── Unit/
     └── PassageTrigger.test.js             # new
@@ -211,17 +207,17 @@ tests/
 
 ## Delivery Slices
 
-1. **Worlds contain regions (US1, US3 without passages)**:
+1. **Worlds contain regions (US2 without passages)**:
    - Migrations, the model rename, the new `World`, and the region and world controllers and resources.
    - The World and Regions tabs.
    - AI code retyped to `Region`, with world + region prompts.
-2. **Passages and spawn (US2, US3)**:
+2. **Passages and spawn (US1, US2)**:
    - Marker parsing, links and reconcile.
    - The passages editor and `PassageSelect`.
    - The spawn setting, and session start requiring the spawn.
-3. **Travel (US2)**: `passageTrigger`, `PassageTracker`, the travel and resume endpoints, and region remounting on the world page.
-4. **Residents per world (US4)**: the 409 conflict, bring, grayed rows, followers on travel, and resident region in session state.
-5. **Region location and music (US5)**: the location readout, the track switch on remount, and the region name in the AI location line.
+3. **Travel (US1)**: `passageTrigger`, `PassageTracker`, the travel and resume endpoints, and region remounting on the world page.
+4. **Residents per world (US3)**: the 409 conflict, bring, grayed rows, followers on travel, and resident region in session state.
+5. **Region location and music (US4)**: the location readout, the track switch on remount, and the region name in the AI location line.
 
 ## Complexity Tracking
 
