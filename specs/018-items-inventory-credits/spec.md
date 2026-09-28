@@ -14,6 +14,7 @@
 
 - Q: Should an object's activity be able to cost credits, as well as require an item? → A: An activity can require an item, cost credits, or both, and it can give credits, items, or both.
 - Q: Should residents also be able to ask the player for an item, not just credits? → A: A request can be for anything: credits, items, information, a certain response. Activities and items likewise can require or give anything, including information, described in plain language and judged by the LLM.
+- Q: What happens to a request still unanswered when the conversation ends? → A: It is cancelled.
 - Q: Can the player see what a resident is carrying? → A: Vendors show the player their items for sale; every other resident's inventory stays hidden, and they may tell the player what they carry, or not.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -141,7 +142,7 @@ Every change to a balance is recorded with the amount, who it moved between and 
 
 **Why this priority**: Useful for the player and needed later for judging how the player spent their money, but trading works without it.
 
-**Independent Test**: Give credits, accept a payment request and receive credits, then open the history and confirm three entries with amounts, counterparts and reasons in order.
+**Independent Test**: Give credits, accept a handover request and receive credits, then open the history and confirm three entries with amounts, counterparts and reasons in order.
 
 **Acceptance Scenarios**:
 
@@ -152,7 +153,8 @@ Every change to a balance is recorded with the amount, who it moved between and 
 
 - A resident's model cannot hand over items or ask for payment: the resident configuration does not allow giving that resident a starting inventory or credits, and says why.
 - The player gives an item to a resident in the middle of that resident's reply: the handover is applied once and appears in the conversation before the next reply.
-- Two payment requests arrive before the player answers the first: each is shown and answered separately; accepting one that is no longer affordable is refused.
+- Two handover requests arrive before the player answers the first: each is shown and answered separately; accepting one that is no longer affordable is refused.
+- The player ends a conversation while a request from that character is still unanswered: the request is cancelled; nothing moves, and the character must ask again in a later conversation.
 - A resident is removed from a region while holding items from the player: the items are lost with the resident's session state.
 - An item's quantity reaches 0 in an inventory: it disappears from that inventory; unlimited quantities never reach 0.
 - Credits never go below 0 for any holder.
@@ -174,7 +176,7 @@ Every change to a balance is recorded with the amount, who it moved between and 
 - **FR-008**: A resident MUST be able to give items or credits from their own inventory to whoever they are talking with; a handover larger than what they hold MUST be refused and the resident told why.
 - **FR-009**: A resident MUST be able to ask the player for credits, items, or both, with a stated reason; they MUST move only when the player accepts, and the resident MUST be told whether the player accepted, declined or could not provide them. Requests for anything else (information, an answer, an action) happen in conversation and are judged by the resident.
 - **FR-009a**: Users MUST be able to mark items in a resident's inventory as for sale, which makes that resident a vendor; while talking with a vendor, the player MUST be able to see the items for sale, with quantities and base prices. The inventory of a resident who is not a vendor, and a vendor's items not for sale, MUST never be shown to the player.
-- **FR-010**: Nothing MUST ever leave the player's inventory other than through the player giving it, the player accepting a payment request, or an activity consuming a required item.
+- **FR-010**: Nothing MUST ever leave the player's inventory other than through the player giving it, the player accepting a handover request, or the player using an activity or item whose terms cost credits, consume a required item, or consume the item itself.
 - **FR-011**: The player MUST be notified whenever their inventory or balance changes.
 - **FR-012**: Users MUST be able to place items with a quantity or unlimited amount on objects in a region's configuration; the player MUST be able to take one of an item from an object while it has any left.
 - **FR-013**: Objects' remaining amounts MUST be tracked per session.
@@ -202,7 +204,7 @@ Every change to a balance is recorded with the amount, who it moved between and 
 ### Measurable Outcomes
 
 - **SC-001**: A user can define an item and give a resident a starting stock of it in under 2 minutes.
-- **SC-002**: In 100% of test runs, no item or credit leaves the player's inventory without the player giving it, accepting a request, or consuming it through a configured requirement.
+- **SC-002**: In 100% of test runs, no item or credit leaves the player's inventory without the player giving it, accepting a handover request, or choosing to use an activity or item whose terms cost or consume it.
 - **SC-003**: After any handover, both inventories show the change within 1 second, and the receiving character's next reply reflects it.
 - **SC-004**: In 100% of attempts, an activity is refused to anyone lacking its required item or credits, and the player is told what is missing.
 - **SC-005**: A new session always starts with inventories exactly matching the configuration, regardless of what happened in earlier sessions.

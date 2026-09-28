@@ -52,7 +52,8 @@ All under `/worlds/{world}/sessions/{session}`. Every response that can change t
 | GET | /credit-history | worlds.sessions.credit-history.index | | `[{ amount, direction: "in"\|"out", counterpart, reason, createdAt }]`, newest first |
 | GET | /residents/{resident}/goods | worlds.sessions.residents.goods.index | | `[{ itemId, name, description, quantity, basePrice, cardImageUrl }]` for items for sale; `[]` for a resident who is not a vendor |
 | POST | /handovers | worlds.sessions.handovers.store | `{ residentId, credits, items: [{ itemId, quantity }] }` | `{ line, inventory, changes }`; 422 when the player doesn't have enough |
-| POST | /handover-requests/{request}/answer | worlds.sessions.handover-requests.answer | `{ accept: bool }` | `{ status, line, inventory, changes }`; `unaffordable` when accepting fails the balance check; 409 when already answered |
+| POST | /handover-requests/{request}/answer | worlds.sessions.handover-requests.answer | `{ accept: bool }` | `{ status, line, inventory, changes }`; `unaffordable` when accepting fails the balance check; 409 when no longer pending |
+| POST | /conversations/{conversation}/handover-requests/cancel | worlds.sessions.conversations.handover-requests.cancel | | `204`; cancels every pending request of that conversation |
 | POST | /objects/{object}/take | worlds.sessions.objects.take | `{ regionId, itemId }` | `{ inventory, changes }`; 422 when none is left or the item is not takeable |
 | POST | /activity-uses | worlds.sessions.activity-uses.store | `{ regionId, objectId, activityId, attempt? }` | `{ allowed, reason?, narration?, inventory, changes }` |
 | GET | /items/{item}/examine | worlds.sessions.items.examine | | `{ narration }`; 422 when the player doesn't hold it |

@@ -82,7 +82,7 @@ Unique `(region_id, object_id, activity_id)`.
 | `credits` | uint, default 0 | |
 | `items` | json, default `[]` | `[{ "itemId": int, "quantity": uint }]` |
 | `reason` | string | |
-| `status` | enum `pending`, `accepted`, `declined`, `unaffordable` | |
+| `status` | enum `pending`, `accepted`, `declined`, `unaffordable`, `cancelled` | |
 | `answered_at` | timestamp, nullable | |
 
 ### `credit_transactions`
@@ -107,7 +107,7 @@ Unique `(region_id, object_id, activity_id)`.
 
 - `Item`, `StartingInventory`, `StartingInventoryItem`, `Inventory`, `InventoryItem`, `ActivityTerms`, `HandoverRequest`, `CreditTransaction`, each with a factory.
 - `InventoryHolder` enum: `Player`, `Resident`, `Object`.
-- `HandoverRequestStatus` enum: `Pending`, `Accepted`, `Declined`, `Unaffordable`.
+- `HandoverRequestStatus` enum: `Pending`, `Accepted`, `Declined`, `Unaffordable`, `Cancelled`.
 - `World` gains `items()`, `startingInventories()`, `narratorModel()`. `WorldSession` gains `inventories()`, `creditTransactions()`. `Region` gains `activityTerms()`.
 
 ## Validation rules
@@ -124,6 +124,6 @@ Unique `(region_id, object_id, activity_id)`.
 - **Session start**: every `starting_inventories` row of the world is copied, with its items, into `inventories` for the new session (research R3).
 - **First use in an older session**: a holder with no inventory row gets one copied from its starting inventory, or an empty one if it has none.
 - **Transfers**: only through `TransferInventory` (research R4). A `credit_transactions` row is written for any credits moved.
-- **Handover request**: created `pending` by the `ask_for` tool; answered once by the player as `accepted`, `declined` or `unaffordable`. Answering an already answered request returns 409.
+- **Handover request**: created `pending` by the `ask_for` tool; answered once by the player as `accepted`, `declined` or `unaffordable`, or `cancelled` when the player ends the conversation first. Answering a request that is no longer pending returns 409. Resuming a session cancels any request still pending.
 - **Item deleted**: its rows cascade out of every inventory and starting inventory; terms that required it lose the requirement; it is removed from every `gives_items` and `releases_items` list by the delete action.
 - **Environment re-uploaded**: the existing layout reconciliation also deletes starting inventories and activity terms of objects or activities that no longer exist in the layout.

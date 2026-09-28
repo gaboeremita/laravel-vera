@@ -32,7 +32,7 @@ description: "Task list for Items, Inventory and Credits"
 
 - [ ] T001 Create the migrations with `php artisan make:migration --no-interaction` in `database/migrations/`: `create_items_table`, `create_starting_inventories_table`, `create_starting_inventory_items_table`, `create_inventories_table`, `create_inventory_items_table`, `create_activity_terms_table`, `create_handover_requests_table`, `create_credit_transactions_table`, `add_narrator_model_id_to_worlds_table`, in that order
 - [ ] T002 [P] Create models with factories with `php artisan make:model <Name> --factory --no-interaction` for `Item`, `StartingInventory`, `StartingInventoryItem`, `Inventory`, `InventoryItem`, `ActivityTerms`, `HandoverRequest`, `CreditTransaction` in `app/Models/` and `database/factories/`
-- [ ] T003 [P] Create `app/Enums/InventoryHolder.php` (`Player`, `Resident`, `Object`) and `app/Enums/HandoverRequestStatus.php` (`Pending`, `Accepted`, `Declined`, `Unaffordable`)
+- [ ] T003 [P] Create `app/Enums/InventoryHolder.php` (`Player`, `Resident`, `Object`) and `app/Enums/HandoverRequestStatus.php` (`Pending`, `Accepted`, `Declined`, `Unaffordable`, `Cancelled`)
 
 ---
 
@@ -112,11 +112,11 @@ description: "Task list for Items, Inventory and Credits"
 - [ ] T038 [US3] Give residents `GiveTool` toward each other in `app/Actions/GenerateResidentConversationTurn.php` when their model supports tools
 - [ ] T039 [US3] Add the resident's own inventory section (items, quantities, for-sale marks, base prices, credits) to the prompt in `app/Actions/AppendWorldConversationContext.php` (research R13)
 - [ ] T040 [P] [US3] Create `AnswerHandoverRequestRequest` in `app/Http/Requests/`
-- [ ] T041 [US3] Implement `answer` in `app/Http/Controllers/Api/HandoverController.php` (accepted / declined / unaffordable, 409 when answered, returns `line`) and `goods` in `app/Http/Controllers/Api/InventoryController.php` (items for sale only; `[]` for non-vendors), with routes in `routes/api.php`
+- [ ] T041 [US3] Implement `answer` (accepted / declined / unaffordable, 409 when no longer pending, returns `line`) and `cancel` (cancels every pending request of a conversation) in `app/Http/Controllers/Api/HandoverController.php`, cancel pending requests on session resume in `app/Http/Controllers/Api/WorldSessionController.php`, and `goods` in `app/Http/Controllers/Api/InventoryController.php` (items for sale only; `[]` for non-vendors), with routes in `routes/api.php`
 - [ ] T042 [P] [US3] Write `tests/Feature/InventoryWorldToolsTest.php`: give moves from the resident, `give` and `ask_for` never reduce the player's inventory even when the model names the player as the giver (SC-002), refuses beyond stock, unlimited stays unlimited, ask_for creates a pending request, residents give to each other, the prompt lists their own inventory and never the player's
-- [ ] T043 [P] [US3] Extend `tests/Feature/Api/InventoryPlayControllerTest.php`: accept moves credits and items together, decline moves nothing, unaffordable status, second answer 409, goods show only for-sale items and nothing for non-vendors
+- [ ] T043 [P] [US3] Extend `tests/Feature/Api/InventoryPlayControllerTest.php`: accept moves credits and items together, decline moves nothing, unaffordable status, second answer 409, ending the conversation cancels pending requests and answering a cancelled one is 409, resuming a session cancels pending requests, goods show only for-sale items and nothing for non-vendors
 - [ ] T044 [P] [US3] Build `resources/js/components/world/hud/HandoverRequestConfirm.jsx`: the request's items (with thumbnails) and credits, the reason, accept disabled with an explanation when unaffordable, ENTER / ESC keys; styled after `PassageConfirm.jsx`
-- [ ] T045 [US3] Show the request confirm when a reply carries `handoverRequest`, post the answer and send the returned `line`, and add the vendor goods strip (thumbnails, quantities, base prices) to the conversation panel when the partner is a vendor, in `resources/js/components/WorldChat.jsx`
+- [ ] T045 [US3] Show the request confirm when a reply carries `handoverRequest`, post the answer and send the returned `line`, cancel pending requests and close the confirm when the player ends the conversation, and add the vendor goods strip (thumbnails, quantities, base prices) to the conversation panel when the partner is a vendor, in `resources/js/components/WorldChat.jsx`
 
 **Checkpoint**: Trading with characters works end to end. MVP complete (US1–US3).
 
