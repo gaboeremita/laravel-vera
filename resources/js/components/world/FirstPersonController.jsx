@@ -230,7 +230,7 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 	const reportPosition = () => {
 		if (lastReportedFoot.current.distanceToSquared(footPosition.current) <= 0.05) return;
 		lastReportedFoot.current.copy(footPosition.current);
-		callbacks.current.onPositionChange?.([footPosition.current.x, footPosition.current.y + PLAYER_EYE_HEIGHT, footPosition.current.z]);
+		callbacks.current.onPositionChange?.([footPosition.current.x, footPosition.current.y, footPosition.current.z]);
 	};
 
 	useFrame(({ camera: activeCamera }, delta) => {
@@ -248,7 +248,7 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 				activeCamera.rotation.set(0, spawnYaw, 0, 'YXZ');
 			}
 			lastReportedFoot.current.copy(footPosition.current);
-			callbacks.current.onPositionChange?.([spawnPosition.x, spawnPosition.y + PLAYER_EYE_HEIGHT, spawnPosition.z]);
+			callbacks.current.onPositionChange?.([spawnPosition.x, spawnPosition.y, spawnPosition.z]);
 		}
 
 		const activeGlide = glide.current;

@@ -216,7 +216,7 @@ it('persists a route, a home spot, the area she keeps to and her decision pace',
     expect(WorldResident::where('region_id', $world->id)->firstOrFail()->behavior_settings)->toBe($settings);
 });
 
-it('persists the resident posture', function () {
+it('leaves posture out of the resident placement, since the home spot decides it', function () {
     $user = User::factory()->create();
     $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
@@ -225,32 +225,9 @@ it('persists the resident posture', function () {
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'stationary',
         'posture' => 'sitting',
-    ])->assertSuccessful()->assertJsonPath('posture', 'sitting');
+    ])->assertSuccessful()->assertJsonMissingPath('posture');
 
-    expect(WorldResident::where('region_id', $world->id)->firstOrFail()->posture->value)->toBe('sitting');
-});
-
-it('defaults the resident posture to standing when not provided', function () {
-    $user = User::factory()->create();
-    $world = Region::factory()->forUser($user)->create();
-    $assistant = residentAssistantFor($user);
-
-    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), [
-        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
-        'behavior' => 'stationary',
-    ])->assertSuccessful()->assertJsonPath('posture', 'standing');
-});
-
-it('rejects an invalid posture value', function () {
-    $user = User::factory()->create();
-    $world = Region::factory()->forUser($user)->create();
-    $assistant = residentAssistantFor($user);
-
-    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), [
-        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
-        'behavior' => 'stationary',
-        'posture' => 'floating',
-    ])->assertUnprocessable()->assertJsonValidationErrors('posture');
+    expect(WorldResident::where('region_id', $world->id)->firstOrFail()->getAttributes())->not->toHaveKey('posture');
 });
 
 it('rejects malformed behavior settings', function (string $behavior, array $settings, string $error) {

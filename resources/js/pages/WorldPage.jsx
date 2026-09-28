@@ -5,7 +5,6 @@ import { api } from '../utils/api.js';
 import WorldScene from '../components/world/WorldScene.jsx';
 import WorldChat from '../components/world/WorldChat.jsx';
 import WorldTrackPlayer from '../components/world/WorldTrackPlayer.jsx';
-import { PLAYER_EYE_HEIGHT } from '../components/world/collisionCheck.js';
 import { CONVERSATION_END_DISTANCE, conversationRangeState } from '../components/world/conversationRange.js';
 import { isTypingTarget } from '../components/world/keyboardFocus.js';
 import { RESIDENT_BUSY, executeAction } from '../components/world/residentActions.js';
@@ -104,6 +103,7 @@ export default function WorldPage() {
 	}, [setHidePortrait]);
 
 	useEffect(() => {
+		let superseded = false;
 		const load = async () => {
 			try {
 				const response = await api.get(route('worlds.show', { world: worldId }));
@@ -132,14 +132,22 @@ export default function WorldPage() {
 				if (!regionResponse.ok) throw new Error('Region unavailable');
 				const regionData = await regionResponse.json();
 				if (!regionData.environmentUrl) throw new Error('This region has no environment asset.');
+				if (superseded) return;
 
 				setSession(selectedSession);
 				setWorldData(data);
 				setRegion(regionData);
 				setStatus('entering');
-			} catch (error) { addToast(error.message || 'Failed to load world', 'error'); setStatus('error'); }
+			} catch (error) {
+				if (superseded) return;
+				addToast(error.message || 'Failed to load world', 'error');
+				setStatus('error');
+			}
 		};
 		void load();
+		return () => {
+			superseded = true;
+		};
 	}, [addToast, worldId, sessionId]);
 
 	const persistPosition = useCallback(async () => {
@@ -266,8 +274,8 @@ export default function WorldPage() {
 		for (const [residentId, position] of residentPositions.current) residents[residentId] = { x: position.x, y: position.y, z: position.z };
 		const foot = playerState.current?.footPosition;
 		if (foot) return { user: { x: foot.x, y: foot.y, z: foot.z }, residents };
-		const eye = latestPosition.current;
-		return eye ? { user: { x: eye[0], y: eye[1] - PLAYER_EYE_HEIGHT, z: eye[2] }, residents } : { residents };
+		const saved = latestPosition.current;
+		return saved ? { user: { x: saved[0], y: saved[1], z: saved[2] }, residents } : { residents };
 	}, []);
 	const getUserState = useCallback(() => {
 		const state = playerState.current;

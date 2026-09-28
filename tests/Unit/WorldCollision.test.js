@@ -170,6 +170,17 @@ test('a blocked spawn is moved to a nearby clear floor', (context) => {
 	assert.ok(Math.abs(position.y) < 0.001);
 });
 
+test('a saved foot position on the floor is restored onto that floor, above any surface below it', (context) => {
+	const lowerDeck = new Mesh(new BoxGeometry(20, 0.1, 20), new MeshBasicMaterial());
+	lowerDeck.position.y = -5.05;
+	const world = createWorld(context, lowerDeck);
+	const fallback = new Vector3(0, 0, 0);
+	const position = world.restorePlayerPosition({ x: 2, y: 0, z: 2 }, fallback);
+	assert.ok(Math.abs(position.x - 2) < 0.001);
+	assert.ok(Math.abs(position.y) < 0.001);
+	assert.ok(Math.abs(position.z - 2) < 0.001);
+});
+
 test('a saved eye-level position is restored to its original floor position', (context) => {
 	const world = createWorld(context);
 	const fallback = new Vector3(0, 0, 0);

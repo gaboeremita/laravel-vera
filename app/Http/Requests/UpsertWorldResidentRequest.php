@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\Posture;
 use App\Enums\WorldResidentBehavior;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Enum;
@@ -28,7 +27,6 @@ class UpsertWorldResidentRequest extends FormRequest
             'rotation.x' => ['required_with:rotation', 'numeric'],
             'rotation.y' => ['required_with:rotation', 'numeric'],
             'rotation.z' => ['required_with:rotation', 'numeric'],
-            'posture' => ['nullable', new Enum(Posture::class)],
             'behavior' => ['required', new Enum(WorldResidentBehavior::class)],
             'behaviorSettings' => ['nullable', 'array:radius,homeSpot,route,area,decisionSeconds'],
             'behaviorSettings.radius' => ['nullable', 'numeric', 'min:0.1', 'max:3'],

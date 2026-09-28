@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\AssistantKind;
-use App\Enums\Posture;
 use App\Enums\WorldResidentBehavior;
 use Database\Factories\WorldResidentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -11,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['region_id', 'assistant_id', 'position', 'rotation', 'posture', 'behavior', 'behavior_settings', 'opening_message', 'custom_prompt', 'zone_access'])]
+#[Fillable(['region_id', 'assistant_id', 'position', 'rotation', 'behavior', 'behavior_settings', 'opening_message', 'custom_prompt', 'zone_access'])]
 class WorldResident extends Model
 {
     /** @use HasFactory<WorldResidentFactory> */
@@ -20,11 +19,9 @@ class WorldResident extends Model
     /** @var array<string, string> */
     public const DEFAULT_POSITION = ['x' => 0, 'y' => 0, 'z' => 0];
 
-    protected $attributes = ['posture' => 'standing'];
-
     protected function casts(): array
     {
-        return ['position' => 'array', 'rotation' => 'array', 'posture' => Posture::class, 'behavior' => WorldResidentBehavior::class, 'behavior_settings' => 'array', 'zone_access' => 'array'];
+        return ['position' => 'array', 'rotation' => 'array', 'behavior' => WorldResidentBehavior::class, 'behavior_settings' => 'array', 'zone_access' => 'array'];
     }
 
     /**
