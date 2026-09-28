@@ -192,7 +192,7 @@ description: "Task list for Items, Inventory and Credits"
 
 - [ ] T068 Review every new and changed screen against the UI standard: spacing, alignment, animations, empty states, long names, ∞ display, keyboard use, and the look next to existing HUD pieces and editors; fix what doesn't match
 - [ ] T069 Run the quality gates once: `vendor/bin/pint --dirty --format agent`, `npm run lint`, `php artisan test --compact`, and `node --test tests/Unit/`; fix everything that surfaces
-- [ ] T070 Hand the user [quickstart.md](quickstart.md) for the manual walkthrough, including a visual check of every new screen and the timing goals in SC-001 and SC-003
+- [X] T070 Hand the user [quickstart.md](quickstart.md) for the manual walkthrough, including a visual check of every new screen and the timing goals in SC-001 and SC-003
 
 ---
 
