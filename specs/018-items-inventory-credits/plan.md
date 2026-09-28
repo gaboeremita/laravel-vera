@@ -37,6 +37,7 @@ Worlds get items, and the player, residents and region objects get inventories o
 **Constraints**:
 - Nothing leaves the player's inventory except through the three player paths (FR-010).
 - Existing sessions and worlds keep working with empty inventories.
+- Every new UI piece follows the current theme and HUD styling and looks polished (FR-018); [tasks.md](tasks.md) spells out the UI standard.
 - Activity and object ids come from the environment layout and are never edited here.
 
 **Scale/Scope**: Tens of items per world, a few dozen inventories per session.

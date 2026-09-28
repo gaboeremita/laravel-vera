@@ -185,6 +185,7 @@ Every change to a balance is recorded with the amount, who it moved between and 
 - **FR-014d**: Users MUST be able to give an item a plain-language description of what examining it reveals and what it takes to use it, plus credits and items it releases when used; the player MUST be able to examine and try to use held items, with the LLM judging and narrating the result.
 - **FR-015**: When the player cannot use an activity for lack of an item or credits, the player MUST be told which item it needs or how much it costs; when a plain-language requirement is not met, the narration MUST say why in the world's terms.
 - **FR-016**: Every balance change MUST be recorded with the amount, the holders involved and the reason; the player MUST be able to see their session's credit history.
+- **FR-018**: Every new screen, panel and control MUST follow the app's current theme and styling and look sleek and polished, consistent with the existing HUD and configuration screens.
 - **FR-017**: Inventories, balances and history MUST belong to one session of one player and never be visible from another session or another user's play.
 
 ### Key Entities
