@@ -17,7 +17,7 @@ description: "Task list for Items, Inventory and Credits"
 - **Configuration UI** uses `resources/js/components/common/Accordion.jsx`, `ConfirmationModal.jsx`, `Toggle.jsx` and the label, input and button classes of `WorldResidentsEditor.jsx` and `RegionPassagesEditor.jsx`.
 - **Colors** use theme tokens only (`accent`, `fg-1`–`fg-3`, `line-1`, `danger`); no hard-coded colors and no unstyled browser controls.
 - **Details:** item images show as thumbnails with a styled placeholder when missing; every list has a designed empty state; numbers and "unlimited" read clearly (∞ for unlimited).
-- **Wording:** labels follow the "Names to approve" table in [plan.md](plan.md) until the user approves or changes them.
+- **Wording:** labels use the approved names in [plan.md](plan.md).
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -94,7 +94,7 @@ description: "Task list for Items, Inventory and Credits"
 - [ ] T031 [P] [US2] Write `tests/Feature/Api/InventoryPlayControllerTest.php` (US2 cases): inventory shape, give moves items and credits and returns the line, giving more than held returns 422 and moves nothing, another session 404
 - [ ] T032 [P] [US2] Build `resources/js/components/world/hud/CreditsReadout.jsx`: a small always-visible HUD panel with the credit balance that pulses briefly on change; follow the UI standard
 - [ ] T033 [P] [US2] Build `resources/js/components/world/hud/InventoryPanel.jsx`: a HUD overlay opened by a key shown in `ControlsLegend`, a grid of item cards with thumbnail, name and quantity, and the item's description on highlight; keyboard navigable like `InspectCard`; empty state; follow the UI standard
-- [ ] T034 [US2] Add the give control to `resources/js/components/WorldChat.jsx`: pick items and quantities or an amount of credits, never more than held, then post the handover and send the returned `line` as the player's message
+- [ ] T034 [US2] Add the give control to `resources/js/components/WorldChat.jsx`: pick items and quantities or an amount of credits, never more than held, then post the handover and send the returned `line` as the player's message; while the character's reply is still pending, queue the line and send it right after the reply arrives (spec Edge Cases)
 - [ ] T035 [US2] Wire `useInventory`, `CreditsReadout` and `InventoryPanel` into `resources/js/pages/WorldPage.jsx` and add the key to `resources/js/components/world/hud/ControlsLegend.jsx`
 
 **Checkpoint**: The player can see and give.
@@ -113,7 +113,7 @@ description: "Task list for Items, Inventory and Credits"
 - [ ] T039 [US3] Add the resident's own inventory section (items, quantities, for-sale marks, base prices, credits) to the prompt in `app/Actions/AppendWorldConversationContext.php` (research R13)
 - [ ] T040 [P] [US3] Create `AnswerHandoverRequestRequest` in `app/Http/Requests/`
 - [ ] T041 [US3] Implement `answer` in `app/Http/Controllers/Api/HandoverController.php` (accepted / declined / unaffordable, 409 when answered, returns `line`) and `goods` in `app/Http/Controllers/Api/InventoryController.php` (items for sale only; `[]` for non-vendors), with routes in `routes/api.php`
-- [ ] T042 [P] [US3] Write `tests/Feature/InventoryWorldToolsTest.php`: give moves from the resident, refuses beyond stock, unlimited stays unlimited, ask_for creates a pending request, residents give to each other, the prompt lists their own inventory and never the player's
+- [ ] T042 [P] [US3] Write `tests/Feature/InventoryWorldToolsTest.php`: give moves from the resident, `give` and `ask_for` never reduce the player's inventory even when the model names the player as the giver (SC-002), refuses beyond stock, unlimited stays unlimited, ask_for creates a pending request, residents give to each other, the prompt lists their own inventory and never the player's
 - [ ] T043 [P] [US3] Extend `tests/Feature/Api/InventoryPlayControllerTest.php`: accept moves credits and items together, decline moves nothing, unaffordable status, second answer 409, goods show only for-sale items and nothing for non-vendors
 - [ ] T044 [P] [US3] Build `resources/js/components/world/hud/HandoverRequestConfirm.jsx`: the request's items (with thumbnails) and credits, the reason, accept disabled with an explanation when unaffordable, ENTER / ESC keys; styled after `PassageConfirm.jsx`
 - [ ] T045 [US3] Show the request confirm when a reply carries `handoverRequest`, post the answer and send the returned `line`, and add the vendor goods strip (thumbnails, quantities, base prices) to the conversation panel when the partner is a vendor, in `resources/js/components/WorldChat.jsx`
@@ -191,9 +191,8 @@ description: "Task list for Items, Inventory and Credits"
 ## Phase 10: Polish & Cross-Cutting Concerns
 
 - [ ] T068 Review every new and changed screen against the UI standard: spacing, alignment, animations, empty states, long names, ∞ display, keyboard use, and the look next to existing HUD pieces and editors; fix what doesn't match
-- [ ] T069 Update the "Names to approve" labels in the UI to whatever the user approved or changed
-- [ ] T070 Run the quality gates once: `vendor/bin/pint --dirty --format agent`, `npm run lint`, `php artisan test --compact`, and `node --test tests/Unit/`; fix everything that surfaces
-- [ ] T071 Hand the user [quickstart.md](quickstart.md) for the manual walkthrough, including a visual check of every new screen
+- [ ] T069 Run the quality gates once: `vendor/bin/pint --dirty --format agent`, `npm run lint`, `php artisan test --compact`, and `node --test tests/Unit/`; fix everything that surfaces
+- [ ] T070 Hand the user [quickstart.md](quickstart.md) for the manual walkthrough, including a visual check of every new screen and the timing goals in SC-001 and SC-003
 
 ---
 

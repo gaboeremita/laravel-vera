@@ -140,9 +140,9 @@ tests/Unit/InventoryChanges.test.js
 
 **Structure Decision**: The existing single Laravel + React repo layout; new code sits beside the world, region and resident code it extends.
 
-## Names to approve
+## Approved names
 
-These names are new and are used in this plan's code, tables and UI until you approve or change them:
+These names are used in the code, tables and UI:
 
 | Name | Where | Refers to |
 |---|---|---|
