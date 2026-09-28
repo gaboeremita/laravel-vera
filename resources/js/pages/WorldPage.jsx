@@ -26,6 +26,8 @@ import ActivityProgress from '../components/world/hud/ActivityProgress.jsx';
 import ActionLine from '../components/world/hud/ActionLine.jsx';
 import ControlsLegend from '../components/world/hud/ControlsLegend.jsx';
 import PauseOverlay from '../components/world/hud/PauseOverlay.jsx';
+import { greetingResident } from '../components/world/greetOnArrival.js';
+import PassageConfirm from '../components/world/hud/PassageConfirm.jsx';
 import { contextLineFor, usePlayerActivities } from '../hooks/usePlayerActivities.js';
 import { fullSpotIds, releaseAllSpots, stackedSpots } from '../components/world/spotOccupancy.js';
 import { readVoiceEnabled, storeVoiceEnabled } from '../components/world/worldVoice.js';
@@ -63,6 +65,9 @@ export default function WorldPage() {
 	const residentDetails = useRef(new Map());
 	const [voiceUntil, setVoiceUntil] = useState(0);
 	const pausedRef = useRef(false);
+	const [pendingPassage, setPendingPassage] = useState(null);
+	const pendingPassageRef = useRef(null);
+	const passageActionsRef = useRef({ confirm: () => {}, cancel: () => {} });
 	const chatResidentRef = useRef(null);
 	const userClaimRef = useRef(null);
 	const residentClaimsRef = useRef(new Map());
@@ -135,6 +140,7 @@ export default function WorldPage() {
 				if (superseded) return;
 
 				setSession(selectedSession);
+				setArrivalFacing(selectedSession?.arrivalFacing ?? null);
 				setWorldData(data);
 				setRegion(regionData);
 				setStatus('entering');
@@ -207,6 +213,13 @@ export default function WorldPage() {
 	useEffect(() => {
 		const keyDown = (event) => {
 			if (isTypingTarget(event.target)) return;
+			if (pendingPassageRef.current) {
+				event.stopImmediatePropagation();
+				if (event.repeat) return;
+				if (event.code === 'Enter' || event.code === 'NumpadEnter') passageActionsRef.current.confirm();
+				else if (event.code === 'Escape') passageActionsRef.current.cancel();
+				return;
+			}
 			if (event.code === 'KeyP') {
 				event.stopImmediatePropagation();
 				if (!event.repeat) setPaused((current) => !current);
@@ -268,6 +281,22 @@ export default function WorldPage() {
 			setStatus('entering');
 		} catch (error) { addToast(error.message || 'Unable to go through this passage', 'error'); } finally { travelingRef.current = false; }
 	}, [addToast, persistResidentStates, region, sessionId, worldId]);
+	const requestPassage = useCallback((passage) => {
+		const link = (region?.links ?? []).find((item) => item.passageId === passage.id);
+		if (!link || travelingRef.current) return;
+		setPendingPassage({ passage, toRegionName: link.targetRegionName });
+	}, [region]);
+	useEffect(() => {
+		pendingPassageRef.current = pendingPassage;
+		passageActionsRef.current = {
+			confirm: async () => {
+				const { passage } = pendingPassage;
+				await travel(passage);
+				setPendingPassage(null);
+			},
+			cancel: () => setPendingPassage(null),
+		};
+	}, [pendingPassage, travel]);
 	const handlePlayerPositionChange = useCallback((position) => { latestPosition.current = position; }, []);
 	const getPositions = useCallback(() => {
 		const residents = {};
@@ -453,6 +482,13 @@ export default function WorldPage() {
 	}, [chatResident]);
 
 	const activeSession = sessionId && String(session?.id) === String(sessionId) ? session : null;
+	const greetedSessionRef = useRef(null);
+	useEffect(() => {
+		if (status !== 'ready' || !activeSession || greetedSessionRef.current === activeSession.id) return;
+		greetedSessionRef.current = activeSession.id;
+		const resident = greetingResident(world?.residents ?? [], activeSession);
+		if (resident) openChat(resident);
+	}, [status, activeSession, world, openChat]);
 	const handleThought = useCallback((residentId, line) => setThoughts((current) => ({ ...current, [residentId]: line })), []);
 	const handleSpeech = useCallback((residentId, line) => {
 		setSpeech((current) => ({ ...current, [residentId]: line }));
@@ -668,7 +704,7 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready' && !paused} voiceUntil={voiceUntil} />
-				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={travel} explorationEnabled={status === 'ready' && !paused} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
+				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
 				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} />{hasZones && readoutText && <LocationReadout text={readoutText} />}</div>} />}
 				{status === 'ready' && (
 					<>
@@ -686,6 +722,7 @@ export default function WorldPage() {
 					</>
 				)}
 				{chatResident && <OffscreenIndicator ref={offscreenIndicator} name={chatResident.assistant.name} />}
+				{pendingPassage && <PassageConfirm fromRegionName={region.name} toRegionName={pendingPassage.toRegionName} onConfirm={() => passageActionsRef.current.confirm()} onCancel={() => passageActionsRef.current.cancel()} />}
 				<PauseOverlay paused={paused} onResume={() => setPaused(false)} onExit={exit} />
 				<div className={`absolute inset-0 z-10 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${status !== 'ready' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
 					{world.cardImageUrl && (

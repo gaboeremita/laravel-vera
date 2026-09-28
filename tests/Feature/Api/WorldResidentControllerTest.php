@@ -216,6 +216,22 @@ it('persists a route, a home spot, the area she keeps to and her decision pace',
     expect(WorldResident::where('region_id', $world->id)->firstOrFail()->behavior_settings)->toBe($settings);
 });
 
+it('stores whether a resident greets on arrival and rejects a non-boolean value', function () {
+    $user = User::factory()->create();
+    $world = Region::factory()->forUser($user)->create();
+    $assistant = residentAssistantFor($user);
+    $url = route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]);
+    $payload = ['position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary'];
+
+    $this->actingAs($user)->putJson($url, $payload + ['behaviorSettings' => ['greetOnArrival' => true]])
+        ->assertSuccessful()
+        ->assertJsonPath('behaviorSettings.greetOnArrival', true);
+
+    $this->actingAs($user)->putJson($url, $payload + ['behaviorSettings' => ['greetOnArrival' => 'yes']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('behaviorSettings.greetOnArrival');
+});
+
 it('leaves posture out of the resident placement, since the home spot decides it', function () {
     $user = User::factory()->create();
     $world = Region::factory()->forUser($user)->create();

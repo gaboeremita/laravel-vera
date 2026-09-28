@@ -5,7 +5,7 @@ import { api } from '../utils/api.js';
 import Accordion from './common/Accordion.jsx';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
 import { parseZoneAccess } from './world/zoneAccess.js';
-import { behaviorSettingsText, parseBehaviorSettings } from './world/behaviorSettings.js';
+import { behaviorSettingsText, parseBehaviorSettings, withGreetOnArrival } from './world/behaviorSettings.js';
 
 const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, behavior: 'stationary', behaviorSettings: null, openingMessage: '', customPrompt: '', zoneAccess: null };
 const ZONE_ACCESS_EXAMPLE = '{ "tags": ["deprecated"], "zones": ["mona-house"] }';
@@ -178,6 +178,15 @@ function ResidentRow({ candidate, resident, regionId, regionNames, privateZones,
 				/>
 				{behaviorSettingsError && <p className="text-danger text-xs mt-1">{behaviorSettingsError}</p>}
 			</div>
+			<label className="flex items-center gap-2 text-fg-2 text-sm cursor-pointer">
+				<input
+					type="checkbox"
+					checked={parseBehaviorSettings(draft.behaviorSettings).behaviorSettings?.greetOnArrival === true}
+					disabled={behaviorSettingsError !== null}
+					onChange={(event) => setDraft((current) => ({ ...current, behaviorSettings: withGreetOnArrival(current.behaviorSettings, event.target.checked) }))}
+				/>
+				<span>Greet on arrival <span className="normal-case text-fg-3">(opens a conversation with her when a session begins)</span></span>
+			</label>
 			<div>
 				<label className={FIELD_LABEL}>Opening Message <span className="normal-case text-fg-3">(overrides the default greeting, only in this world)</span></label>
 				<textarea

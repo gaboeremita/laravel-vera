@@ -1,4 +1,4 @@
-const KEYS = ['radius', 'homeSpot', 'route', 'area', 'decisionSeconds'];
+const KEYS = ['radius', 'homeSpot', 'route', 'area', 'decisionSeconds', 'greetOnArrival'];
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const isName = (value) => typeof value === 'string' && value.trim() !== '';
@@ -39,7 +39,18 @@ export function parseBehaviorSettings(text) {
 	if (pace !== undefined && !(isObject(pace) && typeof pace.min === 'number' && typeof pace.max === 'number' && pace.min <= pace.max)) {
 		return { behaviorSettings: null, error: '"decisionSeconds" needs a "min" and a "max", in seconds' };
 	}
+	if (value.greetOnArrival !== undefined && typeof value.greetOnArrival !== 'boolean') {
+		return { behaviorSettings: null, error: '"greetOnArrival" must be true or false' };
+	}
 	return { behaviorSettings: value, error: null };
+}
+
+/** The behavior settings text with greetOnArrival switched on or off; unchanged when the text is not valid. */
+export function withGreetOnArrival(text, enabled) {
+	const { behaviorSettings, error } = parseBehaviorSettings(text);
+	if (error) return text;
+	const { greetOnArrival, ...rest } = behaviorSettings ?? {};
+	return behaviorSettingsText(enabled ? { ...rest, greetOnArrival: true } : rest);
 }
 
 export function behaviorSettingsText(behaviorSettings) {
