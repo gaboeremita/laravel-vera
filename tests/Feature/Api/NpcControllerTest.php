@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AssistantKind;
+use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
@@ -20,7 +21,7 @@ it('creates NPCs through the assistant persistence flow', function () {
         'name' => 'Station Attendant',
         'description' => 'Welcomes visitors.',
         'slug' => 'must-be-ignored',
-        'mode' => 'agent',
+        'mode' => 'assistant',
         'portrait_type' => 'image',
         'prompt' => ['identity' => ['Helpful resident']],
         'vrm' => UploadedFile::fake()->create('attendant.vrm', 100, 'application/octet-stream'),
@@ -30,7 +31,7 @@ it('creates NPCs through the assistant persistence flow', function () {
     $npc = Assistant::where('name', 'Station Attendant')->firstOrFail();
 
     expect($npc->kind)->toBe(AssistantKind::WorldNpc);
-    expect($npc->mode->value)->toBe('assistant');
+    expect($npc->mode)->toBe(AssistantMode::Agent);
     expect($npc->portrait_type)->toBe(AssistantPortraitType::Avatar3D);
     expect($npc->slug)->toStartWith('station-attendant-');
     expect($npc->slug)->not->toBe('must-be-ignored');

@@ -276,8 +276,7 @@ export class WorldCollision {
 	restorePlayerPosition(savedPosition, fallback) {
 		const coordinates = ['x', 'y', 'z'].map((axis) => savedPosition?.[axis]);
 		if (!coordinates.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate))) return fallback.clone();
-		const preferred = new Vector3(coordinates[0], coordinates[1] - PLAYER_EYE_HEIGHT, coordinates[2]);
-		return this.findSpawn(preferred) ?? fallback.clone();
+		return this.findSpawn(new Vector3(...coordinates)) ?? fallback.clone();
 	}
 
 	dispose() {

@@ -47,7 +47,6 @@ class WorldResidentController extends Controller
             'region_id' => $region->id,
             'position' => $validated['position'],
             'rotation' => $validated['rotation'] ?? null,
-            'posture' => $validated['posture'] ?? 'standing',
             'behavior' => $validated['behavior'],
             'behavior_settings' => $validated['behaviorSettings'] ?? null,
             'opening_message' => $validated['openingMessage'] ?? null,
@@ -81,14 +80,12 @@ class WorldResidentController extends Controller
                     'region_id' => $resident->region_id,
                     'position' => $resident->position,
                     'rotation' => ['y' => $resident->rotation['y'] ?? 0],
-                    'posture' => $resident->posture->value,
                 ]));
 
             $resident->update([
                 'region_id' => $region->id,
                 'position' => WorldResident::DEFAULT_POSITION,
                 'rotation' => ['x' => 0, 'y' => 0, 'z' => 0],
-                'posture' => 'standing',
                 'behavior' => 'stationary',
                 'behavior_settings' => null,
                 'zone_access' => null,

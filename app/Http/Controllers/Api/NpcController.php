@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\DeleteAssistantAssets;
 use App\Enums\AssistantKind;
+use App\Enums\AssistantMode;
 use App\Http\Controllers\Controller;
 use App\Models\Assistant;
 use Illuminate\Http\JsonResponse;
@@ -35,7 +36,7 @@ class NpcController extends Controller
     {
         $request->merge([
             'slug' => Str::slug($request->string('name')->toString()).'-'.Str::lower(Str::random(6)),
-            'mode' => 'assistant',
+            'mode' => AssistantMode::Agent->value,
             'portrait_type' => 'avatar3d',
         ]);
 
