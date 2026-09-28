@@ -48,6 +48,32 @@ class Region extends Model
         return $this->morphOne(Track::class, 'trackable');
     }
 
+    public function activityTerms(): HasMany
+    {
+        return $this->hasMany(ActivityTerms::class);
+    }
+
+    /**
+     * @return ?array<string, mixed>
+     */
+    public function layoutObject(string $objectId): ?array
+    {
+        return collect($this->layout['objects'] ?? [])->firstWhere('id', $objectId);
+    }
+
+    /**
+     * The activities an object offers across its spots, by id.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function objectActivities(string $objectId): array
+    {
+        return collect($this->layoutObject($objectId)['spots'] ?? [])
+            ->flatMap(fn (array $spot) => $spot['activities'])
+            ->keyBy('id')
+            ->all();
+    }
+
     public function passageLinks(): HasMany
     {
         return $this->hasMany(PassageLink::class);

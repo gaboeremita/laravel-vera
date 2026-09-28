@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ItemThumb from '../../ItemThumb.jsx';
 
 const ROW_HEIGHT_REM = 2.75;
 
@@ -21,7 +22,26 @@ function PostureGlyph({ posture }) {
  * The object or zone card. Pass `card` as null to close it: the last card
  * stays on screen while it animates out.
  */
-export default function InspectCard({ card, highlightedIndex, onHighlight, onChoose }) {
+function AttemptForm({ row, onSubmit, onCancel }) {
+	const [text, setText] = useState('');
+
+	return (
+		<form onSubmit={(event) => { event.preventDefault(); onSubmit(text.trim() || null); }} className="hud-enter-rise space-y-3">
+			<span className="world-hud-label">HOW DO YOU GO ABOUT IT?</span>
+			<p className="text-fg-1 text-sm">{row.name}</p>
+			<input
+				autoFocus
+				value={text}
+				onChange={(event) => setText(event.target.value)}
+				onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onCancel(); } }}
+				placeholder="Say or do something (optional)"
+				className="w-full border border-accent/40 bg-bg-0/70 px-3 py-2 text-sm text-fg-1 outline-none focus:border-accent"
+			/>
+		</form>
+	);
+}
+
+export default function InspectCard({ card, highlightedIndex, onHighlight, onChoose, attemptRow = null, onAttemptSubmit, onAttemptCancel }) {
 	const [shown, setShown] = useState(card);
 
 	if (card && card !== shown) setShown(card);
@@ -43,7 +63,9 @@ export default function InspectCard({ card, highlightedIndex, onHighlight, onCho
 			<p className="text-fg-1/85 text-sm leading-relaxed">{description}</p>
 
 			<div className="mt-4 min-h-0 overflow-y-auto">
-				{rows.length === 0 ? (
+				{attemptRow ? (
+					<AttemptForm key={attemptRow.id} row={attemptRow} onSubmit={onAttemptSubmit} onCancel={onAttemptCancel} />
+				) : rows.length === 0 ? (
 					<span className="world-hud-label italic text-fg-3">NOTHING TO DO HERE</span>
 				) : (
 					<div role="listbox" className="relative">
@@ -66,8 +88,12 @@ export default function InspectCard({ card, highlightedIndex, onHighlight, onCho
 									className={`hud-enter-rise relative flex w-full items-center gap-3 px-3 text-left transition-colors duration-[120ms] ${highlighted ? 'text-fg-1' : 'text-fg-2 hover:text-fg-1'}`}
 									style={{ height: `${ROW_HEIGHT_REM}rem`, animationDelay: `${index * 40}ms`, borderRadius: 0 }}
 								>
-									<span className={highlighted ? 'text-accent' : 'text-fg-3'}><PostureGlyph posture={row.posture} /></span>
+									{row.kind === 'take'
+										? <ItemThumb item={row.item} size="sm" className="!h-6 !w-6 !text-[0.6rem]" />
+										: <span className={highlighted ? 'text-accent' : 'text-fg-3'}><PostureGlyph posture={row.posture} /></span>}
 									<span className="flex-1 truncate text-sm tracking-[0.04em]">{row.name}</span>
+									{row.requires && <span className="world-hud-label border border-accent/30 px-1 text-fg-2" title={`Needs the ${row.requires}`}>⚿ {row.requires}</span>}
+									{row.price && <span className="world-hud-label text-accent">{row.price}</span>}
 									{row.availability && (
 										<span className={`world-hud-label ${row.taken ? 'text-warning' : highlighted ? 'text-accent' : ''}`}>{row.availability}</span>
 									)}
@@ -79,7 +105,12 @@ export default function InspectCard({ card, highlightedIndex, onHighlight, onCho
 			</div>
 
 			<div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-accent/20 pt-3">
-				{rows.length > 0 && (
+				{attemptRow ? (
+					<>
+						<span className="flex items-center gap-1"><span className="world-hud-key">ENTER</span><span className="world-hud-label">TRY</span></span>
+						<span className="flex items-center gap-1"><span className="world-hud-key">ESC</span><span className="world-hud-label">BACK</span></span>
+					</>
+				) : rows.length > 0 && (
 					<>
 						<span className="flex items-center gap-1"><span className="world-hud-key">↑ ↓</span><span className="world-hud-label">CHOOSE</span></span>
 						<span className="flex items-center gap-1"><span className="world-hud-key">ENTER</span><span className="world-hud-label">START</span></span>

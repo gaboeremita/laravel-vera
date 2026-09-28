@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AiProvider;
 use App\Models\World;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -32,6 +33,7 @@ class UpdateWorldRequest extends FormRequest
             'npcContextPrompt' => ['required', 'string'],
             'spawnRegionId' => ['nullable', 'integer', 'required_with:spawnPassageId'],
             'spawnPassageId' => ['nullable', 'string', 'required_with:spawnRegionId'],
+            'narratorModelId' => ['nullable', 'integer', Rule::exists('ai_models', 'id')->whereIn('provider_id', AiProvider::where('user_id', $this->user()->id)->pluck('id')->all())],
         ];
     }
 

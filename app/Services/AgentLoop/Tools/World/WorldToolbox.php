@@ -17,6 +17,8 @@ class WorldToolbox
      */
     private ?array $chosenAction = null;
 
+    private ?ActivityGate $activityGate = null;
+
     /**
      * @param  array<int, array<string, mixed>>  $residentZoneChain  the zone she stands in and the zones around it; empty when her position is unknown
      * @param  array<int, string>  $occupiedSpots  spot ids other residents are using
@@ -160,7 +162,28 @@ class WorldToolbox
      */
     public function spots(): array
     {
-        return collect($this->objects())->flatMap(fn (array $object) => collect($object['spots'])->map(fn (array $spot) => [...$spot, 'objectId' => $object['id'], 'objectName' => $object['name']]))->values()->all();
+        return collect($this->objects())
+            ->flatMap(fn (array $object) => collect($object['spots'])->map(fn (array $spot) => [...$spot, 'objectId' => $object['id'], 'objectName' => $object['name']]))
+            ->map(fn (array $spot) => $this->activityGate === null ? $spot : [...$spot, 'activities' => collect($spot['activities'])->filter(fn (array $activity) => $this->activityGate->canAfford($spot['objectId'], $activity['id']))->values()->all()])
+            ->filter(fn (array $spot) => $spot['activities'] !== [])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Applies activity terms to her: activities she cannot afford are left out,
+     * and using one pays its cost and takes what it gives.
+     */
+    public function withActivityGate(ActivityGate $activityGate): static
+    {
+        $this->activityGate = $activityGate;
+
+        return $this;
+    }
+
+    public function activityGate(): ?ActivityGate
+    {
+        return $this->activityGate;
     }
 
     /**

@@ -36,7 +36,7 @@ Shapes used below:
 | PUT | /worlds/{world}/regions/{region}/objects/{object}/activities/{activity}/terms | worlds.regions.activity-terms.update | the terms; 422 when the activity is not offered by that object |
 | DELETE | same | worlds.regions.activity-terms.destroy | 204 |
 
-`GET /worlds/{world}/regions/{region}` also returns `activityTerms[]` and, per layout object, `takeable: ItemEntry[]` for the current session when a `session` query parameter is given, so the world page knows which activities need a request and what an object offers.
+`GET /worlds/{world}/regions/{region}` also returns `activityTerms[]` (each with `requiredItemName`), so the world page knows which activities need a request.
 
 ### World
 
@@ -54,6 +54,7 @@ All under `/worlds/{world}/sessions/{session}`. Every response that can change t
 | POST | /handovers | worlds.sessions.handovers.store | `{ residentId, credits, items: [{ itemId, quantity }] }` | `{ line, inventory, changes }`; 422 when the player doesn't have enough |
 | POST | /handover-requests/{request}/answer | worlds.sessions.handover-requests.answer | `{ accept: bool }` | `{ status, line, inventory, changes }`; `unaffordable` when accepting fails the balance check; 409 when no longer pending |
 | POST | /conversations/{conversation}/handover-requests/cancel | worlds.sessions.conversations.handover-requests.cancel | | `204`; cancels every pending request of that conversation |
+| GET | /objects/{object}?regionId= | worlds.sessions.objects.show | | `{ takeable: ItemEntry[] }`, what the player can take from the object now |
 | POST | /objects/{object}/take | worlds.sessions.objects.take | `{ regionId, itemId }` | `{ inventory, changes }`; 422 when none is left or the item is not takeable |
 | POST | /activity-uses | worlds.sessions.activity-uses.store | `{ regionId, objectId, activityId, attempt? }` | `{ allowed, reason?, narration?, inventory, changes }` |
 | GET | /items/{item}/examine | worlds.sessions.items.examine | | `{ narration }`; 422 when the player doesn't hold it |

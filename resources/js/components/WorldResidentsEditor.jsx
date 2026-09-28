@@ -6,6 +6,7 @@ import Accordion from './common/Accordion.jsx';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
 import { parseZoneAccess } from './world/zoneAccess.js';
 import { behaviorSettingsText, parseBehaviorSettings, withGreetOnArrival } from './world/behaviorSettings.js';
+import StartingInventoryEditor from './StartingInventoryEditor.jsx';
 
 const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, behavior: 'stationary', behaviorSettings: null, openingMessage: '', customPrompt: '', zoneAccess: null };
 const ZONE_ACCESS_EXAMPLE = '{ "tags": ["deprecated"], "zones": ["mona-house"] }';
@@ -82,7 +83,7 @@ function OtherRegionRow({ candidate, regionName, onMove }) {
 	);
 }
 
-function ResidentRow({ candidate, resident, regionId, regionNames, privateZones, onAdd, onRemove, onUpdate, onMove }) {
+function ResidentRow({ candidate, resident, regionId, regionNames, privateZones, inventoryConfig, onAdd, onRemove, onUpdate, onMove }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [draft, setDraft] = useState(toDraft(resident ?? DEFAULT_PLACEMENT));
 	const [isSaving, setIsSaving] = useState(false);
@@ -167,7 +168,7 @@ function ResidentRow({ candidate, resident, regionId, regionNames, privateZones,
 				</select>
 			</div>
 			<div>
-				<label className={FIELD_LABEL}>Behavior Settings <span className="normal-case text-fg-3">(JSON: homeSpot, route stops, the area she keeps to, decisionSeconds)</span></label>
+				<label className={FIELD_LABEL}>Behavior Settings <span className="normal-case text-fg-3">(JSON: homeSpot, route stops, the area they keep to, decisionSeconds)</span></label>
 				<textarea
 					value={draft.behaviorSettings}
 					onChange={(event) => setDraft((current) => ({ ...current, behaviorSettings: event.target.value }))}
@@ -185,7 +186,7 @@ function ResidentRow({ candidate, resident, regionId, regionNames, privateZones,
 					disabled={behaviorSettingsError !== null}
 					onChange={(event) => setDraft((current) => ({ ...current, behaviorSettings: withGreetOnArrival(current.behaviorSettings, event.target.checked) }))}
 				/>
-				<span>Greet on arrival <span className="normal-case text-fg-3">(opens a conversation with her when a session begins)</span></span>
+				<span>Greet on arrival <span className="normal-case text-fg-3">(opens a conversation when a session begins)</span></span>
 			</label>
 			<div>
 				<label className={FIELD_LABEL}>Opening Message <span className="normal-case text-fg-3">(overrides the default greeting, only in this world)</span></label>
@@ -206,7 +207,7 @@ function ResidentRow({ candidate, resident, regionId, regionNames, privateZones,
 				/>
 			</div>
 			<div>
-				<label className={FIELD_LABEL}>Zone Access <span className="normal-case text-fg-3">(JSON: the groups she belongs to and the private places she may enter on her own)</span></label>
+				<label className={FIELD_LABEL}>Zone Access <span className="normal-case text-fg-3">(JSON: the groups they belong to and the private places they may enter on their own)</span></label>
 				<textarea
 					value={draft.zoneAccess}
 					onChange={(event) => setDraft((current) => ({ ...current, zoneAccess: event.target.value }))}
@@ -234,11 +235,25 @@ function ResidentRow({ candidate, resident, regionId, regionNames, privateZones,
 					{isSaving ? 'SAVING...' : 'SAVE'}
 				</button>
 			</div>
+			{inventoryConfig && (
+				<div className="border-t border-line-1 pt-4">
+					<p className="text-fg-3 text-[0.65rem] tracking-[0.15em] mb-3">STARTING INVENTORY <span className="normal-case tracking-normal">— items marked for sale make them a vendor</span></p>
+					<StartingInventoryEditor
+						items={inventoryConfig.items}
+						value={inventoryConfig.starting.residents[resident.id]}
+						allowUnlimited
+						flag="forSale"
+						flagLabel="For sale"
+						saveLabel="SAVE STARTING INVENTORY"
+						onSave={(draft) => inventoryConfig.saveStarting('worlds.starting-inventories.residents.update', { resident: resident.id }, draft, (current, saved) => ({ ...current, residents: { ...current.residents, [resident.id]: saved } }))}
+					/>
+				</div>
+			)}
 		</Accordion>
 	);
 }
 
-function KindList({ label, candidates, residentsByAssistantId, regionId, regionNames, privateZones, onAdd, onRemove, onUpdate, onMove }) {
+function KindList({ label, candidates, residentsByAssistantId, regionId, regionNames, privateZones, inventoryConfig, onAdd, onRemove, onUpdate, onMove }) {
 	const rows = candidates.filter((candidate) => isEligible(candidate) || residentsByAssistantId.has(candidate.id));
 	if (rows.length === 0) return null;
 
@@ -254,6 +269,7 @@ function KindList({ label, candidates, residentsByAssistantId, regionId, regionN
 						regionId={regionId}
 						regionNames={regionNames}
 						privateZones={privateZones}
+						inventoryConfig={inventoryConfig}
 						onAdd={onAdd}
 						onRemove={onRemove}
 						onUpdate={onUpdate}
@@ -265,7 +281,7 @@ function KindList({ label, candidates, residentsByAssistantId, regionId, regionN
 	);
 }
 
-export default function WorldResidentsEditor({ worldId, region, residents, regionNames, onResidentsChange, addToast }) {
+export default function WorldResidentsEditor({ worldId, region, residents, regionNames, inventoryConfig, onResidentsChange, addToast }) {
 	const [assistantCandidates, setAssistantCandidates] = useState([]);
 	const [npcCandidates, setNpcCandidates] = useState([]);
 	const [collapsed, setCollapsed] = useState(false);
@@ -324,8 +340,8 @@ export default function WorldResidentsEditor({ worldId, region, residents, regio
 					<p className="text-fg-3 text-xs">Loading eligible characters...</p>
 				) : (
 					<>
-						<KindList label="Assistants" candidates={assistantCandidates} residentsByAssistantId={residentsByAssistantId} regionId={region.id} regionNames={regionNames} privateZones={privateZones} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} onMove={moveResident} />
-						<KindList label="NPCs" candidates={npcCandidates} residentsByAssistantId={residentsByAssistantId} regionId={region.id} regionNames={regionNames} privateZones={privateZones} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} onMove={moveResident} />
+						<KindList label="Assistants" candidates={assistantCandidates} residentsByAssistantId={residentsByAssistantId} regionId={region.id} regionNames={regionNames} privateZones={privateZones} inventoryConfig={inventoryConfig} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} onMove={moveResident} />
+						<KindList label="NPCs" candidates={npcCandidates} residentsByAssistantId={residentsByAssistantId} regionId={region.id} regionNames={regionNames} privateZones={privateZones} inventoryConfig={inventoryConfig} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} onMove={moveResident} />
 					</>
 				)}
 			</div>

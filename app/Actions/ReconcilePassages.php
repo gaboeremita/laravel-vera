@@ -2,7 +2,10 @@
 
 namespace App\Actions;
 
+use App\Models\ActivityTerms;
+use App\Models\Inventory;
 use App\Models\Region;
+use App\Models\StartingInventory;
 
 class ReconcilePassages
 {
@@ -10,7 +13,7 @@ class ReconcilePassages
 
     /**
      * Drops the links and the world's spawn point that refer to passages the
-     * region's layout no longer has.
+     * region's layout no longer has, and what was configured on objects it no longer has.
      *
      * @return array<int, string> the ids of passages whose link was removed
      */
@@ -28,6 +31,23 @@ class ReconcilePassages
             $world->update(['spawn_region_id' => null, 'spawn_passage_id' => null]);
         }
 
+        $this->dropVanishedObjects($region);
+
         return $removed;
+    }
+
+    /**
+     * Drops the starting inventories, session inventories and activity terms of
+     * objects, or activities of an object, the layout no longer has.
+     */
+    private function dropVanishedObjects(Region $region): void
+    {
+        $objectIds = collect($region->layout['objects'] ?? [])->pluck('id')->all();
+
+        StartingInventory::where('region_id', $region->id)->whereNotIn('object_id', $objectIds)->delete();
+        Inventory::where('region_id', $region->id)->whereNotIn('object_id', $objectIds)->delete();
+        $region->activityTerms()->get()
+            ->reject(fn (ActivityTerms $terms) => array_key_exists($terms->activity_id, $region->objectActivities($terms->object_id)))
+            ->each->delete();
     }
 }

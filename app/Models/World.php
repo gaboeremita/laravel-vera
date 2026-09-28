@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['name', 'slug', 'description', 'assistant_context_prompt', 'npc_context_prompt', 'spawn_region_id', 'spawn_passage_id'])]
+#[Fillable(['name', 'slug', 'description', 'assistant_context_prompt', 'npc_context_prompt', 'spawn_region_id', 'spawn_passage_id', 'narrator_model_id'])]
 class World extends Model
 {
     /** @use HasFactory<WorldFactory> */
@@ -38,6 +38,21 @@ class World extends Model
     public function residents(): HasMany
     {
         return $this->hasMany(WorldResident::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(Item::class);
+    }
+
+    public function startingInventories(): HasMany
+    {
+        return $this->hasMany(StartingInventory::class);
+    }
+
+    public function narratorModel(): BelongsTo
+    {
+        return $this->belongsTo(AiModel::class, 'narrator_model_id');
     }
 
     public function spawnRegion(): BelongsTo

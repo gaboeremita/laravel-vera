@@ -2,6 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\BuildInventoryPrompt;
+use App\Actions\ResolveInventory;
+use App\Models\Inventory;
+use App\Services\AgentLoop\Tools\World\ActivityGate;
+use App\Services\AgentLoop\Tools\World\AskForTool;
+use App\Services\AgentLoop\Tools\World\GiveTool;
 use App\Actions\AppendExpressionTags;
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
@@ -363,6 +369,19 @@ class ConversationController extends Controller
 
         $director->withLongTermMemory($conversation);
 
+        $playerInventory = null;
+        $residentInventory = null;
+        if ($worldSession !== null) {
+            $inventoryResident = $world->residents()->where('assistant_id', $assistantModel->id)->first();
+            if ($inventoryResident !== null) {
+                $playerInventory = app(ResolveInventory::class)->forPlayer($worldSession);
+                $residentInventory = app(ResolveInventory::class)->forResident($worldSession, $inventoryResident);
+                $director->append('inventory', app(BuildInventoryPrompt::class)->handle($residentInventory));
+            }
+        }
+        $playerBefore = $playerInventory?->summary();
+        $askForTool = null;
+
         $systemPrompt = $director->build();
 
         $tts = $voiceModel ? (new TtsManager)->fromModel($voiceModel) : null;
@@ -412,7 +431,15 @@ class ConversationController extends Controller
                     residentPoint: $residentPoint,
                     staysAtPost: $resident->staysAtPost(),
                 );
+                if ($residentInventory !== null) {
+                    $worldToolbox->withActivityGate(new ActivityGate($worldSession, $region, $residentInventory, $assistantModel->name));
+                }
                 $tools = [...$tools, ...$worldToolbox->tools()];
+            }
+
+            if ($residentInventory !== null && $aiModel?->supports_tools) {
+                $askForTool = new AskForTool($residentInventory, $conversation);
+                $tools = [...$tools, new GiveTool($residentInventory, $playerInventory, 'the user'), $askForTool];
             }
 
             if ($tools !== []) {
@@ -491,6 +518,8 @@ class ConversationController extends Controller
             'audioBase64' => $audioBase64,
             'audioContentType' => $audioContentType,
             'audioError' => $audioError,
+            ...($playerInventory !== null ? ['inventory' => $playerAfter = $playerInventory->summary(), 'changes' => Inventory::changesBetween($playerBefore, $playerAfter)] : []),
+            ...($askForTool?->request !== null ? ['handoverRequest' => $askForTool->request->toPayload($playerInventory)] : []),
         ]);
     }
 

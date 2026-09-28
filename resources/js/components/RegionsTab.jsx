@@ -7,6 +7,7 @@ import RegionPassagesEditor from './RegionPassagesEditor.jsx';
 import WorldImagesEditor from './WorldImagesEditor.jsx';
 import WorldTrackEditor from './WorldTrackEditor.jsx';
 import WorldResidentsEditor from './WorldResidentsEditor.jsx';
+import RegionObjectsEditor from './RegionObjectsEditor.jsx';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
 
 const NEW_REGION = { name: '', slug: '', description: '', assistantContextPrompt: '', npcContextPrompt: '', settings: { theme: 'default' } };
@@ -15,7 +16,7 @@ function hasWarning(region) {
 	return region.warnings.noPassages || region.warnings.unlinkedPassages > 0;
 }
 
-function RegionEditor({ world, regionId, onSaved, onDeleted, onWorldReload, onResidentsChange, addToast }) {
+function RegionEditor({ world, inventoryConfig, regionId, onSaved, onDeleted, onWorldReload, onResidentsChange, addToast }) {
 	const [value, setValue] = useState(regionId === null ? NEW_REGION : null);
 	const [environment, setEnvironment] = useState(null);
 	const [isSaving, setIsSaving] = useState(false);
@@ -33,6 +34,13 @@ function RegionEditor({ world, regionId, onSaved, onDeleted, onWorldReload, onRe
 		void load();
 		return () => { active = false; };
 	}, [addToast, regionId, world.id]);
+
+	const reloadTerms = async () => {
+		const response = await api.get(route('worlds.regions.show', { world: world.id, region: regionId }));
+		if (!response.ok) return addToast('Failed to reload region', 'error');
+		const region = await response.json();
+		setValue((current) => ({ ...current, activityTerms: region.activityTerms }));
+	};
 
 	const save = async () => {
 		setIsSaving(true);
@@ -90,7 +98,8 @@ function RegionEditor({ world, regionId, onSaved, onDeleted, onWorldReload, onRe
 				{regionId !== null && (
 					<>
 						<RegionPassagesEditor worldId={world.id} region={value} regions={world.regions} spawn={spawn} onLinksChange={onWorldReload} addToast={addToast} />
-						<WorldResidentsEditor worldId={world.id} region={value} residents={world.residents} regionNames={regionNames} onResidentsChange={onResidentsChange} addToast={addToast} />
+						{inventoryConfig && <RegionObjectsEditor worldId={world.id} region={value} inventoryConfig={inventoryConfig} onTermsChange={reloadTerms} addToast={addToast} />}
+						<WorldResidentsEditor worldId={world.id} region={value} residents={world.residents} regionNames={regionNames} inventoryConfig={inventoryConfig} onResidentsChange={onResidentsChange} addToast={addToast} />
 					</>
 				)}
 			</RegionForm>
@@ -106,7 +115,7 @@ function RegionEditor({ world, regionId, onSaved, onDeleted, onWorldReload, onRe
 	);
 }
 
-export default function RegionsTab({ world, onWorldReload, onResidentsChange, addToast }) {
+export default function RegionsTab({ world, inventoryConfig, onWorldReload, onResidentsChange, addToast }) {
 	const [selectedId, setSelectedId] = useState(world.regions[0]?.id ?? null);
 
 	const selectSaved = async (regionId) => {
@@ -140,7 +149,7 @@ export default function RegionsTab({ world, onWorldReload, onResidentsChange, ad
 					+ ADD REGION
 				</button>
 			</div>
-			<RegionEditor key={selectedId ?? 'new'} world={world} regionId={selectedId} onSaved={selectSaved} onDeleted={afterDelete} onWorldReload={onWorldReload} onResidentsChange={onResidentsChange} addToast={addToast} />
+			<RegionEditor key={selectedId ?? 'new'} world={world} inventoryConfig={inventoryConfig} regionId={selectedId} onSaved={selectSaved} onDeleted={afterDelete} onWorldReload={onWorldReload} onResidentsChange={onResidentsChange} addToast={addToast} />
 		</div>
 	);
 }

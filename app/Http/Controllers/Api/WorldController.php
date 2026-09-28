@@ -60,6 +60,7 @@ class WorldController extends Controller
             'npc_context_prompt' => $validated['npcContextPrompt'],
             'spawn_region_id' => $validated['spawnRegionId'] ?? null,
             'spawn_passage_id' => $validated['spawnPassageId'] ?? null,
+            'narrator_model_id' => $validated['narratorModelId'] ?? null,
         ]);
 
         return $this->show($world->fresh());

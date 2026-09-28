@@ -35,6 +35,21 @@ class WorldSession extends Model
         return $this->hasMany(WorldSessionResident::class);
     }
 
+    public function inventories(): HasMany
+    {
+        return $this->hasMany(Inventory::class);
+    }
+
+    public function creditTransactions(): HasMany
+    {
+        return $this->hasMany(CreditTransaction::class);
+    }
+
+    public function handoverRequests(): HasMany
+    {
+        return $this->hasMany(HandoverRequest::class);
+    }
+
     public function region(): BelongsTo
     {
         return $this->belongsTo(Region::class);

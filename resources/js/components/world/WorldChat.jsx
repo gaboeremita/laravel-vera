@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff } from 'lucide-react';
+import { Gift, Mic, MicOff } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { api } from '../../utils/api.js';
 import { useEmotions } from '../../hooks/useEmotions.js';
@@ -10,8 +10,10 @@ import { isTypingTarget } from './keyboardFocus.js';
 import { joinLines } from './activityLines.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
+import GivePanel from './GivePanel.jsx';
+import GoodsStrip from './GoodsStrip.jsx';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getResidentState, getUserState, getOccupiedSpots, getStackedSpots, onVoiceAudio, onSilentReply, onAction, actionSender: actionSenderRef }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getResidentState, getUserState, getOccupiedSpots, getStackedSpots, onVoiceAudio, onSilentReply, onAction, actionSender: actionSenderRef, inventory, onInventory, onHandoverRequest }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
 	const [pendingImage, setPendingImage] = useState(null);
@@ -26,6 +28,59 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 	const { portraitType, fetchEmotions } = useEmotions();
 	const poseNames = [...new Set((resident.assistant.poses ?? []).map((pose) => pose.name))];
 	const { theme, setTheme } = useTheme();
+	const [isGiveOpen, setIsGiveOpen] = useState(false);
+	const [isGiving, setIsGiving] = useState(false);
+	const [goods, setGoods] = useState([]);
+	const [goodsVersion, setGoodsVersion] = useState(0);
+	const conversationIdRef = useRef(null);
+	const queueLine = (line) => {
+		queuedLines.current.push(line);
+		setQueueVersion((version) => version + 1);
+	};
+
+	useEffect(() => {
+		conversationIdRef.current = conversationId;
+	}, [conversationId]);
+
+	useEffect(() => () => {
+		if (!worldSessionId || !conversationIdRef.current) return;
+		void api.post(route('worlds.sessions.conversations.handover-requests.cancel', { world: world.id, session: worldSessionId, conversation: conversationIdRef.current }))
+			.then((response) => { if (!response.ok) throw new Error(); })
+			.catch(() => addToast('Unable to withdraw the unanswered request', 'error'));
+	}, []);
+
+	useEffect(() => {
+		if (!worldSessionId) return undefined;
+		let active = true;
+		const loadGoods = async () => {
+			try {
+				const response = await api.get(route('worlds.sessions.residents.goods.index', { world: world.id, session: worldSessionId, resident: resident.id }));
+				if (!response.ok) throw new Error();
+				const loaded = await response.json();
+				if (active) setGoods(loaded);
+			} catch {
+				if (active) addToast(`Unable to see what ${resident.assistant.name} sells`, 'error');
+			}
+		};
+		void loadGoods();
+		return () => { active = false; };
+	}, [world.id, worldSessionId, resident.id, resident.assistant.name, goodsVersion, addToast]);
+
+	const give = async ({ credits, items }) => {
+		setIsGiving(true);
+		try {
+			const response = await api.post(route('worlds.sessions.handovers.store', { world: world.id, session: worldSessionId }), { residentId: resident.id, credits, items });
+			const body = await response.json();
+			if (!response.ok) throw new Error(body.message);
+			onInventory?.(body.inventory);
+			setIsGiveOpen(false);
+			queueLine(body.line);
+		} catch (error) {
+			addToast(error.message || 'Unable to hand that over', 'error');
+		} finally {
+			setIsGiving(false);
+		}
+	};
 
 	useEffect(() => {
 		const worldTheme = world.settings?.theme;
@@ -98,6 +153,11 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		fetchEmotions,
 		onVoiceReply: (text, ttsInstructions) => { void speakReply(text, ttsInstructions); },
 		onAction,
+		onResponse: (data) => {
+			if (data.inventory) onInventory?.(data.inventory);
+			if (data.handoverRequest) onHandoverRequest?.(data.handoverRequest);
+			if (goods.length > 0 || data.changes?.items?.length) setGoodsVersion((version) => version + 1);
+		},
 		extraParams: worldSessionId && getPositions
 			? { worldId: world.id, regionId: world.regionId, worldSessionId, get positions() { return getPositions(); }, get residentPosture() { return getResidentPosture(resident.id); }, get residentState() { return getResidentState?.(resident.id) ?? null; }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; }, get stackedSpots() { return getStackedSpots?.() ?? []; } }
 			: { worldId: world.id, regionId: world.regionId, get residentPosture() { return getResidentPosture(resident.id); }, get residentState() { return getResidentState?.(resident.id) ?? null; }, get userState() { return getUserState?.() ?? null; }, get occupiedSpots() { return getOccupiedSpots?.(resident.id) ?? []; }, get stackedSpots() { return getStackedSpots?.() ?? []; } },
@@ -150,10 +210,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 
 	useEffect(() => {
 		if (!actionSenderRef) return undefined;
-		actionSenderRef.current = (line) => {
-			queuedLines.current.push(line);
-			setQueueVersion((version) => version + 1);
-		};
+		actionSenderRef.current = (line) => queueLine(line);
 		return () => { actionSenderRef.current = null; };
 	}, [actionSenderRef]);
 
@@ -218,17 +275,24 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 				</div>
 				<div className="flex items-center gap-3">
 					{voiceStatus && <span className="text-accent text-[0.6rem] tracking-[0.12em]">{voiceStatus}</span>}
+					{worldSessionId && (
+						<button type="button" onClick={() => setIsGiveOpen((open) => !open)} title={`Give ${resident.assistant.name} credits or items`} aria-pressed={isGiveOpen} className={`cursor-pointer transition-colors ${isGiveOpen ? 'text-accent' : 'text-fg-3 hover:text-fg-1'}`}>
+							<Gift size={16} />
+						</button>
+					)}
 					<button type="button" onClick={isListening ? stopVoiceMode : startVoiceMode} title={isListening ? 'Turn voice mode off (V)' : 'Turn voice mode on (V)'} className={`cursor-pointer ${isListening ? 'text-accent' : 'text-fg-3 hover:text-fg-1'}`}>
 						{isListening ? <Mic size={16} /> : <MicOff size={16} />}
 					</button>
 					<button type="button" onClick={onClose} className="text-fg-3 text-xs hover:text-fg-1 cursor-pointer">END (C)</button>
 				</div>
 			</header>
+			<GoodsStrip goods={goods} />
 			<div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4 custom-scrollbar">
 				{messages.map((msg) => (
 					<ChatMessage key={msg.id} msg={msg} assistantName={resident.assistant.name} />
 				))}
 			</div>
+			{isGiveOpen && <GivePanel inventory={inventory} recipientName={resident.assistant.name} isGiving={isGiving} onGive={give} onClose={() => setIsGiveOpen(false)} />}
 			{pendingImage && (
 				<div className="flex items-center gap-2 border-t border-line-1 px-3 py-2">
 					<img src={pendingImage} alt="Pending upload" className="h-16 w-16 object-cover rounded border border-line-1" />

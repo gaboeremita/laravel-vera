@@ -7,6 +7,9 @@ import WorldForm from '../components/WorldForm.jsx';
 import RegionsTab from '../components/RegionsTab.jsx';
 import WorldImagesEditor from '../components/WorldImagesEditor.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
+import ItemsEditor from '../components/ItemsEditor.jsx';
+import StartingInventoryEditor from '../components/StartingInventoryEditor.jsx';
+import useWorldInventoryConfig from '../hooks/useWorldInventoryConfig.js';
 
 const TABS = [{ id: 'world', label: 'WORLD' }, { id: 'regions', label: 'REGIONS' }];
 
@@ -22,6 +25,7 @@ export default function EditWorldPage() {
 	const [tab, setTab] = useState('world');
 	const [isSaving, setIsSaving] = useState(false);
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
+	const inventoryConfig = useWorldInventoryConfig(worldId, addToast);
 
 	const fetchWorld = useCallback(async () => {
 		const response = await api.get(route('worlds.show', { world: worldId }));
@@ -53,7 +57,7 @@ export default function EditWorldPage() {
 			const response = await api.patch(route('worlds.update', { world: worldId }), {
 				name: value.name, slug: value.slug, description: value.description,
 				assistantContextPrompt: value.assistantContextPrompt, npcContextPrompt: value.npcContextPrompt,
-				spawnRegionId: value.spawnRegionId, spawnPassageId: value.spawnPassageId,
+				spawnRegionId: value.spawnRegionId, spawnPassageId: value.spawnPassageId, narratorModelId: value.narratorModelId ?? null,
 			});
 			const saved = await response.json();
 			if (!response.ok) throw new Error(saved.message);
@@ -92,12 +96,22 @@ export default function EditWorldPage() {
 						value={value}
 						onChange={setValue}
 						regions={value.regions}
+						itemsEditor={<ItemsEditor worldId={value.id} items={inventoryConfig.items} onItemsChange={inventoryConfig.reloadItems} addToast={addToast} />}
+						playerInventoryEditor={
+							<StartingInventoryEditor
+								items={inventoryConfig.items}
+								value={inventoryConfig.starting.player}
+								allowUnlimited={false}
+								saveLabel="SAVE STARTING INVENTORY"
+								onSave={(draft) => inventoryConfig.saveStarting('worlds.starting-inventories.player.update', {}, draft, (current, saved) => ({ ...current, player: saved }))}
+							/>
+						}
 						imagesEditor={<WorldImagesEditor routePrefix="worlds.image" routeParams={{ world: value.id }} cardImageUrl={value.cardImageUrl} portraitImageUrl={value.portraitImageUrl} addToast={addToast} />}
 						isSaving={isSaving}
 						onSubmit={save}
 					/>
 				) : (
-					<RegionsTab world={value} onWorldReload={reloadWorld} onResidentsChange={setResidents} addToast={addToast} />
+					<RegionsTab world={value} inventoryConfig={inventoryConfig} onWorldReload={reloadWorld} onResidentsChange={setResidents} addToast={addToast} />
 				)}
 			</div>
 			{confirmingDelete && <ConfirmationModal title="Delete world" message={`Delete "${value.name}"? Its regions, environment assets, resident placements and sessions will be removed. Assistants and NPCs will not be affected.`} options={[{ label: 'DELETE', value: 'confirm', destructive: true }, { label: 'CANCEL', value: 'cancel', cancel: true }]} onSelect={(selected) => { if (selected === 'confirm') handleDelete(); else setConfirmingDelete(false); }} />}

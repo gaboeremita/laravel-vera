@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\StockSession;
+use App\Enums\HandoverRequestStatus;
 use App\Actions\TravelThroughPassage;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TravelRequest;
@@ -11,6 +13,7 @@ use App\Models\WorldSessionResident;
 use App\Traits\ResolvesWorldUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class WorldSessionController extends Controller
@@ -48,12 +51,17 @@ class WorldSessionController extends Controller
         return response()->json($sessions);
     }
 
-    public function store(Request $request, int $world): JsonResponse
+    public function store(Request $request, int $world, StockSession $stockSession): JsonResponse
     {
         $worldUser = $this->resolveWorldUser($request, $world);
         $spawn = $this->requireSpawn($worldUser->world);
 
-        $session = $worldUser->sessions()->create(['title' => 'New session', 'region_id' => $worldUser->world->spawn_region_id, 'position' => $spawn['arrival'], 'arrival_facing' => $spawn['facing']]);
+        $session = DB::transaction(function () use ($worldUser, $spawn, $stockSession): WorldSession {
+            $session = $worldUser->sessions()->create(['title' => 'New session', 'region_id' => $worldUser->world->spawn_region_id, 'position' => $spawn['arrival'], 'arrival_facing' => $spawn['facing']]);
+            $stockSession->handle($session);
+
+            return $session;
+        });
 
         return response()->json($session, 201);
     }
@@ -65,6 +73,7 @@ class WorldSessionController extends Controller
     {
         $worldUser = $this->resolveWorldUser($request, $world);
         $worldSession = $worldUser->sessions()->findOrFail($session);
+        $worldSession->handoverRequests()->where('status', HandoverRequestStatus::Pending)->update(['status' => HandoverRequestStatus::Cancelled, 'answered_at' => now()]);
 
         if ($worldSession->region_id === null) {
             $spawn = $this->requireSpawn($worldUser->world);
