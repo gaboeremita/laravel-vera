@@ -6,6 +6,8 @@ export function modelYaw(metaVersion) {
 	return metaVersion === '0' ? 0 : Math.PI;
 }
 
+const ANGLE_EPSILON = 1e-9;
+
 /**
  * A resident's body faces local -Z once modelYaw() has turned her model. This
  * converts horizontal travel into the rotation that puts that front in the
@@ -15,7 +17,8 @@ export function facingAngleForMovement(dx, dz) {
 	if (dx === 0 && dz === 0) return null;
 
 	const angle = Math.atan2(-dx, -dz);
-	if (Object.is(angle, -0)) return 0;
+	// Directions from sin/cos of a spot's facing carry rounding error, which would wrap a tiny negative angle to 2π.
+	if (Math.abs(angle) < ANGLE_EPSILON) return 0;
 
 	return angle < 0 ? angle + Math.PI * 2 : angle;
 }

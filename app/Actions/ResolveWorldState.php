@@ -2,7 +2,7 @@
 
 namespace App\Actions;
 
-use App\Models\World;
+use App\Models\Region;
 
 class ResolveWorldState
 {
@@ -12,9 +12,9 @@ class ResolveWorldState
      * @param  array{user?: array{x: float, y: float, z: float}, residents?: array<int|string, array{x: float, y: float, z: float}>}  $positions
      * @return array{user: ?array{floor: ?array, zone: ?array, zoneChain: array<int, array>}, residents: array<int|string, array{floor: ?array, zone: ?array, zoneChain: array<int, array>, distanceToUser: ?float}>}
      */
-    public function handle(World $world, array $positions): array
+    public function handle(Region $region, array $positions): array
     {
-        $layout = $world->layout ?? [];
+        $layout = $region->layout ?? [];
         $user = isset($positions['user']) ? $this->locate($layout, $positions['user']) : null;
 
         $residents = [];

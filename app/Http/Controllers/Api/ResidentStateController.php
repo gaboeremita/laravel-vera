@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\ResolveResidentRegion;
 use App\Enums\Posture;
 use App\Http\Controllers\Controller;
 use App\Models\WorldSessionResident;
@@ -14,11 +15,12 @@ class ResidentStateController extends Controller
 {
     use ResolvesWorldUser;
 
-    public function update(Request $request, int $world, int $session, int $resident): Response
+    public function update(Request $request, int $world, int $session, int $resident, ResolveResidentRegion $resolveResidentRegion): Response
     {
         $worldUser = $this->resolveWorldUser($request, $world);
         $worldSession = $worldUser->sessions()->findOrFail($session);
         $worldResident = $worldUser->world->residents()->findOrFail($resident);
+        $region = $resolveResidentRegion->inCurrentRegion($worldSession, $worldResident);
 
         $validated = $request->validate([
             'position' => ['required', 'array:x,y,z'],
@@ -35,6 +37,7 @@ class ResidentStateController extends Controller
         WorldSessionResident::updateOrCreate(
             ['world_session_id' => $worldSession->id, 'world_resident_id' => $worldResident->id],
             [
+                'region_id' => $region->id,
                 'position' => $validated['position'],
                 'rotation' => $validated['rotation'] ?? null,
                 'spot_id' => $validated['spotId'] ?? null,

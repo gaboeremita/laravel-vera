@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Region;
 use App\Models\User;
 use App\Models\World;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -66,10 +67,10 @@ function penthouseMarkerNodes(): array
 it('imports floors, zones, objects and spots in world space from an uploaded environment', function () {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb(penthouseMarkerNodes())));
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment(buildTestGlb(penthouseMarkerNodes())));
 
     $response->assertCreated()->assertJsonPath('layoutWarnings', []);
-    $layout = World::findOrFail($response->json('id'))->layout;
+    $layout = Region::findOrFail($response->json('id'))->layout;
 
     expect($layout['floors'])->toBe([['id' => 'ground', 'name' => 'Ground floor', 'minY' => -2, 'maxY' => 4]]);
 
@@ -109,10 +110,10 @@ it('imports how many bodies a spot holds', function () {
     $nodes = penthouseMarkerNodes();
     $nodes[5]['extras']['vera']['capacity'] = 2;
 
-    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment(buildTestGlb($nodes)));
 
     $response->assertCreated()->assertJsonPath('layoutWarnings', []);
-    expect(World::findOrFail($response->json('id'))->layout['objects'][0]['spots'][0]['capacity'])->toBe(2);
+    expect(Region::findOrFail($response->json('id'))->layout['objects'][0]['spots'][0]['capacity'])->toBe(2);
 });
 
 it('falls back to one body with a warning for an invalid spot capacity', function (mixed $capacity) {
@@ -120,10 +121,10 @@ it('falls back to one body with a warning for an invalid spot capacity', functio
     $nodes = penthouseMarkerNodes();
     $nodes[5]['extras']['vera']['capacity'] = $capacity;
 
-    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment(buildTestGlb($nodes)));
 
     $response->assertCreated()->assertJsonPath('layoutWarnings.0.reason', 'spot capacity must be a whole number of at least 1');
-    expect(World::findOrFail($response->json('id'))->layout['objects'][0]['spots'][0]['capacity'])->toBe(1);
+    expect(Region::findOrFail($response->json('id'))->layout['objects'][0]['spots'][0]['capacity'])->toBe(1);
 })->with([
     'zero' => [0],
     'fraction' => [1.5],
@@ -145,10 +146,10 @@ it('imports nested zones and custom outlines', function () {
         3 => markerNode('Zone.Booth.Entry', ['type' => 'entry']),
     ];
 
-    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment(buildTestGlb($nodes)));
 
     $response->assertCreated()->assertJsonPath('layoutWarnings', []);
-    $booth = collect(World::findOrFail($response->json('id'))->layout['zones'])->firstWhere('id', 'vocal-booth');
+    $booth = collect(Region::findOrFail($response->json('id'))->layout['zones'])->firstWhere('id', 'vocal-booth');
     expect($booth['parentId'])->toBe('music-studio')
         ->and($booth['private'])->toBeTrue()
         ->and($booth['floorId'])->toBeNull()
@@ -157,15 +158,15 @@ it('imports nested zones and custom outlines', function () {
 
 it('replaces the layout when the environment is replaced and keeps it otherwise', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->withLayout()->create(['slug' => 'lua-penthouse']);
+    $world = Region::factory()->forUser($user)->withLayout()->create(['slug' => 'lua-penthouse']);
 
     $payload = worldPayloadWithEnvironment(buildTestGlb(penthouseMarkerNodes()));
     unset($payload['environment']);
-    $this->actingAs($user)->withHeader('Accept', 'application/json')->put(route('worlds.update', $world), $payload)->assertSuccessful();
+    $this->actingAs($user)->withHeader('Accept', 'application/json')->patch(route('worlds.regions.update', [$world->world_id, $world]), $payload)->assertSuccessful();
     expect(collect($world->fresh()->layout['zones'])->pluck('id')->all())->toBe(['studio', 'vocal-booth', 'pool-terrace', 'gallery']);
 
     $this->actingAs($user)->withHeader('Accept', 'application/json')
-        ->put(route('worlds.update', $world), worldPayloadWithEnvironment(buildTestGlb(penthouseMarkerNodes())))
+        ->patch(route('worlds.regions.update', [$world->world_id, $world]), worldPayloadWithEnvironment(buildTestGlb(penthouseMarkerNodes())))
         ->assertSuccessful()
         ->assertJsonPath('layoutWarnings', []);
     expect(collect($world->fresh()->layout['zones'])->pluck('id')->all())->toBe(['pool-terrace']);
@@ -174,30 +175,30 @@ it('replaces the layout when the environment is replaced and keeps it otherwise'
 it('stores an empty layout for an environment without markers', function () {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb([['name' => 'Floor mesh']])));
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment(buildTestGlb([['name' => 'Floor mesh']])));
 
     $response->assertCreated()->assertJsonPath('layoutWarnings', []);
-    expect(World::findOrFail($response->json('id'))->layout)->toBe(['floors' => [], 'zones' => [], 'objects' => []]);
+    expect(Region::findOrFail($response->json('id'))->layout)->toBe(['floors' => [], 'zones' => [], 'objects' => [], 'passages' => []]);
 });
 
 it('reports a file that is not a valid GLB and stores an empty layout', function () {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment('not a glb file'));
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment('not a glb file'));
 
     $response->assertCreated()->assertJsonPath('layoutWarnings.0.reason', 'The environment file is not a valid GLB, so no markers were read.');
-    expect(World::findOrFail($response->json('id'))->layout)->toBe(['floors' => [], 'zones' => [], 'objects' => []]);
+    expect(Region::findOrFail($response->json('id'))->layout)->toBe(['floors' => [], 'zones' => [], 'objects' => [], 'passages' => []]);
 });
 
 it('skips invalid markers with a warning while importing the valid ones', function (array $invalidNodes, string $expectedReason) {
     $user = User::factory()->create();
     $nodes = [...penthouseMarkerNodes(), ...$invalidNodes];
 
-    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment(buildTestGlb($nodes)));
 
     $response->assertCreated();
     expect(collect($response->json('layoutWarnings'))->pluck('reason')->implode(' | '))->toContain($expectedReason);
-    $layout = World::findOrFail($response->json('id'))->layout;
+    $layout = Region::findOrFail($response->json('id'))->layout;
     expect(collect($layout['zones'])->pluck('id'))->toContain('pool-terrace');
     expect(collect($layout['objects'])->pluck('id'))->toContain('pool-lounger-1');
 })->with([
@@ -226,10 +227,10 @@ it('imports secret zones and the groups they let in', function () {
         1 => markerNode('Zone.Hideout.Entry', ['type' => 'entry']),
     ];
 
-    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment(buildTestGlb($nodes)));
 
     $response->assertCreated()->assertJsonPath('layoutWarnings', []);
-    $zone = World::findOrFail($response->json('id'))->layout['zones'][0];
+    $zone = Region::findOrFail($response->json('id'))->layout['zones'][0];
     expect($zone['private'])->toBeTrue()
         ->and($zone['secret'])->toBeTrue()
         ->and($zone['accessTags'])->toBe(['deprecated', 'forks']);
@@ -245,8 +246,51 @@ it('warns about access that is not a list of tags', function () {
         1 => markerNode('Zone.House.Entry', ['type' => 'entry']),
     ];
 
-    $response = $this->actingAs($user)->postJson(route('worlds.store'), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment(buildTestGlb($nodes)));
 
     $response->assertCreated()->assertJsonPath('layoutWarnings.0.reason', 'access must be a list of tags');
-    expect(World::findOrFail($response->json('id'))->layout['zones'][0]['accessTags'])->toBe([]);
+    expect(Region::findOrFail($response->json('id'))->layout['zones'][0]['accessTags'])->toBe([]);
 });
+
+it('imports passages with their facing, radius, arrival point and zone', function () {
+    $user = User::factory()->create();
+    $quarterTurn = [0, sin(M_PI / 4), 0, cos(M_PI / 4)];
+    $nodes = [
+        ...penthouseMarkerNodes(),
+        markerNode('Passage.Gate', ['type' => 'passage', 'id' => 'terrace-gate', 'name' => 'Terrace gate', 'radius' => 1.5], ['translation' => [12, 0, 0], 'rotation' => $quarterTurn]),
+        markerNode('Passage.Door', ['type' => 'passage', 'id' => 'lobby-door', 'name' => 'Lobby door'], ['translation' => [0, 0, 20]]),
+    ];
+
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+
+    $response->assertCreated()->assertJsonPath('layoutWarnings', []);
+    [$gate, $door] = Region::findOrFail($response->json('id'))->layout['passages'];
+    expect($gate['id'])->toBe('terrace-gate')
+        ->and($gate['name'])->toBe('Terrace gate')
+        ->and($gate['radius'])->toBe(1.5)
+        ->and($gate['facing'])->toEqualWithDelta(M_PI / 2, 0.0001)
+        ->and($gate['arrival']['x'])->toEqualWithDelta(13, 0.0001)
+        ->and($gate['arrival']['z'])->toEqualWithDelta(0, 0.0001)
+        ->and($gate['zoneId'])->toBe('pool-terrace');
+    expect($door['radius'])->toEqual(1.0)
+        ->and($door['arrival']['z'])->toEqualWithDelta(21, 0.0001)
+        ->and($door['zoneId'])->toBeNull();
+});
+
+it('warns about invalid passage markers', function (array $vera, string $expectedReason, int $passageCount) {
+    $user = User::factory()->create();
+    $nodes = [
+        markerNode('Passage.Valid', ['type' => 'passage', 'id' => 'lobby-door', 'name' => 'Lobby door']),
+        markerNode('Passage.Invalid', ['type' => 'passage', ...$vera]),
+    ];
+
+    $response = $this->actingAs($user)->postJson(route('worlds.regions.store', World::factory()->forUser($user)->create()), worldPayloadWithEnvironment(buildTestGlb($nodes)));
+
+    expect(collect($response->json('layoutWarnings'))->pluck('reason')->implode(' | '))->toContain($expectedReason);
+    expect(Region::findOrFail($response->json('id'))->layout['passages'])->toHaveCount($passageCount);
+})->with([
+    'missing name' => [['id' => 'pier'], 'missing required field "name"', 1],
+    'missing id' => [['name' => 'Pier'], 'missing required field "id"', 1],
+    'duplicate id' => [['id' => 'lobby-door', 'name' => 'Other door'], 'duplicate passage id "lobby-door"', 1],
+    'bad radius' => [['id' => 'pier', 'name' => 'Pier', 'radius' => -1], 'passage radius must be a number above 0', 2],
+]);

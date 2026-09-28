@@ -8,9 +8,9 @@ use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\ImageGenModel;
 use App\Models\ImageGenProvider;
+use App\Models\Region;
 use App\Models\Settings;
 use App\Models\User;
-use App\Models\World;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Models\WorldUser;
@@ -197,19 +197,19 @@ function toolCallResponse(string $callId, string $toolName, array $arguments): a
 }
 
 /**
- * @return array{0: User, 1: Assistant, 2: Conversation, 3: World, 4: WorldResident, 5: WorldSession}
+ * @return array{0: User, 1: Assistant, 2: Conversation, 3: Region, 4: WorldResident, 5: WorldSession}
  */
 function worldStateScenario(array $worldAttributes = [], bool $fakeReply = true): array
 {
     [$user, $assistant, $conversation] = setUpAgentAssistant('assistant');
-    $world = World::factory()->forUser($user)->withLayout()->create($worldAttributes);
+    $world = Region::factory()->forUser($user)->withLayout()->create($worldAttributes);
     $resident = $world->residents()->create([
         'assistant_id' => $assistant->id,
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'stationary',
     ]);
-    $worldUser = WorldUser::where('world_id', $world->id)->where('user_id', $user->id)->firstOrFail();
-    $session = WorldSession::factory()->create(['world_user_id' => $worldUser->id]);
+    $worldUser = WorldUser::where('world_id', $world->world_id)->where('user_id', $user->id)->firstOrFail();
+    $session = WorldSession::factory()->create(['world_user_id' => $worldUser->id, 'region_id' => $world->id]);
 
     if ($fakeReply) {
         Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Right here.'))]);
@@ -224,7 +224,8 @@ function sendWorldMessage($test, array $scenario, array $positions, array $extra
 
     return $test->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]), [
         'messages' => [['role' => 'user', 'content' => 'Where are you, and where am I?']],
-        'worldId' => $world->id,
+        'worldId' => $world->world_id,
+        'regionId' => $world->id,
         'worldSessionId' => $session->id,
         'positions' => $positions,
         ...$extra,

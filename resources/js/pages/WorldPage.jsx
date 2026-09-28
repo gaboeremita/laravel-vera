@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
@@ -43,7 +43,10 @@ export default function WorldPage() {
 	const sessionId = searchParams.get('session');
 	const navigate = useNavigate();
 	const { addToast, setHidePortrait } = useOutletContext();
-	const [world, setWorld] = useState(null);
+	const [worldData, setWorldData] = useState(null);
+	const [region, setRegion] = useState(null);
+	const [arrivalFacing, setArrivalFacing] = useState(null);
+	const travelingRef = useRef(false);
 	const [session, setSession] = useState(null);
 	const [status, setStatus] = useState('loading');
 	const [nearbyResident, setNearbyResident] = useState(null);
@@ -87,6 +90,14 @@ export default function WorldPage() {
 	const [focusedObject, setFocusedObject] = useState(null);
 	const [nearbyObjectIds, setNearbyObjectIds] = useState([]);
 
+	const world = useMemo(() => {
+		if (!worldData || !region) return null;
+		const states = session?.residentStates ?? {};
+		const residents = worldData.residents.filter((resident) => (states[resident.id]?.regionId ?? resident.regionId) === region.id);
+		return { ...region, id: worldData.id, regionId: region.id, residents };
+	}, [worldData, region, session]);
+	const linkedPassageIds = useMemo(() => new Set((region?.links ?? []).map((link) => link.passageId)), [region]);
+
 	useEffect(() => {
 		setHidePortrait(true);
 		return () => setHidePortrait(false);
@@ -98,8 +109,8 @@ export default function WorldPage() {
 				const response = await api.get(route('worlds.show', { world: worldId }));
 				if (!response.ok) throw new Error('World unavailable');
 				const data = await response.json();
-				if (!data.environmentUrl) throw new Error('This world has no environment asset.');
 				let selectedSession = null;
+				let regionId = data.spawnRegionId;
 
 				if (sessionId) {
 					const sessionsResponse = await api.get(route('worlds.sessions.index', { world: worldId }));
@@ -107,10 +118,24 @@ export default function WorldPage() {
 					const sessions = await sessionsResponse.json();
 					selectedSession = sessions.find((item) => String(item.id) === String(sessionId)) ?? null;
 					if (!selectedSession) throw new Error('World session unavailable');
+					if (selectedSession.regionId === null) {
+						const resumeResponse = await api.post(route('worlds.sessions.resume', { world: worldId, session: sessionId }));
+						const resumed = await resumeResponse.json();
+						if (!resumeResponse.ok) throw new Error(resumed.message || 'World session unavailable');
+						selectedSession = { ...selectedSession, ...resumed };
+					}
+					regionId = selectedSession.regionId;
 				}
 
+				if (!regionId) throw new Error('This world has no spawn point yet.');
+				const regionResponse = await api.get(route('worlds.regions.show', { world: worldId, region: regionId }));
+				if (!regionResponse.ok) throw new Error('Region unavailable');
+				const regionData = await regionResponse.json();
+				if (!regionData.environmentUrl) throw new Error('This region has no environment asset.');
+
 				setSession(selectedSession);
-				setWorld(data);
+				setWorldData(data);
+				setRegion(regionData);
 				setStatus('entering');
 			} catch (error) { addToast(error.message || 'Failed to load world', 'error'); setStatus('error'); }
 		};
@@ -207,6 +232,34 @@ export default function WorldPage() {
 		setInvite((current) => (current?.residentId === resident.id ? null : current));
 	}, []);
 	const closeChat = useCallback(() => setChatResident(null), []);
+
+	const travel = useCallback(async (passage) => {
+		if (travelingRef.current || !sessionId || !region) return;
+		travelingRef.current = true;
+		setChatResident(null);
+		const followerIds = [...residentCommands.current].filter(([, commands]) => commands.isFollowing?.()).map(([residentId]) => residentId);
+		try {
+			await persistResidentStates();
+			latestPosition.current = null;
+			const response = await api.post(route('worlds.sessions.travel', { world: worldId, session: sessionId }), { regionId: region.id, passageId: passage.id, followerIds });
+			const arrival = await response.json();
+			if (!response.ok) throw new Error(arrival.message || 'Unable to go through this passage');
+			const [regionResponse, sessionsResponse] = await Promise.all([
+				api.get(route('worlds.regions.show', { world: worldId, region: arrival.regionId })),
+				api.get(route('worlds.sessions.index', { world: worldId })),
+			]);
+			if (!regionResponse.ok || !sessionsResponse.ok) throw new Error('Region unavailable');
+			const [nextRegion, sessions] = await Promise.all([regionResponse.json(), sessionsResponse.json()]);
+			releaseAllSpots(occupiedSpots.current, 'user');
+			residentPositions.current.clear();
+			occupiedSpots.current.clear();
+			setSession(sessions.find((item) => String(item.id) === String(sessionId)) ?? null);
+			setArrivalFacing(arrival.facing);
+			setLocation(null);
+			setRegion(nextRegion);
+			setStatus('entering');
+		} catch (error) { addToast(error.message || 'Unable to go through this passage', 'error'); } finally { travelingRef.current = false; }
+	}, [addToast, persistResidentStates, region, sessionId, worldId]);
 	const handlePlayerPositionChange = useCallback((position) => { latestPosition.current = position; }, []);
 	const getPositions = useCallback(() => {
 		const residents = {};
@@ -574,7 +627,7 @@ export default function WorldPage() {
 	});
 	const hasZones = (world?.layout?.zones?.length ?? 0) > 0;
 	const readoutText = location?.zone
-		? [location.zone.name, hasMultipleFloors ? location.floor?.name : null].filter(Boolean).join(' · ')
+		? [world?.name, location.zone.name, hasMultipleFloors ? location.floor?.name : null].filter(Boolean).join(' · ')
 		: world?.name;
 	const [lastCardKey, setLastCardKey] = useState(null);
 	if (player.cardKey && player.cardKey !== lastCardKey) setLastCardKey(player.cardKey);
@@ -607,7 +660,7 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready' && !paused} voiceUntil={voiceUntil} />
-				<WorldScene key={`${world.id}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} explorationEnabled={status === 'ready' && !paused} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
+				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={travel} explorationEnabled={status === 'ready' && !paused} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
 				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} />{hasZones && readoutText && <LocationReadout text={readoutText} />}</div>} />}
 				{status === 'ready' && (
 					<>

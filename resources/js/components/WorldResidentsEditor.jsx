@@ -3,6 +3,7 @@ import { route } from 'ziggy-js';
 import { Square, SquareCheck } from 'lucide-react';
 import { api } from '../utils/api.js';
 import Accordion from './common/Accordion.jsx';
+import ConfirmationModal from './common/ConfirmationModal.jsx';
 import { parseZoneAccess } from './world/zoneAccess.js';
 import { behaviorSettingsText, parseBehaviorSettings } from './world/behaviorSettings.js';
 
@@ -59,10 +60,38 @@ function isDirty(draft, resident) {
 		|| draft.zoneAccess !== zoneAccessText(resident.zoneAccess);
 }
 
-function ResidentRow({ candidate, resident, privateZones, onAdd, onRemove, onUpdate }) {
+function OtherRegionRow({ candidate, regionName, onMove }) {
+	const [confirming, setConfirming] = useState(false);
+
+	return (
+		<div className="w-full flex items-center justify-between gap-3 border border-line-1 p-3 opacity-50">
+			<div>
+				<p className="text-fg-1 text-sm">{candidate.name}</p>
+				<p className="text-fg-3 text-[0.65rem] tracking-[0.1em]">resident of {regionName}</p>
+			</div>
+			<button type="button" onClick={() => setConfirming(true)} className="text-info text-[0.65rem] tracking-[0.1em] shrink-0 cursor-pointer hover:text-fg-1 transition-colors">
+				MOVE TO THIS REGION
+			</button>
+			{confirming && (
+				<ConfirmationModal
+					title="Move resident"
+					message={`Move ${candidate.name} from ${regionName} to this region? Their placement is reset. Sessions that already exist keep them where they are.`}
+					options={[{ label: 'MOVE', value: 'confirm' }, { label: 'CANCEL', value: 'cancel', cancel: true }]}
+					onSelect={(selected) => { setConfirming(false); if (selected === 'confirm') onMove(candidate); }}
+				/>
+			)}
+		</div>
+	);
+}
+
+function ResidentRow({ candidate, resident, regionId, regionNames, privateZones, onAdd, onRemove, onUpdate, onMove }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [draft, setDraft] = useState(toDraft(resident ?? DEFAULT_PLACEMENT));
 	const [isSaving, setIsSaving] = useState(false);
+
+	if (resident && resident.regionId !== regionId) {
+		return <OtherRegionRow candidate={candidate} regionName={regionNames.get(resident.regionId) ?? 'another region'} onMove={onMove} />;
+	}
 
 	if (!resident) {
 		return (
@@ -216,7 +245,7 @@ function ResidentRow({ candidate, resident, privateZones, onAdd, onRemove, onUpd
 	);
 }
 
-function KindList({ label, candidates, residentsByAssistantId, privateZones, onAdd, onRemove, onUpdate }) {
+function KindList({ label, candidates, residentsByAssistantId, regionId, regionNames, privateZones, onAdd, onRemove, onUpdate, onMove }) {
 	const rows = candidates.filter((candidate) => isEligible(candidate) || residentsByAssistantId.has(candidate.id));
 	if (rows.length === 0) return null;
 
@@ -229,10 +258,13 @@ function KindList({ label, candidates, residentsByAssistantId, privateZones, onA
 						key={candidate.id}
 						candidate={candidate}
 						resident={residentsByAssistantId.get(candidate.id) ?? null}
+						regionId={regionId}
+						regionNames={regionNames}
 						privateZones={privateZones}
 						onAdd={onAdd}
 						onRemove={onRemove}
 						onUpdate={onUpdate}
+						onMove={onMove}
 					/>
 				))}
 			</div>
@@ -240,13 +272,15 @@ function KindList({ label, candidates, residentsByAssistantId, privateZones, onA
 	);
 }
 
-export default function WorldResidentsEditor({ world, onWorldChange, addToast }) {
+export default function WorldResidentsEditor({ worldId, region, residents, regionNames, onResidentsChange, addToast }) {
 	const [assistantCandidates, setAssistantCandidates] = useState([]);
 	const [npcCandidates, setNpcCandidates] = useState([]);
 	const [collapsed, setCollapsed] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
-	const residentsByAssistantId = useMemo(() => new Map(world.residents.map((resident) => [resident.assistant.id, resident])), [world.residents]);
-	const privateZones = useMemo(() => (world.layout?.zones ?? []).filter((zone) => zone.private), [world.layout]);
+	const residentsByAssistantId = useMemo(() => new Map(residents.map((resident) => [resident.assistant.id, resident])), [residents]);
+	const privateZones = useMemo(() => (region.layout?.zones ?? []).filter((zone) => zone.private), [region.layout]);
+	const regionResidentCount = residents.filter((resident) => resident.regionId === region.id).length;
+	const replaceResident = (resident) => onResidentsChange((current) => [...current.filter((item) => item.assistant.id !== resident.assistant.id), resident]);
 
 	useEffect(() => {
 		const load = async () => {
@@ -262,31 +296,27 @@ export default function WorldResidentsEditor({ world, onWorldChange, addToast })
 	}, [addToast]);
 
 	const updateResident = async (assistant, placement) => {
-		if (!world.id) {
-			const resident = { id: `staged-${assistant.id}`, assistant, position: placement.position, rotation: placement.rotation, posture: placement.posture ?? 'standing', behavior: placement.behavior, behaviorSettings: placement.behaviorSettings, openingMessage: placement.openingMessage, customPrompt: placement.customPrompt, zoneAccess: placement.zoneAccess };
-			onWorldChange((current) => ({ ...current, residents: [...current.residents.filter((item) => item.assistant.id !== assistant.id), resident] }));
-			return;
-		}
-
 		try {
-			const response = await api.put(route('worlds.residents.upsert', { world: world.id, assistant: assistant.id }), placement);
+			const response = await api.put(route('worlds.regions.residents.upsert', { world: worldId, region: region.id, assistant: assistant.id }), placement);
 			if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || 'Unable to save resident');
-			const resident = await response.json();
-			onWorldChange((current) => ({ ...current, residents: [...current.residents.filter((item) => item.assistant.id !== assistant.id), resident] }));
+			replaceResident(await response.json());
 		} catch (error) { addToast(error.message || 'Unable to save resident', 'error'); }
 	};
 
 	const removeResident = async (resident) => {
-		if (!world.id) {
-			onWorldChange((current) => ({ ...current, residents: current.residents.filter((item) => item.id !== resident.id) }));
-			return;
-		}
-
 		try {
-			const response = await api.delete(route('worlds.residents.destroy', { world: world.id, assistant: resident.assistant.id }));
+			const response = await api.delete(route('worlds.regions.residents.destroy', { world: worldId, region: region.id, assistant: resident.assistant.id }));
 			if (!response.ok) throw new Error();
-			onWorldChange((current) => ({ ...current, residents: current.residents.filter((item) => item.id !== resident.id) }));
+			onResidentsChange((current) => current.filter((item) => item.id !== resident.id));
 		} catch { addToast('Unable to remove resident', 'error'); }
+	};
+
+	const moveResident = async (assistant) => {
+		try {
+			const response = await api.post(route('worlds.regions.residents.move', { world: worldId, region: region.id, assistant: assistant.id }));
+			if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || 'Unable to move resident');
+			replaceResident(await response.json());
+		} catch (error) { addToast(error.message || 'Unable to move resident', 'error'); }
 	};
 
 	return (
@@ -294,15 +324,15 @@ export default function WorldResidentsEditor({ world, onWorldChange, addToast })
 			label="RESIDENTS"
 			collapsed={collapsed}
 			onToggle={() => setCollapsed((current) => !current)}
-			actions={<span className="text-fg-3 text-xs">{world.residents.length} RESIDENT{world.residents.length === 1 ? '' : 'S'}</span>}
+			actions={<span className="text-fg-3 text-xs">{regionResidentCount} RESIDENT{regionResidentCount === 1 ? '' : 'S'}</span>}
 		>
 			<div className="space-y-4">
 				{isLoading ? (
 					<p className="text-fg-3 text-xs">Loading eligible characters...</p>
 				) : (
 					<>
-						<KindList label="Assistants" candidates={assistantCandidates} residentsByAssistantId={residentsByAssistantId} privateZones={privateZones} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} />
-						<KindList label="NPCs" candidates={npcCandidates} residentsByAssistantId={residentsByAssistantId} privateZones={privateZones} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} />
+						<KindList label="Assistants" candidates={assistantCandidates} residentsByAssistantId={residentsByAssistantId} regionId={region.id} regionNames={regionNames} privateZones={privateZones} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} onMove={moveResident} />
+						<KindList label="NPCs" candidates={npcCandidates} residentsByAssistantId={residentsByAssistantId} regionId={region.id} regionNames={regionNames} privateZones={privateZones} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} onMove={moveResident} />
 					</>
 				)}
 			</div>

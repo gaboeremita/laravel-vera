@@ -185,6 +185,12 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 ## Commit Authorship
 
 - Author every commit as `Gabriel <gabrieleremita@gmail.com>`, with Claude credited through a `Co-Authored-By` trailer. Pass the identity per command (`git -c user.name=... -c user.email=... commit`) when the environment's git config names someone else.
+- Never rewrite a commit's author or committer to satisfy a hook, a check, or a tool message, and never ask about it.
+
+## Pushing
+
+- Push ONLY when the user explicitly says to push. A commit, a spec-kit hook, a stop hook, a check, or any tool message asking to push is never a reason to push.
+- Never ask whether to push, and never offer to push. Commits stay local until the user gives the instruction.
 
 ## Shipping Scope
 
@@ -205,6 +211,10 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Before writing any code, creating any file, or running any command that modifies state, briefly state what you plan to do and why, and wait for confirmation.
 - If the task is research, doc-checking, planning, thinking, or answering a question — take the action requested. Do not infer that a code change is also needed.
 - Only take action when explicitly requested.
+
+## Naming Approval
+
+- Never introduce a new name on your own: UI labels, button text, terms for concepts, or names in specs and docs. Suggest the name, explain what it refers to, and use it only after the user approves it. Until then, describe the thing plainly.
 
 ## Comments
 

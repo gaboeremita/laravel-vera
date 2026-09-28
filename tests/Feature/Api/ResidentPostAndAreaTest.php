@@ -2,7 +2,7 @@
 
 use App\Actions\ApplyResidentZoneAccess;
 use App\Enums\AssistantKind;
-use App\Models\World;
+use App\Models\Region;
 use App\Models\WorldResident;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 it('keeps a resident with an area to its zones and the zones inside them', function () {
-    $world = World::factory()->withLayout()->make();
+    $world = Region::factory()->withLayout()->make();
     $resident = WorldResident::factory()->make(['behavior_settings' => ['area' => ['studio']]]);
 
     $layout = (new ApplyResidentZoneAccess)->handle($world, $resident)->layout;

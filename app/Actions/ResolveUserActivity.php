@@ -2,7 +2,7 @@
 
 namespace App\Actions;
 
-use App\Models\World;
+use App\Models\Region;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -33,9 +33,9 @@ class ResolveUserActivity
      *
      * @throws ValidationException
      */
-    public function handle(World $world, ?array $userState, string $key = 'userState'): ?array
+    public function handle(Region $region, ?array $userState, string $key = 'userState'): ?array
     {
-        $layout = $world->layout ?? [];
+        $layout = $region->layout ?? [];
         if ($userState === null || empty($layout['zones'])) {
             return null;
         }

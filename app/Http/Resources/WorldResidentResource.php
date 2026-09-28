@@ -16,6 +16,7 @@ class WorldResidentResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'regionId' => $this->region_id,
             'assistant' => [
                 'id' => $this->assistant->id,
                 'name' => $this->assistant->name,

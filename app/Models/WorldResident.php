@@ -11,13 +11,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['assistant_id', 'position', 'rotation', 'posture', 'behavior', 'behavior_settings', 'opening_message', 'custom_prompt', 'zone_access'])]
+#[Fillable(['region_id', 'assistant_id', 'position', 'rotation', 'posture', 'behavior', 'behavior_settings', 'opening_message', 'custom_prompt', 'zone_access'])]
 class WorldResident extends Model
 {
     /** @use HasFactory<WorldResidentFactory> */
     use HasFactory;
 
     /** @var array<string, string> */
+    public const DEFAULT_POSITION = ['x' => 0, 'y' => 0, 'z' => 0];
+
     protected $attributes = ['posture' => 'standing'];
 
     protected function casts(): array
@@ -66,6 +68,13 @@ class WorldResident extends Model
             && in_array($this->behavior, [WorldResidentBehavior::Stationary, WorldResidentBehavior::Route], true);
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (WorldResident $resident): void {
+            $resident->world_id ??= Region::findOrFail($resident->region_id)->world_id;
+        });
+    }
+
     public function world(): BelongsTo
     {
         return $this->belongsTo(World::class);
@@ -74,5 +83,10 @@ class WorldResident extends Model
     public function assistant(): BelongsTo
     {
         return $this->belongsTo(Assistant::class);
+    }
+
+    public function region(): BelongsTo
+    {
+        return $this->belongsTo(Region::class);
     }
 }

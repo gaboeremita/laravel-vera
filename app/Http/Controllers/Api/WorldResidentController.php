@@ -9,14 +9,19 @@ use App\Http\Requests\UpsertWorldResidentRequest;
 use App\Http\Resources\WorldResidentResource;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
+use App\Models\Region;
 use App\Models\World;
+use App\Models\WorldResident;
+use App\Models\WorldSession;
+use App\Models\WorldSessionResident;
 use App\Services\LlmProviders\LlmManager;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class WorldResidentController extends Controller
 {
-    public function upsert(UpsertWorldResidentRequest $request, World $world, Assistant $assistant): JsonResponse
+    public function upsert(UpsertWorldResidentRequest $request, World $world, Region $region, Assistant $assistant): JsonResponse
     {
         Gate::authorize('update', $world);
         abort_unless($assistant->users()->whereKey($request->user())->exists(), 404);
@@ -31,9 +36,15 @@ class WorldResidentController extends Controller
             );
         }
 
+        $elsewhere = $world->residents()->with('region')->where('assistant_id', $assistant->id)->where('region_id', '!=', $region->id)->first();
+        if ($elsewhere !== null) {
+            return response()->json(['message' => "{$assistant->name} is a resident of {$elsewhere->region->name}.", 'regionId' => $elsewhere->region_id, 'regionName' => $elsewhere->region->name], 409);
+        }
+
         $validated = $request->validated();
 
         $resident = $world->residents()->updateOrCreate(['assistant_id' => $assistant->id], [
+            'region_id' => $region->id,
             'position' => $validated['position'],
             'rotation' => $validated['rotation'] ?? null,
             'posture' => $validated['posture'] ?? 'standing',
@@ -51,10 +62,48 @@ class WorldResidentController extends Controller
         return response()->json((new WorldResidentResource($resident))->resolve());
     }
 
-    public function destroy(World $world, Assistant $assistant): JsonResponse
+    /**
+     * Makes the region the resident's region with the default placement.
+     * Sessions that already exist keep her where she was.
+     */
+    public function move(World $world, Region $region, Assistant $assistant): JsonResponse
     {
         Gate::authorize('update', $world);
-        $world->residents()->where('assistant_id', $assistant->id)->firstOrFail()->delete();
+        $resident = $world->residents()->where('assistant_id', $assistant->id)->firstOrFail();
+
+        DB::transaction(function () use ($world, $region, $resident): void {
+            WorldSession::whereHas('worldUser', fn ($query) => $query->where('world_id', $world->id))
+                ->whereDoesntHave('residentStates', fn ($query) => $query->where('world_resident_id', $resident->id))
+                ->pluck('id')
+                ->each(fn (int $sessionId) => WorldSessionResident::create([
+                    'world_session_id' => $sessionId,
+                    'world_resident_id' => $resident->id,
+                    'region_id' => $resident->region_id,
+                    'position' => $resident->position,
+                    'rotation' => ['y' => $resident->rotation['y'] ?? 0],
+                    'posture' => $resident->posture->value,
+                ]));
+
+            $resident->update([
+                'region_id' => $region->id,
+                'position' => WorldResident::DEFAULT_POSITION,
+                'rotation' => ['x' => 0, 'y' => 0, 'z' => 0],
+                'posture' => 'standing',
+                'behavior' => 'stationary',
+                'behavior_settings' => null,
+                'zone_access' => null,
+            ]);
+        });
+
+        $resident->load(['assistant.vrm', 'assistant.poses.animationFile']);
+
+        return response()->json((new WorldResidentResource($resident))->resolve());
+    }
+
+    public function destroy(World $world, Region $region, Assistant $assistant): JsonResponse
+    {
+        Gate::authorize('update', $world);
+        $region->residents()->where('assistant_id', $assistant->id)->firstOrFail()->delete();
 
         return response()->json(status: 204);
     }

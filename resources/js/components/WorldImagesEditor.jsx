@@ -38,7 +38,7 @@ export function ImageUploadField({ label, hint, previewUrl, isUploading, onUploa
 	);
 }
 
-export default function WorldImagesEditor({ worldId, cardImageUrl, portraitImageUrl, addToast }) {
+export default function WorldImagesEditor({ routePrefix, routeParams, cardImageUrl, portraitImageUrl, addToast }) {
 	const [cardPreview, setCardPreview] = useState(cardImageUrl ?? null);
 	const [portraitPreview, setPortraitPreview] = useState(portraitImageUrl ?? null);
 	const [isUploadingCard, setIsUploadingCard] = useState(false);
@@ -49,7 +49,7 @@ export default function WorldImagesEditor({ worldId, cardImageUrl, portraitImage
 		try {
 			const formData = new FormData();
 			formData.append('image', file);
-			const res = await api.postForm(route(routeName, { world: worldId }), formData);
+			const res = await api.postForm(route(routeName, routeParams), formData);
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
 				throw new Error(error.message || 'Upload failed');
@@ -72,14 +72,14 @@ export default function WorldImagesEditor({ worldId, cardImageUrl, portraitImage
 					hint="shown in the worlds menu"
 					previewUrl={cardPreview}
 					isUploading={isUploadingCard}
-					onUpload={(file) => upload('worlds.image.card.store', file, setCardPreview, setIsUploadingCard, 'Card')}
+					onUpload={(file) => upload(`${routePrefix}.card.store`, file, setCardPreview, setIsUploadingCard, 'Card')}
 				/>
 				<ImageUploadField
 					label="Portrait Image"
 					hint="shown while browsing this world's sessions"
 					previewUrl={portraitPreview}
 					isUploading={isUploadingPortrait}
-					onUpload={(file) => upload('worlds.image.portrait.store', file, setPortraitPreview, setIsUploadingPortrait, 'Portrait')}
+					onUpload={(file) => upload(`${routePrefix}.portrait.store`, file, setPortraitPreview, setIsUploadingPortrait, 'Portrait')}
 				/>
 			</div>
 		</div>

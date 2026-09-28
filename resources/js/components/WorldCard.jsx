@@ -9,6 +9,7 @@ export default function WorldCard({ world, onEdit, onEnter, onDelete }) {
 			<div className="p-4 flex-1">
 				<p className="text-accent text-sm tracking-[0.05em] font-medium truncate">{world.name}</p>
 				<p className="text-fg-3 text-xs mt-2 line-clamp-3">{world.description}</p>
+				<p className="text-fg-3 text-[0.65rem] tracking-[0.1em] mt-3">{world.regionCount} REGION{world.regionCount === 1 ? '' : 'S'}{!world.hasSpawn && <span className="text-warning"> · ⚠ NO SPAWN POINT</span>}</p>
 			</div>
 			<div className="border-t border-line-1 px-4 py-3 flex items-center justify-between gap-3">
 				<div className="flex items-center gap-3">

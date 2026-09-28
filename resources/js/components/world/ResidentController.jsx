@@ -390,6 +390,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 					routeRef.current = { mode: 'follow', getTarget, waypoints: [], index: 0, moving: false, heading: null, replanAt: 0, progressAt: null, bestDistance: Infinity, resolve };
 				});
 			},
+			isFollowing: () => routeRef.current?.mode === 'follow',
 			stop: () => {
 				settle('interrupted', 'told to stop');
 				return Promise.resolve({ outcome: 'completed', reason: null });

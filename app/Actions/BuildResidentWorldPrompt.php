@@ -8,8 +8,8 @@ use App\Models\Assistant;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\Pose;
+use App\Models\Region;
 use App\Models\ResidentActivity;
-use App\Models\World;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use Illuminate\Support\Str;
@@ -42,9 +42,9 @@ class BuildResidentWorldPrompt
      * @param  bool  $lean  for an NPC who keeps to her post: where she is and who is there, without the place's activities and things
      * @return array<string, string|array<int, string>>
      */
-    public function worldState(World $world, array $resident, ?array $user, ?array $userActivity = null, array $stacking = [], ?string $userTalkingWith = null, ?array $residentActivity = null, bool $userInSight = true, array $withYou = [], bool $lean = false): array
+    public function worldState(Region $region, array $resident, ?array $user, ?array $userActivity = null, array $stacking = [], ?string $userTalkingWith = null, ?array $residentActivity = null, bool $userInSight = true, array $withYou = [], bool $lean = false): array
     {
-        $layout = $world->layout ?? [];
+        $layout = $region->layout ?? [];
         $state = ['you are in' => $this->placePhrase($resident).$this->activityPhrase($residentActivity)];
 
         if ($resident['zone'] !== null) {
@@ -91,9 +91,9 @@ class BuildResidentWorldPrompt
      *
      * @return array<int, string>
      */
-    public function availablePlaces(World $world): array
+    public function availablePlaces(Region $region): array
     {
-        $layout = $world->layout ?? [];
+        $layout = $region->layout ?? [];
 
         return collect($layout['zones'] ?? [])->map(fn (array $zone) => $this->zoneName($layout, $zone))->all();
     }
@@ -120,7 +120,7 @@ class BuildResidentWorldPrompt
      * @param  array<int, string>  $occupiedSpots
      * @return array<string, string|array<int, string>>
      */
-    public function availableActivities(World $world, Assistant $assistant, array $location, array $occupiedSpots, Posture $posture): array
+    public function availableActivities(Region $region, Assistant $assistant, array $location, array $occupiedSpots, Posture $posture): array
     {
         $available = ['you are' => $posture->value];
 
@@ -140,7 +140,7 @@ class BuildResidentWorldPrompt
         }
 
         $zoneIds = collect($location['zoneChain'])->pluck('id');
-        $spots = collect($world->layout['objects'] ?? [])
+        $spots = collect($region->layout['objects'] ?? [])
             ->filter(fn (array $object) => $zoneIds->contains($object['zoneId']))
             ->flatMap(fn (array $object) => collect($object['spots'])->map(fn (array $spot) => sprintf(
                 '%s [%s] at the %s: %s (%s)',
@@ -172,15 +172,15 @@ class BuildResidentWorldPrompt
      * @param  array<int, ?int>  $busyWith  for each resident who is busy, the resident she is talking with or on her way to
      * @return array<int, string>
      */
-    public function companions(World $world, WorldResident $resident, ?array $positions, array $busyWith = []): array
+    public function companions(Region $region, WorldResident $resident, ?array $positions, array $busyWith = []): array
     {
         $resolveWorldState = new ResolveWorldState;
-        $layout = $world->layout ?? [];
+        $layout = $region->layout ?? [];
         $own = $positions['residents'][$resident->id] ?? null;
         if ($own === null) {
             return [];
         }
-        $residents = $world->residents()->with('assistant')->get();
+        $residents = $region->world->residents()->with('assistant')->get();
         $names = $residents->mapWithKeys(fn (WorldResident $candidate) => [$candidate->id => $candidate->assistant->name]);
 
         $inRoom = $residents
@@ -277,7 +277,7 @@ class BuildResidentWorldPrompt
         return "Talking with {$otherName}:\nYou are talking with {$otherName} in person, right where you both are. Their lines come to you as messages starting with their name. Reply with what you say next, in your own voice: one to three sentences, with any action in asterisks. Follow the thread of the conversation; when it has run its course for now, or you want to pick it up another time, say your goodbye and call stop_conversation.";
     }
 
-    public function recentActivity(World $world, WorldSession $session, WorldResident $resident, ?int $limit = null): ?string
+    public function recentActivity(Region $region, WorldSession $session, WorldResident $resident, ?int $limit = null): ?string
     {
         $activities = ResidentActivity::where('world_session_id', $session->id)
             ->where('world_resident_id', $resident->id)
@@ -290,7 +290,7 @@ class BuildResidentWorldPrompt
             return null;
         }
 
-        $zoneNames = collect($world->layout['zones'] ?? [])->pluck('name', 'id');
+        $zoneNames = collect($region->layout['zones'] ?? [])->pluck('name', 'id');
         $lines = $activities->map(function (ResidentActivity $activity) use ($zoneNames) {
             $line = '- '.$this->describeActivity($activity);
             if ($activity->zone_id !== null && $zoneNames->has($activity->zone_id)) {

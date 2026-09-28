@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import Accordion from './common/Accordion.jsx';
+import PassageSelect from './PassageSelect.jsx';
 import { FIELD_LABEL, FIELD_INPUT } from '../utils/formFieldStyles.js';
 
-export default function WorldForm({ value, onChange, environmentFile, onEnvironmentChange, isSaving, submitLabel, imagesEditor, trackEditor, children }) {
+export default function WorldForm({ value, onChange, regions = null, imagesEditor = null, isSaving, onSubmit }) {
 	const update = (field, fieldValue) => onChange({ ...value, [field]: fieldValue });
-	const [sections, setSections] = useState({ details: false, environment: false, context: false });
+	const [sections, setSections] = useState({ details: false, prompts: false, start: false });
 	const toggle = (section) => setSections((current) => ({ ...current, [section]: !current[section] }));
+	const spawn = value.spawnRegionId ? { regionId: value.spawnRegionId, passageId: value.spawnPassageId } : null;
 
 	return (
-		<form onSubmit={(event) => { event.preventDefault(); submitLabel(); }} className="flex-1 overflow-y-auto p-5 custom-scrollbar space-y-5">
+		<form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="space-y-5">
 			<Accordion label="DETAILS" collapsed={sections.details} onToggle={() => toggle('details')}>
 				<div>
 					<label className={FIELD_LABEL}>Name</label>
@@ -22,33 +24,9 @@ export default function WorldForm({ value, onChange, environmentFile, onEnvironm
 					<label className={FIELD_LABEL}>Description</label>
 					<textarea value={value.description} onChange={(event) => update('description', event.target.value)} rows={3} className={`${FIELD_INPUT} resize-none`} required />
 				</div>
-				<div>
-					<label className={FIELD_LABEL}>Theme</label>
-					<select value={value.settings?.theme ?? 'default'} onChange={(event) => update('settings', { ...value.settings, theme: event.target.value })} className={FIELD_INPUT} required>
-						<option value="default">Default</option>
-						<option value="terminal">Terminal</option>
-						<option value="slate">Slate</option>
-						<option value="grimoire">Grimoire</option>
-					</select>
-				</div>
 				{imagesEditor}
-				{trackEditor}
 			</Accordion>
-			<Accordion label="ENVIRONMENT" collapsed={sections.environment} onToggle={() => toggle('environment')}>
-				<div>
-					<label className={FIELD_LABEL}>Room Environment (.glb)</label>
-					<input
-						type="file"
-						accept=".glb,model/gltf-binary"
-						onChange={(event) => onEnvironmentChange(event.target.files?.[0] ?? null)}
-						className="w-full text-sm text-accent file:mr-3 file:border file:border-line-1 file:bg-bg-1 file:text-fg-3 file:text-[0.65rem] file:tracking-[0.1em] file:px-3 file:py-1 file:cursor-pointer"
-						required={!environmentFile && !value.environmentUrl}
-					/>
-					{environmentFile && <span className="text-fg-3 text-[0.65rem] mt-1 block">{environmentFile.name}</span>}
-					{!environmentFile && value.environmentUrl && <a href={value.environmentUrl} className="text-info text-xs hover:text-fg-1 mt-1 block" target="_blank" rel="noreferrer">CURRENT ENVIRONMENT</a>}
-				</div>
-			</Accordion>
-			<Accordion label="CONVERSATION CONTEXT" collapsed={sections.context} onToggle={() => toggle('context')}>
+			<Accordion label="WORLD PROMPTS" collapsed={sections.prompts} onToggle={() => toggle('prompts')}>
 				<div>
 					<label className={FIELD_LABEL}>Companion Assistant World Context</label>
 					<textarea value={value.assistantContextPrompt} onChange={(event) => update('assistantContextPrompt', event.target.value)} rows={4} className={`${FIELD_INPUT} resize-none`} required />
@@ -58,7 +36,15 @@ export default function WorldForm({ value, onChange, environmentFile, onEnvironm
 					<textarea value={value.npcContextPrompt} onChange={(event) => update('npcContextPrompt', event.target.value)} rows={4} className={`${FIELD_INPUT} resize-none`} required />
 				</div>
 			</Accordion>
-			{children}
+			{regions && (
+				<Accordion label="START" collapsed={sections.start} onToggle={() => toggle('start')}>
+					<div>
+						<label className={FIELD_LABEL}>Spawn point</label>
+						<PassageSelect regions={regions} value={spawn} onChange={(passage) => onChange({ ...value, spawnRegionId: passage?.regionId ?? null, spawnPassageId: passage?.passageId ?? null })} emptyLabel="— none —" />
+						{!spawn && <p className="text-warning text-xs mt-2">⚠ Choose a spawn point before starting a session in this world.</p>}
+					</div>
+				</Accordion>
+			)}
 			<div className="flex justify-end pt-2 pb-4">
 				<button
 					disabled={isSaving}

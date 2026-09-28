@@ -7,8 +7,8 @@ use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\Pose;
+use App\Models\Region;
 use App\Models\User;
-use App\Models\World;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -190,13 +190,13 @@ it('gives NPCs the world tools on the default model', function () {
     $npc = Assistant::factory()->create(['kind' => AssistantKind::WorldNpc, 'mode' => 'assistant']);
     $assistantUser = AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $npc->id]);
     $conversation = Conversation::factory()->forAssistantUser($assistantUser)->create();
-    $world = World::factory()->forUser($user)->withLayout()->create();
+    $world = Region::factory()->forUser($user)->withLayout()->create();
     $resident = $world->residents()->create(['assistant_id' => $npc->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'roam']);
     fakeTurn(toolCallResponse('call_1', 'go_to', ['target' => 'studio']), finalAnswerResponse('This way.'));
 
     $this->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $npc->id, 'id' => $conversation->id]), [
         'messages' => [['role' => 'user', 'content' => 'Show me the studio.']],
-        'worldId' => $world->id,
+        'worldId' => $world->world_id, 'regionId' => $world->id,
     ])->assertSuccessful()->assertJsonPath('action.target', 'studio');
 
     expect($resident->exists)->toBeTrue();
@@ -310,7 +310,7 @@ it('runs an NPC on the model chosen for it instead of the default', function () 
 
     $this->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $npc->id, 'id' => $conversation->id]), [
         'messages' => [['role' => 'user', 'content' => 'Hello.']],
-        'worldId' => $world->id,
+        'worldId' => $world->world_id, 'regionId' => $world->id,
     ])->assertSuccessful()->assertJsonPath('content', 'Hi.');
 });
 

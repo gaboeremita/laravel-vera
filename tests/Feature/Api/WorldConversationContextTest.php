@@ -5,6 +5,7 @@ use App\Enums\AssistantKind;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
+use App\Models\Region;
 use App\Models\User;
 use App\Models\World;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -12,8 +13,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('appends the appropriate world context without mutating the base prompt', function () {
-    $world = World::factory()->create([
+it('layers the world prompt, the region prompt and the region name without mutating the base prompt', function () {
+    $world = Region::factory()->for(World::factory()->state([
+        'assistant_context_prompt' => 'Assistant world prompt',
+        'npc_context_prompt' => 'NPC world prompt',
+    ]))->create([
+        'name' => 'Lua Building',
         'assistant_context_prompt' => 'Assistant world context',
         'npc_context_prompt' => 'NPC world context',
     ]);
@@ -26,14 +31,14 @@ it('appends the appropriate world context without mutating the base prompt', fun
 
     $action = new AppendWorldConversationContext;
 
-    expect($action->handle($assistant, $world)['world_context'])->toBe(['Assistant world context']);
-    expect($action->handle($npc, $world)['world_context'])->toBe(['NPC world context']);
+    expect($action->handle($assistant, $world)['world_context'])->toBe(['Assistant world prompt', 'Assistant world context', 'You are in Lua Building.']);
+    expect($action->handle($npc, $world)['world_context'])->toBe(['NPC world prompt', 'NPC world context', 'You are in Lua Building.']);
     expect($action->handle($assistant, null))->toBe(['identity' => ['Base identity']]);
     expect($assistant->fresh()->prompt)->toBe(['identity' => ['Base identity']]);
 });
 
 it('adds a resident-specific custom prompt on top of the world context', function () {
-    $world = World::factory()->create(['assistant_context_prompt' => 'Assistant world context']);
+    $world = Region::factory()->for(World::factory()->state(['assistant_context_prompt' => 'Assistant world prompt']))->create(['name' => 'Lua Building', 'assistant_context_prompt' => 'Assistant world context']);
     $assistant = Assistant::factory()->create(['prompt' => ['identity' => ['Base identity']]]);
     $world->residents()->create([
         'assistant_id' => $assistant->id,
@@ -45,14 +50,16 @@ it('adds a resident-specific custom prompt on top of the world context', functio
     $action = new AppendWorldConversationContext;
 
     expect($action->handle($assistant, $world)['world_context'])->toBe([
+        'Assistant world prompt',
         'Assistant world context',
+        'You are in Lua Building.',
         'Only this placement knows about the hidden door.',
     ]);
 });
 
 it('uses a resident-specific opening message when starting a fresh world conversation', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = Assistant::factory()->create(['opening_message' => 'Base greeting']);
     AssistantUser::factory()->create(['assistant_id' => $assistant->id, 'user_id' => $user->id]);
     $world->residents()->create([
@@ -62,7 +69,7 @@ it('uses a resident-specific opening message when starting a fresh world convers
         'opening_message' => 'World-specific greeting',
     ]);
 
-    $response = $this->actingAs($user)->postJson(route('conversations.store', $assistant), ['worldId' => $world->id]);
+    $response = $this->actingAs($user)->postJson(route('conversations.store', $assistant), ['worldId' => $world->world_id, 'regionId' => $world->id]);
 
     $response->assertCreated();
     $conversation = Conversation::findOrFail($response->json('id'));
@@ -71,12 +78,12 @@ it('uses a resident-specific opening message when starting a fresh world convers
 
 it('uses an empty opening message in a world when the resident has no override, never the assistant\'s own', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = Assistant::factory()->create(['opening_message' => 'Base greeting']);
     AssistantUser::factory()->create(['assistant_id' => $assistant->id, 'user_id' => $user->id]);
     $world->residents()->create(['assistant_id' => $assistant->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
 
-    $response = $this->actingAs($user)->postJson(route('conversations.store', $assistant), ['worldId' => $world->id]);
+    $response = $this->actingAs($user)->postJson(route('conversations.store', $assistant), ['worldId' => $world->world_id, 'regionId' => $world->id]);
 
     $response->assertCreated();
     $conversation = Conversation::findOrFail($response->json('id'));
@@ -84,7 +91,7 @@ it('uses an empty opening message in a world when the resident has no override, 
 });
 
 it('rejects a character that is not a resident of the requested world', function () {
-    $world = World::factory()->create();
+    $world = Region::factory()->create();
     $assistant = Assistant::factory()->create();
 
     expect(fn () => (new AppendWorldConversationContext)->handle($assistant, $world))

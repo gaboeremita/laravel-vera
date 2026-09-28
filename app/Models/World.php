@@ -7,21 +7,16 @@ use Database\Factories\WorldFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
-use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['name', 'slug', 'description', 'environment_disk', 'environment_path', 'environment_original_name', 'assistant_context_prompt', 'npc_context_prompt', 'settings', 'layout'])]
+#[Fillable(['name', 'slug', 'description', 'assistant_context_prompt', 'npc_context_prompt', 'spawn_region_id', 'spawn_passage_id'])]
 class World extends Model
 {
     /** @use HasFactory<WorldFactory> */
     use HasFactory;
-
-    protected function casts(): array
-    {
-        return ['settings' => 'array', 'layout' => 'array'];
-    }
 
     public function users(): BelongsToMany
     {
@@ -35,9 +30,19 @@ class World extends Model
         return $this->hasMany(WorldUser::class);
     }
 
+    public function regions(): HasMany
+    {
+        return $this->hasMany(Region::class);
+    }
+
     public function residents(): HasMany
     {
         return $this->hasMany(WorldResident::class);
+    }
+
+    public function spawnRegion(): BelongsTo
+    {
+        return $this->belongsTo(Region::class, 'spawn_region_id');
     }
 
     public function cardImage(): MorphOne
@@ -50,20 +55,29 @@ class World extends Model
         return $this->morphOne(Image::class, 'imageable')->where('role', 'portrait');
     }
 
-    public function track(): MorphOne
-    {
-        return $this->morphOne(Track::class, 'trackable');
-    }
-
     public function contextPromptFor(AssistantKind $kind): string
     {
         return $kind === AssistantKind::WorldNpc ? $this->npc_context_prompt : $this->assistant_context_prompt;
     }
 
+    /**
+     * The spawn passage, or null while none is chosen or it no longer exists in its region.
+     *
+     * @return ?array{id: string, name: string, position: array{x: float, y: float, z: float}, facing: float, radius: float, arrival: array{x: float, y: float, z: float}, zoneId: ?string}
+     */
+    public function spawnPassage(): ?array
+    {
+        if ($this->spawn_passage_id === null) {
+            return null;
+        }
+
+        return $this->spawnRegion?->passage($this->spawn_passage_id);
+    }
+
     protected static function booted(): void
     {
-        static::deleted(function (World $world): void {
-            Storage::disk($world->environment_disk)->delete($world->environment_path);
+        static::deleting(function (World $world): void {
+            $world->regions->each->delete();
         });
     }
 }

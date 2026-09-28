@@ -13,6 +13,7 @@ import ThoughtBubble from './ThoughtBubble.jsx';
 import { OffscreenIndicatorTracker } from './OffscreenIndicator.jsx';
 import InteractionSystem from './InteractionSystem.jsx';
 import LocationTracker from './LocationTracker.jsx';
+import PassageTracker from './PassageTracker.jsx';
 import FocusTracker from './FocusTracker.jsx';
 import SpotBeacons from './SpotBeacons.jsx';
 import ResidentController from './ResidentController.jsx';
@@ -177,7 +178,9 @@ function NavigationBuilder({ layout, environment, fileUrl, navigationRef }) {
 	return null;
 }
 
-export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands, occupiedSpots, residentStates = {}, thoughts = {}, speech = {}, playerState, playerCommands, collisionWorldRef, onMovementChange, onGetUpIntent, onMoveIntent, onLocationChange, focusLabelRef, focusEnabled = true, focusedObjectId = null, nearbyObjectIds = [], onFocusChange, onNearbyChange, watchedObjectId = null, onWatchedOutOfReach, paused = false, onResidentVoice, statsRef = null, residentDetails = null }) {
+const NO_PASSAGES = [];
+
+export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, initialFacing = null, linkedPassageIds, onEnterPassage, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands, occupiedSpots, residentStates = {}, thoughts = {}, speech = {}, playerState, playerCommands, collisionWorldRef, onMovementChange, onGetUpIntent, onMoveIntent, onLocationChange, focusLabelRef, focusEnabled = true, focusedObjectId = null, nearbyObjectIds = [], onFocusChange, onNearbyChange, watchedObjectId = null, onWatchedOutOfReach, paused = false, onResidentVoice, statsRef = null, residentDetails = null }) {
 	const [environment, setEnvironment] = useState(null);
 	const audioListener = useRef(null);
 	const [playerPosition, setPlayerPosition] = useState([0, 1.6, 4]);
@@ -208,12 +211,13 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 			<WorldEnvironment url={world.environmentUrl} onReady={handleReady} onError={onError} />
 			{environment && (
 				<>
-					<FirstPersonController collisionWorld={environment.collisionWorld} navigation={navigation} spawnPosition={spawnPosition} enabled={explorationEnabled} onPositionChange={handlePositionChange} playerState={playerState} playerCommands={playerCommands} onMovementChange={onMovementChange} onGetUpIntent={onGetUpIntent} onMoveIntent={onMoveIntent} />
+					<FirstPersonController collisionWorld={environment.collisionWorld} navigation={navigation} spawnPosition={spawnPosition} spawnYaw={initialFacing === null ? null : initialFacing + Math.PI} enabled={explorationEnabled} onPositionChange={handlePositionChange} playerState={playerState} playerCommands={playerCommands} onMovementChange={onMovementChange} onGetUpIntent={onGetUpIntent} onMoveIntent={onMoveIntent} />
 					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} layout={world.layout} onVoice={onResidentVoice} savedState={residentStates[resident.id] ?? homeStates.get(resident.id) ?? null} occupiedSpots={occupiedSpots} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} interaction={interaction} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} residentVoices={residentVoices} audioListener={audioListener} inConversation={resident.id === activeResidentId} navigation={navigation} residentCommands={residentCommands} residentDetails={residentDetails} />)}
 					<PlayerViewTracker viewRef={playerView} playerState={playerState} />
 					<EnvironmentDetail root={environment.root} layout={world.layout} playerState={playerState} />
 					{statsRef && residentDetails && <PerformanceProbe statsRef={statsRef} residentDetails={residentDetails} />}
 					<LocationTracker layout={world.layout} playerState={playerState} onLocationChange={onLocationChange} />
+					<PassageTracker passages={world.layout?.passages ?? NO_PASSAGES} linkedPassageIds={linkedPassageIds} playerState={playerState} enabled={explorationEnabled} onEnter={onEnterPassage} />
 					<FocusTracker layout={world.layout} playerState={playerState} enabled={explorationEnabled && focusEnabled} labelRef={focusLabelRef} onFocusChange={onFocusChange} onNearbyChange={onNearbyChange} watchedObjectId={watchedObjectId} onWatchedOutOfReach={onWatchedOutOfReach} />
 					<SpotBeacons layout={world.layout} focusedObjectId={focusedObjectId} nearbyIds={nearbyObjectIds} occupiedSpots={occupiedSpots} collisionWorld={environment.collisionWorld} />
 					<NameTags residents={world.residents} residentPositions={residentPositions} activeResidentId={activeResidentId} />

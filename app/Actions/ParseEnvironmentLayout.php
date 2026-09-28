@@ -6,9 +6,13 @@ class ParseEnvironmentLayout
 {
     private const POSTURES = ['sitting', 'lying', 'reclining'];
 
-    private const TYPES = ['floor', 'zone', 'entry', 'object', 'spot'];
+    private const TYPES = ['floor', 'zone', 'entry', 'object', 'spot', 'passage'];
 
     private const APPROACH_DISTANCE = 0.6;
+
+    private const PASSAGE_RADIUS = 1.0;
+
+    private const ARRIVAL_DISTANCE = 1.0;
 
     /** @var array<int, array{node: string, reason: string}> */
     private array $warnings = [];
@@ -16,12 +20,12 @@ class ParseEnvironmentLayout
     public function __construct(private readonly ResolveWorldState $resolveWorldState) {}
 
     /**
-     * @return array{layout: array{floors: array, zones: array, objects: array}, warnings: array<int, array{node: string, reason: string}>}
+     * @return array{layout: array{floors: array, zones: array, objects: array, passages: array}, warnings: array<int, array{node: string, reason: string}>}
      */
     public function handle(string $contents): array
     {
         $this->warnings = [];
-        $empty = ['floors' => [], 'zones' => [], 'objects' => []];
+        $empty = ['floors' => [], 'zones' => [], 'objects' => [], 'passages' => []];
         $gltf = $this->readJsonChunk($contents);
 
         if ($gltf === null) {
@@ -36,6 +40,7 @@ class ParseEnvironmentLayout
         $layout = ['floors' => $this->floors($markers), 'zones' => [], 'objects' => []];
         $layout['zones'] = $this->zones($markers, $layout['floors']);
         $layout['objects'] = $this->objects($markers, $layout);
+        $layout['passages'] = $this->passages($markers, $layout);
 
         return ['layout' => $layout, 'warnings' => $this->warnings];
     }
@@ -321,6 +326,47 @@ class ParseEnvironmentLayout
         }
 
         return $spots;
+    }
+
+    /**
+     * @return array<int, array{id: string, name: string, position: array{x: float, y: float, z: float}, facing: float, radius: float, arrival: array{x: float, y: float, z: float}, zoneId: ?string}>
+     */
+    private function passages(array $markers, array $layout): array
+    {
+        $passages = [];
+
+        foreach ($this->ofType($markers, 'passage') as $marker) {
+            if (! $this->hasFields($marker, ['id', 'name']) || ! $this->validId($marker, 'passage', $passages)) {
+                continue;
+            }
+
+            $radius = $marker['vera']['radius'] ?? self::PASSAGE_RADIUS;
+            if (! is_numeric($radius) || $radius <= 0) {
+                $this->warn($marker, 'passage radius must be a number above 0');
+                $radius = self::PASSAGE_RADIUS;
+            }
+
+            $position = $this->position($marker['matrix']);
+            [$dx, , $dz] = $this->transformDirection($marker['matrix'], [0, 0, 1]);
+            $facing = atan2($dx, $dz);
+            $zone = $this->resolveWorldState->zoneAt($layout, $position);
+
+            $passages[] = [
+                'id' => $marker['vera']['id'],
+                'name' => $marker['vera']['name'],
+                'position' => $position,
+                'facing' => round($facing, 6),
+                'radius' => (float) $radius,
+                'arrival' => [
+                    'x' => round($position['x'] + sin($facing) * self::ARRIVAL_DISTANCE, 6),
+                    'y' => $position['y'],
+                    'z' => round($position['z'] + cos($facing) * self::ARRIVAL_DISTANCE, 6),
+                ],
+                'zoneId' => $zone['id'] ?? null,
+            ];
+        }
+
+        return $passages;
     }
 
     /**

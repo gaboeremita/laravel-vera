@@ -2,9 +2,10 @@
 
 namespace App\Http\Resources;
 
+use App\Models\PassageLink;
+use App\Models\Region;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 class WorldResource extends JsonResource
 {
@@ -20,18 +21,29 @@ class WorldResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'description' => $this->description,
-            'environmentUrl' => $this->environment_disk && $this->environment_path ? Storage::disk($this->environment_disk)->url($this->environment_path) : null,
             'assistantContextPrompt' => $this->assistant_context_prompt,
             'npcContextPrompt' => $this->npc_context_prompt,
-            'settings' => $this->settings,
-            'layout' => $this->layout ?? ['floors' => [], 'zones' => [], 'objects' => []],
+            'spawnRegionId' => $this->spawn_region_id,
+            'spawnPassageId' => $this->spawn_passage_id,
+            'hasSpawn' => $this->spawnPassage() !== null,
             'cardImageUrl' => $this->whenLoaded('cardImage', fn () => $this->cardImage?->url),
             'portraitImageUrl' => $this->whenLoaded('portraitImage', fn () => $this->portraitImage?->url),
-            'trackUrl' => $this->whenLoaded('track', fn () => $this->track?->url),
-            'trackOriginalName' => $this->whenLoaded('track', fn () => $this->track?->original_name),
-            'residents' => $this->relationLoaded('residents')
-                ? WorldResidentResource::collection($this->residents)
-                : [],
+            'regionCount' => $this->whenCounted('regions'),
+            'regions' => $this->whenLoaded('regions', fn () => $this->regions->map(fn (Region $region) => [
+                'id' => $region->id,
+                'name' => $region->name,
+                'passages' => collect($region->layout['passages'] ?? [])->map(fn (array $passage) => ['id' => $passage['id'], 'name' => $passage['name']])->values(),
+                'links' => $region->passageLinks->map(fn (PassageLink $link) => [
+                    'passageId' => $link->passage_id,
+                    'targetRegionId' => $link->target_region_id,
+                    'targetPassageId' => $link->target_passage_id,
+                ])->values(),
+                'warnings' => [
+                    'noPassages' => empty($region->layout['passages']),
+                    'unlinkedPassages' => count($region->layout['passages'] ?? []) - $region->passageLinks->count(),
+                ],
+            ])->values()),
+            'residents' => $this->whenLoaded('residents', fn () => WorldResidentResource::collection($this->residents)),
         ];
     }
 }

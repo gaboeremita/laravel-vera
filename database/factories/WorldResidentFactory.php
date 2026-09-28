@@ -4,7 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\WorldResidentBehavior;
 use App\Models\Assistant;
-use App\Models\World;
+use App\Models\Region;
 use App\Models\WorldResident;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -21,7 +21,7 @@ class WorldResidentFactory extends Factory
     public function definition(): array
     {
         return [
-            'world_id' => World::factory(),
+            'region_id' => Region::factory(),
             'assistant_id' => Assistant::factory(),
             'position' => ['x' => 0, 'y' => 0, 'z' => 0],
             'rotation' => ['x' => 0, 'y' => 0, 'z' => 0],

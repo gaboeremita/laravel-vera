@@ -6,11 +6,14 @@ use App\Models\AiModel;
 use App\Models\AiProvider;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
+use App\Models\Region;
 use App\Models\Settings;
 use App\Models\User;
 use App\Models\VrmFile;
-use App\Models\World;
 use App\Models\WorldResident;
+use App\Models\WorldSession;
+use App\Models\WorldSessionResident;
+use App\Models\WorldUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -45,24 +48,24 @@ function residentAssistantFor(User $user, ?bool $modelSupportsTools = true, Assi
 
 it('adds and removes a resident placement without deleting the character', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
     $payload = ['position' => ['x' => 1, 'y' => 0, 'z' => 2], 'behavior' => 'roam', 'behaviorSettings' => ['radius' => 1]];
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), $payload)
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), $payload)
         ->assertSuccessful()
         ->assertJsonPath('assistant.id', $assistant->id)
         ->assertJsonPath('behavior', 'roam');
 
-    $this->actingAs($user)->deleteJson(route('worlds.residents.destroy', [$world, $assistant]))->assertNoContent();
+    $this->actingAs($user)->deleteJson(route('worlds.regions.residents.destroy', [$world->world_id, $world, $assistant]))->assertNoContent();
 
-    expect(WorldResident::where('world_id', $world->id)->exists())->toBeFalse();
+    expect(WorldResident::where('region_id', $world->id)->exists())->toBeFalse();
     expect(Assistant::find($assistant->id))->not->toBeNull();
 });
 
 it('persists a resident-specific opening message and custom prompt', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
     $payload = [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
@@ -71,19 +74,19 @@ it('persists a resident-specific opening message and custom prompt', function ()
         'customPrompt' => 'You are especially wary of strangers near the archive.',
     ];
 
-    $response = $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), $payload)
+    $response = $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), $payload)
         ->assertSuccessful()
         ->assertJsonPath('openingMessage', $payload['openingMessage'])
         ->assertJsonPath('customPrompt', $payload['customPrompt']);
 
-    expect(WorldResident::where('world_id', $world->id)->where('assistant_id', $assistant->id)->first())
+    expect(WorldResident::where('region_id', $world->id)->where('assistant_id', $assistant->id)->first())
         ->opening_message->toBe($payload['openingMessage'])
         ->custom_prompt->toBe($payload['customPrompt']);
 });
 
 it('persists the resident facing rotation', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
     $payload = [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
@@ -91,21 +94,21 @@ it('persists the resident facing rotation', function () {
         'behavior' => 'stationary',
     ];
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), $payload)
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), $payload)
         ->assertSuccessful()
         ->assertJsonPath('rotation.y', 1.5708);
 
-    expect(WorldResident::where('world_id', $world->id)->where('assistant_id', $assistant->id)->first()->rotation)
+    expect(WorldResident::where('region_id', $world->id)->where('assistant_id', $assistant->id)->first()->rotation)
         ->toBe($payload['rotation']);
 });
 
 it('rejects a resident without a VRM asset', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = Assistant::factory()->create(['portrait_type' => AssistantPortraitType::Avatar3D]);
     AssistantUser::factory()->create(['assistant_id' => $assistant->id, 'user_id' => $user->id]);
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), [
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'stationary',
     ])->assertUnprocessable();
@@ -113,15 +116,15 @@ it('rejects a resident without a VRM asset', function () {
 
 it('rejects a resident whose model cannot call tools', function (?bool $modelSupportsTools) {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user, $modelSupportsTools);
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), [
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'stationary',
     ])->assertUnprocessable()->assertJsonPath('message', 'Assistants living in a world need a model that supports tool calling. Choose one in this assistant\'s settings.');
 
-    expect(WorldResident::where('world_id', $world->id)->exists())->toBeFalse();
+    expect(WorldResident::where('region_id', $world->id)->exists())->toBeFalse();
 })->with([
     'model without tool calling' => [false],
     'no model selected' => [null],
@@ -129,10 +132,10 @@ it('rejects a resident whose model cannot call tools', function (?bool $modelSup
 
 it('places an NPC on the default model', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $npc = residentAssistantFor($user, null, AssistantKind::WorldNpc);
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $npc]), [
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $npc]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'stationary',
     ])->assertSuccessful();
@@ -140,10 +143,10 @@ it('places an NPC on the default model', function () {
 
 it('accepts an autonomous resident', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), [
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'autonomous',
     ])->assertSuccessful()->assertJsonPath('behavior', 'autonomous');
@@ -151,7 +154,7 @@ it('accepts an autonomous resident', function () {
 
 it('persists the groups and private zones a resident may enter', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
     $payload = [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
@@ -159,29 +162,29 @@ it('persists the groups and private zones a resident may enter', function () {
         'zoneAccess' => ['tags' => [' deprecated '], 'zones' => ['mona-house']],
     ];
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), $payload)
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), $payload)
         ->assertSuccessful()
         ->assertJsonPath('zoneAccess', ['tags' => ['deprecated'], 'zones' => ['mona-house']]);
 
-    expect(WorldResident::where('world_id', $world->id)->firstOrFail()->zone_access)->toBe(['tags' => ['deprecated'], 'zones' => ['mona-house']]);
+    expect(WorldResident::where('region_id', $world->id)->firstOrFail()->zone_access)->toBe(['tags' => ['deprecated'], 'zones' => ['mona-house']]);
 });
 
 it('returns empty zone access for a resident without any', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), ['position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary'])
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), ['position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary'])
         ->assertSuccessful()
         ->assertJsonPath('zoneAccess', ['tags' => [], 'zones' => []]);
 });
 
 it('rejects malformed zone access', function (array $zoneAccess, string $error) {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), [
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'stationary',
         'zoneAccess' => $zoneAccess,
@@ -195,7 +198,7 @@ it('rejects malformed zone access', function (array $zoneAccess, string $error) 
 
 it('persists a route, a home spot, the area she keeps to and her decision pace', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $npc = residentAssistantFor($user, null, AssistantKind::WorldNpc);
     $settings = [
         'homeSpot' => ['spotId' => 'toll-booth-stool', 'activityId' => 'man-the-toll-booth'],
@@ -204,35 +207,35 @@ it('persists a route, a home spot, the area she keeps to and her decision pace',
         'decisionSeconds' => ['min' => 30, 'max' => 60],
     ];
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $npc]), [
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $npc]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'route',
         'behaviorSettings' => $settings,
     ])->assertSuccessful()->assertJsonPath('behavior', 'route')->assertJsonPath('behaviorSettings.area', ['fork-yard']);
 
-    expect(WorldResident::where('world_id', $world->id)->firstOrFail()->behavior_settings)->toBe($settings);
+    expect(WorldResident::where('region_id', $world->id)->firstOrFail()->behavior_settings)->toBe($settings);
 });
 
 it('persists the resident posture', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), [
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'stationary',
         'posture' => 'sitting',
     ])->assertSuccessful()->assertJsonPath('posture', 'sitting');
 
-    expect(WorldResident::where('world_id', $world->id)->firstOrFail()->posture->value)->toBe('sitting');
+    expect(WorldResident::where('region_id', $world->id)->firstOrFail()->posture->value)->toBe('sitting');
 });
 
 it('defaults the resident posture to standing when not provided', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), [
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'stationary',
     ])->assertSuccessful()->assertJsonPath('posture', 'standing');
@@ -240,10 +243,10 @@ it('defaults the resident posture to standing when not provided', function () {
 
 it('rejects an invalid posture value', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $assistant = residentAssistantFor($user);
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $assistant]), [
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => 'stationary',
         'posture' => 'floating',
@@ -252,10 +255,10 @@ it('rejects an invalid posture value', function () {
 
 it('rejects malformed behavior settings', function (string $behavior, array $settings, string $error) {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $world = Region::factory()->forUser($user)->create();
     $npc = residentAssistantFor($user, null, AssistantKind::WorldNpc);
 
-    $this->actingAs($user)->putJson(route('worlds.residents.upsert', [$world, $npc]), [
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $npc]), [
         'position' => ['x' => 0, 'y' => 0, 'z' => 0],
         'behavior' => $behavior,
         'behaviorSettings' => $settings,
@@ -269,3 +272,59 @@ it('rejects malformed behavior settings', function (string $behavior, array $set
     'pace slower at its minimum than its maximum' => ['autonomous', ['decisionSeconds' => ['min' => 60, 'max' => 30]], 'behaviorSettings.decisionSeconds.max'],
     'pace faster than ten seconds' => ['autonomous', ['decisionSeconds' => ['min' => 2, 'max' => 30]], 'behaviorSettings.decisionSeconds.min'],
 ]);
+
+it('refuses to add a resident of another region of the same world', function () {
+    $user = User::factory()->create();
+    $harbor = Region::factory()->forUser($user)->create(['name' => 'Harbor']);
+    $penthouse = Region::factory()->create(['world_id' => $harbor->world_id]);
+    $assistant = residentAssistantFor($user);
+    $harbor->residents()->create(['assistant_id' => $assistant->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
+
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$penthouse->world_id, $penthouse, $assistant]), ['position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary'])
+        ->assertConflict()
+        ->assertJsonPath('regionId', $harbor->id)
+        ->assertJsonPath('regionName', 'Harbor');
+});
+
+it('lets the same assistant be a resident of a region in another world', function () {
+    $user = User::factory()->create();
+    $assistant = residentAssistantFor($user);
+    Region::factory()->forUser($user)->create()->residents()->create(['assistant_id' => $assistant->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
+    $elsewhere = Region::factory()->forUser($user)->create();
+
+    $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$elsewhere->world_id, $elsewhere, $assistant]), ['position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary'])
+        ->assertSuccessful()
+        ->assertJsonPath('regionId', $elsewhere->id);
+});
+
+it('moves a resident to another region with the default placement, keeping existing sessions as they were', function () {
+    $user = User::factory()->create();
+    $harbor = Region::factory()->forUser($user)->create();
+    $penthouse = Region::factory()->create(['world_id' => $harbor->world_id]);
+    $assistant = residentAssistantFor($user);
+    $resident = $harbor->residents()->create(['assistant_id' => $assistant->id, 'position' => ['x' => 4, 'y' => 0, 'z' => 2], 'rotation' => ['x' => 0, 'y' => 1.5, 'z' => 0], 'behavior' => 'roam']);
+    $worldUser = WorldUser::where('world_id', $harbor->world_id)->where('user_id', $user->id)->firstOrFail();
+    $untouched = WorldSession::factory()->for($worldUser)->create();
+    $travelled = WorldSession::factory()->for($worldUser)->create();
+    WorldSessionResident::factory()->create(['world_session_id' => $travelled->id, 'world_resident_id' => $resident->id, 'region_id' => $penthouse->id, 'position' => ['x' => 9, 'y' => 0, 'z' => 9]]);
+
+    $this->actingAs($user)->postJson(route('worlds.regions.residents.move', [$penthouse->world_id, $penthouse, $assistant]))
+        ->assertSuccessful()
+        ->assertJsonPath('regionId', $penthouse->id)
+        ->assertJsonPath('position', ['x' => 0, 'y' => 0, 'z' => 0])
+        ->assertJsonPath('behavior', 'stationary');
+
+    $kept = WorldSessionResident::where('world_session_id', $untouched->id)->firstOrFail();
+    expect($kept->region_id)->toBe($harbor->id)
+        ->and($kept->position)->toBe(['x' => 4, 'y' => 0, 'z' => 2])
+        ->and($kept->rotation)->toBe(['y' => 1.5])
+        ->and(WorldSessionResident::where('world_session_id', $travelled->id)->firstOrFail()->position)->toBe(['x' => 9, 'y' => 0, 'z' => 9]);
+});
+
+it('does not move an assistant who is not a resident of the world', function () {
+    $user = User::factory()->create();
+    $region = Region::factory()->forUser($user)->create();
+    $assistant = residentAssistantFor($user);
+
+    $this->actingAs($user)->postJson(route('worlds.regions.residents.move', [$region->world_id, $region, $assistant]))->assertNotFound();
+});

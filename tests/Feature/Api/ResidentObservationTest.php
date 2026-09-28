@@ -2,8 +2,8 @@
 
 use App\Models\AssistantUser;
 use App\Models\Conversation;
+use App\Models\Region;
 use App\Models\User;
-use App\Models\World;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
@@ -14,7 +14,7 @@ function postObservation($test, array $scenario, array $payload, ?User $as = nul
 {
     [$user, , , $world, $resident, $session] = $scenario;
 
-    return $test->actingAs($as ?? $user)->postJson(route('worlds.sessions.residents.observations.store', [$world->id, $session->id, $residentId ?? $resident->id]), $payload);
+    return $test->actingAs($as ?? $user)->postJson(route('worlds.sessions.residents.observations.store', [$world->world_id, $session->id, $residentId ?? $resident->id]), $payload);
 }
 
 function sessionConversation(array $scenario): ?Conversation
@@ -67,7 +67,7 @@ it('refuses another user\'s world session', function () {
 it('refuses a resident of another world', function () {
     $scenario = worldStateScenario(fakeReply: false);
     [$user, $assistant] = $scenario;
-    $otherWorld = World::factory()->forUser($user)->create();
+    $otherWorld = Region::factory()->forUser($user)->create();
     $stranger = $otherWorld->residents()->create(['assistant_id' => $assistant->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
 
     postObservation($this, $scenario, ['line' => '*I see the user sit down*'], residentId: $stranger->id)->assertNotFound();

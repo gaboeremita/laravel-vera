@@ -16,6 +16,7 @@ class WorldSessionResident extends Model
     protected $fillable = [
         'world_session_id',
         'world_resident_id',
+        'region_id',
         'position',
         'rotation',
         'spot_id',
@@ -49,5 +50,10 @@ class WorldSessionResident extends Model
     public function worldResident(): BelongsTo
     {
         return $this->belongsTo(WorldResident::class);
+    }
+
+    public function region(): BelongsTo
+    {
+        return $this->belongsTo(Region::class);
     }
 }

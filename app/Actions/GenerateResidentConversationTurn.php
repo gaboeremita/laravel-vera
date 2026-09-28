@@ -43,6 +43,7 @@ class GenerateResidentConversationTurn
         private readonly AppendWorldConversationContext $appendWorldConversationContext,
         private readonly BuildResidentWorldPrompt $buildResidentWorldPrompt,
         private readonly LlmResponseTagParser $tagParser,
+        private readonly ResolveResidentRegion $resolveResidentRegion,
     ) {}
 
     /**
@@ -82,10 +83,11 @@ class GenerateResidentConversationTurn
             return ['status' => 'paused'];
         }
 
-        $world = $session->worldUser->world;
+        $speakerResident = $session->worldUser->world->residents()->where('assistant_id', $speaker->id)->firstOrFail();
+        $region = $this->resolveResidentRegion->handle($session, $speakerResident);
         $assistantUser = AssistantUser::where('user_id', $session->worldUser->user_id)->where('assistant_id', $speaker->id)->firstOrFail();
 
-        $director = new PromptDirector($this->appendWorldConversationContext->handle($speaker, $world, $positions, $session));
+        $director = new PromptDirector($this->appendWorldConversationContext->handle($speaker, $region, $positions, $session));
         $director->append('talking with', $this->buildResidentWorldPrompt->conversationTurnInstruction($other->name));
         $excluded = ['opening_message', 'voice mode', 'image handling', 'OOC mode', 'conversations_with_others'];
         $this->appendExpressionTags->handle($director, $speaker, $excluded, $posturesByAssistantId[$speaker->id] ?? Posture::Standing);

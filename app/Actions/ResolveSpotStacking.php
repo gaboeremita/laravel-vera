@@ -2,7 +2,7 @@
 
 namespace App\Actions;
 
-use App\Models\World;
+use App\Models\Region;
 use App\Models\WorldResident;
 use Illuminate\Validation\ValidationException;
 
@@ -30,9 +30,9 @@ class ResolveSpotStacking
      *
      * @throws ValidationException
      */
-    public function handle(World $world, WorldResident $resident, array $stackedSpots): array
+    public function handle(Region $region, WorldResident $resident, array $stackedSpots): array
     {
-        $names = $world->residents()->with('assistant')->get()
+        $names = $region->world->residents()->with('assistant')->get()
             ->mapWithKeys(fn (WorldResident $candidate) => [(string) $candidate->id => $candidate->assistant->name])
             ->put('user', 'the user');
         $self = (string) $resident->id;
@@ -44,7 +44,7 @@ class ResolveSpotStacking
                 continue;
             }
 
-            $object = $this->objectWithSpot($world, $spotId);
+            $object = $this->objectWithSpot($region, $spotId);
             if ($object === null) {
                 throw ValidationException::withMessages(["stackedSpots.{$index}.spotId" => 'There is no spot with this id in the world.']);
             }
@@ -62,9 +62,9 @@ class ResolveSpotStacking
         return $phrases;
     }
 
-    private function objectWithSpot(World $world, string $spotId): ?array
+    private function objectWithSpot(Region $region, string $spotId): ?array
     {
-        foreach ($world->layout['objects'] ?? [] as $object) {
+        foreach ($region->layout['objects'] ?? [] as $object) {
             if (collect($object['spots'])->contains('id', $spotId)) {
                 return $object;
             }

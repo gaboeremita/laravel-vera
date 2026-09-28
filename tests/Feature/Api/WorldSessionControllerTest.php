@@ -1,9 +1,14 @@
 <?php
 
+use App\Actions\LinkPassages;
+use App\Models\Assistant;
 use App\Models\Conversation;
+use App\Models\Region;
 use App\Models\User;
 use App\Models\World;
+use App\Models\WorldResident;
 use App\Models\WorldSession;
+use App\Models\WorldSessionResident;
 use App\Models\WorldUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -46,17 +51,27 @@ it('returns 404 listing sessions for a world the requester has no access to', fu
     $this->actingAs($user)->getJson(route('worlds.sessions.index', $world))->assertNotFound();
 });
 
-it('creates a new session defaulting to title New session and null position', function () {
+it('creates a new session in front of the spawn point', function () {
     $user = User::factory()->create();
-    $world = World::factory()->forUser($user)->create();
+    $region = Region::factory()->forUser($user)->withLayout()->create();
+    $region->world->update(['spawn_region_id' => $region->id, 'spawn_passage_id' => 'studio-door']);
 
-    $response = $this->actingAs($user)->postJson(route('worlds.sessions.store', $world))
+    $this->actingAs($user)->postJson(route('worlds.sessions.store', $region->world_id))
         ->assertCreated()
         ->assertJsonPath('title', 'New session')
-        ->assertJsonPath('position', null);
+        ->assertJsonPath('region_id', $region->id)
+        ->assertJsonPath('position', ['x' => -5, 'y' => 0, 'z' => 1.5]);
+});
 
-    $worldUser = WorldUser::where('world_id', $world->id)->where('user_id', $user->id)->firstOrFail();
-    expect(WorldSession::where('world_user_id', $worldUser->id)->count())->toBe(1);
+it('refuses to start a session while the world has no spawn point', function () {
+    $user = User::factory()->create();
+    $region = Region::factory()->forUser($user)->withLayout()->create();
+
+    $this->actingAs($user)->postJson(route('worlds.sessions.store', $region->world_id))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('world');
+
+    expect(WorldSession::count())->toBe(0);
 });
 
 it('returns 404 creating a session for a world the requester has no access to', function () {
@@ -167,4 +182,105 @@ it('returns 404 deleting a session the requester does not own', function () {
     $intruder = User::factory()->create();
 
     $this->actingAs($intruder)->deleteJson(route('worlds.sessions.destroy', [$world, $session]))->assertNotFound();
+});
+
+/**
+ * Two linked regions of one world, a session in the first, and a resident there.
+ *
+ * @return array{0: User, 1: Region, 2: Region, 3: WorldSession, 4: WorldResident}
+ */
+function linkedRegionsScenario(): array
+{
+    $user = User::factory()->create();
+    $lobby = Region::factory()->forUser($user)->withLayout()->create();
+    $penthouse = Region::factory()->withLayout()->create(['world_id' => $lobby->world_id]);
+    app(LinkPassages::class)->link($lobby, 'studio-door', $penthouse, 'terrace-gate');
+    $worldUser = WorldUser::where('world_id', $lobby->world_id)->where('user_id', $user->id)->firstOrFail();
+    $session = WorldSession::factory()->for($worldUser)->create(['region_id' => $lobby->id, 'position' => ['x' => -5, 'y' => 0, 'z' => 3]]);
+    $resident = $lobby->residents()->create(['assistant_id' => Assistant::factory()->create()->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
+
+    return [$user, $lobby, $penthouse, $session, $resident];
+}
+
+it('travels to the linked passage with the residents following the player', function () {
+    [$user, $lobby, $penthouse, $session, $follower] = linkedRegionsScenario();
+    $stayer = $lobby->residents()->create(['assistant_id' => Assistant::factory()->create()->id, 'position' => ['x' => 1, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
+
+    $this->actingAs($user)->postJson(route('worlds.sessions.travel', [$lobby->world_id, $session]), ['regionId' => $lobby->id, 'passageId' => 'studio-door', 'followerIds' => [$follower->id]])
+        ->assertSuccessful()
+        ->assertJsonPath('regionId', $penthouse->id)
+        ->assertJsonPath('position', ['x' => 5, 'y' => 0, 'z' => -8.5])
+        ->assertJsonPath('followers.'.$follower->id.'.position.z', -8.5);
+
+    expect($session->fresh()->region_id)->toBe($penthouse->id)
+        ->and($session->fresh()->position)->toBe(['x' => 5, 'y' => 0, 'z' => -8.5])
+        ->and(WorldSessionResident::where('world_resident_id', $follower->id)->firstOrFail()->region_id)->toBe($penthouse->id)
+        ->and(WorldSessionResident::where('world_resident_id', $stayer->id)->exists())->toBeFalse();
+
+    $this->actingAs($user)->getJson(route('worlds.sessions.index', $lobby->world_id))
+        ->assertJsonPath('0.regionId', $penthouse->id)
+        ->assertJsonPath('0.residentStates.'.$follower->id.'.regionId', $penthouse->id);
+});
+
+it('travels back the other way through the same link', function () {
+    [$user, $lobby, $penthouse, $session] = linkedRegionsScenario();
+    $session->update(['region_id' => $penthouse->id]);
+
+    $this->actingAs($user)->postJson(route('worlds.sessions.travel', [$lobby->world_id, $session]), ['regionId' => $penthouse->id, 'passageId' => 'terrace-gate'])
+        ->assertSuccessful()
+        ->assertJsonPath('regionId', $lobby->id)
+        ->assertJsonPath('position', ['x' => -5, 'y' => 0, 'z' => 1.5]);
+});
+
+it('does not travel through an unlinked passage or from a region the session is not in', function (Closure $payload) {
+    [$user, $lobby, $penthouse, $session] = linkedRegionsScenario();
+
+    $this->actingAs($user)->postJson(route('worlds.sessions.travel', [$lobby->world_id, $session]), $payload($lobby, $penthouse))
+        ->assertUnprocessable();
+
+    expect($session->fresh()->region_id)->toBe($lobby->id);
+})->with([
+    'unlinked passage' => [fn (Region $lobby) => ['regionId' => $lobby->id, 'passageId' => 'terrace-gate']],
+    'another region' => [fn (Region $lobby, Region $penthouse) => ['regionId' => $penthouse->id, 'passageId' => 'terrace-gate']],
+]);
+
+it('does not bring along a resident who is in another region', function () {
+    [$user, $lobby, $penthouse, $session] = linkedRegionsScenario();
+    $elsewhere = $penthouse->residents()->create(['assistant_id' => Assistant::factory()->create()->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary']);
+
+    $this->actingAs($user)->postJson(route('worlds.sessions.travel', [$lobby->world_id, $session]), ['regionId' => $lobby->id, 'passageId' => 'studio-door', 'followerIds' => [$elsewhere->id]])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('followerIds');
+
+    expect($session->fresh()->region_id)->toBe($lobby->id);
+});
+
+it('resumes a session whose region was deleted in front of the spawn point', function () {
+    [$user, $lobby, $penthouse, $session] = linkedRegionsScenario();
+    $lobby->world->update(['spawn_region_id' => $lobby->id, 'spawn_passage_id' => 'studio-door']);
+    $session->update(['region_id' => $penthouse->id]);
+    $penthouse->delete();
+
+    $this->actingAs($user)->postJson(route('worlds.sessions.resume', [$lobby->world_id, $session]))
+        ->assertSuccessful()
+        ->assertJsonPath('regionId', $lobby->id)
+        ->assertJsonPath('position', ['x' => -5, 'y' => 0, 'z' => 1.5]);
+});
+
+it('cannot resume a session whose region was deleted while there is no spawn point', function () {
+    [$user, $lobby, $penthouse, $session] = linkedRegionsScenario();
+    $session->update(['region_id' => $penthouse->id]);
+    $penthouse->delete();
+
+    $this->actingAs($user)->postJson(route('worlds.sessions.resume', [$lobby->world_id, $session]))->assertUnprocessable();
+});
+
+it('keeps the region a moved resident belongs to when their current region is deleted', function () {
+    [$user, $lobby, $penthouse, $session, $resident] = linkedRegionsScenario();
+    WorldSessionResident::factory()->create(['world_session_id' => $session->id, 'world_resident_id' => $resident->id, 'region_id' => $penthouse->id]);
+
+    $penthouse->delete();
+
+    expect(WorldSessionResident::count())->toBe(0)
+        ->and($resident->fresh()->region_id)->toBe($lobby->id);
 });
