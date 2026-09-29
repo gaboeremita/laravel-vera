@@ -130,3 +130,27 @@ it('keeps another user\'s session out of reach', function () {
     $this->actingAs($stranger)->postJson(route('worlds.sessions.quest-offers.answer', [$region->world_id, $session->id, $tool->offer->id]), ['accept' => true])->assertNotFound();
     expect(WorldSession::find($session->id)->questRuns()->first()->status)->toBe(QuestStatus::Available);
 });
+
+it('lists the session\'s quest events oldest first, marking the creator\'s', function () {
+    [$user, , , $region, , $session] = worldStateScenario();
+    $quest = worldQuest($region->world, [], ['title' => 'The Mill']);
+    $run = WorldSessionQuest::factory()->active()->create(['world_session_id' => $session->id, 'quest_id' => $quest->id]);
+    QuestEvent::factory()->create(['world_session_quest_id' => $run->id, 'type' => QuestEventType::Started]);
+    QuestEvent::factory()->create(['world_session_quest_id' => $run->id, 'type' => QuestEventType::BeatFinished, 'beat' => 'first', 'by_creator' => true]);
+
+    $this->actingAs($user)->getJson(route('worlds.sessions.quest-events.index', [$region->world_id, $session->id]))
+        ->assertOk()
+        ->assertJsonPath('0.type', 'started')
+        ->assertJsonPath('1.beat', 'first')
+        ->assertJsonPath('1.byCreator', true)
+        ->assertJsonPath('1.questTitle', 'The Mill');
+});
+
+it('shows empty logs for a session with no quests, and keeps another user\'s out', function () {
+    [$user, , , $region, , $session] = worldStateScenario();
+
+    $this->actingAs($user)->getJson(route('worlds.sessions.quest-events.index', [$region->world_id, $session->id]))->assertOk()->assertExactJson([]);
+    $this->getJson(route('worlds.sessions.quests.index', [$region->world_id, $session->id]))->assertOk()->assertJsonPath('runs', []);
+
+    $this->actingAs(User::factory()->create())->getJson(route('worlds.sessions.quest-events.index', [$region->world_id, $session->id]))->assertNotFound();
+});

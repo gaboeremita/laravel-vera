@@ -4,6 +4,7 @@ import { route } from 'ziggy-js';
 import Header from '../components/Header.jsx';
 import WorldSessionList from '../components/WorldSessionList.jsx';
 import RevealLog from '../components/RevealLog.jsx';
+import QuestEventLog from '../components/QuestEventLog.jsx';
 import useWorldSessions from '../hooks/useWorldSessions.js';
 import { api } from '../utils/api.js';
 
@@ -80,6 +81,7 @@ export default function WorldSessionsPage() {
 					onRename={handleRename}
 				/>
 				<RevealLog worldId={worldId} sessions={sessions} addToast={addToast} />
+				<QuestEventLog worldId={worldId} sessions={sessions} addToast={addToast} />
 			</div>
 		</>
 	);

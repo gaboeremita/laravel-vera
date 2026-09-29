@@ -150,6 +150,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/worlds/{world}/sessions/{session}/objects/{object}', [InventoryController::class, 'object'])->name('worlds.sessions.objects.show');
     Route::get('/worlds/{world}/sessions/{session}/known-facts', [FactPlayController::class, 'index'])->name('worlds.sessions.known-facts.index');
     Route::get('/worlds/{world}/sessions/{session}/quests', [QuestPlayController::class, 'index'])->name('worlds.sessions.quests.index');
+    Route::get('/worlds/{world}/sessions/{session}/quest-events', [QuestPlayController::class, 'events'])->name('worlds.sessions.quest-events.index');
     Route::post('/worlds/{world}/sessions/{session}/quest-runs/{run}/abandon', [QuestPlayController::class, 'abandon'])->name('worlds.sessions.quest-runs.abandon');
     Route::post('/worlds/{world}/sessions/{session}/quest-offers/{offer}/answer', [QuestOfferController::class, 'answer'])->name('worlds.sessions.quest-offers.answer');
     Route::post('/worlds/{world}/sessions/{session}/conversations/{conversation}/quest-offers/withdraw', [QuestOfferController::class, 'withdraw'])->name('worlds.sessions.conversations.quest-offers.withdraw');

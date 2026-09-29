@@ -46,6 +46,7 @@ import QuestTracker from '../components/world/hud/QuestTracker.jsx';
 import BeatNotice from '../components/world/hud/BeatNotice.jsx';
 import EndingCard from '../components/world/hud/EndingCard.jsx';
 import QuestOfferCard from '../components/world/hud/QuestOfferCard.jsx';
+import QuestLogPanel from '../components/world/hud/QuestLogPanel.jsx';
 
 const INVITE_MS = 30000;
 const LISTEN_DISTANCE = 12;
@@ -81,6 +82,7 @@ export default function WorldPage() {
 	const [pendingPassage, setPendingPassage] = useState(null);
 	const [inventoryOpen, setInventoryOpen] = useState(false);
 	const [learnedOpen, setLearnedOpen] = useState(false);
+	const [questLogOpen, setQuestLogOpen] = useState(false);
 	const [handoverRequest, setHandoverRequest] = useState(null);
 	const [questOffer, setQuestOffer] = useState(null);
 	const [questOfferOpen, setQuestOfferOpen] = useState(false);
@@ -378,6 +380,27 @@ export default function WorldPage() {
 		window.addEventListener('keydown', keyDown);
 		return () => window.removeEventListener('keydown', keyDown);
 	}, [sessionId]);
+
+	useEffect(() => {
+		const keyDown = (event) => {
+			if (event.code !== 'KeyK' || event.repeat || isTypingTarget(event.target) || !sessionId) return;
+			event.preventDefault();
+			setQuestLogOpen(true);
+		};
+		window.addEventListener('keydown', keyDown);
+		return () => window.removeEventListener('keydown', keyDown);
+	}, [sessionId]);
+
+	const abandonQuest = useCallback(async (runId) => {
+		try {
+			const response = await api.post(route('worlds.sessions.quest-runs.abandon', { world: worldId, session: sessionId, run: runId }), {});
+			const body = await response.json();
+			if (!response.ok) throw new Error(body.message);
+			applyQuestRun(body);
+		} catch (error) {
+			addToast(error.message || 'Unable to abandon the quest', 'error');
+		}
+	}, [worldId, sessionId, applyQuestRun, addToast]);
 
 	const travel = useCallback(async (passage) => {
 		if (travelingRef.current || !sessionId || !region) return;
@@ -842,7 +865,7 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready' && !paused} voiceUntil={voiceUntil} />
-				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !learnedOpen && !handoverRequest && !player.purchase && !quests.ending && !questOfferOpen} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
+				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !learnedOpen && !questLogOpen && !handoverRequest && !player.purchase && !quests.ending && !questOfferOpen} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
 				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} hasInventory={!!sessionId} />{hasZones && readoutText && <LocationReadout text={readoutText} />}{sessionId && <CreditsReadout credits={inventory?.credits} />}{sessionId && <QuestTracker runs={quests.runs} />}{quests.notice && <BeatNotice key={quests.notice.key} notice={quests.notice} onDone={quests.dismissNotice} />}</div>} />}
 				{status === 'ready' && (
 					<>
@@ -862,6 +885,7 @@ export default function WorldPage() {
 				{chatResident && <OffscreenIndicator ref={offscreenIndicator} name={chatResident.assistant.name} />}
 				{narration && <NarrationCard key={narration.key} title={narration.title} narration={narration.narration} succeeded={narration.succeeded} changes={narration.changes} onDone={() => setNarration(null)} />}
 				{learnedOpen && <LearnedFactsPanel knownFacts={knownFacts} onClose={() => setLearnedOpen(false)} />}
+				{questLogOpen && <QuestLogPanel runs={quests.runs} campaigns={quests.campaigns} onAbandon={abandonQuest} onRetry={(runId) => void quests.retryEnding(runId)} onShowEnding={(ending) => { setQuestLogOpen(false); quests.showEnding(ending); }} onClose={() => setQuestLogOpen(false)} />}
 				{quests.ending && !handoverRequest && <EndingCard key={quests.ending.key} ending={quests.ending} onRetry={quests.ending.runId ? () => { void quests.retryEnding(quests.ending.runId); quests.dismissEnding(); } : null} onClose={quests.dismissEnding} />}
 				{inventoryOpen && <InventoryPanel worldId={worldId} sessionId={sessionId} inventory={inventory} busyItemId={busyItemId} onExamine={examineItem} onUse={tryItem} onClose={() => setInventoryOpen(false)} />}
 				{player.purchase && !handoverRequest && <HandoverRequestConfirm key={player.purchase.id} request={player.purchase} isAnswering={false} label="A PURCHASE" verb="charges you" confirmLabel="PAY" declineLabel="CANCEL" onAccept={player.confirmPurchase} onDecline={player.cancelPurchase} />}

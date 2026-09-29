@@ -200,11 +200,11 @@ description: "Task list for Quests for Worlds"
 
 **Independent Test**: [quickstart.md](quickstart.md) step 9.
 
-- [ ] T068 [US9] Implement `questEvents` in `app/Http/Controllers/Api/QuestPlayController.php` and its route per [contracts/api.md](contracts/api.md) in `routes/api.php`
-- [ ] T069 [P] [US9] Extend `tests/Feature/Api/QuestPlayControllerTest.php` (US9 cases): the log is oldest first with creator marks; empty states; another user's session 404
-- [ ] T070 [P] [US9] Build `resources/js/components/world/hud/QuestLogPanel.jsx` in the style of `LearnedFactsPanel`: "QUESTS" title, campaigns grouping their quests, each quest's latest run with finished and current visible beats or its ending, earlier runs under it, "ABANDON" with "Abandon this quest?" confirmation, "WRITE IT AGAIN" for failed endings, keyboard navigation, empty state; follow the UI standard
-- [ ] T071 [US9] Open `QuestLogPanel` with K in `resources/js/pages/WorldPage.jsx` and add K to `resources/js/components/world/hud/ControlsLegend.jsx`
-- [ ] T072 [US9] Build `resources/js/components/QuestEventLog.jsx` (each event with quest, run, beat, type, payload summary, creator mark, time; empty state) and show it per session under its approved label "Quest log" in `resources/js/pages/WorldSessionsPage.jsx` beside `RevealLog`; this is the author's quest event log, separate from the player's `QuestLogPanel`; follow the UI standard
+- [X] T068 [US9] Implement `questEvents` in `app/Http/Controllers/Api/QuestPlayController.php` and its route per [contracts/api.md](contracts/api.md) in `routes/api.php`
+- [X] T069 [P] [US9] Extend `tests/Feature/Api/QuestPlayControllerTest.php` (US9 cases): the log is oldest first with creator marks; empty states; another user's session 404
+- [X] T070 [P] [US9] Build `resources/js/components/world/hud/QuestLogPanel.jsx` in the style of `LearnedFactsPanel`: "QUESTS" title, campaigns grouping their quests, each quest's latest run with finished and current visible beats or its ending, earlier runs under it, "ABANDON" with "Abandon this quest?" confirmation, "WRITE IT AGAIN" for failed endings, keyboard navigation, empty state; follow the UI standard
+- [X] T071 [US9] Open `QuestLogPanel` with K in `resources/js/pages/WorldPage.jsx` and add K to `resources/js/components/world/hud/ControlsLegend.jsx`
+- [X] T072 [US9] Build `resources/js/components/QuestEventLog.jsx` (each event with quest, run, beat, type, payload summary, creator mark, time; empty state) and show it per session under its approved label "Quest log" in `resources/js/pages/WorldSessionsPage.jsx` beside `RevealLog`; this is the author's quest event log, separate from the player's `QuestLogPanel`; follow the UI standard
 
 **Checkpoint**: All stories complete.
 

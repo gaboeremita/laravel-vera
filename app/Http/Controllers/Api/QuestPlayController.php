@@ -10,6 +10,7 @@ use App\Enums\QuestStatus;
 use App\Jobs\AssessQuestEnding;
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
+use App\Models\QuestEvent;
 use App\Models\WorldSessionCampaign;
 use App\Models\WorldSessionQuest;
 use App\Traits\ResolvesWorldSession;
@@ -36,6 +37,29 @@ class QuestPlayController extends Controller
             'campaigns' => $worldSession->worldUser->world->campaigns()->with('quests:id,campaign_id')->orderBy('title')->get()
                 ->map(fn (Campaign $campaign) => $this->campaignView($campaign, $endings->get($campaign->id))),
         ]);
+    }
+
+    /**
+     * Every quest event of the session, oldest first, for the world's author.
+     */
+    public function events(Request $request, int $world, int $session): JsonResponse
+    {
+        $worldSession = $this->resolveWorldSession($request, $world, $session);
+
+        return response()->json(QuestEvent::with('run.quest')
+            ->whereIn('world_session_quest_id', $worldSession->questRuns()->select('id'))
+            ->oldest('id')
+            ->get()
+            ->map(fn (QuestEvent $event) => [
+                'id' => $event->id,
+                'questTitle' => $event->run->quest->title,
+                'run' => $event->run->run,
+                'beat' => $event->beat,
+                'type' => $event->type->value,
+                'payload' => $event->payload,
+                'byCreator' => $event->by_creator,
+                'createdAt' => $event->created_at?->toIso8601String(),
+            ]));
     }
 
     /**

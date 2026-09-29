@@ -64,6 +64,7 @@ export default function useQuests(worldId, sessionId, addToast) {
 	const dismissNotice = useCallback(() => setNotices((current) => current.slice(1)), []);
 	const dismissEnding = useCallback(() => setEndings((current) => current.slice(1)), []);
 	const applyRun = useCallback((run) => setRuns((current) => mergeRuns(current, [run])), []);
+	const showEnding = useCallback((ending) => setEndings((current) => [...current, { ...ending, key: crypto.randomUUID() }]), []);
 
 	/** Queues the ending to be written again after it failed. */
 	const retryEnding = useCallback(async (runId) => {
@@ -74,5 +75,5 @@ export default function useQuests(worldId, sessionId, addToast) {
 		} catch (error) { addToast(error.message || 'Unable to write the ending again', 'error'); }
 	}, [worldId, sessionId, addToast]);
 
-	return { runs, campaigns, notice: notices[0] ?? null, dismissNotice, ending: endings[0] ?? null, dismissEnding, applyRun, retryEnding };
+	return { runs, campaigns, notice: notices[0] ?? null, dismissNotice, ending: endings[0] ?? null, dismissEnding, showEnding, applyRun, retryEnding };
 }
