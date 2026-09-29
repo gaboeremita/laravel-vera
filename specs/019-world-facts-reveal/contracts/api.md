@@ -12,7 +12,7 @@ Shapes used below:
 
 | Method | Path | Name | Notes |
 |---|---|---|---|
-| GET | /worlds/{world}/residents/{resident}/facts | worlds.residents.facts.index | `Fact[]` |
+| GET | /worlds/{world}/residents/{resident}/facts | worlds.residents.facts.index | `{ facts: Fact[], toolsUnsupported: ?string }`; `toolsUnsupported` is the reason when the resident's model no longer supports tools |
 | POST | /worlds/{world}/residents/{resident}/facts | worlds.residents.facts.store | `{ topic, content, disclosure, relayResidentIds }`; 422 when the resident's model can't call tools (FR-002), on a duplicate topic, or a relay resident outside the world or equal to the holder |
 | PATCH | /worlds/{world}/residents/{resident}/facts/{fact} | worlds.residents.facts.update | same fields |
 | DELETE | /worlds/{world}/residents/{resident}/facts/{fact} | worlds.residents.facts.destroy | 204 |

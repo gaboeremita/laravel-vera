@@ -101,7 +101,7 @@ Anything the player writes inside `[OOC: ...]` is out of character and never cou
 
 The user sets a creator password in their settings; it is stored so that it cannot be read back. Typing `[creator mode: "<password>"]` in a conversation activates creator mode only if the server verifies the password. The password is never part of the delivered interface, the stored conversation or what any character sees; the password currently written into the interface's code is removed. The character's creator mode instructions apply only while creator mode is active. Creator mode stays active in the conversation it was activated in; every other conversation needs its own activation.
 
-**Why this priority**: Today the password ships inside the interface and in the repository, readable by anyone; fixing that is a security issue, and creator commands depend on it.
+**Why this priority**: Today the password ships inside the interface and in the repository, readable by anyone; that leaks it in the delivered interface and keeps personal data in the repository, and creator commands depend on the server knowing it.
 
 **Independent Test**: Set a password, type the activation with a wrong password and confirm nothing activates, type it with the right one and confirm creator mode is active, and confirm the password appears nowhere in the stored conversation or the delivered interface.
 
@@ -185,7 +185,7 @@ The user can read a session's reveal log: every attempt with the holder, the fac
 - Two residents hold facts about the same thing: each is its own fact; learning one teaches the player nothing about the other.
 - The review cannot be completed (the model fails or doesn't answer): the reveal is rejected as not the right moment yet, and the failure is recorded.
 - The player tells a resident a fact inside an OOC tag: the telling is out of character; the resident's acknowledgement still only requires the player to know the fact.
-- Residents talk with each other while one holds a fact: they are told only the topic and never reveal it to each other; facts reach other residents only through the player.
+- Residents talk with each other while one holds a fact: they are told only the topic and disclosure prose and never reveal it to each other; facts reach other residents only through the player.
 - The player sends an activation and a command in the same message: the activation is checked first, then the command applies.
 - A resident's model loses tool calling after they were given facts: they keep the facts in configuration but cannot reveal them until their model can call tools again, and the configuration shows why.
 - A fact is edited while sessions exist: its topic, content and prose read as currently configured; what players already know stays known.
@@ -210,7 +210,7 @@ The user can read a session's reveal log: every attempt with the holder, the fac
 - **FR-010**: On turns where the player's latest message contains an OOC tag, holders MUST be given the full content of their facts, and reveals MUST be approved without review.
 - **FR-011**: OOC text MUST never be removed from the conversation a character sees.
 - **FR-012**: OOC and creator bypasses MUST apply only where the player talks with a character, never when residents decide on their own or talk with each other.
-- **FR-012a**: Residents MUST reveal facts only to the player; in conversations between residents, holders MUST be given only topics and MUST NOT have the reveal available.
+- **FR-012a**: Residents MUST reveal facts only to the player; in conversations between residents, holders MUST be given only topics and disclosure prose and MUST NOT have the reveal available.
 - **FR-013**: Users MUST be able to set and change a creator password in their settings; it MUST be stored so it cannot be read back.
 - **FR-014**: Creator mode MUST activate only when the server verifies the typed password; the password MUST be removed from the stored conversation and from what the character sees, and MUST NOT appear in the delivered interface or the repository.
 - **FR-015**: Creator mode MUST stay active in the conversation it was activated in, and only there; in a world, that is the conversation with the one resident it was activated with. A character's creator mode instructions MUST be included only while it is active.
@@ -244,7 +244,7 @@ The user can read a session's reveal log: every attempt with the holder, the fac
 - "Fact" is the working term for a secret; UI labels and tool names are proposed in the plan and used only after approval.
 - The review uses the world's narrator model, falling back to the default model like narration does.
 - The review can be turned off per world; it is on by default.
-- Creator mode can be activated in any conversation with an assistant; fact, item and credit tools apply only inside a world session.
+- Creator mode can be activated in any conversation with an assistant in the app, in chats and in worlds; Discord conversations never have it, since a password typed there is visible to the channel. Fact, item and credit tools apply only inside a world session.
 - Creator grants can give any defined item from nothing; creating new item definitions is out of scope.
 - The OOC tag grammar stays as the existing parsers recognise it, with no extra edge-case handling.
 - On OOC turns, a secret the character says outside the tag counts as revealed only when the character also reveals it; a check that reads OOC-turn replies for secrets is out of scope.

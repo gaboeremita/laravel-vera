@@ -140,11 +140,11 @@ tests/Feature/FactWorldToolsTest.php, ReviewRevealTest.php, CreatorModeTest.php
 
 **Structure Decision**: The existing single Laravel + React repo layout; new code sits beside the resident, inventory and conversation code it extends.
 
-## Proposed names (awaiting approval)
+## Approved names
 
-None of these is used until approved; the plain descriptions stand in for them until then.
+These names are used in the code, tables and UI:
 
-| Proposed name | Where | Refers to |
+| Name | Where | Refers to |
 |---|---|---|
 | fact, "Facts" | code, tables, section title in a resident's configuration | a secret a resident holds |
 | "Topic" | field label, `topic` column | what the fact is about, all the holder sees at first |

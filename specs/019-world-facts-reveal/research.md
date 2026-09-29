@@ -84,7 +84,7 @@ The instructions ask it to judge whether the situation reasonably meets the pros
 
 The response returns the stored user content and `creatorMode: { active, notice }`. `useConversationChat` swaps its local copy of the message for the stored one and refetches emotions when `active` turns on; the hardcoded `CREATOR_MODE_TRIGGER` is deleted.
 
-Creator mode stays on for the conversation it was activated in (clarification); in a world that is one resident's conversation, so each resident needs their own activation. The assistant's `creator mode` prompt section is excluded unless `creator_mode_at` is set, and the `secret trigger` section is always excluded, since the server now does the check. Every other place that builds a prompt from the assistant's sections (resident turns, decisions, Discord, image prompts) excludes both.
+Creator mode stays on for the conversation it was activated in (clarification); in a world that is one resident's conversation, so each resident needs their own activation. The assistant's `creator mode` prompt section is excluded unless `creator_mode_at` is set, and the `secret trigger` section is always excluded, since the server now does the check. The replies to the image and background commands in `sendMessage` follow the same rule, since they happen in the same conversation. Places with no player conversation (resident turns, decisions, image prompt enhancers) and Discord, where a typed password would be visible to the channel, exclude both.
 
 **Rationale**: FR-013 to FR-015 and SC-007. **Note for the user**: if the `secret trigger` or `creator mode` sections of an assistant's prompt in the database contain the password, it should be removed from them; the server no longer needs it there.
 
@@ -107,7 +107,7 @@ Every creator action counts: reveals and `set_fact_known` write `reveal_attempts
 
 ## R12. Holding facts needs tool calling
 
-**Decision**: Saving a fact for a resident whose model, for the saving user, doesn't support tools returns 422 with the reason, as feature 1 does for starting inventories. At play time, a resident without tool support gets no `facts` section at all.
+**Decision**: Saving a fact for a resident whose model, for the saving user, doesn't support tools returns 422 with the reason, as feature 1 does for starting inventories. The fact list returns `toolsUnsupported` for a resident whose model lost tool support after their facts were saved, and the editor shows the reason. At play time, a resident without tool support gets no `facts` section and neither tool.
 
 **Rationale**: FR-002; without `reveal`, a holder could never share.
 
@@ -120,7 +120,7 @@ The summary (`known_facts.summary`) is what the player was actually told, writte
 - **From an item or activity**: the narration the player read, as is.
 - **From a creator command**: the fact's content.
 
-A repeated reveal keeps the first summary.
+A repeated reveal keeps the first summary. The call runs inside the request, after the reply; it is short and happens only when a fact becomes known, so it stays synchronous and the response carries the summary.
 
 **Rationale**: FR-017 and the clarification: the list reflects what the scene gave the player, and only a holder's retelling needs a model to condense it. The notification pattern is the one feature 1 uses for inventory changes (no push channel).
 

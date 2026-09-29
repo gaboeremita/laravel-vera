@@ -39,7 +39,7 @@ Facts the player knows, per session.
 | `summary` | text | what the player was told, written once when learned (research R13) |
 | `created_at` | timestamp | |
 
-Unique (`world_session_id`, `fact_id`). `set_fact_known(…, false)` deletes the row.
+Unique (`world_session_id`, `fact_id`). `set_fact_known(…, false)` deletes the row and logs a `reveal_attempts` row with source `Creator`, `reviewed = false`, `approved = false` and the verdict "Marked unknown by the creator".
 
 ### `fact_acknowledgements`
 
