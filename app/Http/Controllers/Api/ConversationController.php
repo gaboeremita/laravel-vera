@@ -4,6 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\BuildQuestsPrompt;
 use App\Services\AgentLoop\Tools\World\GrantFlagTool;
+use App\Services\AgentLoop\Tools\World\AssessQuestTool;
+use App\Services\AgentLoop\Tools\World\EditQuestTool;
+use App\Services\AgentLoop\Tools\World\EndQuestTool;
+use App\Services\AgentLoop\Tools\World\ResetQuestTool;
+use App\Services\AgentLoop\Tools\World\SetBeatTool;
+use App\Services\AgentLoop\Tools\World\SetQuestFlagTool;
+use App\Services\AgentLoop\Tools\World\StartQuestTool;
 use App\Services\AgentLoop\Tools\World\OfferQuestTool;
 use App\Services\AgentLoop\Tools\World\SignalQuestionTool;
 use App\Events\Quests\PlayerTalkedTo;
@@ -686,6 +693,12 @@ class ConversationController extends Controller
         $offerQuest = new OfferQuestTool($session, $conversation, $resident);
         if ($offerQuest->offerable()->isNotEmpty()) {
             $tools['offer_quest'] = $offerQuest;
+        }
+
+        if ($mode === TurnMode::Creator) {
+            foreach ([new StartQuestTool($session), new EndQuestTool($session), new ResetQuestTool($session), new SetBeatTool($session), new SetQuestFlagTool($session), new AssessQuestTool($session), new EditQuestTool($session)] as $tool) {
+                $tools[$tool->name()] = $tool;
+            }
         }
 
         return $tools;

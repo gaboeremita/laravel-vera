@@ -186,9 +186,9 @@ description: "Task list for Quests for Worlds"
 
 **Independent Test**: [quickstart.md](quickstart.md) step 8.
 
-- [ ] T065 [P] [US8] Implement the creator tools in `app/Services/AgentLoop/Tools/World/` per research R13: `StartQuestTool` and `ResetQuestTool` (both dispatch `QuestStarted`; a reset also deletes its campaign's `world_session_campaigns` row so the campaign is assessed again, research R11), `EndQuestTool`, `SetBeatTool` (undo cascades to beats that require it and dispatches `QuestStarted` so the undone beats are re-checked), `SetQuestFlagTool`, `AssessQuestTool`, `EditQuestTool` (checked by `ValidateQuestDefinition`, then `ReconcileQuestRuns`); each records its events with `by_creator` and dispatches the same events as play
-- [ ] T066 [US8] On creator turns in world sessions, add the tools of T065 in `sendMessage` of `app/Http/Controllers/Api/ConversationController.php` and the creator part (every quest's status, beats and flags) to `app/Actions/BuildQuestsPrompt.php`
-- [ ] T067 [P] [US8] Write `tests/Feature/QuestCreatorModeTest.php` (faked LLM): each tool's effect with `by_creator`; undo cascades; reset keeps earlier log rows; an invalid edit is refused with the configuration's messages; creator events reach the assessment marked; no quest tools without active creator mode
+- [X] T065 [P] [US8] Implement the creator tools in `app/Services/AgentLoop/Tools/World/` per research R13: `StartQuestTool` and `ResetQuestTool` (both dispatch `QuestStarted`; a reset also deletes its campaign's `world_session_campaigns` row so the campaign is assessed again, research R11), `EndQuestTool`, `SetBeatTool` (undo cascades to beats that require it and dispatches `QuestStarted` so the undone beats are re-checked), `SetQuestFlagTool`, `AssessQuestTool`, `EditQuestTool` (checked by `ValidateQuestDefinition`, then `ReconcileQuestRuns`); each records its events with `by_creator` and dispatches the same events as play
+- [X] T066 [US8] On creator turns in world sessions, add the tools of T065 in `sendMessage` of `app/Http/Controllers/Api/ConversationController.php` and the creator part (every quest's status, beats and flags) to `app/Actions/BuildQuestsPrompt.php`
+- [X] T067 [P] [US8] Write `tests/Feature/QuestCreatorModeTest.php` (faked LLM): each tool's effect with `by_creator`; undo cascades; reset keeps earlier log rows; an invalid edit is refused with the configuration's messages; creator events reach the assessment marked; no quest tools without active creator mode
 
 **Checkpoint**: Quests are quick to test.
 
