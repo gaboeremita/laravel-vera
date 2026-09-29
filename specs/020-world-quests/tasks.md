@@ -212,10 +212,10 @@ description: "Task list for Quests for Worlds"
 
 ## Phase 12: Polish & Cross-Cutting Concerns
 
-- [ ] T073 Add the `quests` prompt section to the prompt-section table in `ARCHITECTURE.md` and describe triggers, runs, judged questions and endings beside facts and inventory
-- [ ] T074 Review every new and changed screen against the UI standard: spacing, alignment, animations, empty states, long titles and epilogues, keyboard use, and the look next to existing HUD pieces and editors; search the new code and migrations for any hardcoded world, region, resident or quest (FR-021); fix what doesn't match
+- [X] T073 Add the `quests` prompt section to the prompt-section table in `ARCHITECTURE.md` and describe triggers, runs, judged questions and endings beside facts and inventory
+- [X] T074 Review every new and changed screen against the UI standard: spacing, alignment, animations, empty states, long titles and epilogues, keyboard use, and the look next to existing HUD pieces and editors; search the new code and migrations for any hardcoded world, region, resident or quest (FR-021); fix what doesn't match
 - [ ] T075 Run the quality gates once: `vendor/bin/pint --dirty --format agent`, `npm run lint`, `php artisan test --compact`; fix everything that surfaces
-- [ ] T076 Hand the user the [quickstart.md](quickstart.md) walkthrough, including the judged scenes of SC-005 and the timing goals of SC-003 and SC-006
+- [X] T076 Hand the user the [quickstart.md](quickstart.md) walkthrough, including the judged scenes of SC-005 and the timing goals of SC-003 and SC-006
 
 ---
 

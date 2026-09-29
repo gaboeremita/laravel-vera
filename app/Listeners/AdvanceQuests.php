@@ -71,8 +71,9 @@ class AdvanceQuests
             return;
         }
 
+        $startedRunId = $trigger instanceof QuestStarted ? $trigger->runId : null;
         $runs = $session->questRuns()->with('quest')->whereIn('status', [QuestStatus::Available, QuestStatus::Active])
-            ->when($trigger instanceof QuestStarted, fn ($query) => $query->whereKey($trigger->runId))
+            ->when($startedRunId !== null, fn ($query) => $query->whereKey($startedRunId))
             ->get();
         if ($runs->isEmpty()) {
             return;

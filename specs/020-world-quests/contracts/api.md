@@ -1,11 +1,11 @@
 # Contract: HTTP API, broadcasts and LLM tools
 
-All routes are under `/api`, behind the existing `auth:sanctum` group. A world is reachable only through `$request->user()->worlds()`; a quest, campaign, session, run or offer outside it returns 404. Keys are camelCase.
+All routes are under `/api`, behind the existing `auth:sanctum` group. Configuration routes use scoped route binding and the world policy, so another user's world returns 403, as the item and fact routes do; play routes resolve the session through the user's world membership, so another user's session, run or offer returns 404. Keys are camelCase.
 
 Shapes used below:
 - `Quest`: `{ id, key, title, campaignId, definition, sessionCount, problems: string[] }`; `sessionCount` counts sessions with a run of it; `problems` is the current result of the check (research R14).
 - `Campaign`: `{ id, key, title, definition, questIds: int[] }`.
-- `RunView`: `{ id, questId, key, title, description, campaignId, run, status, beats: [{ id, text, finished }], ending: ?Ending, endingStatus, startedAt, endedAt }`. `beats` never contains a hidden beat that isn't finished.
+- `RunView`: `{ id, questId, key, title, description, campaignId, run, status, beats: [{ id, text, finished, current }], ending: ?Ending, endingStatus, startedAt, endedAt }`. `beats` never contains a hidden beat that isn't finished.
 - `Ending`: `{ tier, title, epilogue, scores: [{ dimension, score, reason }] }`.
 - `Notice`: `{ type: "beatFinished" | "questStarted" | "questEnded" | "questAvailable", questTitle, text }`.
 

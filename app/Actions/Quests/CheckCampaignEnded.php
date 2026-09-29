@@ -3,6 +3,7 @@
 namespace App\Actions\Quests;
 
 use App\Enums\EndingStatus;
+use App\Enums\QuestStatus;
 use App\Jobs\AssessCampaignEnding;
 use App\Models\Quest;
 use App\Models\WorldSessionCampaign;
@@ -57,7 +58,7 @@ class CheckCampaignEnded
             }) && $quest->requirements() !== [];
         }
 
-        if ($questRuns->contains(fn (WorldSessionQuest $run) => $run->status->value === 'active' || ($run->status->hasEnded() && $run->ending_status === EndingStatus::Pending))) {
+        if ($questRuns->contains(fn (WorldSessionQuest $run) => $run->status === QuestStatus::Active || ($run->status->hasEnded() && $run->ending_status === EndingStatus::Pending))) {
             return false;
         }
 
