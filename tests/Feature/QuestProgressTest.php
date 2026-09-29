@@ -8,6 +8,7 @@ use App\Enums\QuestStatus;
 use App\Events\Quests\FactAcknowledged;
 use App\Events\Quests\PlayerEnteredRegion;
 use App\Events\Quests\QuestsUpdated;
+use App\Jobs\AssessQuestEnding;
 use App\Models\FactAcknowledgement;
 use App\Models\Inventory;
 use App\Models\QuestEvent;
@@ -16,6 +17,7 @@ use App\Models\WorldSessionQuest;
 use Database\Factories\QuestFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -30,6 +32,7 @@ function syncQuests(WorldSession $session): void
 }
 
 it('starts a quest with a new session, and a beat about the spawn zone finishes at once', function () {
+    Queue::fake([AssessQuestEnding::class]);
     [$user, , , $region] = worldStateScenario();
     $region->world->update(['spawn_region_id' => $region->id, 'spawn_passage_id' => 'studio-door']);
     worldQuest($region->world, ['beats' => [QuestFactory::beat('arrive', ['when' => ['enterZone' => ['region' => $region->id, 'zone' => 'studio']]])]]);
@@ -40,6 +43,7 @@ it('starts a quest with a new session, and a beat about the spawn zone finishes 
     expect($run->status)->toBe(QuestStatus::Completed)
         ->and($run->finishedBeats())->toBe(['arrive'])
         ->and($run->events()->pluck('type')->all())->toEqual([QuestEventType::Started, QuestEventType::BeatFinished, QuestEventType::Completed]);
+    Queue::assertPushed(AssessQuestEnding::class, fn (AssessQuestEnding $job) => $job->runId === $run->id);
 });
 
 it('finishes a zone beat when the player crosses into it, counting the zone around a room, and only once', function () {

@@ -91,6 +91,11 @@ DB_DATABASE=vera
 # Sanctum
 SANCTUM_STATEFUL_DOMAINS=laravel-vera.test
 
+# Reverb (live updates such as the avatar background). Both ports must match, and
+# must differ from the whisper (8080) and llama.cpp (8081) ports used below.
+REVERB_PORT=8090
+REVERB_SERVER_PORT=8090
+
 # Default LLM provider (fallback if no model is selected in the UI)
 AI_DEFAULT_URL=https://openrouter.ai/api/v1/chat/completions
 AI_DEFAULT_API_KEY=
