@@ -7,13 +7,13 @@ use App\Actions\Quests\OfferQuestionStatus;
 use App\Actions\Quests\QuestSessionState;
 use App\Actions\Quests\RecordQuestEvent;
 use App\Actions\Quests\SyncSessionQuests;
+use App\Actions\ResolveInventory;
 use App\Actions\TransferInventory;
 use App\Enums\QuestEventType;
 use App\Enums\QuestStatus;
 use App\Enums\TurnMode;
 use App\Events\Quests\PlayerEnteredRegion;
 use App\Models\Conversation;
-use App\Models\Inventory;
 use App\Models\Quest;
 use App\Models\QuestEvent;
 use App\Models\QuestOffer;
@@ -153,7 +153,7 @@ it('lets the giver offer while the quest\'s condition doesn\'t hold, recording w
 
 it('records a met condition, and a latched part once it has happened', function () {
     [, , , $region, $resident, $session] = offerConditionScenario(fn (WorldResident $resident) => ['all' => [['enterRegion' => $resident->region_id], ['credits' => ['atLeast' => 5]]]]);
-    Inventory::factory()->forPlayer()->create(['world_session_id' => $session->id, 'credits' => 10]);
+    app(ResolveInventory::class)->forPlayer($session)->update(['credits' => 10]);
     $moment = offerMomentOf($session, $resident, giverPositions($resident));
     $lookUp = app(LookUpOfferCondition::class);
     $state = fn () => QuestSessionState::for($session->fresh());

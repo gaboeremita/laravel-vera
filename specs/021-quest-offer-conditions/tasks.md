@@ -156,7 +156,7 @@ description: "Task list for Offer Conditions for Quests"
 
 - [X] T048 Describe offer conditions, the new leaves, `check_offer_condition` and the item ledger beside quests in `ARCHITECTURE.md`
 - [ ] T049 Review every changed screen against the UI standard (long names in pickers, narrow widths, error placement, the badge and descriptions next to existing rows), and confirm in the browser's network panel that nothing names a quest before it is offered (FR-024); fix what doesn't match
-- [ ] T050 Run the quality gates once: `vendor/bin/pint --dirty --format agent`, `npm run lint`, `php artisan test --compact`; fix everything that surfaces
+- [X] T050 Run the quality gates once: `vendor/bin/pint --dirty --format agent`, `npm run lint`, `php artisan test --compact`; fix everything that surfaces
 - [ ] T051 Hand the user the [quickstart.md](quickstart.md) walkthrough, including the giver judgement scenes of SC-001 and the timing goals of SC-002 and SC-006
 
 ---
