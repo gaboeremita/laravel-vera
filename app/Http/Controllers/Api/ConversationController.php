@@ -43,6 +43,7 @@ use App\Models\WorldSession;
 use App\Models\WorldUser;
 use App\Services\AgentLoop\AgentLoopRunner;
 use App\Services\AgentLoop\Tools\BasicCalculatorTool;
+use App\Services\AgentLoop\Tools\ChangeBackgroundTool;
 use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\AgentLoop\Tools\ImageGenerationTool;
 use App\Services\AgentLoop\Tools\World\AcknowledgeTool;
@@ -83,6 +84,8 @@ class ConversationController extends Controller
     private const MEMORY_SUMMARY_TRIGGER_COUNT = 50;
 
     private const IMAGE_GEN_COMMAND = '/create-image ';
+
+    private const COMMANDS = ['/create-image', '/change-background', '/send-voice-message'];
 
     private const TTS_TRUNCATION_LENGTH = 200;
 
@@ -244,6 +247,11 @@ class ConversationController extends Controller
             ->findOrFail($id);
 
         $lastUserMessage = collect($validated['messages'])->last(fn ($m) => $m['role'] === 'user');
+
+        $unknownCommand = $this->unknownCommand($lastUserMessage['content'] ?? null);
+        if ($unknownCommand !== null) {
+            return response()->json(['message' => "Unknown command {$unknownCommand}. Available commands: ".implode(', ', self::COMMANDS).'.'], 422);
+        }
 
         $forceVoice = false;
         $voiceCommandContent = $this->extractVoiceMessageCommand($lastUserMessage['content'] ?? null);
@@ -481,6 +489,10 @@ class ConversationController extends Controller
 
                 if ($imageGenerationService->isAvailableFor($assistantUser)) {
                     $tools[] = new ImageGenerationTool($imageGenerationService, $assistantUser, $conversation);
+
+                    if ($assistantModel->portrait_type === AssistantPortraitType::Avatar3D) {
+                        $tools[] = new ChangeBackgroundTool($assistantUser, $conversation);
+                    }
                 }
             }
 
@@ -726,6 +738,15 @@ class ConversationController extends Controller
             ->map(fn (KnownFact $known) => $known->toPayload())
             ->values()
             ->all();
+    }
+
+    private function unknownCommand(?string $content): ?string
+    {
+        if (! preg_match('/^\/[^\s\/]+/', trim($content ?? ''), $match)) {
+            return null;
+        }
+
+        return in_array(strtolower($match[0]), self::COMMANDS, true) ? null : $match[0];
     }
 
     private function extractImageGenPrompt(?string $content): ?string

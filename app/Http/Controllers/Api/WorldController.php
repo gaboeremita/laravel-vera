@@ -38,6 +38,7 @@ class WorldController extends Controller
         Gate::authorize('view', $world);
 
         return response()->json((new WorldResource($world->load([
+            'regions' => fn ($query) => $query->orderBy('id'),
             'regions.passageLinks',
             'spawnRegion',
             'residents.assistant.vrm',
