@@ -36,6 +36,7 @@ Facts the player knows, per session.
 | `fact_id` | FK `facts`, cascade | |
 | `source` | enum `RevealSource` | how the player learned it |
 | `source_name` | string | the holder's, item's or object's name, or "Creator" |
+| `summary` | text | what the player was told, written once when learned (research R13) |
 | `created_at` | timestamp | |
 
 Unique (`world_session_id`, `fact_id`). `set_fact_known(…, false)` deletes the row.

@@ -4,7 +4,7 @@ All routes are under `/api`, behind the existing `auth:sanctum` group. A world i
 
 Shapes used below:
 - `Fact`: `{ id, topic, content, disclosure, relayResidentIds: int[], usage }`; `usage` counts sessions where the player knows it.
-- `KnownFact`: `{ factId, topic, content, sourceName, learnedAt }`.
+- `KnownFact`: `{ factId, topic, summary, sourceName, learnedAt }`.
 
 ## Configuration
 

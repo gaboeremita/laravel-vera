@@ -9,11 +9,11 @@
 Residents hold facts, secrets they share in character, and the server makes sure a secret is earned in the story.
 
 - **Schema**: `facts` on resident placements, `fact_relays`, and per session `known_facts`, `fact_acknowledgements` and `reveal_attempts`; flags on worlds, conversations, users, credit transactions, items and activity terms ([data-model.md](data-model.md)).
-- **Prompts**: a `facts` section shows a holder only the topic and disclosure prose until the player knows the fact; relay residents get the content once the player knows it (research R2).
-- **Tools**: `reveal` returns the content only after a review by the world's narrator model, which judges the disclosure prose against the stored conversation with OOC spans removed; `acknowledge` is refused unless the player knows the fact. Every attempt is logged (R3–R6).
+- **Prompts**: a `facts` section shows a holder only the topic and disclosure prose until the player knows the fact; when the player learned it elsewhere, the holder gets the content and how, to talk about once the player brings it up. Relay residents know the topic from the start and get the content once the player knows it (research R2).
+- **Tools**: `reveal` returns the content only after a review by the world's narrator model, which judges the disclosure prose against the stored conversation with OOC spans removed, the holder's memory and what both sides carry; `acknowledge` is refused unless the player knows the fact. Every attempt is logged (R3–R6).
 - **OOC turns**: holders get the content and reveals skip the review; OOC text stays in the conversation (R7).
-- **Creator mode**: a hashed per-user password checked by the server, kept on per conversation, removed from every stored and sent message. The hardcoded frontend trigger is deleted. Creator turns get unscoped tools plus `set_fact_known`, `grant` and `remove` (R8–R10).
-- **Player and owner UI**: facts editor in each resident's section of the region editor, relay picker, review toggle on the world, fact links on items and activity terms, creator password in Settings, a learned-facts HUD panel with toasts, and a reveal log on the sessions page.
+- **Creator mode**: a hashed per-user password checked by the server, kept on per conversation (one resident's, in a world), removed from every stored and sent message. The hardcoded frontend trigger is deleted. Creator turns get unscoped tools plus `set_fact_known`, `grant` and `remove` (R8–R10).
+- **Player and owner UI**: facts editor in each resident's section of the region editor, relay picker, review toggle on the world, fact links on items and activity terms, creator password in Settings, a learned-facts HUD panel with a summary of what the player was told for each fact (R13) and toasts, and a reveal log on the sessions page.
 
 ## Technical Context
 
@@ -31,7 +31,7 @@ Residents hold facts, secrets they share in character, and the server makes sure
 
 **Project Type**: Web application (Laravel backend + React frontend, single repo).
 
-**Performance Goals**: A reviewed reveal adds one LLM call (SC-006, under 5 s on the narrator model); prompts gain one short section.
+**Performance Goals**: A reviewed reveal adds one LLM call (SC-006, under 5 s on the narrator model); a fact learned from a holder adds one summary call after the reply; prompts gain one short section.
 
 **Constraints**:
 - A fact's content reaches a holder's prompt only when the player knows it, or on OOC and creator turns (FR-005, SC-002).
@@ -62,7 +62,8 @@ Residents hold facts, secrets they share in character, and the server makes sure
   - Configuration refusals return 422 with the reason; the client shows a toast for every failure. PASS.
 - **VI. Feature-Test-First, Factory-Backed**: factories for every new model, with states for relays, known facts and creator-mode conversations. PASS.
 - **VII. No Speculative Abstraction**:
-  - `ResolveNarratorModel` is extracted because the review is its second real caller.
+  - `ResolveNarratorModel` is extracted because the review and the summary are its second and third real callers.
+  - The summary call runs only for facts learned from a holder; narration and creator facts reuse text they already have (R13).
   - No per-session copy of holders, because nothing moves them in this feature (R1).
   - No output scanner for OOC turns (clarification). PASS.
 - **VIII. State Derivation During Render**: the learned-facts toasts and the panel are derived during render from the latest response; fetching uses effect-local closures. PASS.
@@ -93,6 +94,7 @@ app/
 │   ├── ReviewReveal.php                  # new: forced-verdict review call
 │   ├── ResolveNarratorModel.php          # new: extracted from Narrate
 │   ├── LearnFact.php                     # new: record a known fact and its log row
+│   ├── SummarizeLearnedFact.php          # new: what the player was told, after the reply
 │   ├── CreatorModeTags.php               # new: find and remove activations and commands
 │   ├── Narrate.php                       # changed: uses ResolveNarratorModel
 │   ├── UseActivity.php                   # changed: linked fact
@@ -158,6 +160,7 @@ None of these is used until approved; the plain descriptions stand in for them u
 | `set_fact_known`, `grant`, `remove` | LLM tool names, creator turns | marking a fact known or unknown; creating or destroying items and credits for any holder |
 | "Learned" | HUD panel title and key label | the facts the player knows in the session |
 | "You learned something" | toast | a fact became known |
+| "You haven't heard the details yet." | learned-facts panel | the summary when the holder's reply told nothing of the fact |
 | "Reveal log" | sessions page section | the list of reveal attempts |
 | "Creator mode", "Creator password" | Settings section and field | the password check for creator mode |
 | "Creator mode is on" / "Creator mode didn't activate" / "Set a creator password in Settings first" | chat notices | the outcome of an activation |

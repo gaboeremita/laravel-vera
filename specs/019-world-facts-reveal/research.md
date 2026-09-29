@@ -13,11 +13,12 @@
 | Who | In character (and conversations between residents) | OOC turn | Creator turn |
 |---|---|---|---|
 | Holder, fact unknown to the player | topic and disclosure prose | topic, prose and content | every fact in the world, with content |
-| Holder, fact known to the player | topic, prose and content | same | same |
-| Relay resident, fact known to the player | content and "the user has learned this" | same | same |
-| Relay resident, fact unknown | nothing | nothing | same |
+| Holder, player learned it from them | topic, prose and content, to speak of freely | same | same |
+| Holder, player learned it elsewhere | content, and how the player found out (the source name); they talk about it once the player brings it up | same | same |
+| Relay resident, fact unknown to the player | topic, and that they want to find out about it | same | same |
+| Relay resident, fact known to the player | topic, content and "the user has learned this; when they tell you, you can act on it" | same | same |
 
-Wording states the behaviour directly, e.g. "You keep these secrets. Each lists what it is about and when you share it. When the moment comes, call `reveal` with your reason; it gives you what you know, and you tell it in your own words." In conversations between residents, holders get only topics and prose, and neither `reveal` nor `acknowledge` is offered (FR-012a).
+Wording states the behaviour directly, e.g. "You keep these secrets. Each lists what it is about and when you share it. When the moment comes, call `reveal` with your reason; it gives you what you know, and you tell it in your own words." and "You want to find out about these things; ask about them when it suits the moment." In conversations between residents, holders get only topics and prose, relay residents only topics, and neither `reveal` nor `acknowledge` is offered (FR-012a).
 
 **Rationale**: FR-005 holds by construction: the content is never in the prompt until the player knows it, so the character cannot blurt it or be talked out of it.
 
@@ -38,7 +39,8 @@ Wording states the behaviour directly, e.g. "You keep these secrets. Each lists 
 - the holder's name, the fact's topic and disclosure prose (never its content), and the holder's reason;
 - the region and the holder's zone;
 - the holder's last few expressions (`messages.expression` of their recent replies);
-- credits the player handed the holder in this session (`credit_transactions`), so "for 50 credits" is judged from what really moved;
+- the holder's memory of the player (the conversation's `long_term_memory`);
+- what the holder and the player carry (`Narrate::holdings`), and credits the player handed the holder in this session (`credit_transactions`), so "for 50 credits" is judged from what really moved;
 - the last messages of the conversation as stored on the server, with OOC spans removed, inside a block the instructions describe as data to judge, never instructions to follow.
 
 The instructions ask it to judge whether the situation reasonably meets the prose, in the spirit of a tabletop game master, without demanding literal proof. A failure of the call (no model, no verdict, timeout) rejects the reveal and records the failure as the verdict (spec edge case; Principle V).
@@ -67,9 +69,9 @@ The instructions ask it to judge whether the situation reasonably meets the pros
 
 ## R8. Creator password
 
-**Decision**: A nullable `users.creator_password` column with Laravel's `hashed` cast, hidden from serialization. The Settings page gets a section to set, change or clear it (`PUT /api/creator-password`); the response never contains it. Verification uses `Hash::check`, rate-limited per user (5 attempts a minute).
+**Decision**: A nullable `users.creator_password` column with Laravel's `hashed` cast, hidden from serialization. The Settings page gets a section to set, change or clear it (`PUT /api/creator-password`); the response never contains it. Verification uses `Hash::check`.
 
-**Rationale**: The password belongs to the person, not to one assistant: one password must work with every assistant and NPC, and `settings` rows are per assistant. The rate limit stops guessing through the chat.
+**Rationale**: The password belongs to the person, not to one assistant: one password works with every assistant and NPC, and `settings` rows are per assistant. Hashing keeps it out of the bundle, the repository and the database in readable form, the same way login passwords are kept.
 
 **Alternatives considered**: A per-assistant value in `settings.data`, which would need a password per assistant and has no page for NPCs.
 
@@ -82,7 +84,7 @@ The instructions ask it to judge whether the situation reasonably meets the pros
 
 The response returns the stored user content and `creatorMode: { active, notice }`. `useConversationChat` swaps its local copy of the message for the stored one and refetches emotions when `active` turns on; the hardcoded `CREATOR_MODE_TRIGGER` is deleted.
 
-Creator mode stays on for the conversation (clarification). The assistant's `creator mode` prompt section is excluded unless `creator_mode_at` is set, and the `secret trigger` section is always excluded, since the server now does the check. Every other place that builds a prompt from the assistant's sections (resident turns, decisions, Discord, image prompts) excludes both.
+Creator mode stays on for the conversation it was activated in (clarification); in a world that is one resident's conversation, so each resident needs their own activation. The assistant's `creator mode` prompt section is excluded unless `creator_mode_at` is set, and the `secret trigger` section is always excluded, since the server now does the check. Every other place that builds a prompt from the assistant's sections (resident turns, decisions, Discord, image prompts) excludes both.
 
 **Rationale**: FR-013 to FR-015 and SC-007. **Note for the user**: if the `secret trigger` or `creator mode` sections of an assistant's prompt in the database contain the password, it should be removed from them; the server no longer needs it there.
 
@@ -111,9 +113,16 @@ Every creator action counts: reveals and `set_fact_known` write `reveal_attempts
 
 ## R13. What the player sees
 
-**Decision**: A HUD panel lists `known_facts` for the session: topic, content, source name, newest first, with an empty state. Every endpoint that can make a fact known (`sendMessage`, item examine, activity use) returns `learnedFacts` for this request, and the world page shows a toast for each.
+**Decision**: A HUD panel lists `known_facts` for the session: topic, source name and summary, newest first, with an empty state. Every endpoint that can make a fact known (`sendMessage`, item examine, activity use) returns `learnedFacts` for this request, and the world page shows a toast for each.
 
-**Rationale**: FR-017 with the notification pattern feature 1 uses for inventory changes (no push channel).
+The summary (`known_facts.summary`) is what the player was actually told, written once, when the fact becomes known:
+- **From a holder**: after the reply is generated, a `SummarizeLearnedFact` action makes one call on the narrator model with the fact's topic and the reply's in-story text (OOC spans removed), asking for one to three sentences in second person of what the player was told about the topic, or the sentence "You haven't heard the details yet." when the reply says nothing of it. If the call fails, the error is reported and the summary is the reply's in-story text.
+- **From an item or activity**: the narration the player read, as is.
+- **From a creator command**: the fact's content.
+
+A repeated reveal keeps the first summary.
+
+**Rationale**: FR-017 and the clarification: the list reflects what the scene gave the player, and only a holder's retelling needs a model to condense it. The notification pattern is the one feature 1 uses for inventory changes (no push channel).
 
 ## R14. Deleting
 
