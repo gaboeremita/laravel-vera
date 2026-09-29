@@ -16,11 +16,12 @@ The destroy endpoints for items and world NPCs, and removing a resident from a r
 
 | Method | Path | Change |
 |---|---|---|
-| GET | /worlds/{world}/sessions/{session}/quest-events | payloads carry the keys in [data-model.md](../data-model.md): `cause`; on `offered`, `lookups`, `offerWhenHeld` and `unmetParts` |
+| GET | /worlds/{world}/sessions/{session}/quests | `runs` leaves out Available runs; the `quests.updated` broadcast leaves out Available runs and `questAvailable` notices. A quest's title and description reach the player's page only once it is offered (FR-024) |
+| GET | /worlds/{world}/sessions/{session}/quest-events | payloads carry the keys in [data-model.md](../data-model.md): `because`; on `offered`, `lookups`, `offerWhenHeld` and `unmetParts` |
 | POST | /worlds/{world}/sessions/{session}/quest-offers/{offer}/answer | unchanged shape; a decline dispatches `QuestStateChanged` |
 | POST | /worlds/{world}/sessions/{session}/conversations/{conversation}/quest-offers/withdraw | unchanged shape; each withdrawn offer counts as a decline for `questState` and `declinedTimes` |
 
-Nothing reaches the player's page before an offer: the quests list, the tracker and the quest log don't change.
+Nothing reaches the player's page before an offer: the offer card carries the quest's details, and the run joins the list once it is accepted.
 
 ## LLM tools
 
@@ -46,7 +47,7 @@ Returns `{ "part": "your trust toward the user", "value": "2", "asks": "at least
 | `feeling` | the feeling, one decimal |
 | `questState` | offered, active, declined, abandoned, or another word for the run's status (available, completed, failed), or "not available" |
 | `declinedTimes`, `gaveTo`, `spentWith`, `messagesWith` | the count or sum |
-| `giverIn` | the zone the giver is in, or "no zone" |
+| `giverIn` | the zone the giver is in, or "no zone"; when the zone the quest names no longer exists in the region's layout, "{zone} no longer exists in {region}" |
 | `othersInTheZone` | the names of the other residents in the giver's zone, or "nobody" |
 | `has`, `credits` | what the player holds |
 | `knows`, `acknowledged`, `flag` | "yes" or "no" |

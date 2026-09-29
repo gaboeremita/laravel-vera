@@ -13,6 +13,7 @@ use Illuminate\Support\Collection;
 
 /**
  * Finds the quests whose definitions name a region, resident, item or fact,
+ * or name another quest by where it stands or how often it was turned down,
  * so none of them can be deleted from under a quest.
  */
 class FindQuestReferences
@@ -50,9 +51,20 @@ class FindQuestReferences
     }
 
     /**
+     * @throws UsedByQuests
+     */
+    public function ensureQuestUnused(Quest $quest): void
+    {
+        $quests = $this->using($quest->world, 'quests', $quest->key)->reject(fn (Quest $other) => $other->is($quest))->values();
+        if ($quests->isNotEmpty()) {
+            throw new UsedByQuests("\"{$quest->title}\"", $quests);
+        }
+    }
+
+    /**
      * @return Collection<int, Quest>
      */
-    public function using(World $world, string $kind, int $id): Collection
+    public function using(World $world, string $kind, int|string $id): Collection
     {
         return $world->quests()->orderBy('title')->get()
             ->filter(fn (Quest $quest) => in_array($id, $this->references($quest->definition)[$kind], true))
@@ -72,13 +84,13 @@ class FindQuestReferences
 
     /**
      * @param  array<string, mixed>  $definition
-     * @return array{regions: array<int, int>, residents: array<int, int>, items: array<int, int>, facts: array<int, int>}
+     * @return array{regions: array<int, int>, residents: array<int, int>, items: array<int, int>, facts: array<int, int>, quests: array<int, string>}
      */
     private function references(array $definition): array
     {
-        $found = ['regions' => [], 'residents' => [], 'items' => [], 'facts' => []];
+        $found = ['regions' => [], 'residents' => [], 'items' => [], 'facts' => [], 'quests' => []];
         $add = function (string $kind, mixed $id) use (&$found): void {
-            if (is_int($id)) {
+            if (is_int($id) || ($kind === 'quests' && is_string($id))) {
                 $found[$kind][] = $id;
             }
         };
@@ -99,6 +111,10 @@ class FindQuestReferences
                 'has' => $add('items', $value['item'] ?? null),
                 'knows' => $add('facts', $value),
                 'acknowledged' => [$add('facts', $value['fact'] ?? null), $add('residents', $value['resident'] ?? null)],
+                'feeling', 'spentWith', 'messagesWith', 'othersInTheZone' => $add('residents', $value['resident'] ?? null),
+                'gaveTo' => [$add('residents', $value['resident'] ?? null), $add('items', $value['item'] ?? null)],
+                'questState', 'declinedTimes' => $add('quests', $value['quest'] ?? null),
+                'giverIn' => $add('regions', $value['region'] ?? null),
                 default => null,
             };
         };
@@ -107,6 +123,7 @@ class FindQuestReferences
         $add('residents', $definition['reward']['from']['resident'] ?? null);
         $add('regions', $definition['reward']['from']['object']['region'] ?? null);
         $walk($definition['start']['when'] ?? null);
+        $walk($definition['start']['offerWhen'] ?? null);
         $walk($definition['complete'] ?? null);
         $walk($definition['fail'] ?? null);
         foreach ($definition['beats'] ?? [] as $beat) {

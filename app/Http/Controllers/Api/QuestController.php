@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Quests\FindQuestReferences;
 use App\Actions\Quests\ReconcileQuestRuns;
 use App\Actions\Quests\ValidateQuestDefinition;
 use App\Http\Controllers\Controller;
@@ -57,9 +58,10 @@ class QuestController extends Controller
         return response()->json(['quest' => (new QuestResource($quest))->resolve(), 'warnings' => $request->warnings()]);
     }
 
-    public function destroy(World $world, Quest $quest): JsonResponse
+    public function destroy(World $world, Quest $quest, FindQuestReferences $findQuestReferences): JsonResponse
     {
         Gate::authorize('update', $world);
+        $findQuestReferences->ensureQuestUnused($quest);
 
         $quest->delete();
 

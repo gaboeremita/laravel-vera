@@ -52,7 +52,7 @@ No change. The offerQuestion's answers are read from `quest_events` (research R6
 
 | Event type | New payload keys |
 |---|---|
-| `beat_finished`, `started`, `completed`, `failed` | `cause`: ?string, the trigger's sentence (research R9) |
+| `beat_finished`, `started`, `completed`, `failed` | `because`: ?string, the trigger's sentence (research R9); `started` keeps its existing `cause` (session, condition, offer or creator) |
 | `offered` | `lookups`: `[{ part, value, asks }]` in the order made this turn; `offerWhenHeld`: ?bool (null without offerWhen); `unmetParts`: string[] |
 | `question_signalled`, `question_judged` for the offerQuestion | `question: ":offer"`, `textHash`: string |
 

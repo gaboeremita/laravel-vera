@@ -4,8 +4,14 @@ namespace App\Actions\Quests;
 
 use App\Actions\ResolveInventory;
 use App\Enums\EndingStatus;
+use App\Enums\InventoryHolder;
+use App\Enums\QuestOfferStatus;
 use App\Enums\QuestStatus;
+use App\Models\CreditTransaction;
+use App\Models\ItemTransfer;
 use App\Models\Quest;
+use App\Models\QuestOffer;
+use App\Models\ResidentFeeling;
 use App\Models\WorldSession;
 use App\Models\WorldSessionCampaign;
 use App\Models\WorldSessionQuest;
@@ -13,7 +19,8 @@ use Illuminate\Support\Collection;
 
 /**
  * What quest conditions read about a session, loaded once per trigger:
- * the player's holdings, what they know and have told, and how other quests
+ * the player's holdings, what they know and have told, how residents feel
+ * about them, what they handed residents, and how other quests, their offers
  * and campaigns went.
  */
 class QuestSessionState
@@ -24,6 +31,10 @@ class QuestSessionState
      * @param  array<int, string>  $acknowledgements  "factId:residentId"
      * @param  Collection<string, WorldSessionQuest>  $latestRuns  by quest key
      * @param  Collection<string, WorldSessionCampaign>  $campaignEndings  by campaign key
+     * @param  array<int, array{romance: float, trust: float, liking: float}>  $feelings  by resident id
+     * @param  array<string, int>  $itemsGiven  quantity the player handed over, by "residentId:itemId"
+     * @param  array<int, int>  $creditsPaid  credits the player paid, by resident id
+     * @param  array<string, array{pending: bool, lastAnswer: ?QuestOfferStatus, declined: int}>  $offers  by quest key; pending and lastAnswer are about the latest run
      */
     public function __construct(
         public readonly WorldSession $session,
@@ -33,11 +44,21 @@ class QuestSessionState
         private readonly array $acknowledgements,
         private readonly Collection $latestRuns,
         private readonly Collection $campaignEndings,
+        private readonly array $feelings = [],
+        private readonly array $itemsGiven = [],
+        private readonly array $creditsPaid = [],
+        private readonly array $offers = [],
     ) {}
 
     public static function for(WorldSession $session): self
     {
         $player = app(ResolveInventory::class)->forPlayer($session);
+        $latestRuns = $session->questRuns()->with('quest')->orderBy('run')->get()->keyBy(fn (WorldSessionQuest $run) => $run->quest->key);
+        $residentByInventory = $session->inventories()->where('holder', InventoryHolder::Resident)->pluck('world_resident_id', 'id')->all();
+        $handedOver = fn (string $model) => $model::query()
+            ->where('world_session_id', $session->id)
+            ->where('from_inventory_id', $player->id)
+            ->whereIn('to_inventory_id', array_keys($residentByInventory));
 
         return new self(
             $session,
@@ -45,9 +66,43 @@ class QuestSessionState
             $player->items()->pluck('quantity', 'item_id')->all(),
             $session->knownFacts()->pluck('fact_id')->all(),
             $session->factAcknowledgements()->get(['fact_id', 'world_resident_id'])->map(fn ($row) => "{$row->fact_id}:{$row->world_resident_id}")->all(),
-            $session->questRuns()->with('quest')->orderBy('run')->get()->keyBy(fn (WorldSessionQuest $run) => $run->quest->key),
+            $latestRuns,
             $session->campaignEndings()->with('campaign')->get()->keyBy(fn (WorldSessionCampaign $ending) => $ending->campaign->key),
+            ResidentFeeling::where('world_session_id', $session->id)->get()
+                ->mapWithKeys(fn (ResidentFeeling $feeling) => [$feeling->world_resident_id => $feeling->values()])
+                ->all(),
+            $handedOver(ItemTransfer::class)
+                ->selectRaw('to_inventory_id, item_id, sum(quantity) as total')->groupBy('to_inventory_id', 'item_id')->get()
+                ->mapWithKeys(fn ($row) => [$residentByInventory[$row->to_inventory_id].':'.$row->item_id => (int) $row->total])
+                ->all(),
+            $handedOver(CreditTransaction::class)
+                ->selectRaw('to_inventory_id, sum(amount) as total')->groupBy('to_inventory_id')->get()
+                ->mapWithKeys(fn ($row) => [$residentByInventory[$row->to_inventory_id] => (int) $row->total])
+                ->all(),
+            self::offerHistory($session, $latestRuns),
         );
+    }
+
+    /**
+     * @param  Collection<string, WorldSessionQuest>  $latestRuns
+     * @return array<string, array{pending: bool, lastAnswer: ?QuestOfferStatus, declined: int}>
+     */
+    private static function offerHistory(WorldSession $session, Collection $latestRuns): array
+    {
+        $turnedDown = [QuestOfferStatus::Declined, QuestOfferStatus::Withdrawn];
+
+        return QuestOffer::with('run.quest')->where('world_session_id', $session->id)->orderBy('id')->get()
+            ->groupBy(fn (QuestOffer $offer) => $offer->run->quest->key)
+            ->map(function (Collection $offers, string $key) use ($latestRuns, $turnedDown): array {
+                $onLatest = $offers->where('world_session_quest_id', $latestRuns->get($key)?->id);
+
+                return [
+                    'pending' => $onLatest->contains('status', QuestOfferStatus::Pending),
+                    'lastAnswer' => $onLatest->where('status', '!==', QuestOfferStatus::Pending)->last()?->status,
+                    'declined' => $offers->filter(fn (QuestOffer $offer) => in_array($offer->status, $turnedDown, true))->count(),
+                ];
+            })
+            ->all();
     }
 
     public function holds(int $itemId, int $atLeast): bool
@@ -62,6 +117,74 @@ class QuestSessionState
     public function hasCredits(int $atLeast): bool
     {
         return $this->credits === null || $this->credits >= $atLeast;
+    }
+
+    /**
+     * How many of the item the player holds: 0 when none, null when unlimited.
+     */
+    public function quantityOf(int $itemId): ?int
+    {
+        return array_key_exists($itemId, $this->itemQuantities) ? $this->itemQuantities[$itemId] : 0;
+    }
+
+    /**
+     * The player's credits; null when unlimited.
+     */
+    public function credits(): ?int
+    {
+        return $this->credits;
+    }
+
+    /**
+     * How the resident feels about the player; a resident with no feelings
+     * yet feels as every resident starts, at 0.
+     */
+    public function feeling(int $residentId, string $kind): float
+    {
+        return (float) ($this->feelings[$residentId][$kind] ?? 0);
+    }
+
+    public function gaveTo(int $residentId, int $itemId): int
+    {
+        return $this->itemsGiven["{$residentId}:{$itemId}"] ?? 0;
+    }
+
+    public function spentWith(int $residentId): int
+    {
+        return $this->creditsPaid[$residentId] ?? 0;
+    }
+
+    /**
+     * Where another quest stands as quest conditions name it: offered,
+     * active, declined or abandoned; otherwise its latest run's status, or
+     * null when it has no run.
+     */
+    public function questState(string $questKey): ?string
+    {
+        $run = $this->latestRuns->get($questKey);
+        if ($run === null) {
+            return null;
+        }
+
+        $offers = $this->offers[$questKey] ?? ['pending' => false, 'lastAnswer' => null];
+        if ($run->status === QuestStatus::Available) {
+            return match (true) {
+                $offers['pending'] => 'offered',
+                in_array($offers['lastAnswer'], [QuestOfferStatus::Declined, QuestOfferStatus::Withdrawn], true) => 'declined',
+                default => QuestStatus::Available->value,
+            };
+        }
+
+        return $run->status->value;
+    }
+
+    /**
+     * How many times the player turned down the quest's offers in the
+     * session, across runs; offers left unanswered count as turned down.
+     */
+    public function declinedTimes(string $questKey): int
+    {
+        return $this->offers[$questKey]['declined'] ?? 0;
     }
 
     public function knows(int $factId): bool

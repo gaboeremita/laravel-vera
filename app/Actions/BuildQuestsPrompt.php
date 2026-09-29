@@ -2,6 +2,8 @@
 
 namespace App\Actions;
 
+use App\Actions\Quests\DescribeCondition;
+use App\Actions\Quests\OfferQuestionStatus;
 use App\Enums\EndingStatus;
 use App\Enums\QuestOfferStatus;
 use App\Enums\QuestStatus;
@@ -122,10 +124,47 @@ class BuildQuestsPrompt
      */
     private function offers(Collection $runs, WorldResident $resident, array $pendingRunIds): ?string
     {
-        $lines = $runs->filter(fn (WorldSessionQuest $run) => $run->status === QuestStatus::Available && $run->quest->giverId() === $resident->id && ! in_array($run->id, $pendingRunIds, true))
-            ->map(fn (WorldSessionQuest $run) => "- {$run->quest->title}: {$run->quest->description()}");
+        $offerable = $runs->filter(fn (WorldSessionQuest $run) => $run->status === QuestStatus::Available && $run->quest->giverId() === $resident->id && ! in_array($run->id, $pendingRunIds, true));
+        if ($offerable->isEmpty()) {
+            return null;
+        }
 
-        return $lines->isEmpty() ? null : "You have tasks you can ask of the user. When it suits the conversation, bring one up in your own words and call the offer_quest tool:\n".$lines->implode("\n");
+        $lines = $offerable->map(fn (WorldSessionQuest $run) => implode(' ', array_filter([
+            "- {$run->quest->title}: {$run->quest->description()}",
+            $this->offerWhen($run, $resident),
+            $this->offerQuestion($run),
+        ])));
+        $asksFirst = $offerable->contains(fn (WorldSessionQuest $run) => $run->quest->offerWhen() !== null || $run->quest->offerQuestion() !== null);
+
+        return "You have tasks you can ask of the user. When it suits the conversation, bring one up in your own words and call the offer_quest tool:\n".$lines->implode("\n")
+            .($asksFirst ? "\nUntil you offer, you may hint in character that you have something in mind, if you judge it fits. Never name or describe the task, its conditions, or what you checked." : '');
+    }
+
+    private function offerWhen(WorldSessionQuest $run, WorldResident $resident): ?string
+    {
+        $offerWhen = $run->quest->offerWhen();
+        if ($offerWhen === null) {
+            return null;
+        }
+
+        return 'Offer it only once this holds: '.app(DescribeCondition::class)->tree($offerWhen, $run->quest->world, $resident).'. Check each part with check_offer_condition before you offer.';
+    }
+
+    private function offerQuestion(WorldSessionQuest $run): ?string
+    {
+        $question = $run->quest->offerQuestion();
+        if ($question === null) {
+            return null;
+        }
+
+        $status = app(OfferQuestionStatus::class)->handle($run->worldSession, $run->quest);
+        $line = "Also wait until you are sure of this: {$question} When you believe the user has shown it, call signal_question.";
+
+        return match (true) {
+            $status['met'] => "{$line} It has been confirmed.",
+            $status['reason'] !== null => "{$line} Not confirmed yet: {$status['reason']}",
+            default => $line,
+        };
     }
 
     /**

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import ConditionBuilder from './ConditionBuilder.jsx';
-import { ALL_CONDITION_TYPES } from '../utils/questConditionTypes.js';
 import Toggle from './common/Toggle.jsx';
 import { FieldErrors } from './RubricEditor.jsx';
 import { FIELD_INPUT, FIELD_LABEL } from '../utils/formFieldStyles.js';
@@ -74,8 +73,7 @@ export default function QuestBeatEditor({ beat, index, beats, onChange, onRemove
 
 			<div>
 				<p className={FIELD_LABEL}>Finishes when</p>
-				<ConditionBuilder value={beat.when ?? null} onChange={(value) => update('when', value)} options={options} context={{ ...context, types: ALL_CONDITION_TYPES.filter((type) => type !== 'beat') }} />
-				<FieldErrors messages={errorsAt(`${path}.when`, true)} />
+				<ConditionBuilder value={beat.when ?? null} onChange={(value) => update('when', value)} options={options} context={{ ...context, types: context.types.filter((type) => type !== 'beat') }} path={`${path}.when`} errorsAt={errorsAt} />
 			</div>
 
 			<Section title="What residents know" hint="— prose a resident is given while this beat is current" count={beat.knowledge?.length ?? 0}>

@@ -37,7 +37,7 @@ A quest that starts by offer can carry an `offerWhen` condition and an `offerQue
 
 **Constraints**:
 - The game never refuses an offer because offerWhen doesn't hold or the offerQuestion isn't met (FR-004).
-- Nothing about an unoffered quest reaches the player's page (FR-024).
+- Nothing about an unoffered quest reaches the player's page: Available runs and `questAvailable` notices are no longer sent to it (FR-024).
 - Moment leaves are only valid in `start.offerWhen`, and read only the current turn (FR-014).
 - Existing quests and sessions keep working unchanged.
 - New UI follows the UI standard of [feature 018's tasks.md](../018-items-inventory-credits/tasks.md) and the existing quest editor (FR-025).
@@ -112,6 +112,8 @@ app/
 ├── Models/Quest.php                        # changed: offerWhen(), offerQuestion(), question(':offer')
 ├── Http/Controllers/Api/QuestController.php      # changed: refuse deleting a named quest
 ├── Http/Controllers/Api/QuestOfferController.php # changed: QuestStateChanged
+├── Http/Controllers/Api/QuestPlayController.php  # changed: no Available runs in the player's list
+├── Actions/Quests/BroadcastQuestRuns.php          # changed: no Available runs or questAvailable notices
 ├── Http/Controllers/Api/ConversationController.php  # changed: OfferMoment and the new tool in questTools
 └── Services/AgentLoop/Tools/World/
     ├── CheckOfferConditionTool.php         # new
@@ -148,6 +150,8 @@ Approved in this session. Names from the spec (offerWhen, offerQuestion, the lea
 | "Romance", "Trust", "Liking"; "at least", "at most" | feeling fields | `kind`, bounds |
 | "Offered", "Active", "Declined", "Abandoned" | quest state choices | `state` |
 | "This quest" | quest pickers | the quest being edited |
+| "Any time" | Offer when, when empty | no offer condition |
+| "(optional)" | hint beside "Offer question" | the question can be left out |
 | "Offer when only" | badge on moment rows | `offerOnly` |
 | "Offered while these didn't hold:" | event log | `unmetParts` |
 

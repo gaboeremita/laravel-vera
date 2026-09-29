@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\Quests\ResidentFeelingsChanged;
 use Database\Factories\ResidentFeelingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -53,7 +54,15 @@ class ResidentFeeling extends Model
                 $this->{$feeling} = max(-self::LIMIT, min(self::LIMIT, round($this->{$feeling} + $changes[$feeling], 1)));
             }
         }
+        $changed = array_keys($this->getDirty());
         $this->save();
+
+        if ($changed !== []) {
+            $name = $this->worldResident->assistant->name;
+            ResidentFeelingsChanged::dispatch($this->world_session_id, collect($changed)
+                ->map(fn (string $feeling) => "{$name}'s {$feeling} is now ".number_format($this->{$feeling}, 1))
+                ->implode('; '));
+        }
     }
 
     /**

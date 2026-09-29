@@ -1,17 +1,23 @@
 <?php
 
+use App\Actions\Quests\QuestSessionState;
 use App\Actions\Quests\SyncSessionQuests;
+use App\Actions\Quests\WithdrawQuestOffers;
 use App\Actions\RecordResidentActivity;
 use App\Actions\TransferInventory;
 use App\Enums\QuestEventType;
+use App\Enums\QuestOfferStatus;
 use App\Enums\QuestStatus;
 use App\Events\Quests\FactAcknowledged;
 use App\Events\Quests\PlayerEnteredRegion;
+use App\Events\Quests\QuestStateChanged;
 use App\Events\Quests\QuestsUpdated;
 use App\Jobs\AssessQuestEnding;
 use App\Models\FactAcknowledgement;
 use App\Models\Inventory;
 use App\Models\QuestEvent;
+use App\Models\QuestOffer;
+use App\Models\ResidentFeeling;
 use App\Models\WorldSession;
 use App\Models\WorldSessionQuest;
 use Database\Factories\QuestFactory;
@@ -197,4 +203,110 @@ it('leaves other sessions untouched', function () {
     PlayerEnteredRegion::dispatch($session->id, $region->id);
 
     expect(runOf($session)->finishedBeats())->toBe(['arrive'])->and(runOf($other)->finishedBeats())->toBe([]);
+});
+
+it('finishes a beat the moment a resident\'s trust reaches what it asks, with the change as its cause', function () {
+    [, , , $region, $resident, $session] = worldStateScenario();
+    worldQuest($region->world, ['beats' => [
+        QuestFactory::beat('trusted', ['when' => ['feeling' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => 3]]]),
+        QuestFactory::beat('later', ['requires' => ['trusted']]),
+    ]]);
+    syncQuests($session);
+    $feeling = ResidentFeeling::of($session, $resident);
+
+    $feeling->adjust(['trust' => 2]);
+    expect(runOf($session)->finishedBeats())->toBe([]);
+
+    $feeling->adjust(['trust' => 1]);
+    $finished = QuestEvent::where('type', QuestEventType::BeatFinished)->firstOrFail();
+    expect(runOf($session)->finishedBeats())->toBe(['trusted'])
+        ->and($finished->payload['because'])->toBe("{$resident->assistant->name}'s trust is now 3.0");
+});
+
+it('reads a feeling bound from above, and a resident with no feelings yet as 0', function () {
+    [, , , $region, $resident, $session] = worldStateScenario();
+    worldQuest($region->world, ['beats' => [
+        QuestFactory::beat('cold', ['when' => ['feeling' => ['resident' => $resident->id, 'kind' => 'romance', 'atMost' => -2]]]),
+        QuestFactory::beat('neutral', ['when' => ['all' => [['feeling' => ['resident' => $resident->id, 'kind' => 'liking', 'atLeast' => 0, 'atMost' => 0]], ['flag' => 'go']]]]),
+        QuestFactory::beat('later', ['requires' => ['cold', 'neutral']]),
+    ]]);
+    syncQuests($session);
+    $run = runOf($session);
+    $run->mergeState(['flags' => ['go' => ['by' => null, 'reason' => null]]]);
+    $run->save();
+
+    ResidentFeeling::of($session, $resident)->adjust(['romance' => -2]);
+
+    expect(runOf($session)->finishedBeats())->toEqualCanonicalizing(['cold', 'neutral']);
+});
+
+it('counts what the player handed a resident across handovers, and never what came back', function () {
+    [, , , $region, $resident, $session, $player, $residentInventory] = inventoryScenario();
+    $bread = worldItem($region, ['name' => 'bread']);
+    $player->items()->create(['item_id' => $bread->id, 'quantity' => 5]);
+    worldQuest($region->world, ['beats' => [
+        QuestFactory::beat('fed', ['when' => ['gaveTo' => ['resident' => $resident->id, 'item' => $bread->id, 'atLeast' => 3]]]),
+        QuestFactory::beat('paid', ['when' => ['spentWith' => ['resident' => $resident->id, 'atLeast' => 50]]]),
+        QuestFactory::beat('later', ['requires' => ['fed', 'paid']]),
+    ]]);
+    syncQuests($session);
+    $transfer = app(TransferInventory::class);
+
+    $transfer->handle($player, $residentInventory, 20, [$bread->id => 1], 'gift');
+    $transfer->handle($residentInventory, $player, 0, [$bread->id => 1], 'gift');
+    $transfer->handle($player, $residentInventory, 0, [$bread->id => 1], 'gift');
+    expect(runOf($session)->finishedBeats())->toBe([]);
+
+    $transfer->handle($player, $residentInventory, 30, [$bread->id => 1], 'trade');
+
+    $fed = QuestEvent::where('type', QuestEventType::BeatFinished)->where('beat', 'fed')->firstOrFail();
+    expect(runOf($session)->finishedBeats())->toEqualCanonicalizing(['fed', 'paid'])
+        ->and($fed->payload['because'])->toBe("The user gave {$resident->assistant->name} 1 bread and paid them 30 credits");
+});
+
+it('reads another quest\'s state and how often its offer was turned down, walking away included', function () {
+    [, , , $region, $resident, $session] = worldStateScenario();
+    $ledger = worldQuest($region->world, ['start' => ['mode' => 'offer', 'giver' => $resident->id]], ['key' => 'the-ledger', 'title' => 'The Ledger']);
+    worldQuest($region->world, ['beats' => [
+        QuestFactory::beat('declined', ['when' => ['questState' => ['quest' => 'the-ledger', 'state' => 'declined']]]),
+        QuestFactory::beat('twice', ['when' => ['declinedTimes' => ['quest' => 'the-ledger', 'atLeast' => 2]]]),
+        QuestFactory::beat('later', ['requires' => ['declined', 'twice']]),
+    ]], ['key' => 'watcher']);
+    syncQuests($session);
+    $ledgerRun = $session->questRuns()->where('quest_id', $ledger->id)->firstOrFail();
+    $watcher = fn () => $session->questRuns()->whereHas('quest', fn ($query) => $query->where('key', 'watcher'))->firstOrFail();
+
+    QuestOffer::factory()->create(['world_session_id' => $session->id, 'world_session_quest_id' => $ledgerRun->id, 'world_resident_id' => $resident->id, 'status' => QuestOfferStatus::Declined]);
+    QuestStateChanged::dispatch($session->id, 'The user declined "The Ledger"');
+    expect($watcher()->finishedBeats())->toBe(['declined']);
+
+    $pending = QuestOffer::factory()->create(['world_session_id' => $session->id, 'world_session_quest_id' => $ledgerRun->id, 'world_resident_id' => $resident->id, 'status' => QuestOfferStatus::Pending]);
+    app(WithdrawQuestOffers::class)->handle(QuestOffer::whereKey($pending->id));
+
+    expect($watcher()->finishedBeats())->toEqualCanonicalizing(['declined', 'twice'])
+        ->and(QuestSessionState::for($session->fresh())->questState('the-ledger'))->toBe('declined');
+});
+
+it('reads a quest as active once its offer is accepted, and starts a quest on a feeling', function () {
+    [, , , $region, $resident, $session] = worldStateScenario();
+    worldQuest($region->world, ['start' => ['mode' => 'condition', 'when' => ['feeling' => ['resident' => $resident->id, 'kind' => 'liking', 'atLeast' => 4]]]], ['key' => 'fond']);
+    syncQuests($session);
+    $run = runOf($session);
+
+    ResidentFeeling::of($session, $resident)->adjust(['liking' => 4]);
+
+    expect($run->fresh()->status)->toBe(QuestStatus::Active)
+        ->and(QuestSessionState::for($session->fresh())->questState('fond'))->toBe('active');
+});
+
+it('counts no handovers, payments or declines of another session', function () {
+    [, , , $region, $resident, $session, $player, $residentInventory] = inventoryScenario();
+    $other = WorldSession::factory()->create(['world_user_id' => $session->world_user_id, 'region_id' => $region->id]);
+    $otherPlayer = Inventory::factory()->forPlayer()->create(['world_session_id' => $other->id, 'credits' => 100]);
+    $otherResident = Inventory::factory()->forResident($resident)->create(['world_session_id' => $other->id]);
+
+    app(TransferInventory::class)->handle($otherPlayer, $otherResident, 40, [], 'gift');
+
+    expect(QuestSessionState::for($session)->spentWith($resident->id))->toBe(0)
+        ->and(QuestSessionState::for($other)->spentWith($resident->id))->toBe(40);
 });

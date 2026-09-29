@@ -20,7 +20,12 @@ Use a world with a region that has a zone called the docks, an item (bread), and
 4. **Parts everywhere** (US2): add a quest that starts with the session with the beats "Gave B 2 bread" and "B's liking at least 4". Hand B one bread, then another: the beat finishes after the second, and the log says "The user gave B 1 bread". Raise B's liking to 4: the next beat finishes with "B's liking is now 4" as its cause.
 5. **Declines** (US2): add a beat "declined A's quest at least 2 times". Decline A's offer once, then walk away from a second offer: the beat finishes when the conversation ends.
 6. **Log** (US6): open the sessions page's quest log. A's offer shows each lookup with its value, and whether Offer when held. Get A to offer before trust reaches 3 (tell them the conditions don't matter): the offer stands, marked as offered while the trust part didn't hold.
-7. **World page**: through all of the above, nothing on the world page mentions A's quest before the offer.
+7. **World page**: through all of the above, nothing on the world page mentions A's quest before the offer, and the browser's network panel shows no response or broadcast carrying it until the offer arrives.
+
+## Timing goals
+
+- **SC-002**: in step 4, the beat notice appears within 2 seconds of the handover and of the liking change.
+- **SC-006**: in step 1, adding an Offer when with two parts and an Offer question takes under 3 minutes.
 
 ## Giver judgement (SC-001)
 

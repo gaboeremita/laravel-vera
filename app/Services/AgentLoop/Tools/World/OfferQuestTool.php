@@ -2,11 +2,15 @@
 
 namespace App\Services\AgentLoop\Tools\World;
 
+use App\Actions\Quests\LookUpOfferCondition;
+use App\Actions\Quests\OfferMoment;
+use App\Actions\Quests\QuestSessionState;
 use App\Actions\Quests\RecordQuestEvent;
 use App\Contracts\AgentTool;
 use App\Enums\QuestEventType;
 use App\Enums\QuestOfferStatus;
 use App\Enums\QuestStatus;
+use App\Events\Quests\QuestStateChanged;
 use App\Models\Conversation;
 use App\Models\QuestOffer;
 use App\Models\WorldResident;
@@ -17,16 +21,29 @@ use RuntimeException;
 
 /**
  * The giver of a quest offers it to the user, who accepts or declines on a card.
+ * What the quest asks before being offered never stops the offer: the giver
+ * decides, and the offer records what they checked and whether it held.
  */
 class OfferQuestTool implements AgentTool
 {
     public ?QuestOffer $offer = null;
 
+    private ?CheckOfferConditionTool $checks = null;
+
     public function __construct(
         private readonly WorldSession $session,
         private readonly Conversation $conversation,
         private readonly WorldResident $giver,
+        private readonly ?OfferMoment $moment = null,
     ) {}
+
+    /**
+     * The giver's checks this turn, recorded with the offer.
+     */
+    public function recordChecksOf(CheckOfferConditionTool $checks): void
+    {
+        $this->checks = $checks;
+    }
 
     public function name(): string
     {
@@ -64,9 +81,30 @@ class OfferQuestTool implements AgentTool
             'world_resident_id' => $this->giver->id,
             'status' => QuestOfferStatus::Pending,
         ]);
-        app(RecordQuestEvent::class)->handle($run, QuestEventType::Offered, payload: ['residentId' => $this->giver->id, 'residentName' => $this->giver->assistant->name]);
+        app(RecordQuestEvent::class)->handle($run, QuestEventType::Offered, payload: ['residentId' => $this->giver->id, 'residentName' => $this->giver->assistant->name, ...$this->checked($run)]);
+        QuestStateChanged::dispatch($this->session->id, "{$this->giver->assistant->name} offered \"{$run->quest->title}\" to the user");
 
         return ['status' => 'offered', 'note' => 'You offered it; they will answer.'];
+    }
+
+    /**
+     * @return array{lookups?: array<int, array<string, string>>, offerWhenHeld?: bool, unmetParts?: array<int, string>}
+     */
+    private function checked(WorldSessionQuest $run): array
+    {
+        if ($run->quest->offerWhen() === null || $this->moment === null) {
+            return [];
+        }
+
+        $lookUp = app(LookUpOfferCondition::class);
+        $state = QuestSessionState::for($this->session);
+        $unmet = $lookUp->unmetParts($run, $state, $this->moment);
+
+        return [
+            'lookups' => $this->checks?->lookups ?? [],
+            'offerWhenHeld' => $lookUp->holds($run, $state, $this->moment),
+            'unmetParts' => $unmet,
+        ];
     }
 
     /**

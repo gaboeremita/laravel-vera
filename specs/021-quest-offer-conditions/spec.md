@@ -24,7 +24,7 @@
 
 ### User Story 1 - A giver decides when to offer a quest (Priority: P1)
 
-In a quest that starts when offered, the author writes an offerWhen condition, for example "the player holds the lantern and the giver's trust is at least 3". The giver knows the quest and its offerWhen. When the player talks with them, the giver checks, during their turn, what they need: they call tools to look up the current value of each part ("my trust toward the player is 2"), compare it with what the quest asks for ("I need at least 3"), and decide in character whether to offer the quest now. The condition can use every existing condition part and combine them with all, any and not.
+In a quest that starts when offered, the author writes an offerWhen condition, for example "the player holds the lantern and the giver's trust is at least 3". The giver knows the quest and its offerWhen. When the player talks with them, the giver checks, during their turn, what they need: they call tools to look up the current value of each part ("my trust toward the player is 2"), compare it with what the quest asks for ("I need at least 3"), and decide in character whether to offer the quest now. The condition can use the existing parts about what the player holds, knows and has done (holding an item, holding credits, knowing a fact, a resident having learned a fact, a flag, entering a region or a zone, talking to a resident, using an activity, a resident doing an activity) and combine them with all, any and not.
 
 **Why this priority**: This is the core of the feature. It lets a giver hold a quest back until the player has earned it, and keeps that decision in the giver's hands.
 
@@ -169,7 +169,7 @@ The author needs to see why a giver did or didn't offer a quest, to tune offerWh
 - **FR-003**: During their turn, the giver MUST be able to look up, through tools, the current value of any part of the offerWhen of a quest they give, getting the value read and what the quest asks for, as many times and for as many parts as they need before replying. Lookups MUST read the state at the moment they are made and MUST be refused for parts outside their quests' offerWhen.
 - **FR-004**: The giver MUST decide alone whether to offer. An offer MUST NOT be refused because offerWhen doesn't hold or the offerQuestion isn't met; the existing reasons to refuse an offer still apply.
 - **FR-005**: A pending offer and an active quest MUST NOT be affected by offerWhen or offerQuestion.
-- **FR-006**: offerWhen MUST accept all, any and not, and every existing condition part.
+- **FR-006**: offerWhen MUST accept all, any and not, and the existing parts has, credits, knows, acknowledged, flag, enterRegion, enterZone, talkTo, use and residentDid; the beat and question parts, which read a running quest's own beats and questions, MUST NOT be used in offerWhen.
 - **FR-007**: Conditions MUST support a feeling part: a named resident's romance, trust or liking toward the player is at least and/or at most a value from -10 to 10.
 - **FR-008**: Conditions MUST support a questState part: another quest's latest run is offered (an offer is pending), active, declined (its latest offer was declined, or withdrawn unanswered when the conversation ended, and it hasn't started since), or abandoned.
 - **FR-009**: Conditions MUST support a declinedTimes part: the player declined a named quest's offer at least a number of times in the session. An offer withdrawn unanswered when the conversation ends MUST count as a decline.

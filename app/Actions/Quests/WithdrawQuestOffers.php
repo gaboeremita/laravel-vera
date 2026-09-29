@@ -4,6 +4,7 @@ namespace App\Actions\Quests;
 
 use App\Enums\QuestEventType;
 use App\Enums\QuestOfferStatus;
+use App\Events\Quests\QuestStateChanged;
 use App\Models\QuestOffer;
 use App\Models\WorldSession;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,9 +22,10 @@ class WithdrawQuestOffers
      */
     public function handle(Builder|HasMany $offers): void
     {
-        $offers->where('status', QuestOfferStatus::Pending)->with('run')->get()->each(function (QuestOffer $offer): void {
+        $offers->where('status', QuestOfferStatus::Pending)->with('run.quest')->get()->each(function (QuestOffer $offer): void {
             $offer->update(['status' => QuestOfferStatus::Withdrawn, 'answered_at' => now()]);
             $this->recordQuestEvent->handle($offer->run, QuestEventType::OfferWithdrawn);
+            QuestStateChanged::dispatch($offer->world_session_id, "The user left \"{$offer->run->quest->title}\" unanswered");
         });
     }
 }

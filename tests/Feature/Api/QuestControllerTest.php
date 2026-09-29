@@ -93,3 +93,21 @@ it('keeps another user\'s world out of reach', function () {
     $this->actingAs(User::factory()->create())->getJson(route('worlds.quests.index', $region->world_id))->assertForbidden();
     $this->getJson(route('worlds.quest-options', $region->world_id))->assertForbidden();
 });
+
+it('refuses to delete a quest another quest checks, and what the new conditions name', function () {
+    [$user, $assistant, , $region, $resident] = worldStateScenario();
+    $item = worldItem($region);
+    $ledger = worldQuest($region->world, [], ['key' => 'the-ledger', 'title' => 'The Ledger']);
+    worldQuest($region->world, ['start' => ['mode' => 'offer', 'giver' => $resident->id, 'offerWhen' => ['all' => [
+        ['declinedTimes' => ['quest' => 'the-ledger', 'atLeast' => 1]],
+        ['gaveTo' => ['resident' => $resident->id, 'item' => $item->id, 'atLeast' => 1]],
+    ]]]], ['key' => 'the-watcher', 'title' => 'The Watcher']);
+
+    $this->actingAs($user)->deleteJson(route('worlds.quests.destroy', [$region->world_id, $ledger->id]))
+        ->assertUnprocessable()->assertJsonPath('quests.0.title', 'The Watcher');
+    $this->deleteJson(route('worlds.items.destroy', [$region->world_id, $item->id]))->assertUnprocessable()->assertJsonPath('quests.0.title', 'The Watcher');
+    $this->deleteJson(route('worlds.regions.residents.destroy', [$region->world_id, $region->id, $assistant->id]))->assertUnprocessable();
+
+    $selfWatching = worldQuest($region->world, ['beats' => [QuestFactory::beat('again', ['when' => ['questState' => ['quest' => 'lonely', 'state' => 'abandoned']]])]], ['key' => 'lonely']);
+    $this->deleteJson(route('worlds.quests.destroy', [$region->world_id, $selfWatching->id]))->assertNoContent();
+});

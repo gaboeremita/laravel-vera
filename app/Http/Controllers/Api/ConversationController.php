@@ -10,6 +10,7 @@ use App\Actions\BuildFeelingsPrompt;
 use App\Actions\BuildInventoryPrompt;
 use App\Actions\BuildQuestsPrompt;
 use App\Actions\CreatorModeTags;
+use App\Actions\Quests\OfferMoment;
 use App\Actions\ResolveInventory;
 use App\Actions\ResolveSpotStacking;
 use App\Actions\ResolveUserActivity;
@@ -58,6 +59,7 @@ use App\Services\AgentLoop\Tools\World\EndQuestTool;
 use App\Services\AgentLoop\Tools\World\GiveTool;
 use App\Services\AgentLoop\Tools\World\GrantFlagTool;
 use App\Services\AgentLoop\Tools\World\GrantTool;
+use App\Services\AgentLoop\Tools\World\CheckOfferConditionTool;
 use App\Services\AgentLoop\Tools\World\OfferQuestTool;
 use App\Services\AgentLoop\Tools\World\RemoveTool;
 use App\Services\AgentLoop\Tools\World\ResetQuestTool;
@@ -535,7 +537,7 @@ class ConversationController extends Controller
 
             if ($factsResident !== null) {
                 $factTools = $this->factTools($worldSession, $conversation, $factsResident, $turnMode, $region, $validated['positions']['residents'][$factsResident->id] ?? null);
-                $questTools = $this->questTools($worldSession, $conversation, $factsResident, $turnMode);
+                $questTools = $this->questTools($worldSession, $conversation, $factsResident, $turnMode, new OfferMoment($worldSession, $factsResident, $region, $validated['positions'] ?? null));
                 $tools = [...$tools, ...array_values($factTools), ...array_values($questTools), new AdjustFeelingsTool(ResidentFeeling::of($worldSession, $factsResident), $turnMode)];
             }
 
@@ -696,7 +698,7 @@ class ConversationController extends Controller
      *
      * @return array<string, AgentTool>
      */
-    private function questTools(WorldSession $session, Conversation $conversation, WorldResident $resident, TurnMode $mode): array
+    private function questTools(WorldSession $session, Conversation $conversation, WorldResident $resident, TurnMode $mode, OfferMoment $moment): array
     {
         $tools = [];
 
@@ -710,9 +712,15 @@ class ConversationController extends Controller
             $tools['signal_question'] = $signalQuestion;
         }
 
-        $offerQuest = new OfferQuestTool($session, $conversation, $resident);
+        $offerQuest = new OfferQuestTool($session, $conversation, $resident, $moment);
         if ($offerQuest->offerable()->isNotEmpty()) {
             $tools['offer_quest'] = $offerQuest;
+        }
+
+        $checkOfferCondition = new CheckOfferConditionTool($offerQuest, $moment);
+        if ($checkOfferCondition->checkable()->isNotEmpty()) {
+            $tools['check_offer_condition'] = $checkOfferCondition;
+            $offerQuest->recordChecksOf($checkOfferCondition);
         }
 
         if ($mode === TurnMode::Creator) {

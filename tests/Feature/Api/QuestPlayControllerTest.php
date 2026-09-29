@@ -8,6 +8,7 @@ use App\Enums\QuestOfferStatus;
 use App\Enums\QuestStatus;
 use App\Enums\TurnMode;
 use App\Events\Quests\PlayerEnteredRegion;
+use App\Events\Quests\QuestsUpdated;
 use App\Models\QuestEvent;
 use App\Models\QuestOffer;
 use App\Models\User;
@@ -17,6 +18,7 @@ use App\Models\WorldSessionQuest;
 use App\Services\AgentLoop\Tools\World\OfferQuestTool;
 use Database\Factories\QuestFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 
 uses(RefreshDatabase::class);
 
@@ -192,4 +194,40 @@ it('shows empty logs for a session with no quests, and keeps another user\'s out
     $this->getJson(route('worlds.sessions.quests.index', [$region->world_id, $session->id]))->assertOk()->assertJsonPath('runs', []);
 
     $this->actingAs(User::factory()->create())->getJson(route('worlds.sessions.quest-events.index', [$region->world_id, $session->id]))->assertNotFound();
+});
+
+it('gives the author the causes, the giver\'s checks and whether the offer condition held', function () {
+    [$user, , , $region, , $session] = worldStateScenario();
+    $quest = worldQuest($region->world, [], ['title' => 'The Mill']);
+    $run = WorldSessionQuest::factory()->active()->create(['world_session_id' => $session->id, 'quest_id' => $quest->id]);
+    QuestEvent::factory()->create(['world_session_quest_id' => $run->id, 'type' => QuestEventType::BeatFinished, 'beat' => 'first', 'payload' => ['trigger' => 'ResidentFeelingsChanged', 'because' => 'Mara\'s trust is now 3.0']]);
+    QuestEvent::factory()->create(['world_session_quest_id' => $run->id, 'type' => QuestEventType::Offered, 'payload' => [
+        'lookups' => [['quest' => 'The Mill', 'part' => 'your trust toward the user', 'value' => '1.0', 'asks' => 'at least 3']],
+        'offerWhenHeld' => false,
+        'unmetParts' => ['your trust toward the user is at least 3'],
+    ]]);
+
+    $this->actingAs($user)->getJson(route('worlds.sessions.quest-events.index', [$region->world_id, $session->id]))
+        ->assertOk()
+        ->assertJsonPath('0.payload.because', 'Mara\'s trust is now 3.0')
+        ->assertJsonPath('1.payload.lookups.0.value', '1.0')
+        ->assertJsonPath('1.payload.offerWhenHeld', false)
+        ->assertJsonPath('1.payload.unmetParts.0', 'your trust toward the user is at least 3');
+});
+
+it('keeps a quest nobody has offered off the player\'s page until it is accepted', function () {
+    Event::fake([QuestsUpdated::class]);
+    $scenario = offerScenario();
+    [$user, , $conversation, $region, $resident, $session] = $scenario;
+    $index = fn () => $this->actingAs($user)->getJson(route('worlds.sessions.quests.index', [$region->world_id, $session->id]))->assertOk()->json('runs');
+
+    expect($index())->toBe([]);
+    Event::assertDispatched(QuestsUpdated::class, fn (QuestsUpdated $event) => collect($event->runs)->every(fn (array $run) => array_keys($run) === ['id', 'status'])
+        && collect($event->notices)->doesntContain('type', 'questAvailable'));
+
+    $tool = new OfferQuestTool($session, $conversation, $resident);
+    $tool->handle(['quest' => 'The Flooded Mill']);
+    $this->postJson(route('worlds.sessions.quest-offers.answer', [$region->world_id, $session->id, $tool->offer->id]), ['accept' => true])->assertOk();
+
+    expect(collect($index())->pluck('title')->all())->toBe(['The Flooded Mill']);
 });

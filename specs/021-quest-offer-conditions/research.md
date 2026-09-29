@@ -102,7 +102,7 @@
 - `ResidentFeelingsChanged` (new, leaves `feeling`), dispatched by `ResidentFeeling::adjust()`, the one place feelings change (the adjust tool in every mode and quest rewards).
 - `PlayerInventoryChanged` also lists `gaveTo` and `spentWith`.
 - `QuestStateChanged` (new, leaves `questState` and `declinedTimes`), dispatched when an offer is made, accepted, declined or withdrawn, and when a run starts or ends.
-- `QuestTrigger` gets `cause(): ?string`, a sentence in plain words; `QuestTriggerEvent` returns null, and the three triggers above return one ("Mara's trust is now 3", "The user gave Mara 2 bread", "The user declined The Lost Ledger"). `AdvanceQuests` adds it to the `beat_finished`, `started`, `completed` and `failed` payloads.
+- `QuestTrigger` gets `cause(): ?string`, a sentence in plain words; `QuestTriggerEvent` returns null, and the three triggers above return one ("Mara's trust is now 3", "The user gave Mara 2 bread", "The user declined The Lost Ledger"). `AdvanceQuests` adds it under `because` to the `beat_finished`, `started`, `completed` and `failed` payloads, since `started` already uses `cause` for what started it.
 - `AdvanceQuests` also latches event leaves of `start.offerWhen` for Available runs of offered quests, under the scope `offer`, so `enterRegion` and the like hold there once they happen.
 
 **Rationale**: Every condition part reacts through the same listener as today (FR-012). Putting the sentence on the trigger, where the names are at hand, gives the event log readable causes without the log having to reconstruct them (FR-023).
@@ -121,6 +121,6 @@
 
 ## R11. The event log
 
-**Decision**: `QuestEventLog.jsx` shows a payload's `cause` as a sentence, and for an `offered` event lists each lookup ("your trust toward the user: 2, asks at least 3") and, when `offerWhenHeld` is false, "Offered while these didn't hold:" with the parts. Those keys leave the generic key-value summary.
+**Decision**: `QuestEventLog.jsx` shows a payload's `because` as a sentence, and for an `offered` event lists each lookup ("your trust toward the user: 2, asks at least 3") and, when `offerWhenHeld` is false, "Offered while these didn't hold:" with the parts. Those keys leave the generic key-value summary.
 
 **Rationale**: FR-022 and FR-023 ask for plain words; the rest of the log keeps its current look.

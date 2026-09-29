@@ -3,14 +3,17 @@
 use App\Actions\ResolveInventory;
 use App\Actions\StockSession;
 use App\Actions\TransferInventory;
+use App\Events\Quests\PlayerInventoryChanged;
 use App\Exceptions\InsufficientInventory;
 use App\Models\CreditTransaction;
 use App\Models\Inventory;
 use App\Models\InventoryItem;
+use App\Models\ItemTransfer;
 use App\Models\StartingInventory;
 use App\Models\StartingInventoryItem;
 use App\Models\WorldSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 
 uses(RefreshDatabase::class);
 
@@ -144,4 +147,33 @@ it('starts a new session through the API with the configured inventory', functio
 
     expect(app(ResolveInventory::class)->forPlayer(WorldSession::find($response->json('id')))->credits)->toBe(75)
         ->and(Inventory::where('world_session_id', $session->id)->count())->toBe(2);
+});
+
+it('records every item it moves, with the reason and whether the creator moved it', function () {
+    [, , , $region, , , $player, $resident] = inventoryScenario();
+    $bread = worldItem($region, ['name' => 'Bread']);
+    $salt = worldItem($region, ['name' => 'Salt']);
+    InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => $bread->id, 'quantity' => 3]);
+
+    app(TransferInventory::class)->handle($player, $resident, 0, [$bread->id => 2], 'gift');
+    app(TransferInventory::class)->handle(null, $player, 0, [$salt->id => 1], 'grant', byCreator: true);
+
+    expect(ItemTransfer::orderBy('id')->get()->map->only(['from_inventory_id', 'to_inventory_id', 'item_id', 'quantity', 'reason', 'by_creator'])->all())->toBe([
+        ['from_inventory_id' => $player->id, 'to_inventory_id' => $resident->id, 'item_id' => $bread->id, 'quantity' => 2, 'reason' => 'gift', 'by_creator' => false],
+        ['from_inventory_id' => null, 'to_inventory_id' => $player->id, 'item_id' => $salt->id, 'quantity' => 1, 'reason' => 'grant', 'by_creator' => true],
+    ]);
+});
+
+it('tells the quests what the player handed a resident, in plain words', function () {
+    Event::fake([PlayerInventoryChanged::class]);
+    [, $assistant, , $region, , , $player, $resident] = inventoryScenario();
+    $bread = worldItem($region, ['name' => 'bread']);
+    InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => $bread->id, 'quantity' => 3]);
+
+    app(TransferInventory::class)->handle($player, $resident, 0, [$bread->id => 2], 'gift');
+    app(TransferInventory::class)->handle($player, $resident, 15, [], 'gift');
+    app(TransferInventory::class)->handle($resident, $player, 0, [$bread->id => 1], 'gift');
+
+    $causes = collect(Event::dispatched(PlayerInventoryChanged::class))->map(fn (array $event) => $event[0]->cause())->all();
+    expect($causes)->toBe(["The user gave {$assistant->name} 2 bread", "The user paid {$assistant->name} 15 credits", null]);
 });

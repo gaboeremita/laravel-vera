@@ -2,12 +2,16 @@
 
 namespace App\Services\AgentLoop\Tools\World;
 
+use App\Actions\Quests\OfferQuestionStatus;
 use App\Actions\Quests\RecordQuestEvent;
 use App\Contracts\AgentTool;
 use App\Enums\QuestEventType;
+use App\Enums\QuestOfferStatus;
 use App\Enums\QuestStatus;
 use App\Jobs\JudgeQuestion;
 use App\Models\Conversation;
+use App\Models\Quest;
+use App\Models\QuestOffer;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Models\WorldSessionQuest;
@@ -55,7 +59,7 @@ class SignalQuestionTool implements AgentTool
         $reason = trim((string) ($arguments['reason'] ?? '')) ?: 'no reason given';
 
         foreach ($questions as ['run' => $run, 'beat' => $beatId, 'question' => $questionId]) {
-            app(RecordQuestEvent::class)->handle($run, QuestEventType::QuestionSignalled, $beatId, ['question' => $questionId, 'reason' => $reason, 'residentId' => $this->resident->id, 'residentName' => $this->resident->assistant->name, 'conversationId' => $this->conversation->id]);
+            app(RecordQuestEvent::class)->handle($run, QuestEventType::QuestionSignalled, $beatId, ['question' => $questionId, 'reason' => $reason, 'residentId' => $this->resident->id, 'residentName' => $this->resident->assistant->name, 'conversationId' => $this->conversation->id, ...OfferQuestionStatus::textHash($run, $questionId)]);
             JudgeQuestion::dispatch($run->id, $questionId, $this->conversation->id, $this->resident->id);
         }
 
@@ -63,19 +67,41 @@ class SignalQuestionTool implements AgentTool
     }
 
     /**
-     * The unmet questions of current beats that name this resident, by text.
+     * The unmet questions of current beats that name this resident, and the
+     * unmet offerQuestions of the quests they could offer, by text.
      *
-     * @return Collection<string, array<int, array{run: WorldSessionQuest, beat: string, question: string}>>
+     * @return Collection<string, array<int, array{run: WorldSessionQuest, beat: ?string, question: string}>>
      */
     public function signallable(): Collection
     {
-        return $this->session->questRuns()->with('quest')->where('status', QuestStatus::Active)->get()
+        $runs = $this->session->questRuns()->with('quest')->whereIn('status', [QuestStatus::Active, QuestStatus::Available])->get();
+        $beatQuestions = $runs->where('status', QuestStatus::Active)
             ->flatMap(fn (WorldSessionQuest $run) => collect($run->currentBeats())
                 ->flatMap(fn (array $beat) => collect($beat['questions'] ?? [])
                     ->filter(fn (array $question) => in_array($this->resident->id, $question['residents'] ?? [], true) && ! $run->questionMet($question['id']))
-                    ->map(fn (array $question) => ['text' => $question['text'], 'run' => $run, 'beat' => $beat['id'], 'question' => $question['id']])))
+                    ->map(fn (array $question) => ['text' => $question['text'], 'run' => $run, 'beat' => $beat['id'], 'question' => $question['id']])));
+
+        return $beatQuestions->merge($this->offerQuestions($runs))
             ->groupBy('text')
             ->map(fn (Collection $entries) => $entries->map(fn (array $entry) => ['run' => $entry['run'], 'beat' => $entry['beat'], 'question' => $entry['question']])->all());
+    }
+
+    /**
+     * @param  Collection<int, WorldSessionQuest>  $runs
+     * @return Collection<int, array{text: string, run: WorldSessionQuest, beat: null, question: string}>
+     */
+    private function offerQuestions(Collection $runs): Collection
+    {
+        $pending = QuestOffer::where('world_session_id', $this->session->id)->where('status', QuestOfferStatus::Pending)->pluck('world_session_quest_id')->all();
+        $status = app(OfferQuestionStatus::class);
+
+        return $runs->where('status', QuestStatus::Available)
+            ->filter(fn (WorldSessionQuest $run) => $run->quest->giverId() === $this->resident->id
+                && $run->quest->offerQuestion() !== null
+                && ! in_array($run->id, $pending, true)
+                && ! $status->handle($this->session, $run->quest)['met'])
+            ->map(fn (WorldSessionQuest $run) => ['text' => $run->quest->offerQuestion(), 'run' => $run, 'beat' => null, 'question' => Quest::OFFER_QUESTION_ID])
+            ->values();
     }
 
     public function timeoutSeconds(): int

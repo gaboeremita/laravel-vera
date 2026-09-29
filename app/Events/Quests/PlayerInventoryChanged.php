@@ -7,8 +7,21 @@ namespace App\Events\Quests;
  */
 class PlayerInventoryChanged extends QuestTriggerEvent
 {
+    /**
+     * @param  ?string  $handover  what the player handed a resident, when that is what changed
+     */
+    public function __construct(int $sessionId, private readonly ?string $handover = null)
+    {
+        parent::__construct($sessionId);
+    }
+
     public function leaves(): array
     {
-        return ['has', 'credits'];
+        return ['has', 'credits', 'gaveTo', 'spentWith'];
+    }
+
+    public function cause(): ?string
+    {
+        return $this->handover;
     }
 }

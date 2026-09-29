@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import ConditionBuilder from './ConditionBuilder.jsx';
-import { ALL_CONDITION_TYPES } from '../utils/questConditionTypes.js';
+import { EVERYWHERE_CONDITION_TYPES, OFFER_WHEN_CONDITION_TYPES } from '../utils/questConditionTypes.js';
 import QuestBeatEditor from './QuestBeatEditor.jsx';
 import RubricEditor, { FieldErrors } from './RubricEditor.jsx';
 import Toggle from './common/Toggle.jsx';
@@ -134,7 +134,7 @@ function QuestRewardEditor({ value, onChange, options, errorsAt }) {
 	);
 }
 
-function OptionalCondition({ label, emptyLabel, value, onChange, options, context, errors }) {
+function OptionalCondition({ label, emptyLabel, value, onChange, options, context, path, errorsAt }) {
 	const [editing, setEditing] = useState(value !== null);
 	const custom = editing || value !== null;
 
@@ -148,8 +148,22 @@ function OptionalCondition({ label, emptyLabel, value, onChange, options, contex
 					</button>
 				))}
 			</div>
-			{custom && <ConditionBuilder value={value} onChange={onChange} options={options} context={context} />}
-			<FieldErrors messages={errors} />
+			{custom ? <ConditionBuilder value={value} onChange={onChange} options={options} context={context} path={path} errorsAt={errorsAt} /> : <FieldErrors messages={errorsAt(path, true)} />}
+		</div>
+	);
+}
+
+/** What the giver checks, and the question they weigh, before offering the quest. */
+function OfferConditions({ start, onChange, options, context, errorsAt }) {
+	return (
+		<div className="mt-3 border-l-2 border-accent/40 pl-3 space-y-3">
+			<p className="text-fg-3 text-xs">The giver checks these and decides alone whether to offer.</p>
+			<OptionalCondition label="Offer when" emptyLabel="Any time" value={start.offerWhen ?? null} onChange={(value) => onChange({ ...start, offerWhen: value })} options={options} context={{ ...context, types: OFFER_WHEN_CONDITION_TYPES }} path="start.offerWhen" errorsAt={errorsAt} />
+			<div>
+				<label className={FIELD_LABEL}>Offer question <span className={HINT}>(optional)</span></label>
+				<textarea value={start.offerQuestion ?? ''} onChange={(event) => onChange({ ...start, offerQuestion: event.target.value === '' ? null : event.target.value })} rows={2} placeholder="Has the user shown they can keep a secret?" className={`${FIELD_INPUT} resize-none placeholder:text-fg-3/60`} />
+				<FieldErrors messages={errorsAt('start.offerQuestion')} />
+			</div>
 		</div>
 	);
 }
@@ -189,7 +203,7 @@ export default function QuestEditor({ worldId, quest, options, campaigns = [], o
 		flags: [...new Set(beats.flatMap((beat) => (beat.grants ?? []).map((grant) => grant.flag)).filter(Boolean))],
 		questions: beats.flatMap((beat) => beat.questions ?? []).filter((question) => question.id),
 		beats: beats.filter((beat) => beat.id),
-		types: ALL_CONDITION_TYPES,
+		types: EVERYWHERE_CONDITION_TYPES,
 	};
 
 	const switchMode = (next) => {
@@ -309,15 +323,16 @@ export default function QuestEditor({ worldId, quest, options, campaigns = [], o
 								</button>
 							))}
 							{definition.start?.mode === 'offer' && (
-								<select value={definition.start.giver ?? ''} onChange={(event) => setDefinition('start', { mode: 'offer', giver: Number(event.target.value) })} className={`${FIELD_INPUT} w-auto ml-2`} aria-label="Giver">
+								<select value={definition.start.giver ?? ''} onChange={(event) => setDefinition('start', { ...definition.start, giver: Number(event.target.value) })} className={`${FIELD_INPUT} w-auto ml-2`} aria-label="Giver">
 									{options.residents.map((resident) => <option key={resident.id} value={resident.id}>{resident.name}</option>)}
 								</select>
 							)}
 						</div>
 						{definition.start?.mode === 'condition' && (
-							<div className="mt-2"><ConditionBuilder value={definition.start.when ?? null} onChange={(value) => setDefinition('start', { mode: 'condition', when: value })} options={options} context={{ ...context, types: ALL_CONDITION_TYPES.filter((type) => !['beat', 'question'].includes(type)) }} /></div>
+							<div className="mt-2"><ConditionBuilder value={definition.start.when ?? null} onChange={(value) => setDefinition('start', { mode: 'condition', when: value })} options={options} context={{ ...context, types: EVERYWHERE_CONDITION_TYPES.filter((type) => !['beat', 'question'].includes(type)) }} path="start.when" errorsAt={errorsAt} /></div>
 						)}
-						<FieldErrors messages={errorsAt('start', true)} />
+						{definition.start?.mode === 'offer' && <OfferConditions start={definition.start} onChange={(value) => setDefinition('start', value)} options={options} context={context} errorsAt={errorsAt} />}
+						<FieldErrors messages={['start', 'start.mode', 'start.giver'].flatMap((path) => errorsAt(path))} />
 					</div>
 
 					<div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-start">
@@ -350,8 +365,8 @@ export default function QuestEditor({ worldId, quest, options, campaigns = [], o
 					</div>
 
 					<div className="grid grid-cols-1 gap-4">
-						<OptionalCondition label="Completes when" emptyLabel="Every beat is finished" value={definition.complete ?? null} onChange={(value) => setDefinition('complete', value)} options={options} context={context} errors={errorsAt('complete', true)} />
-						<OptionalCondition label="Fails when" emptyLabel="Never" value={definition.fail ?? null} onChange={(value) => setDefinition('fail', value)} options={options} context={context} errors={errorsAt('fail', true)} />
+						<OptionalCondition label="Completes when" emptyLabel="Every beat is finished" value={definition.complete ?? null} onChange={(value) => setDefinition('complete', value)} options={options} context={context} path="complete" errorsAt={errorsAt} />
+						<OptionalCondition label="Fails when" emptyLabel="Never" value={definition.fail ?? null} onChange={(value) => setDefinition('fail', value)} options={options} context={context} path="fail" errorsAt={errorsAt} />
 					</div>
 
 					<p className={SECTION}><span>ENDING</span><span className="h-px flex-1 bg-line-1" /></p>

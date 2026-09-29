@@ -25,6 +25,17 @@ class ValidateQuestDefinition
 
     private const OUTCOMES = ['ended', 'completed', 'failed', 'abandoned'];
 
+    private const FEELINGS = ['romance', 'trust', 'liking'];
+
+    private const QUEST_STATES = ['offered', 'active', 'declined', 'abandoned'];
+
+    /** Leaves about the turn with the giver, which only mean something in offerWhen. */
+    public const OFFER_ONLY_LEAVES = ['messagesWith', 'giverIn', 'othersInTheZone'];
+
+    private string $key = '';
+
+    private bool $inOfferWhen = false;
+
     /** @var array<string, array<int, string>> */
     private array $errors = [];
 
@@ -66,6 +77,7 @@ class ValidateQuestDefinition
     {
         $this->errors = [];
         $this->warnings = [];
+        $this->key = $key;
         $this->load($world, $quest);
 
         if (! is_array($definition) || array_is_list($definition)) {
@@ -107,6 +119,7 @@ class ValidateQuestDefinition
         }
         if ($user !== null) {
             $this->toolWarnings($beats, $user);
+            $this->giverToolWarning($definition['start'] ?? null, $user);
         }
 
         return $this->result();
@@ -172,6 +185,23 @@ class ValidateQuestDefinition
         }
         if ($start['mode'] === 'offer') {
             $this->resident($start['giver'] ?? null, 'start.giver');
+        }
+
+        foreach (['offerWhen', 'offerQuestion'] as $field) {
+            if (($start[$field] ?? null) !== null && $start['mode'] !== 'offer') {
+                $this->error("start.{$field}", 'Only a quest that starts by offer can have an offer condition.');
+            }
+        }
+        if ($start['mode'] !== 'offer') {
+            return;
+        }
+        if (($start['offerWhen'] ?? null) !== null) {
+            $this->inOfferWhen = true;
+            $this->condition($start['offerWhen'], 'start.offerWhen');
+            $this->inOfferWhen = false;
+        }
+        if (array_key_exists('offerQuestion', $start) && $start['offerQuestion'] !== null && (! is_string($start['offerQuestion']) || trim($start['offerQuestion']) === '')) {
+            $this->error('start.offerQuestion', 'Write the question, or leave it out.');
         }
     }
 
@@ -308,6 +338,17 @@ class ValidateQuestDefinition
         $kind = array_key_first($node);
         $value = $node[$kind];
 
+        if (in_array($kind, self::OFFER_ONLY_LEAVES, true) && ! $this->inOfferWhen) {
+            $this->error($path, 'This condition only works in Offer when.');
+
+            return;
+        }
+        if (in_array($kind, ['beat', 'question'], true) && $this->inOfferWhen) {
+            $this->error($path, 'Offer when can\'t depend on this quest\'s own beats or questions.');
+
+            return;
+        }
+
         match ($kind) {
             'all', 'any' => $this->group($value, "{$path}.{$kind}"),
             'not' => $this->condition($value, "{$path}.not"),
@@ -323,6 +364,13 @@ class ValidateQuestDefinition
             'flag' => $this->flag($value, "{$path}.flag"),
             'question' => $this->known($value, $this->questionIds, "{$path}.question", 'question'),
             'beat' => $this->known($value, $this->beatIds, "{$path}.beat", 'beat'),
+            'feeling' => $this->feeling($value, "{$path}.feeling"),
+            'questState' => $this->questState($value, "{$path}.questState"),
+            'declinedTimes' => [$this->anyQuest($value['quest'] ?? null, "{$path}.declinedTimes.quest"), $this->atLeast($value, "{$path}.declinedTimes", 1)],
+            'gaveTo' => $this->gaveTo($value, "{$path}.gaveTo"),
+            'spentWith', 'messagesWith' => [$this->resident($value['resident'] ?? null, "{$path}.{$kind}.resident"), $this->atLeast($value, "{$path}.{$kind}", 1)],
+            'giverIn' => $this->zone($value, "{$path}.giverIn"),
+            'othersInTheZone' => $this->othersInTheZone($value, "{$path}.othersInTheZone"),
             default => $this->error($path, "\"{$kind}\" isn't a condition."),
         };
     }
@@ -392,6 +440,69 @@ class ValidateQuestDefinition
     {
         if (! is_int($value['atLeast'] ?? null) || $value['atLeast'] < $minimum) {
             $this->error("{$path}.atLeast", "Must be a whole number of at least {$minimum}.");
+        }
+    }
+
+    private function feeling(mixed $value, string $path): void
+    {
+        $this->resident($value['resident'] ?? null, "{$path}.resident");
+        if (! in_array($value['kind'] ?? null, self::FEELINGS, true)) {
+            $this->error("{$path}.kind", 'Choose romance, trust or liking.');
+        }
+
+        $bounds = array_intersect_key(is_array($value) ? $value : [], ['atLeast' => true, 'atMost' => true]);
+        if ($bounds === []) {
+            $this->error($path, 'Give at least one bound.');
+
+            return;
+        }
+        foreach ($bounds as $bound => $number) {
+            if ((! is_int($number) && ! is_float($number)) || $number < -10 || $number > 10) {
+                $this->error("{$path}.{$bound}", 'Must be from -10 to 10.');
+            }
+        }
+        if (is_numeric($bounds['atLeast'] ?? null) && is_numeric($bounds['atMost'] ?? null) && $bounds['atLeast'] > $bounds['atMost']) {
+            $this->error("{$path}.atMost", 'Must be at least the lower bound.');
+        }
+    }
+
+    private function questState(mixed $value, string $path): void
+    {
+        $this->anyQuest($value['quest'] ?? null, "{$path}.quest");
+        if (! in_array($value['state'] ?? null, self::QUEST_STATES, true)) {
+            $this->error("{$path}.state", 'Choose offered, active, declined or abandoned.');
+        }
+    }
+
+    /**
+     * A quest of this world, this one included.
+     */
+    private function anyQuest(mixed $questKey, string $path): void
+    {
+        if (! is_string($questKey) || ($questKey !== $this->key && ! $this->otherQuests->has($questKey))) {
+            $this->error($path, 'Choose a quest of this world.');
+        }
+    }
+
+    private function gaveTo(mixed $value, string $path): void
+    {
+        $this->resident($value['resident'] ?? null, "{$path}.resident");
+        if (! is_int($value['item'] ?? null) || ! in_array($value['item'], $this->itemIds, true)) {
+            $this->error("{$path}.item", 'Choose an item of this world.');
+        }
+        $this->atLeast($value, $path, 1);
+    }
+
+    private function othersInTheZone(mixed $value, string $path): void
+    {
+        $nobody = is_array($value) && ($value['nobody'] ?? null) === true;
+        if (! is_array($value) || $nobody === array_key_exists('resident', $value)) {
+            $this->error($path, 'Choose a named resident, or no one besides the giver.');
+
+            return;
+        }
+        if (! $nobody) {
+            $this->resident($value['resident'], "{$path}.resident");
         }
     }
 
@@ -602,6 +713,22 @@ class ValidateQuestDefinition
             ->each(function (WorldResident $resident): void {
                 $this->warnings[] = "{$resident->assistant->name}'s model can't call tools, so they can't grant flags or signal questions until it can.";
             });
+    }
+
+    /**
+     * The giver weighs offer conditions and signals the offerQuestion with
+     * tools, so a giver whose model can't call them never checks anything.
+     */
+    private function giverToolWarning(mixed $start, User $user): void
+    {
+        if (! is_array($start) || ($start['mode'] ?? null) !== 'offer' || (($start['offerWhen'] ?? null) === null && ($start['offerQuestion'] ?? null) === null)) {
+            return;
+        }
+
+        $giver = is_int($start['giver'] ?? null) ? $this->residents->get($start['giver']) : null;
+        if ($giver !== null && ! $giver->canCallToolsFor($user)) {
+            $this->warnings[] = "{$giver->assistant->name}'s model can't call tools, so they can't check what the quest asks before offering it.";
+        }
     }
 
     private function text(mixed $value): string

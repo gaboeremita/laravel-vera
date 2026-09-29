@@ -1,11 +1,15 @@
 <?php
 
+use App\Actions\Quests\OfferQuestionStatus;
+use App\Actions\Quests\RecordQuestEvent;
 use App\Actions\Quests\SyncSessionQuests;
 use App\Enums\QuestEventType;
 use App\Enums\QuestStatus;
 use App\Jobs\JudgeQuestion;
 use App\Models\AiModel;
+use App\Models\Quest;
 use App\Models\QuestEvent;
+use App\Models\QuestOffer;
 use App\Models\WorldResident;
 use App\Services\AgentLoop\Tools\World\SignalQuestionTool;
 use Database\Factories\QuestFactory;
@@ -132,4 +136,69 @@ it('offers the signal only to residents the question names', function () {
     $stranger = WorldResident::factory()->create(['region_id' => $region->id]);
 
     expect((new SignalQuestionTool($session, $conversation, $stranger))->signallable())->toBeEmpty();
+});
+
+/**
+ * A session whose resident gives a quest they may offer once the user has shown they can keep a secret.
+ */
+function secretScenario(): array
+{
+    $scenario = worldStateScenario(fakeReply: false);
+    [, , $conversation, $region, $resident, $session] = $scenario;
+    $region->world->update(['narrator_model_id' => AiModel::first()->id]);
+    Quest::factory()->offeredBy($resident)->offerQuestion('Has the user shown they can keep a secret?')->create(['world_id' => $region->world_id, 'title' => 'The Ledger']);
+    app(SyncSessionQuests::class)->handle($session->fresh());
+    $conversation->update(['world_session_id' => $session->id]);
+    $earlier = $conversation->messages()->create(['role' => 'user', 'content' => 'I never told anyone about the ledger, and I never will.']);
+
+    return [...$scenario, $earlier];
+}
+
+function secretSignal(): array
+{
+    return toolCallResponse('signal_1', 'signal_question', ['question' => 'Has the user shown they can keep a secret?', 'reason' => 'They kept the ledger to themselves.']);
+}
+
+it('judges the offer question the giver signals, recording the text it answered and leaving the run as it was', function () {
+    $scenario = secretScenario();
+    [, , , , $resident, $session, $earlier] = $scenario;
+    fakeTurn(secretSignal(), judgementResponse(true, [$earlier->id]), finalAnswerResponse('Good.'));
+
+    sendWorldMessage($this, $scenario, apologyPositions($resident))->assertOk();
+
+    $run = $session->questRuns()->with('quest')->first();
+    expect(QuestEvent::where('type', QuestEventType::QuestionJudged)->first()->payload)
+        ->toMatchArray(['question' => Quest::OFFER_QUESTION_ID, 'met' => true, 'textHash' => OfferQuestionStatus::hash('Has the user shown they can keep a secret?')])
+        ->and($run->status)->toBe(QuestStatus::Available)
+        ->and($run->state['questions'])->toBe([])
+        ->and(app(OfferQuestionStatus::class)->handle($session, $run->quest))->toBe(['met' => true, 'reason' => null])
+        ->and((new SignalQuestionTool($session, $scenario[2], $resident))->signallable())->toBeEmpty();
+});
+
+it('lets the giver signal the offer question again after a no, and asks for a new yes once its text changes', function () {
+    $scenario = secretScenario();
+    [, , $conversation, , $resident, $session, $earlier] = $scenario;
+    fakeTurn(secretSignal(), judgementResponse(false, [$earlier->id], 'Not yet.'), finalAnswerResponse('Hm.'));
+
+    sendWorldMessage($this, $scenario, apologyPositions($resident))->assertOk();
+
+    $quest = $session->questRuns()->first()->quest;
+    expect(app(OfferQuestionStatus::class)->handle($session, $quest))->toBe(['met' => false, 'reason' => 'Not yet.'])
+        ->and((new SignalQuestionTool($session, $conversation, $resident))->signallable())->not->toBeEmpty();
+
+    app(RecordQuestEvent::class)->handle($session->questRuns()->first(), QuestEventType::QuestionJudged, payload: ['question' => Quest::OFFER_QUESTION_ID, 'met' => true, 'reason' => 'Kept.', ...OfferQuestionStatus::textHash($session->questRuns()->first(), Quest::OFFER_QUESTION_ID)]);
+    $quest->update(['definition' => [...$quest->definition, 'start' => [...$quest->definition['start'], 'offerQuestion' => 'Has the user kept two secrets?']]]);
+
+    expect(app(OfferQuestionStatus::class)->handle($session, $quest->fresh())['met'])->toBeFalse();
+});
+
+it('keeps the offer question from anyone but the giver, and while an offer is pending', function () {
+    [, , $conversation, $region, $resident, $session] = secretScenario();
+    $stranger = WorldResident::factory()->create(['region_id' => $region->id]);
+
+    expect((new SignalQuestionTool($session, $conversation, $stranger))->signallable())->toBeEmpty();
+
+    QuestOffer::factory()->create(['world_session_id' => $session->id, 'world_session_quest_id' => $session->questRuns()->first()->id, 'conversation_id' => $conversation->id, 'world_resident_id' => $resident->id]);
+
+    expect((new SignalQuestionTool($session, $conversation, $resident))->signallable())->toBeEmpty();
 });

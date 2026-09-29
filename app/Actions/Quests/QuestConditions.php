@@ -3,6 +3,7 @@
 namespace App\Actions\Quests;
 
 use App\Contracts\QuestTrigger;
+use App\Models\WorldResident;
 use App\Models\WorldSessionQuest;
 
 /**
@@ -88,7 +89,10 @@ class QuestConditions
         return true;
     }
 
-    public function holds(?array $condition, WorldSessionQuest $run, QuestSessionState $state, string $scope, string $path = ''): bool
+    /**
+     * @param  ?OfferMoment  $moment  the current turn with a giver; leaves about the moment only hold with one
+     */
+    public function holds(?array $condition, WorldSessionQuest $run, QuestSessionState $state, string $scope, string $path = '', ?OfferMoment $moment = null): bool
     {
         if ($condition === null || $condition === []) {
             return false;
@@ -98,9 +102,9 @@ class QuestConditions
         $value = $condition[$kind];
 
         return match ($kind) {
-            'all' => collect($value)->every(fn ($child, $index) => $this->holds(is_array($child) ? $child : null, $run, $state, $scope, "{$path}.all.{$index}")),
-            'any' => collect($value)->contains(fn ($child, $index) => $this->holds(is_array($child) ? $child : null, $run, $state, $scope, "{$path}.any.{$index}")),
-            'not' => ! $this->holds(is_array($value) ? $value : null, $run, $state, $scope, "{$path}.not"),
+            'all' => collect($value)->every(fn ($child, $index) => $this->holds(is_array($child) ? $child : null, $run, $state, $scope, "{$path}.all.{$index}", $moment)),
+            'any' => collect($value)->contains(fn ($child, $index) => $this->holds(is_array($child) ? $child : null, $run, $state, $scope, "{$path}.any.{$index}", $moment)),
+            'not' => ! $this->holds(is_array($value) ? $value : null, $run, $state, $scope, "{$path}.not", $moment),
             'enterRegion', 'enterZone', 'talkTo', 'use', 'residentDid' => $run->hasSeen(self::seenKey($scope, $path, $condition)),
             'has' => $state->holds((int) ($value['item'] ?? 0), (int) ($value['atLeast'] ?? 1)),
             'credits' => $state->hasCredits((int) ($value['atLeast'] ?? 0)),
@@ -109,7 +113,45 @@ class QuestConditions
             'flag' => is_string($value) ? $run->hasFlag($value) : $state->questEndedWithFlag((string) ($value['quest'] ?? ''), (string) ($value['name'] ?? '')),
             'question' => $run->questionMet((string) $value),
             'beat' => $run->hasFinished((string) $value),
+            'feeling' => $this->withinBounds($state->feeling((int) ($value['resident'] ?? 0), (string) ($value['kind'] ?? '')), $value),
+            'questState' => $state->questState((string) ($value['quest'] ?? '')) === ($value['state'] ?? null),
+            'declinedTimes' => $state->declinedTimes((string) ($value['quest'] ?? '')) >= (int) ($value['atLeast'] ?? 1),
+            'gaveTo' => $state->gaveTo((int) ($value['resident'] ?? 0), (int) ($value['item'] ?? 0)) >= (int) ($value['atLeast'] ?? 1),
+            'spentWith' => $state->spentWith((int) ($value['resident'] ?? 0)) >= (int) ($value['atLeast'] ?? 1),
+            'messagesWith', 'giverIn', 'othersInTheZone' => $moment !== null && $this->holdsNow($kind, $value, $moment),
             default => false,
         };
+    }
+
+    /**
+     * @param  array{atLeast?: float|int, atMost?: float|int}  $bounds
+     */
+    private function withinBounds(float $feeling, array $bounds): bool
+    {
+        return (! isset($bounds['atLeast']) || $feeling >= $bounds['atLeast'])
+            && (! isset($bounds['atMost']) || $feeling <= $bounds['atMost']);
+    }
+
+    /**
+     * Leaves about the turn with the giver, read from the moment.
+     */
+    private function holdsNow(string $kind, mixed $value, OfferMoment $moment): bool
+    {
+        if ($kind === 'messagesWith') {
+            $resident = WorldResident::find((int) ($value['resident'] ?? 0));
+
+            return $resident !== null && $moment->messagesWith($resident) >= (int) ($value['atLeast'] ?? 1);
+        }
+        if ($kind === 'giverIn') {
+            return $moment->region?->id === ($value['region'] ?? null)
+                && collect($moment->giverZoneChain())->contains('id', $value['zone'] ?? null);
+        }
+        if ($moment->giverZoneChain() === []) {
+            return false;
+        }
+
+        return ($value['nobody'] ?? false) === true
+            ? $moment->residentsInGiverZone() === []
+            : in_array((int) ($value['resident'] ?? 0), $moment->residentsInGiverZone(), true);
     }
 }

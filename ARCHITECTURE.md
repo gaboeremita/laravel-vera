@@ -1215,6 +1215,16 @@ Specified in `specs/020-world-quests/`.
 
 **Frontend.** Configuration: `QuestsEditor` with `QuestEditor` (Form/JSON), `QuestBeatEditor`, `ConditionBuilder` and `RubricEditor`, fed by `useQuestOptions`; `CampaignsEditor` with `useCampaigns`. Play: `useQuests` (runs, campaigns, notices and endings from the channel), `QuestTracker`, `BeatNotice`, `QuestLogPanel` (`K`), `EndingCard`, and `QuestOfferCard` opened from the offer line in `WorldChat`. The sessions page shows `QuestEventLog`.
 
+### Offer conditions
+
+Specified in `specs/021-quest-offer-conditions/`.
+
+**Definitions.** A quest that starts by offer can carry `start.offerWhen`, a condition, and `start.offerQuestion`, prose. Conditions gain `feeling`, `questState`, `declinedTimes`, `gaveTo` and `spentWith`, usable everywhere, and `messagesWith`, `giverIn` and `othersInTheZone`, which read the turn with the giver and are refused by `ValidateQuestDefinition` outside `offerWhen`. `FindQuestReferences` also refuses deleting a quest another quest names by its state or declines.
+
+**The giver decides.** The game never evaluates `offerWhen` to allow or refuse an offer. `BuildQuestsPrompt` writes it in plain words (`DescribeCondition`) with a discretion line, and `CheckOfferConditionTool` (`check_offer_condition`) returns a part's current value next to what the quest asks, through `LookUpOfferCondition`. `OfferMoment` carries what only the turn knows: the giver, the region and the positions the page sent. `OfferQuestTool` records the turn's lookups, whether `offerWhen` held and the parts that didn't on the `offered` event. The `offerQuestion` is signalled and judged like a beat's question under the id `:offer`; `OfferQuestionStatus` reads its answers from the log by a hash of its text, so a yes lasts the session until the question changes.
+
+**Data and triggers.** `TransferInventory` writes an `ItemTransfer` per item moved, beside `CreditTransaction`; `gaveTo` and `spentWith` sum the player's handovers to a resident from both. `questState` and `declinedTimes` read `quest_offers`, a withdrawn offer counting as declined. `ResidentFeelingsChanged` (from `ResidentFeeling::adjust`) and `QuestStateChanged` (offers, answers, starts and ends) are new triggers; a trigger's `cause()` reaches the event log as `because`. The player's page never receives a quest before it is offered: the quests list leaves Available runs out and broadcasts carry only their id and status.
+
 ### Runtime (3D Scene)
 
 **`WorldEnvironment`** loads the environment GLB, builds a `WorldCollision` (`collisionCheck.js`) from it, resolves a spawn position near the room's center, and adds the scene graph — errors (a failed load, or a GLB with no collision geometry at all) surface via `onError` rather than leaving the scene half-initialized.
