@@ -3,7 +3,9 @@
 use App\Actions\ResolveInventory;
 use App\Models\ActivityTerms;
 use App\Models\AiModel;
+use App\Models\Assistant;
 use App\Models\InventoryItem;
+use App\Models\Region;
 use App\Models\ResidentActivity;
 use App\Models\WorldResident;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -103,24 +105,67 @@ it('asks the narrator about a plain-language requirement', function () {
     useLounger($this, $scenario, 'I show the signet')->assertOk()->assertJsonPath('allowed', true)->assertJsonPath('narration', 'The attendant waves you through.')->assertJsonPath('action', 'flashes a signet at the attendant');
 });
 
-it('leaves activities a resident cannot afford out of their choices, and charges them when they use one', function () {
+it('lets a resident use a paid activity without charging them', function () {
     $scenario = autonomousTermsScenario();
-    [, , , $region, $resident, $session] = $scenario;
+    [, , , , $resident, $session] = $scenario;
     $residentInventory = app(ResolveInventory::class)->forResident($session, $resident);
-    $residentInventory->update(['credits' => 2]);
+    $residentInventory->update(['credits' => 0]);
     loungerTerms($scenario, ['cost' => 5]);
-    fakeTurn(finalAnswerResponse('(Nothing to do) *waits*'), toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline']), finalAnswerResponse('(Sun) *stretches out*'));
+    fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline']), finalAnswerResponse('(Sun) *stretches out*'));
 
     requestTermsDecision($this, $scenario)->assertCreated();
+
+    expect($residentInventory->fresh()->credits)->toBe(0)
+        ->and(ResidentActivity::where('verb', 'use')->count())->toBe(1);
+});
+
+it('leaves activities that need an item a resident lacks out of their choices', function () {
+    $scenario = autonomousTermsScenario();
+    loungerTerms($scenario, ['required_item_id' => worldItem($scenario[3], ['name' => 'Towel'])->id]);
+    fakeTurn(finalAnswerResponse('(Nothing to do) *waits*'));
+
+    requestTermsDecision($this, $scenario)->assertCreated();
+
+    expect(collect(Http::recorded()[0][0]['tools'])->pluck('function.name')->all())->not->toContain('use');
+});
+
+it('leaves an activity to its vendor while the vendor is in the room, and lets a resident use it otherwise', function () {
+    $scenario = autonomousTermsScenario();
+    $vendor = vendorResident($scenario[3]);
+    loungerTerms($scenario, ['vendor_resident_id' => $vendor->id]);
+    fakeTurn(finalAnswerResponse('(Nothing to do) *waits*'), toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline']), finalAnswerResponse('(Sun) *stretches out*'));
+
+    requestTermsDecision($this, $scenario, [$vendor->id => ['x' => 6, 'y' => 0, 'z' => -3]])->assertCreated();
     expect(collect(Http::recorded()[0][0]['tools'])->pluck('function.name')->all())->not->toContain('use');
 
-    $residentInventory->update(['credits' => 9]);
     $this->travel(10)->seconds();
     requestTermsDecision($this, $scenario)->assertCreated();
 
-    expect($residentInventory->fresh()->credits)->toBe(4)
-        ->and(ResidentActivity::where('verb', 'use')->count())->toBe(1);
+    expect(ResidentActivity::where('verb', 'use')->count())->toBe(1);
 });
+
+it('tells a resident who sells what in their region, and nothing that is not for sale', function () {
+    $scenario = autonomousTermsScenario();
+    [, , , $region, , $session] = $scenario;
+    $vendor = vendorResident($region);
+    loungerTerms($scenario, ['vendor_resident_id' => $vendor->id]);
+    $vendorInventory = app(ResolveInventory::class)->forResident($session, $vendor);
+    InventoryItem::factory()->forSale()->create(['inventory_id' => $vendorInventory->id, 'item_id' => worldItem($region, ['name' => 'Tacos'])->id]);
+    InventoryItem::factory()->create(['inventory_id' => $vendorInventory->id, 'item_id' => worldItem($region, ['name' => 'Secret salsa'])->id]);
+    fakeTurn(finalAnswerResponse('(I feel like tacos) *heads for the tacos*'));
+
+    requestTermsDecision($this, $scenario, [$vendor->id => ['x' => 6, 'y' => 0, 'z' => -3]])->assertCreated();
+
+    expect(sentSystemPrompt())
+        ->toContain('Rosa (serves at the Pool lounger, now in Pool terrace): Tacos')
+        ->toContain('It costs you nothing')
+        ->not->toContain('Secret salsa');
+});
+
+function vendorResident(Region $region): WorldResident
+{
+    return $region->residents()->create(['assistant_id' => Assistant::factory()->create(['name' => 'Rosa'])->id, 'position' => ['x' => 6, 'y' => 0, 'z' => -3], 'behavior' => 'stationary']);
+}
 
 function autonomousTermsScenario(): array
 {
@@ -130,11 +175,14 @@ function autonomousTermsScenario(): array
     return $scenario;
 }
 
-function requestTermsDecision($test, array $scenario)
+/**
+ * @param  array<int, array{x: float, y: float, z: float}>  $otherResidents  where other residents are, by resident id
+ */
+function requestTermsDecision($test, array $scenario, array $otherResidents = [])
 {
     [$user, , , $region, $resident, $session] = $scenario;
 
     return $test->actingAs($user)->postJson(route('worlds.sessions.residents.decisions.store', [$region->world_id, $session->id, $resident->id]), [
-        'positions' => ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]]],
+        'positions' => ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]] + $otherResidents],
     ]);
 }

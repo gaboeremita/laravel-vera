@@ -18,7 +18,7 @@ class ActivityTerms extends Model
 
     protected function casts(): array
     {
-        return ['consumes_required' => 'boolean', 'cost' => 'integer', 'gives_credits' => 'integer', 'gives_items' => 'array'];
+        return ['consumes_required' => 'boolean', 'cost' => 'integer', 'gives_credits' => 'integer', 'gives_items' => 'array', 'vendor_resident_id' => 'integer'];
     }
 
     public function region(): BelongsTo

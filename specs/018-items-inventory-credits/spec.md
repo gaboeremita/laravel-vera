@@ -16,6 +16,8 @@
 - Q: Should residents also be able to ask the player for an item, not just credits? → A: A request can be for anything: credits, items, information, a certain response. Activities and items likewise can require or give anything, including information, described in plain language and judged by the LLM.
 - Q: What happens to a request still unanswered when the conversation ends? → A: It is cancelled.
 - Q: Can the player see what a resident is carrying? → A: Vendors show the player their items for sale; every other resident's inventory stays hidden, and they may tell the player what they carry, or not.
+- Q: Do residents pay credits when they trade with each other or use a paid activity? → A: No. Between residents credits are only played at: they may name a price and act out paying, but only items change hands, for free, and residents are never charged an activity's cost.
+- Q: How far do residents look for vendors? → A: Within their own region.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -97,7 +99,7 @@ In a region's configuration, the user places items on objects of the environment
 
 ### User Story 5 - Activities that cost and give (Priority: P2)
 
-In a region's configuration, the user can set, for an activity of an object, an item it requires (and whether using the activity consumes it), a credit cost, or both. The user can also set credits and items the activity gives each time it is used, drawn from the object's own stock. A gate's "open" activity can require a key; a vending machine can cost 5 credits and give a drink; a job board can give 20 credits. Anyone who lacks the required item or credits, player or resident, cannot use that activity.
+In a region's configuration, the user can set, for an activity of an object, an item it requires (and whether using the activity consumes it), a credit cost, or both. The user can also set credits and items the activity gives each time it is used, drawn from the object's own stock. A gate's "open" activity can require a key; a vending machine can cost 5 credits and give a drink; a job board can give 20 credits. Anyone who lacks the required item cannot use that activity, and the player cannot use it without the credits; residents are never charged the cost.
 
 Beyond items and credits, an activity can have a requirement and an outcome written in plain language: "opens for anyone who can show they work for the Guild", "the terminal shows the last message sent from it". The LLM judges whether the player (or resident) meets the requirement from what they hold and the situation, and narrates the outcome, including any information it reveals.
 
@@ -111,6 +113,7 @@ Beyond items and credits, an activity can have a requirement and an outcome writ
 2. **Given** the player holds the key and the requirement keeps the item, **When** the player uses the activity, **Then** it works and the player still holds the key.
 3. **Given** the requirement consumes the item and the player holds 2 coins, **When** the player uses the activity, **Then** it works and the player holds 1 coin.
 4. **Given** an activity requires a key, **When** a resident without the key considers what to do, **Then** that activity is not offered to them.
+4a. **Given** an activity costs 5 credits, **When** a resident with no credits uses it, **Then** it works and the resident's credits do not change.
 5. **Given** an activity costs 5 credits and gives 1 drink, **When** the player with 12 credits uses it, **Then** the player holds 7 credits and 1 more drink, and the object holds 1 drink less.
 6. **Given** an activity costs 5 credits, **When** the player with 3 credits tries to use it, **Then** the activity does not start and the player is told it costs 5 credits.
 7. **Given** an activity gives 20 credits and its object has 30 credits, **When** the player uses it twice, **Then** the first use gives 20 and the second is not offered, because the object has only 10 left.
@@ -149,6 +152,25 @@ Every change to a balance is recorded with the amount, who it moved between and 
 1. **Given** the player paid a resident 30 credits for a map, **When** the player opens the credit history, **Then** an entry shows -30, the resident's name and "for the map".
 2. **Given** a session with no credit changes, **When** the player opens the history, **Then** it shows that nothing has happened yet.
 
+---
+
+### User Story 8 - Residents trade among themselves (Priority: P3)
+
+Residents know which other residents of their region sell something, what they sell and where they serve. When a resident feels like something a vendor sells, like tacos from the taco stand, they go to the vendor and talk to them, and the vendor hands it over in character. Between residents nothing really costs credits: they may name a price and play along with paying, but only the items move. An activity can name a resident as its vendor; while that vendor is in the same room, other residents get what the activity offers from the vendor instead of using it themselves.
+
+**Why this priority**: Residents going about their own errands, buying and sharing things, makes the world feel alive without touching the player's economy.
+
+**Independent Test**: Give a vendor tacos for sale and name them the vendor of the taco stand's activity; let another resident of the region decide what to do, confirm they are told the vendor sells tacos, then have the vendor hand them tacos in conversation and confirm the tacos moved and no credits did.
+
+**Acceptance Scenarios**:
+
+1. **Given** a resident of the region sells tacos and serves at the taco stand, **When** another resident of that region decides what to do, **Then** they are told who sells tacos, where they serve and where they are now.
+2. **Given** a vendor also carries items not for sale, **When** another resident is told what the vendor sells, **Then** only the items for sale are named.
+3. **Given** two residents are talking, **When** one hands the other 2 tacos, **Then** the tacos move, and neither is offered credits to hand over nor told their credit balance.
+4. **Given** an activity names a vendor, **When** the vendor is in the same room as another resident, **Then** that activity is not offered to the other resident; **When** the vendor is elsewhere, **Then** it is offered as usual.
+
+---
+
 ### Edge Cases
 
 - A resident's model cannot hand over items or ask for payment: the resident configuration does not allow giving that resident a starting inventory or credits, and says why.
@@ -180,7 +202,10 @@ Every change to a balance is recorded with the amount, who it moved between and 
 - **FR-011**: The player MUST be notified whenever their inventory or balance changes.
 - **FR-012**: Users MUST be able to place items with a quantity or unlimited amount on objects in a region's configuration; the player MUST be able to take one of an item from an object while it has any left.
 - **FR-013**: Objects' remaining amounts MUST be tracked per session.
-- **FR-014**: Users MUST be able to set, per object activity, a required item (kept or consumed), a credit cost, or both; these MUST apply to the player and to residents.
+- **FR-008a**: Between residents, handovers MUST be items only; credits MUST NOT move between residents, and a resident talking with another resident MUST NOT be told their credit balance.
+- **FR-008b**: When a resident decides what to do on their own, they MUST be told which other residents of their region sell something, what they sell (never items not for sale), where they serve and where they are.
+- **FR-014**: Users MUST be able to set, per object activity, a required item (kept or consumed), a credit cost, or both; the required item MUST apply to the player and to residents, and the cost MUST apply to the player only.
+- **FR-014e**: Users MUST be able to name a resident as the vendor of an object activity; while the vendor is in the same room as another resident, that activity MUST NOT be offered to the other resident.
 - **FR-014a**: Users MUST be able to set, per object activity, credits and items it gives on each use; what it gives MUST come from the object's stock, and the activity MUST NOT be offered once the stock cannot cover it.
 - **FR-014b**: Users MUST be able to give objects a stock of credits, as a number or unlimited, tracked per session like their items.
 - **FR-014c**: Users MUST be able to give an object activity a requirement and an outcome in plain language; the LLM MUST judge the requirement from what the user of the activity holds and the situation, and narrate the outcome, including information it reveals.
@@ -215,7 +240,7 @@ Every change to a balance is recorded with the amount, who it moved between and 
 - The game is an open role-playing sim in the spirit of a tabletop RPG, not focused on combat; mechanics stay open and are judged by the LLM wherever rules are not about moving credits and items.
 - The currency is called "credits" in every world.
 - Residents decide whether to give or ask for payment in character; this feature adds no rules about when they should.
-- Residents can also hand items and credits to other residents they are talking with, under the same limits as giving to the player.
+- Residents can also hand items to other residents they are talking with, under the same limits as giving to the player; credits between residents are pretend.
 - The player cannot drop items or place them back on objects.
 - Items have no durability, weight, or inventory size limit.
 - Base price is a guide for residents and what vendors display; it does not force what they charge.

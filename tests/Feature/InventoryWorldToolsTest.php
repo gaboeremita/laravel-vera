@@ -96,7 +96,7 @@ it('tells a resident what they carry and never what the player carries', functio
         ->not->toContain('777');
 });
 
-it('lets residents hand things to each other while they talk', function () {
+it('lets residents hand each other items for free while they talk', function () {
     [$user, $yinlin, , $region, $first, $session] = worldStateScenario(fakeReply: false);
     $vera = Assistant::factory()->create(['name' => 'Vera', 'mode' => 'agent']);
     AssistantUser::factory()->create(['user_id' => $user->id, 'assistant_id' => $vera->id]);
@@ -104,14 +104,20 @@ it('lets residents hand things to each other while they talk', function () {
     $second = $region->residents()->create(['assistant_id' => $vera->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'autonomous']);
     $veraInventory = app(ResolveInventory::class)->forResident($session, $second);
     $veraInventory->update(['credits' => 30]);
+    InventoryItem::factory()->forSale()->create(['inventory_id' => $veraInventory->id, 'item_id' => worldItem($region, ['name' => 'Tacos', 'base_price' => 15])->id, 'quantity' => 3]);
     $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera)->forWorldSession($session)->create(['resumed_at' => now()->subMinute()]);
-    $conversation->messages()->create(['role' => 'assistant', 'content' => 'Could you spare a few credits?', 'speaker_type' => $yinlin->getMorphClass(), 'speaker_id' => $yinlin->id])->forceFill(['created_at' => now()->subMinute()])->save();
-    fakeTurn(toolCallResponse('call_1', 'give', ['credits' => 10]), finalAnswerResponse('Here you go.'));
+    $conversation->messages()->create(['role' => 'assistant', 'content' => 'Two tacos, please!', 'speaker_type' => $yinlin->getMorphClass(), 'speaker_id' => $yinlin->id])->forceFill(['created_at' => now()->subMinute()])->save();
+    fakeTurn(toolCallResponse('call_1', 'give', ['credits' => 10, 'items' => [['item' => 'Tacos', 'quantity' => 2]]]), finalAnswerResponse('Here you go.'));
 
     $this->actingAs($user)->postJson(route('worlds.sessions.conversations.turns.store', [$region->world_id, $session->id, $conversation->id]), [
         'positions' => ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$first->id => ['x' => 5, 'y' => 0, 'z' => -3], $second->id => ['x' => 6, 'y' => 0, 'z' => -3]]],
     ])->assertSuccessful();
 
-    expect($veraInventory->fresh()->credits)->toBe(20)
-        ->and(app(ResolveInventory::class)->forResident($session, $first)->credits)->toBe(10);
+    $giveTool = collect(Http::recorded()[0][0]['tools'])->firstWhere('function.name', 'give');
+    $yinlinInventory = app(ResolveInventory::class)->forResident($session, $first);
+    expect($giveTool['function']['parameters']['properties'])->not->toHaveKey('credits')
+        ->and(sentSystemPrompt())->toContain('nothing really costs credits')->not->toContain('You carry 30 credits')
+        ->and($veraInventory->fresh()->credits)->toBe(30)
+        ->and($veraInventory->items()->first()->quantity)->toBe(1)
+        ->and($yinlinInventory->items()->first()->quantity)->toBe(2);
 });

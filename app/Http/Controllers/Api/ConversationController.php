@@ -432,7 +432,8 @@ class ConversationController extends Controller
                     staysAtPost: $resident->staysAtPost(),
                 );
                 if ($residentInventory !== null) {
-                    $worldToolbox->withActivityGate(new ActivityGate($worldSession, $region, $residentInventory, $assistantModel->name));
+                    $residentIdsInRoom = $residentPoint !== null ? app(ResolveWorldState::class)->residentIdsInRoom($region->layout ?? [], $residentPoint, $validated['positions']['residents'] ?? []) : [];
+                    $worldToolbox->withActivityGate(new ActivityGate($worldSession, $region, $residentInventory, $assistantModel->name, $residentIdsInRoom));
                 }
                 $tools = [...$tools, ...$worldToolbox->tools()];
             }

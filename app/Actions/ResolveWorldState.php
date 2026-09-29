@@ -146,6 +146,23 @@ class ResolveWorldState
     }
 
     /**
+     * The residents in the same room as a point, by id.
+     *
+     * @param  array{x: float, y: float, z: float}  $point
+     * @param  array<int|string, array{x: float, y: float, z: float}>  $residentPoints  where each resident is, by resident id
+     * @return array<int, int>
+     */
+    public function residentIdsInRoom(array $layout, array $point, array $residentPoints): array
+    {
+        return collect($residentPoints)
+            ->filter(fn (array $residentPoint) => $this->sharesRoom($layout, $point, $residentPoint))
+            ->keys()
+            ->map(fn (int|string $residentId) => (int) $residentId)
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  array{x: float, y: float, z: float}  $a
      * @param  array{x: float, y: float, z: float}  $b
      */

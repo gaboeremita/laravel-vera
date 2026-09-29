@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
 use App\Actions\BuildResidentWorldPrompt;
+use App\Actions\BuildVendorsPrompt;
 use App\Actions\RecallResidentMemory;
 use App\Actions\ResolveInventory;
 use App\Actions\ResolveResidentRegion;
@@ -108,6 +109,10 @@ class ResidentDecisionController extends Controller
         $busyWithOthers = collect($validated['busyResidents'] ?? [])->mapWithKeys(fn (array $busy) => [(int) $busy['id'] => $busy['talkingWith'] ?? null])->all();
         $director = new PromptDirector(app(AppendWorldConversationContext::class)->handle($assistant, $residentRegion, $positions, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], $busyWith, $residentActivity, $busyWithOthers));
         $director->append('available activities', $buildResidentWorldPrompt->availableActivities($residentRegion, $assistant, $location, $occupiedSpots, $posture));
+        $vendors = app(BuildVendorsPrompt::class)->handle($worldSession, $region, $worldResident, $positions);
+        if ($vendors !== null) {
+            $director->append('for sale nearby', $vendors);
+        }
         $companions = $this->companions($residentRegion, $worldResident, $worldSession, $positions, array_keys($busyWithOthers));
         $userInSight = $residentPoint !== null && isset($positions['user']) && $resolveWorldState->sharesRoom($residentRegion->layout ?? [], $residentPoint, $positions['user']);
         $recentConversation = $buildResidentWorldPrompt->recentConversation($conversation);
@@ -119,7 +124,8 @@ class ResidentDecisionController extends Controller
         $director->withLongTermMemory($conversation);
 
         $toolbox = new WorldToolbox($residentRegion, $location['zoneChain'], $occupiedSpots, $assistant->posturesByPoseName(), $companions, userAvailable: $busyWith === null, userInSight: $userInSight, residentPoint: $residentPoint, recall: fn () => app(RecallResidentMemory::class)->handle($assistant, $request->user()));
-        $toolbox->withActivityGate(new ActivityGate($worldSession, $region, app(ResolveInventory::class)->forResident($worldSession, $worldResident), $assistant->name));
+        $residentIdsInRoom = $residentPoint !== null ? $resolveWorldState->residentIdsInRoom($region->layout ?? [], $residentPoint, $positions['residents'] ?? []) : [];
+        $toolbox->withActivityGate(new ActivityGate($worldSession, $region, app(ResolveInventory::class)->forResident($worldSession, $worldResident), $assistant->name, $residentIdsInRoom));
 
         try {
             $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
