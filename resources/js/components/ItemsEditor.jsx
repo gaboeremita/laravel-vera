@@ -125,10 +125,10 @@ function ItemRow({ worldId, item, items, facts, onSaved, onDeleted, addToast }) 
 		setConfirmingDelete(false);
 		try {
 			const response = await api.delete(route('worlds.items.destroy', { world: worldId, item: item.id }));
-			if (!response.ok) throw new Error();
+			if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message);
 			addToast(`${item.name} deleted`, 'success');
 			await onDeleted();
-		} catch { addToast('Failed to delete item', 'error'); }
+		} catch (error) { addToast(error.message || 'Failed to delete item', 'error'); }
 	};
 
 	const [isUploadingSound, setIsUploadingSound] = useState(false);

@@ -346,9 +346,9 @@ export default function WorldResidentsEditor({ worldId, region, residents, regio
 	const removeResident = async (resident) => {
 		try {
 			const response = await api.delete(route('worlds.regions.residents.destroy', { world: worldId, region: region.id, assistant: resident.assistant.id }));
-			if (!response.ok) throw new Error();
+			if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message);
 			onResidentsChange((current) => current.filter((item) => item.id !== resident.id));
-		} catch { addToast('Unable to remove resident', 'error'); }
+		} catch (error) { addToast(error.message || 'Unable to remove resident', 'error'); }
 	};
 
 	const moveResident = async (assistant) => {

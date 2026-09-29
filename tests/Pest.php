@@ -11,12 +11,15 @@ use App\Models\ImageGenModel;
 use App\Models\ImageGenProvider;
 use App\Models\Inventory;
 use App\Models\Item;
+use App\Models\Quest;
 use App\Models\Region;
 use App\Models\Settings;
 use App\Models\User;
+use App\Models\World;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Models\WorldUser;
+use Database\Factories\QuestFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
@@ -293,4 +296,15 @@ function worldItem(Region $region, array $attributes = []): Item
 function worldFact(WorldResident $holder, array $attributes = []): Fact
 {
     return Fact::factory()->create(['world_resident_id' => $holder->id, ...$attributes]);
+}
+
+/**
+ * A quest of the world whose definition is the factory's default with the given keys replaced.
+ *
+ * @param  array<string, mixed>  $definition
+ * @param  array<string, mixed>  $attributes
+ */
+function worldQuest(World $world, array $definition = [], array $attributes = []): Quest
+{
+    return Quest::factory()->create(['world_id' => $world->id, 'definition' => [...QuestFactory::defaultDefinition(), ...$definition], ...$attributes]);
 }

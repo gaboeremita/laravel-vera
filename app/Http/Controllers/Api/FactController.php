@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Quests\FindQuestReferences;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SaveFactRequest;
 use App\Http\Resources\FactResource;
@@ -64,9 +65,10 @@ class FactController extends Controller
         return response()->json((new FactResource($fact->load('relays')->loadCount('knownFacts')))->resolve());
     }
 
-    public function destroy(World $world, WorldResident $resident, Fact $fact): JsonResponse
+    public function destroy(World $world, WorldResident $resident, Fact $fact, FindQuestReferences $findQuestReferences): JsonResponse
     {
         Gate::authorize('update', $world);
+        $findQuestReferences->ensureFactUnused($fact);
 
         $fact->delete();
 

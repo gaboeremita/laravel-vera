@@ -55,6 +55,16 @@ class World extends Model
         return $this->hasMany(StartingInventory::class);
     }
 
+    public function quests(): HasMany
+    {
+        return $this->hasMany(Quest::class);
+    }
+
+    public function campaigns(): HasMany
+    {
+        return $this->hasMany(Campaign::class);
+    }
+
     public function narratorModel(): BelongsTo
     {
         return $this->belongsTo(AiModel::class, 'narrator_model_id');

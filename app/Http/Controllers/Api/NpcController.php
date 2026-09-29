@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Quests\FindQuestReferences;
 use App\Actions\DeleteAssistantAssets;
 use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Http\Controllers\Controller;
 use App\Models\Assistant;
+use App\Models\WorldResident;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -56,9 +58,12 @@ class NpcController extends Controller
         return response()->json($npc->fresh());
     }
 
-    public function destroy(Request $request, Assistant $npc, DeleteAssistantAssets $deleteAssistantAssets): JsonResponse
+    public function destroy(Request $request, Assistant $npc, DeleteAssistantAssets $deleteAssistantAssets, FindQuestReferences $findQuestReferences): JsonResponse
     {
-        $deleteAssistantAssets->handle($this->npcFor($request, $npc));
+        $this->npcFor($request, $npc);
+        WorldResident::with(['world', 'assistant'])->where('assistant_id', $npc->id)->get()
+            ->each(fn (WorldResident $resident) => $findQuestReferences->ensureResidentUnused($resident));
+        $deleteAssistantAssets->handle($npc);
 
         return response()->json(status: 204);
     }
