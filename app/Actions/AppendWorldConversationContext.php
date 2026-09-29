@@ -58,6 +58,11 @@ class AppendWorldConversationContext
             }
         }
 
+        $neighbours = $this->buildResidentWorldPrompt->neighbours($resident);
+        if ($neighbours !== null) {
+            $prompt['neighbours'] = $neighbours;
+        }
+
         $residentPosition = $positions['residents'][$resident->id] ?? null;
         $residentZone = null;
         if ($residentPosition !== null && ! empty($region->layout['zones'])) {

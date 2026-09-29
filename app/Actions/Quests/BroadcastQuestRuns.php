@@ -14,7 +14,7 @@ class BroadcastQuestRuns
 
     /**
      * @param  iterable<WorldSessionQuest>  $runs
-     * @param  array<int, array{type: string, questTitle: string, text: string}>  $notices
+     * @param  array<int, array<string, mixed>>  $notices  each with at least a type, the quest title and a text
      */
     public function handle(int $sessionId, iterable $runs, array $notices = []): void
     {

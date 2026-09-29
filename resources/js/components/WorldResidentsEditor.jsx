@@ -9,7 +9,7 @@ import { behaviorSettingsText, parseBehaviorSettings, withGreetOnArrival } from 
 import StartingInventoryEditor from './StartingInventoryEditor.jsx';
 import ResidentFactsEditor from './ResidentFactsEditor.jsx';
 
-const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, behavior: 'stationary', behaviorSettings: null, openingMessage: '', customPrompt: '', zoneAccess: null };
+const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, behavior: 'stationary', behaviorSettings: null, openingMessage: '', customPrompt: '', publicDescription: '', zoneAccess: null };
 const ZONE_ACCESS_EXAMPLE = '{ "tags": ["deprecated"], "zones": ["mona-house"] }';
 const BEHAVIOR_SETTINGS_EXAMPLE = '{ "homeSpot": { "spotId": "toll-booth-stool", "activityId": "man-the-toll-booth" } }';
 const FIELD_LABEL = 'text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1';
@@ -40,6 +40,7 @@ function toDraft(placement) {
 		behaviorSettings: behaviorSettingsText(placement.behaviorSettings),
 		openingMessage: placement.openingMessage ?? '',
 		customPrompt: placement.customPrompt ?? '',
+		publicDescription: placement.publicDescription ?? '',
 		zoneAccess: zoneAccessText(placement.zoneAccess),
 	};
 }
@@ -57,6 +58,7 @@ function isDirty(draft, resident) {
 		|| draft.position.z !== resident.position.z
 		|| draft.openingMessage !== (resident.openingMessage ?? '')
 		|| draft.customPrompt !== (resident.customPrompt ?? '')
+		|| draft.publicDescription !== (resident.publicDescription ?? '')
 		|| draft.zoneAccess !== zoneAccessText(resident.zoneAccess);
 }
 
@@ -219,6 +221,16 @@ function ResidentRow({ worldId, candidate, resident, otherResidents, regionId, r
 						onChange={(event) => setDraft((current) => ({ ...current, customPrompt: event.target.value }))}
 						rows={3}
 						className={`${FIELD_INPUT} resize-none`}
+					/>
+				</div>
+				<div>
+					<label className={FIELD_LABEL}>What Others Know <span className="normal-case text-fg-3">(a short line the other residents of this region know about them; leave empty to keep them unknown)</span></label>
+					<input
+						type="text"
+						value={draft.publicDescription}
+						onChange={(event) => setDraft((current) => ({ ...current, publicDescription: event.target.value }))}
+						maxLength={255}
+						className={FIELD_INPUT}
 					/>
 				</div>
 				<div>

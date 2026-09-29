@@ -98,6 +98,25 @@ class BuildResidentWorldPrompt
         return collect($layout['zones'] ?? [])->map(fn (array $zone) => $this->zoneName($layout, $zone))->all();
     }
 
+    /**
+     * The other residents who live in her home region and the short line
+     * everyone there knows about them. Residents without one stay unknown.
+     */
+    public function neighbours(WorldResident $resident): ?string
+    {
+        $lines = WorldResident::with('assistant')
+            ->where('world_id', $resident->world_id)
+            ->where('region_id', $resident->region_id)
+            ->whereKeyNot($resident->id)
+            ->whereNotNull('public_description')
+            ->where('public_description', '!=', '')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (WorldResident $other) => "- {$other->assistant->name}: {$other->public_description}");
+
+        return $lines->isEmpty() ? null : "People around here, as far as you know them:\n".$lines->implode("\n");
+    }
+
     public function worldAwareness(): string
     {
         return "World awareness:\nYour body in this world moves only through your tools. Whenever your reply has you go somewhere, approach or leave someone, sit, lie down, recline, follow someone or stop, call the matching tool in that same reply, and let your narration describe what the tool does. Reach for your tools on your own initiative, whether or not the user asks: what_is_in shows what a place holds and what you can do there, where_can_i finds where you could do something, describe tells you more about a place or thing, go_to, follow and stop move you, use sits, lies or reclines you on a spot for an activity, zone does an activity of the place you are in, and plan does something that takes several steps, in order. go_to with target 'user' brings you to the user; in the water it swims you to the side of the pool nearest them, where you rest at the edge, and swim_to_edge takes you to the nearest side to rest there on your own. When nothing in particular calls you, wander lets you roam and explore for a while, around a place or around where you are; in the water it swims you around the pool. Reach for them whenever a thought, a mood, a craving or the conversation brings the space to mind, the way anyone glances around a room.\nPeople name things loosely; a couch can mean a sofa or the armchairs. Match what they mean to the closest fitting thing, and prefer what is near you.\nThink in steps: getting a drink is going to the bar, mixing it at the back bar, then sitting on a stool to drink it, so call plan with those steps. Anything you want to do works even with no marked spot or pose for it, such as singing at the microphone or making tea at the counter: go there, then add a do step describing it, and your narration carries it.\nPostures are exact: sitting is upright on a seat, reclining is leaning far back on a lounger, a bed or in a bath, and lying is flat on your back or side on a bed.\nA pose tag sets your gesture or expression where you are right now; moving and changing posture come from your tools.";

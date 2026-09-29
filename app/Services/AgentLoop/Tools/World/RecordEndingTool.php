@@ -42,7 +42,7 @@ class RecordEndingTool implements AgentTool
             'properties' => [
                 ...($this->tiers !== [] ? ['tier' => ['type' => 'string', 'enum' => $this->tiers, 'description' => 'The tier that fits how it went.']] : []),
                 'title' => ['type' => 'string', 'description' => 'A short title for this ending.'],
-                'epilogue' => ['type' => 'string', 'description' => 'Two to five paragraphs telling how it ended and what it left behind, addressed to the user.'],
+                'epilogue' => ['type' => 'string', 'description' => 'One short paragraph of two to four sentences telling how it ended, addressed to the user.'],
                 'scores' => [
                     'type' => 'array',
                     'items' => [

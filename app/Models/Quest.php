@@ -101,8 +101,19 @@ class Quest extends Model
     }
 
     /**
-     * The world residents the definition names anywhere: its giver and those
-     * on beats' knowledge, grants and questions.
+     * Who gives the reward once the quest is complete, and what they are told.
+     *
+     * @return ?array{from: array{resident?: int, object?: array{region: int, object: string}}, prose: string}
+     */
+    public function reward(): ?array
+    {
+        return $this->definition['reward'] ?? null;
+    }
+
+    /**
+     * The world residents the definition names anywhere: its giver, the
+     * resident who gives its reward, and those on beats' knowledge, grants
+     * and questions.
      *
      * @return array<int, int>
      */
@@ -115,6 +126,7 @@ class Quest extends Model
                 ...collect($beat['questions'] ?? [])->pluck('residents')->flatten(),
             ])
             ->push($this->giverId())
+            ->push($this->reward()['from']['resident'] ?? null)
             ->filter()
             ->map(fn ($id) => (int) $id)
             ->unique()

@@ -95,6 +95,9 @@ class ValidateQuestDefinition
             }
         }
         $this->rubric($definition['rubric'] ?? null);
+        if (($definition['reward'] ?? null) !== null) {
+            $this->reward($definition['reward']);
+        }
 
         if (! isset($this->errors['beats'])) {
             $this->beatCycles($beats);
@@ -440,6 +443,36 @@ class ValidateQuestDefinition
     {
         if (! is_int($residentId) || ! $this->residents->has($residentId)) {
             $this->error($path, 'Choose a resident of this world.');
+        }
+    }
+
+    private function reward(mixed $reward): void
+    {
+        if (! is_array($reward) || array_is_list($reward)) {
+            $this->error('reward', 'Must be an object with who gives it and what they are told.');
+
+            return;
+        }
+        if (! is_string($reward['prose'] ?? null) || trim($reward['prose']) === '') {
+            $this->error('reward.prose', 'Write what the giver is told to do once the quest is complete.');
+        }
+
+        $from = $reward['from'] ?? null;
+        if (! is_array($from) || isset($from['resident']) === isset($from['object'])) {
+            $this->error('reward.from', 'Choose either a resident or an object to give the reward.');
+
+            return;
+        }
+        if (isset($from['resident'])) {
+            $this->resident($from['resident'], 'reward.from.resident');
+
+            return;
+        }
+
+        $region = $this->region($from['object']['region'] ?? null, 'reward.from.object.region');
+        $objectId = $from['object']['object'] ?? null;
+        if ($region !== null && (! is_string($objectId) || $region->layoutObject($objectId) === null)) {
+            $this->error('reward.from.object.object', "{$region->name} has no object \"{$this->text($objectId ?? '')}\".");
         }
     }
 

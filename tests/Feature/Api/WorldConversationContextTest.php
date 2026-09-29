@@ -57,6 +57,34 @@ it('adds a resident-specific custom prompt on top of the world context', functio
     ]);
 });
 
+it('tells a resident the short line known about each other resident of their region, and nothing about the rest', function () {
+    $region = Region::factory()->create();
+    $elsewhere = Region::factory()->create(['world_id' => $region->world_id]);
+    $place = fn (Region $in, string $name, ?string $publicDescription) => $in->residents()->create([
+        'assistant_id' => Assistant::factory()->create(['name' => $name, 'kind' => AssistantKind::WorldNpc])->id,
+        'position' => ['x' => 0, 'y' => 0, 'z' => 0],
+        'behavior' => 'stationary',
+        'public_description' => $publicDescription,
+    ]);
+    $listener = $place($region, 'Trompo', 'The taquera at the Heap.');
+    $place($region, 'Oxygen', 'The diver of the Sump.');
+    $place($region, 'Stranger', 'A strange man who roams Pipe Street at night.');
+    $place($region, 'Secret', null);
+    $place($elsewhere, 'Faraway', 'Lives in another region.');
+
+    $prompt = (new AppendWorldConversationContext)->handle($listener->assistant, $region);
+
+    expect($prompt['neighbours'])->toBe("People around here, as far as you know them:\n- Oxygen: The diver of the Sump.\n- Stranger: A strange man who roams Pipe Street at night.");
+});
+
+it('leaves out who is around when nobody else in the region has a known line', function () {
+    $region = Region::factory()->create();
+    $assistant = Assistant::factory()->create(['kind' => AssistantKind::WorldNpc]);
+    $region->residents()->create(['assistant_id' => $assistant->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary', 'public_description' => 'Known to others.']);
+
+    expect((new AppendWorldConversationContext)->handle($assistant, $region))->not->toHaveKey('neighbours');
+});
+
 it('uses a resident-specific opening message when starting a fresh world conversation', function () {
     $user = User::factory()->create();
     $world = Region::factory()->forUser($user)->create();

@@ -15,7 +15,7 @@ const OUTCOMES = [['completed', 'Completed'], ['failed', 'Failed'], ['abandoned'
 const START_MODES = [['auto', 'With the session'], ['condition', 'On a condition'], ['offer', 'Offered by']];
 
 /** Errors at these definition paths are shown on their field; the rest are listed at the top. */
-const FIELD_PATH = /^(description|start|requires\.\d|repeatable|beats\.\d|complete|fail|rubric\.)/;
+const FIELD_PATH = /^(description|start|requires\.\d|repeatable|beats\.\d|complete|fail|rubric\.|reward)/;
 
 function newBeat(id = '') {
 	return { id, text: '', hidden: false, requires: [], when: null, knowledge: [], grants: [], questions: [] };
@@ -74,6 +74,62 @@ function Requirements({ requires, onChange, options, errorsAt }) {
 			{options.quests.length > 0 && (
 				<button type="button" onClick={() => onChange([...requires, { quest: options.quests[0].key, outcome: 'completed' }])} className={SMALL_BUTTON}>+ QUEST OUTCOME</button>
 			)}
+		</div>
+	);
+}
+
+const REWARD_SOURCES = [['none', 'No reward'], ['resident', 'From a resident'], ['object', 'From an object']];
+
+function QuestRewardEditor({ value, onChange, options, errorsAt }) {
+	const source = value?.from?.resident !== undefined ? 'resident' : value?.from?.object !== undefined ? 'object' : 'none';
+	const regionsWithObjects = options.regions.filter((region) => region.objects.length > 0);
+	const objectRegion = regionsWithObjects.find((region) => region.id === value?.from?.object?.region) ?? null;
+	const choose = (next) => {
+		if (next === 'none') return onChange(null);
+		const prose = value?.prose ?? '';
+		if (next === 'resident') return onChange({ from: { resident: options.residents[0]?.id ?? null }, prose });
+		const region = regionsWithObjects[0];
+		return onChange({ from: { object: { region: region?.id ?? null, object: region?.objects[0]?.id ?? null } }, prose });
+	};
+	const chooseRegion = (regionId) => {
+		const region = regionsWithObjects.find((candidate) => candidate.id === regionId);
+		onChange({ ...value, from: { object: { region: regionId, object: region?.objects[0]?.id ?? null } } });
+	};
+
+	return (
+		<div className="space-y-2">
+			<div className="flex flex-wrap items-center gap-1">
+				{REWARD_SOURCES.map(([key, label]) => (
+					<button key={key} type="button" onClick={() => choose(key)} className={`text-[0.65rem] tracking-[0.1em] uppercase px-3 py-1 border cursor-pointer transition-colors ${source === key ? 'border-accent text-accent bg-accent/10' : 'border-line-1 text-fg-3 hover:border-fg-3'}`}>
+						{label}
+					</button>
+				))}
+				{source === 'resident' && (
+					<select value={value.from.resident ?? ''} onChange={(event) => onChange({ ...value, from: { resident: Number(event.target.value) } })} className={`${FIELD_INPUT} w-auto ml-2`} aria-label="Reward giver">
+						{options.residents.map((resident) => <option key={resident.id} value={resident.id}>{resident.name}</option>)}
+					</select>
+				)}
+				{source === 'object' && (
+					<>
+						<select value={value.from.object.region ?? ''} onChange={(event) => chooseRegion(Number(event.target.value))} className={`${FIELD_INPUT} w-auto ml-2`} aria-label="Reward region">
+							{regionsWithObjects.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
+						</select>
+						<select value={value.from.object.object ?? ''} onChange={(event) => onChange({ ...value, from: { object: { ...value.from.object, object: event.target.value } } })} className={`${FIELD_INPUT} w-auto`} aria-label="Reward object">
+							{(objectRegion?.objects ?? []).map((object) => <option key={object.id} value={object.id}>{object.name}</option>)}
+						</select>
+					</>
+				)}
+			</div>
+			{source !== 'none' && (
+				<textarea
+					value={value.prose ?? ''}
+					onChange={(event) => onChange({ ...value, prose: event.target.value })}
+					rows={3}
+					placeholder="Once the quest is complete, give a reward based on the user's score: a spray can for a low score, a Compliance Unit plating for a high one. Thank them accordingly."
+					className={`${FIELD_INPUT} resize-none placeholder:text-fg-3/60`}
+				/>
+			)}
+			<FieldErrors messages={errorsAt('reward', true)} />
 		</div>
 	);
 }
@@ -300,6 +356,9 @@ export default function QuestEditor({ worldId, quest, options, campaigns = [], o
 
 					<p className={SECTION}><span>ENDING</span><span className="h-px flex-1 bg-line-1" /></p>
 					<RubricEditor value={definition.rubric} onChange={(value) => setDefinition('rubric', value)} errorsAt={errorsAt} />
+
+					<p className={SECTION}><span>REWARD</span><span className="h-px flex-1 bg-line-1" /></p>
+					<QuestRewardEditor value={definition.reward ?? null} onChange={(value) => setDefinition('reward', value)} options={options} errorsAt={errorsAt} />
 				</div>
 			)}
 

@@ -72,16 +72,19 @@ it('persists a resident-specific opening message and custom prompt', function ()
         'behavior' => 'stationary',
         'openingMessage' => 'Oh, hey — you found this room?',
         'customPrompt' => 'You are especially wary of strangers near the archive.',
+        'publicDescription' => 'The archivist who never seems to sleep.',
     ];
 
     $response = $this->actingAs($user)->putJson(route('worlds.regions.residents.upsert', [$world->world_id, $world, $assistant]), $payload)
         ->assertSuccessful()
         ->assertJsonPath('openingMessage', $payload['openingMessage'])
-        ->assertJsonPath('customPrompt', $payload['customPrompt']);
+        ->assertJsonPath('customPrompt', $payload['customPrompt'])
+        ->assertJsonPath('publicDescription', $payload['publicDescription']);
 
     expect(WorldResident::where('region_id', $world->id)->where('assistant_id', $assistant->id)->first())
         ->opening_message->toBe($payload['openingMessage'])
-        ->custom_prompt->toBe($payload['customPrompt']);
+        ->custom_prompt->toBe($payload['customPrompt'])
+        ->public_description->toBe($payload['publicDescription']);
 });
 
 it('persists the resident facing rotation', function () {
