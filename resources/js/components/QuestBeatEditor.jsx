@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import ConditionBuilder, { ALL_CONDITION_TYPES } from './ConditionBuilder.jsx';
+import ConditionBuilder from './ConditionBuilder.jsx';
+import { ALL_CONDITION_TYPES } from '../utils/questConditionTypes.js';
 import Toggle from './common/Toggle.jsx';
 import { FieldErrors } from './RubricEditor.jsx';
 import { FIELD_INPUT, FIELD_LABEL } from '../utils/formFieldStyles.js';

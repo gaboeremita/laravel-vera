@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
-import ConditionBuilder, { ALL_CONDITION_TYPES } from './ConditionBuilder.jsx';
+import ConditionBuilder from './ConditionBuilder.jsx';
+import { ALL_CONDITION_TYPES } from '../utils/questConditionTypes.js';
 import QuestBeatEditor from './QuestBeatEditor.jsx';
 import RubricEditor, { FieldErrors } from './RubricEditor.jsx';
 import Toggle from './common/Toggle.jsx';
@@ -16,11 +17,11 @@ const START_MODES = [['auto', 'With the session'], ['condition', 'On a condition
 /** Errors at these definition paths are shown on their field; the rest are listed at the top. */
 const FIELD_PATH = /^(description|start|requires\.\d|repeatable|beats\.\d|complete|fail|rubric\.)/;
 
-export function newBeat(id = '') {
+function newBeat(id = '') {
 	return { id, text: '', hidden: false, requires: [], when: null, knowledge: [], grants: [], questions: [] };
 }
 
-export const NEW_DEFINITION = {
+const NEW_DEFINITION = {
 	description: '',
 	start: { mode: 'auto' },
 	requires: [],

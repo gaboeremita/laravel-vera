@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\TurnMode;
-use App\Actions\BuildQuestsPrompt;
-use App\Actions\RecordResidentActivity;
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
+use App\Actions\BuildQuestsPrompt;
 use App\Actions\BuildResidentWorldPrompt;
 use App\Actions\BuildVendorsPrompt;
 use App\Actions\RecallResidentMemory;
+use App\Actions\RecordResidentActivity;
 use App\Actions\ResolveInventory;
 use App\Actions\ResolveResidentRegion;
 use App\Actions\ResolveUserActivity;
@@ -18,6 +17,7 @@ use App\Directors\PromptDirector;
 use App\DTOs\AgentRunResult;
 use App\Enums\AssistantKind;
 use App\Enums\Posture;
+use App\Enums\TurnMode;
 use App\Enums\WorldResidentBehavior;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreResidentDecisionRequest;

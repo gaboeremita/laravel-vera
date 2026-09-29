@@ -7,6 +7,7 @@ use App\Models\Quest;
 use App\Models\WorldSession;
 use App\Models\WorldSessionQuest;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Gives a session a run of every quest that can start and has none open:
@@ -32,16 +33,17 @@ class SyncSessionQuests
         $notices = [];
 
         foreach ($session->worldUser->world->quests()->get() as $quest) {
-            $latest = $state->latestRun($quest);
+            // Starting a quest can end another and sync again before this loop moves on, so the snapshot may be behind.
+            $latest = $session->questRuns()->where('quest_id', $quest->id)->orderByDesc('run')->first();
             if (! $this->canHaveNewRun($quest, $latest) || ! $state->requirementsMet($quest)) {
                 continue;
             }
 
             $number = ($latest?->run ?? 0) + 1;
             try {
-                $run = $session->questRuns()->create(['quest_id' => $quest->id, 'run' => $number, 'status' => QuestStatus::Available, 'state' => WorldSessionQuest::EMPTY_STATE]);
+                $run = DB::transaction(fn () => $session->questRuns()->create(['quest_id' => $quest->id, 'run' => $number, 'status' => QuestStatus::Available, 'state' => WorldSessionQuest::EMPTY_STATE]));
             } catch (UniqueConstraintViolationException) {
-                // Another request created this run first.
+                // Another request created this run first; the savepoint keeps any surrounding transaction usable.
                 continue;
             }
             $run->setRelation('quest', $quest);

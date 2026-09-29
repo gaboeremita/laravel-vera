@@ -2,8 +2,8 @@
 
 namespace App\Services\AgentLoop\Tools\World;
 
-use App\Events\Quests\FactAcknowledged;
 use App\Contracts\AgentTool;
+use App\Events\Quests\FactAcknowledged;
 use App\Models\Fact;
 use App\Models\FactAcknowledgement;
 use App\Models\WorldResident;

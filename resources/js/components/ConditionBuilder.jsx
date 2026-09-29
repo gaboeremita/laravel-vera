@@ -1,22 +1,9 @@
+import { CONDITION_TYPES } from '../utils/questConditionTypes.js';
+
 const SELECT = 'bg-bg-1 border border-line-1 text-accent text-sm px-2 py-1.5 outline-none focus:border-accent/50 transition-colors min-w-0';
 const SMALL_BUTTON = 'text-[0.65rem] tracking-[0.1em] px-2 py-1 border border-dashed border-line-1 text-fg-3 hover:text-accent hover:border-accent/50 transition-colors cursor-pointer';
 
 const GROUP_LABELS = { all: 'All of', any: 'Any of', none: 'None of' };
-
-const CONDITION_TYPES = [
-	{ type: 'enterRegion', label: 'Enters region' },
-	{ type: 'enterZone', label: 'Enters zone' },
-	{ type: 'talkTo', label: 'Talks to' },
-	{ type: 'use', label: 'Uses' },
-	{ type: 'residentDid', label: 'Resident uses' },
-	{ type: 'has', label: 'Holds item' },
-	{ type: 'credits', label: 'Holds credits' },
-	{ type: 'knows', label: 'Knows fact' },
-	{ type: 'acknowledged', label: 'Resident learned fact' },
-	{ type: 'flag', label: 'Flag' },
-	{ type: 'question', label: 'Question met' },
-	{ type: 'beat', label: 'Beat finished' },
-];
 
 function isGroup(node) {
 	return node !== null && typeof node === 'object' && ('all' in node || 'any' in node || 'not' in node);
@@ -262,4 +249,3 @@ export default function ConditionBuilder({ value, onChange, options, context }) 
 	return <ConditionGroup node={root} onChange={emit} onRemove={null} options={options} context={context} depth={0} />;
 }
 
-export const ALL_CONDITION_TYPES = CONDITION_TYPES.map((candidate) => candidate.type);

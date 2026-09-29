@@ -128,7 +128,7 @@ it('completes a quest once every beat is finished, and fails it when failure and
     worldQuest($region->world, ['beats' => [QuestFactory::beat('arrive', ['when' => ['enterRegion' => $region->id]])]], ['key' => 'plain']);
     worldQuest($region->world, [
         'beats' => [QuestFactory::beat('arrive', ['when' => ['enterRegion' => $region->id]])],
-        'fail' => ['credits' => ['atLeast' => 0]],
+        'fail' => ['enterRegion' => $region->id],
     ], ['key' => 'doomed']);
     syncQuests($session);
 

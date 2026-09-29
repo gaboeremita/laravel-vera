@@ -5,6 +5,7 @@ namespace App\Actions\Quests;
 use App\Enums\QuestEventType;
 use App\Enums\QuestOfferStatus;
 use App\Models\QuestOffer;
+use App\Models\WorldSession;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -16,7 +17,7 @@ class WithdrawQuestOffers
     public function __construct(private readonly RecordQuestEvent $recordQuestEvent) {}
 
     /**
-     * @param  Builder<QuestOffer>|HasMany<QuestOffer, \App\Models\WorldSession>  $offers
+     * @param  Builder<QuestOffer>|HasMany<QuestOffer, WorldSession>  $offers
      */
     public function handle(Builder|HasMany $offers): void
     {

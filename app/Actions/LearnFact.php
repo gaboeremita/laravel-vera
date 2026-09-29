@@ -2,8 +2,8 @@
 
 namespace App\Actions;
 
-use App\Events\Quests\FactLearned;
 use App\Enums\RevealSource;
+use App\Events\Quests\FactLearned;
 use App\Models\Fact;
 use App\Models\KnownFact;
 use App\Models\RevealAttempt;

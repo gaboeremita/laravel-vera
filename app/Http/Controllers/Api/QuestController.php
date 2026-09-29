@@ -10,6 +10,7 @@ use App\Http\Resources\QuestResource;
 use App\Models\Quest;
 use App\Models\World;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -66,8 +67,8 @@ class QuestController extends Controller
     }
 
     /**
-     * @param  Builder<Quest>|\Illuminate\Database\Eloquent\Relations\HasMany<Quest, World>  $query
-     * @return Builder<Quest>|\Illuminate\Database\Eloquent\Relations\HasMany<Quest, World>
+     * @param  Builder<Quest>|HasMany<Quest, World>  $query
+     * @return Builder<Quest>|HasMany<Quest, World>
      */
     private function withSessionCount($query)
     {

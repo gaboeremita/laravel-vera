@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Events\Quests\PlayerUsedActivity;
 use App\Actions\LearnFact;
 use App\Actions\ResolveInventory;
 use App\Actions\UseActivity;
 use App\Enums\RevealSource;
+use App\Events\Quests\PlayerUsedActivity;
 use App\Exceptions\NarratorUnavailable;
 use App\Http\Controllers\Controller;
 use App\Models\Inventory;

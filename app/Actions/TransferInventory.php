@@ -2,8 +2,8 @@
 
 namespace App\Actions;
 
-use App\Events\Quests\PlayerInventoryChanged;
 use App\Enums\InventoryHolder;
+use App\Events\Quests\PlayerInventoryChanged;
 use App\Exceptions\InsufficientInventory;
 use App\Models\CreditTransaction;
 use App\Models\Inventory;

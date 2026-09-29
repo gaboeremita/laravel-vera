@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\ActivityTermsController;
 use App\Http\Controllers\Api\ActivityUseController;
 use App\Http\Controllers\Api\AgentProgressController;
@@ -17,6 +16,7 @@ use App\Http\Controllers\Api\AssistantPromptController;
 use App\Http\Controllers\Api\AssistantVrmController;
 use App\Http\Controllers\Api\AssistantVrmLodController;
 use App\Http\Controllers\Api\AvatarBackgroundController;
+use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\ConversationBrowserController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\ConversationMemoryController;

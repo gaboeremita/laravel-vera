@@ -30,7 +30,7 @@ class CheckCampaignEnded
             return;
         }
 
-        $campaignEnding = WorldSessionCampaign::firstOrCreate(
+        $campaignEnding = WorldSessionCampaign::createOrFirst(
             ['world_session_id' => $session->id, 'campaign_id' => $campaign->id],
             ['ending_status' => EndingStatus::Pending],
         );
