@@ -26,6 +26,7 @@ class WorldResource extends JsonResource
             'spawnRegionId' => $this->spawn_region_id,
             'spawnPassageId' => $this->spawn_passage_id,
             'hasSpawn' => $this->spawnPassage() !== null,
+            'narratorModelId' => $this->narrator_model_id,
             'cardImageUrl' => $this->whenLoaded('cardImage', fn () => $this->cardImage?->url),
             'portraitImageUrl' => $this->whenLoaded('portraitImage', fn () => $this->portraitImage?->url),
             'regionCount' => $this->whenCounted('regions'),

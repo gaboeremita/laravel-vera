@@ -6,6 +6,7 @@ use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
 use App\Actions\BuildResidentWorldPrompt;
 use App\Actions\RecallResidentMemory;
+use App\Actions\ResolveInventory;
 use App\Actions\ResolveResidentRegion;
 use App\Actions\ResolveUserActivity;
 use App\Actions\ResolveWorldState;
@@ -25,6 +26,7 @@ use App\Models\ResidentActivity;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Services\AgentLoop\AgentLoopRunner;
+use App\Services\AgentLoop\Tools\World\ActivityGate;
 use App\Services\AgentLoop\Tools\World\WorldToolbox;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\LlmResponseTagParser;
@@ -117,6 +119,7 @@ class ResidentDecisionController extends Controller
         $director->withLongTermMemory($conversation);
 
         $toolbox = new WorldToolbox($residentRegion, $location['zoneChain'], $occupiedSpots, $assistant->posturesByPoseName(), $companions, userAvailable: $busyWith === null, userInSight: $userInSight, residentPoint: $residentPoint, recall: fn () => app(RecallResidentMemory::class)->handle($assistant, $request->user()));
+        $toolbox->withActivityGate(new ActivityGate($worldSession, $region, app(ResolveInventory::class)->forResident($worldSession, $worldResident), $assistant->name));
 
         try {
             $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();

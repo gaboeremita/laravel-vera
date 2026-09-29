@@ -53,7 +53,7 @@ class RegionController extends Controller
     {
         Gate::authorize('view', $world);
 
-        return response()->json((new RegionResource($region->load(['cardImage', 'portraitImage', 'track', 'passageLinks.targetRegion'])))->resolve());
+        return response()->json((new RegionResource($region->load(['cardImage', 'portraitImage', 'track', 'passageLinks.targetRegion', 'activityTerms.requiredItem.cardImage'])))->resolve());
     }
 
     public function update(UpdateRegionRequest $request, World $world, Region $region, ParseEnvironmentLayout $parseEnvironmentLayout, ReconcilePassages $reconcilePassages): JsonResponse

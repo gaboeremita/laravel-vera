@@ -56,8 +56,14 @@ class UseTool extends WorldTool
         }
 
         $pose = $this->toolbox->poseForActivity($activity, trim((string) ($arguments['pose'] ?? '')));
+        $outcome = $this->toolbox->chosenAction() === null ? $this->toolbox->activityGate()?->use($spot['objectId'], $activity['id']) : null;
+        if ($outcome !== null && ! $outcome['allowed']) {
+            throw new \RuntimeException($outcome['reason'] ?? $outcome['narration'] ?? 'That does not work right now.');
+        }
         $this->toolbox->choose(['verb' => 'use', 'target' => $spot['id'], 'activity' => $activity['id'], 'pose' => $pose]);
 
-        return ['status' => 'started', 'note' => "You are heading to the {$spot['objectName']} to {$activity['name']}."];
+        $narration = $outcome['narration'] ?? null;
+
+        return ['status' => 'started', 'note' => "You are heading to the {$spot['objectName']} to {$activity['name']}.".($narration !== null ? " {$narration}" : '')];
     }
 }

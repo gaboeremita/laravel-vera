@@ -33,7 +33,7 @@ it('offers places outside her area to nobody who keeps to one', function () {
         ->and(sentSystemPrompt())->toContain('Available places: Music studio [studio] (Ground floor), Vocal booth [vocal-booth] (Ground floor)')->not->toContain('Pool terrace [pool-terrace]');
 });
 
-it('gives an NPC who stays put only the tools that tell her about the place, and tells her she keeps to her post', function (string $behavior) {
+it('gives an NPC who stays put only the tools that tell her about the place and the trading tools, and tells her she keeps to her post', function (string $behavior) {
     $scenario = worldStateScenario();
     $scenario[1]->update(['kind' => AssistantKind::WorldNpc]);
     $scenario[4]->update(['behavior' => $behavior, 'behavior_settings' => $behavior === 'route' ? ['route' => [['target' => 'studio'], ['target' => 'pool-terrace']]] : null]);
@@ -43,7 +43,7 @@ it('gives an NPC who stays put only the tools that tell her about the place, and
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -4]],
     ])->assertSuccessful();
 
-    expect(collect(Http::recorded()[0][0]['tools'])->pluck('function.name')->sort()->values()->all())->toBe(['describe', 'what_is_in', 'where_can_i'])
+    expect(collect(Http::recorded()[0][0]['tools'])->pluck('function.name')->sort()->values()->all())->toBe(['ask_for', 'describe', 'give', 'what_is_in', 'where_can_i'])
         ->and(sentSystemPrompt())->toContain('You keep to your post here, and people come to you.')->not->toContain('Your body in this world moves only through your tools');
 })->with(['stationary', 'route']);
 

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['title', 'region_id', 'position'])]
+#[Fillable(['title', 'region_id', 'position', 'arrival_facing'])]
 class WorldSession extends Model
 {
     /** @use HasFactory<WorldSessionFactory> */
@@ -17,7 +17,7 @@ class WorldSession extends Model
 
     protected function casts(): array
     {
-        return ['position' => 'array'];
+        return ['position' => 'array', 'arrival_facing' => 'float'];
     }
 
     public function worldUser(): BelongsTo
@@ -33,6 +33,21 @@ class WorldSession extends Model
     public function residentStates(): HasMany
     {
         return $this->hasMany(WorldSessionResident::class);
+    }
+
+    public function inventories(): HasMany
+    {
+        return $this->hasMany(Inventory::class);
+    }
+
+    public function creditTransactions(): HasMany
+    {
+        return $this->hasMany(CreditTransaction::class);
+    }
+
+    public function handoverRequests(): HasMany
+    {
+        return $this->hasMany(HandoverRequest::class);
     }
 
     public function region(): BelongsTo

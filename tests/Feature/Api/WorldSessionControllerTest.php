@@ -60,7 +60,8 @@ it('creates a new session in front of the spawn point', function () {
         ->assertCreated()
         ->assertJsonPath('title', 'New session')
         ->assertJsonPath('region_id', $region->id)
-        ->assertJsonPath('position', ['x' => -5, 'y' => 0, 'z' => 1.5]);
+        ->assertJsonPath('position', ['x' => -5, 'y' => 0, 'z' => 1.5])
+        ->assertJsonPath('arrival_facing', 0);
 });
 
 it('refuses to start a session while the world has no spawn point', function () {
@@ -93,6 +94,28 @@ it('updates and returns a sessions position', function () {
         ->assertJsonPath('position', ['x' => 1, 'y' => 2, 'z' => 3]);
 
     expect($session->fresh()->position)->toBe(['x' => 1, 'y' => 2, 'z' => 3]);
+});
+
+it('lists the arrival facing and whether the session has conversations, and drops the facing once the player moves', function () {
+    $user = User::factory()->create();
+    $world = World::factory()->forUser($user)->create();
+    $worldUser = WorldUser::where('world_id', $world->id)->where('user_id', $user->id)->firstOrFail();
+    $session = WorldSession::factory()->for($worldUser)->create(['arrival_facing' => 1.5]);
+
+    $this->actingAs($user)->getJson(route('worlds.sessions.index', $world))
+        ->assertJsonPath('0.arrivalFacing', 1.5)
+        ->assertJsonPath('0.hasConversations', false);
+
+    Conversation::factory()->forWorldSession($session)->create();
+
+    $this->actingAs($user)->getJson(route('worlds.sessions.index', $world))
+        ->assertJsonPath('0.hasConversations', true);
+
+    $this->actingAs($user)->putJson(route('worlds.sessions.position.update', [$world, $session]), [
+        'position' => ['x' => 1, 'y' => 2, 'z' => 3],
+    ])->assertSuccessful();
+
+    expect($session->fresh()->arrival_facing)->toBeNull();
 });
 
 it('rejects malformed session positions', function (array $payload) {

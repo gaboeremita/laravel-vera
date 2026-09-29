@@ -8,6 +8,8 @@ use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\ImageGenModel;
 use App\Models\ImageGenProvider;
+use App\Models\Inventory;
+use App\Models\Item;
 use App\Models\Region;
 use App\Models\Settings;
 use App\Models\User;
@@ -264,4 +266,25 @@ function toolResultSentBack(int $requestIndex = 1): string
     $request = Http::recorded()[$requestIndex][0];
 
     return collect($request['messages'])->where('role', 'tool')->last()['content'] ?? '';
+}
+
+/**
+ * A world scenario whose session has the player's and the resident's inventories.
+ *
+ * @return array{0: User, 1: Assistant, 2: Conversation, 3: Region, 4: WorldResident, 5: WorldSession, 6: Inventory, 7: Inventory}
+ */
+function inventoryScenario(int $playerCredits = 100, ?int $residentCredits = 50): array
+{
+    $scenario = worldStateScenario(fakeReply: false);
+    [, , , $region, $resident, $session] = $scenario;
+
+    $player = Inventory::factory()->forPlayer()->create(['world_session_id' => $session->id, 'credits' => $playerCredits]);
+    $residentInventory = Inventory::factory()->forResident($resident)->create(['world_session_id' => $session->id, 'credits' => $residentCredits]);
+
+    return [...$scenario, $player, $residentInventory];
+}
+
+function worldItem(Region $region, array $attributes = []): Item
+{
+    return Item::factory()->create(['world_id' => $region->world_id, ...$attributes]);
 }

@@ -16,6 +16,7 @@ export default function ToastContainer({ toasts, onDismiss }) {
                         {toast.type === "error" ? "ERR" : "SYS"}
                     </span>
 
+					{toast.imageUrl && <img src={toast.imageUrl} alt="" className="h-9 w-9 shrink-0 border border-line-1 object-cover" />}
 					<span className="flex-1 text-fg-1 leading-relaxed">
                         {toast.message}
                     </span>

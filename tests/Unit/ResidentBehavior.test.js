@@ -35,7 +35,7 @@ function fakeCommands() {
 test('behavior settings parse from the editor and say what is wrong', () => {
 	assert.deepEqual(parseBehaviorSettings(''), { behaviorSettings: null, error: null });
 	assert.deepEqual(parseBehaviorSettings('{"area":["fork-yard"],"decisionSeconds":{"min":30,"max":60}}').behaviorSettings, { area: ['fork-yard'], decisionSeconds: { min: 30, max: 60 } });
-	assert.equal(parseBehaviorSettings('{"speed":2}').error, 'Unknown key "speed"; allowed: radius, homeSpot, route, area, decisionSeconds');
+	assert.equal(parseBehaviorSettings('{"speed":2}').error, 'Unknown key "speed"; allowed: radius, homeSpot, route, area, decisionSeconds, greetOnArrival');
 	assert.equal(parseBehaviorSettings('{"route":[{"target":"the-heap"}]}').error, '"route" must be a list of at least two stops');
 	assert.equal(parseBehaviorSettings('{"route":[{"pause":5},{"target":"the-heap"}]}').error, 'Stop 1 needs a "target" or a "point"');
 	assert.equal(parseBehaviorSettings('{"homeSpot":{"spotId":"zombie-throne-seat"}}').error, '"homeSpot" needs a "spotId" and an "activityId"');

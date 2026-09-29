@@ -12,6 +12,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\WorldSession;
 use App\Services\AgentLoop\AgentLoopRunner;
+use App\Services\AgentLoop\Tools\World\GiveTool;
 use App\Services\AgentLoop\Tools\World\StopConversationTool;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\LlmResponseTagParser;
@@ -92,6 +93,9 @@ class GenerateResidentConversationTurn
         $excluded = ['opening_message', 'voice mode', 'image handling', 'OOC mode', 'conversations_with_others'];
         $this->appendExpressionTags->handle($director, $speaker, $excluded, $posturesByAssistantId[$speaker->id] ?? Posture::Standing);
         $director->except($excluded);
+        $otherResident = $session->worldUser->world->residents()->where('assistant_id', $other->id)->first();
+        $speakerInventory = app(ResolveInventory::class)->forResident($session, $speakerResident);
+        $director->append('inventory', app(BuildInventoryPrompt::class)->handle($speakerInventory, canAskUser: false));
         $userChat = $assistantUser->conversations()->where('world_session_id', $session->id)->first();
         if ($userChat !== null) {
             $director->withLongTermMemory($userChat);
@@ -108,7 +112,11 @@ class GenerateResidentConversationTurn
         $aiModel = $llmManager->resolveModelForAssistantUser($assistantUser);
         $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
         $stop = new StopConversationTool;
-        $result = (new AgentLoopRunner($llm, $aiModel?->supports_tools ? [$stop] : []))->run(
+        $tools = [$stop];
+        if ($otherResident !== null) {
+            $tools[] = new GiveTool($speakerInventory, app(ResolveInventory::class)->forResident($session, $otherResident), $other->name);
+        }
+        $result = (new AgentLoopRunner($llm, $aiModel?->supports_tools ? $tools : []))->run(
             assistant: $speaker,
             messages: [['role' => 'system', 'content' => $director->build()], ...$history],
             conversation: $conversation,

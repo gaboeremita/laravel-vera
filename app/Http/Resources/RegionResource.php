@@ -2,6 +2,9 @@
 
 namespace App\Http\Resources;
 
+use App\Http\Controllers\Api\ActivityTermsController;
+use App\Models\ActivityTerms;
+use App\Models\Item;
 use App\Models\PassageLink;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -31,6 +34,21 @@ class RegionResource extends JsonResource
             'portraitImageUrl' => $this->whenLoaded('portraitImage', fn () => $this->portraitImage?->url),
             'trackUrl' => $this->whenLoaded('track', fn () => $this->track?->url),
             'trackOriginalName' => $this->whenLoaded('track', fn () => $this->track?->original_name),
+            'activityTerms' => $this->whenLoaded('activityTerms', function () {
+                $items = Item::with('cardImage')->whereKey($this->activityTerms->flatMap(fn (ActivityTerms $terms) => collect($terms->gives_items ?? [])->pluck('itemId')))->get()->keyBy('id');
+
+                return $this->activityTerms->map(fn (ActivityTerms $terms) => [
+                    ...ActivityTermsController::present($terms),
+                    'requiredItemName' => $terms->requiredItem?->name,
+                    'requiredItemImageUrl' => $terms->requiredItem?->cardImage?->url,
+                    'gives' => collect($terms->gives_items ?? [])->filter(fn (array $entry) => $items->has($entry['itemId']))->map(fn (array $entry) => [
+                        'itemId' => $entry['itemId'],
+                        'name' => $items[$entry['itemId']]->name,
+                        'quantity' => $entry['quantity'],
+                        'cardImageUrl' => $items[$entry['itemId']]->cardImage?->url,
+                    ])->values(),
+                ])->values();
+            }),
             'links' => $this->whenLoaded('passageLinks', fn () => $this->passageLinks->map(fn (PassageLink $link) => [
                 'passageId' => $link->passage_id,
                 'targetRegionId' => $link->target_region_id,

@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Models\Item;
 use App\Models\Region;
 use App\Models\World;
 use Illuminate\Http\JsonResponse;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Storage;
 
 trait ManagesRoleImages
 {
-    private function storeRoleImage(Request $request, World|Region $owner, string $role, string $directory): JsonResponse
+    private function storeRoleImage(Request $request, World|Region|Item $owner, string $role, string $directory): JsonResponse
     {
         $validated = $request->validate([
             'image' => ['required', 'file', 'image', 'max:10480'],
@@ -46,7 +47,7 @@ trait ManagesRoleImages
         return response()->json(['image_url' => $image->url], 201);
     }
 
-    private function destroyRoleImage(World|Region $owner, string $role): JsonResponse
+    private function destroyRoleImage(World|Region|Item $owner, string $role): JsonResponse
     {
         $image = $role === 'card' ? $owner->cardImage : $owner->portraitImage;
 

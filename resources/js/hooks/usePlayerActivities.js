@@ -8,10 +8,12 @@ import { selectOnlookers } from '../components/world/onlookers.js';
 import { activityKind, nearestFreeSpot } from '../components/world/playerActivities.js';
 import { claimSpot, holderUnder, releaseAllSpots, releaseSpot as releaseHeldSpot, stackTier } from '../components/world/spotOccupancy.js';
 import { floorAt, zoneChain } from '../components/world/worldLocation.js';
+import { formatAmount } from '../components/world/inventoryChanges.js';
 
 const ACTIVITY_MS = 3000;
 const OCCUPANCY_REFRESH_MS = 500;
 const USER_EYE_FOR_SIGHT = 1.2;
+const VENDOR_REACH = 4;
 
 function uniqueActivities(object) {
 	const seen = new Map();
@@ -30,6 +32,28 @@ function availabilityText({ free, total, takenBy }) {
 	return takenBy.includes('YOU') ? 'IN USE · YOU' : `ALL ${total} TAKEN`;
 }
 
+function holds(inventory, itemId) {
+	const held = (inventory?.items ?? []).find((item) => item.itemId === itemId);
+	return !!held && (held.quantity === null || held.quantity >= 1);
+}
+
+/** What an activity with terms asks of the player, shaped like a character's request. */
+function purchaseOf(object, row, inventory) {
+	const { terms } = row;
+	const held = new Map((inventory?.items ?? []).map((item) => [item.itemId, item.quantity]));
+	const hasRequired = !terms.requiredItemId || (held.has(terms.requiredItemId) && (held.get(terms.requiredItemId) === null || held.get(terms.requiredItemId) >= 1));
+	const hasCredits = inventory?.credits === null || (inventory?.credits ?? 0) >= terms.cost;
+	return {
+		id: `${object.id}:${row.id}`,
+		askedBy: object.name,
+		credits: terms.cost,
+		items: terms.requiredItemId && terms.consumesRequired ? [{ itemId: terms.requiredItemId, name: terms.requiredItemName, quantity: 1, cardImageUrl: terms.requiredItemImageUrl }] : [],
+		gives: terms.gives ?? [],
+		reason: row.name,
+		affordable: hasRequired && hasCredits,
+	};
+}
+
 /** A zone's ancestors, or the zone itself with them, then its floor, joined for a context line. */
 export function contextLineFor(layout, zone, { withFloor, includeZone = false }) {
 	if (!zone) return '';
@@ -44,7 +68,7 @@ export function contextLineFor(layout, zone, { withFloor, includeZone = false })
  * The user's side of the world's activities: object and zone cards, starting
  * and leaving activities, and telling the residents who saw it.
  */
-export function usePlayerActivities({ world, worldId, sessionId, location, focusedObject, occupiedSpots: occupiedSpotsRef, playerState: playerStateRef, playerCommands: playerCommandsRef, residentPositions: residentPositionsRef, residentCommands: residentCommandsRef, collisionWorldRef, chatResident, actionSender: actionSenderRef, addToast }) {
+export function usePlayerActivities({ world, worldId, sessionId, location, focusedObject, occupiedSpots: occupiedSpotsRef, playerState: playerStateRef, playerCommands: playerCommandsRef, residentPositions: residentPositionsRef, residentCommands: residentCommandsRef, collisionWorldRef, chatResident, actionSender: actionSenderRef, addToast, onInventory, onNarration, inventory, onTalkToVendor }) {
 	const layout = world?.layout;
 	const withFloor = (layout?.floors?.length ?? 0) > 1;
 	const [card, setCard] = useState(null);
@@ -53,6 +77,20 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 	const [hudEntries, setHudEntries] = useState([]);
 	const [occupancy, setOccupancy] = useState(() => new Map());
 	const gettingUp = useRef(false);
+	const [objectStock, setObjectStock] = useState(null);
+	const [stockVersion, setStockVersion] = useState(0);
+	const [attemptIndex, setAttemptIndex] = useState(null);
+	const [pendingPurchase, setPendingPurchase] = useState(null);
+	const [previousCardId, setPreviousCardId] = useState(null);
+	const cardObjectId = card?.kind === 'object' ? card.id : null;
+	const regionId = world?.regionId;
+	if (cardObjectId !== previousCardId) {
+		setPreviousCardId(cardObjectId);
+		setObjectStock(null);
+		setAttemptIndex(null);
+		setPendingPurchase(null);
+	}
+	const termsFor = (objectId, activityId) => (world?.activityTerms ?? []).find((terms) => terms.objectId === objectId && terms.activityId === activityId) ?? null;
 
 	const cardZone = card?.kind === 'zone' ? layout?.zones?.find((zone) => zone.id === card.id) ?? null : null;
 	const cardObject = card?.kind === 'object' ? layout?.objects?.find((object) => object.id === card.id) ?? null : null;
@@ -67,10 +105,31 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			title: cardObject.name,
 			contextLine: contextLineFor(layout, objectZone, { withFloor, includeZone: true }),
 			description: cardObject.description,
-			rows: uniqueActivities(cardObject).map((candidate) => {
-				const availability = spotAvailability(cardObject, candidate.id, occupancy, residentNames);
-				return { id: candidate.id, name: candidate.name, posture: candidate.posture ?? 'standing', availability: availabilityText(availability), taken: availability.free === 0 && !availability.takenBy.includes('YOU') };
-			}),
+			rows: [
+				...uniqueActivities(cardObject).map((candidate) => {
+					const availability = spotAvailability(cardObject, candidate.id, occupancy, residentNames);
+					const terms = termsFor(cardObject.id, candidate.id);
+					return {
+						id: candidate.id,
+						kind: 'activity',
+						name: candidate.name,
+						posture: candidate.posture ?? 'standing',
+						availability: availabilityText(availability),
+						taken: availability.free === 0 && !availability.takenBy.includes('YOU'),
+						terms,
+						price: terms?.cost > 0 ? `${terms.cost} CR` : null,
+						requires: terms?.requiredItemName ?? null,
+						needsAttempt: !!terms?.requirement,
+					};
+				}),
+				...(objectStock?.objectId === cardObject.id ? objectStock.takeable : []).map((item) => ({
+					id: `take:${item.itemId}`,
+					kind: 'take',
+					name: `Take ${item.name}`,
+					item,
+					availability: `×${formatAmount(item.quantity)}`,
+				})),
+			],
 		};
 	} else if (cardZone) {
 		cardView = {
@@ -81,6 +140,53 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			rows: (cardZone.activities ?? []).map((candidate) => ({ id: candidate.id, name: candidate.name, posture: candidate.posture ?? 'standing', availability: null })),
 		};
 	}
+
+	useEffect(() => {
+		if (!cardObjectId || !sessionId) return undefined;
+		let active = true;
+		const loadStock = async () => {
+			try {
+				const response = await api.get(`${route('worlds.sessions.objects.show', { world: worldId, session: sessionId, object: cardObjectId })}?regionId=${regionId}`);
+				if (!response.ok) throw new Error();
+				const stock = await response.json();
+				if (active) setObjectStock({ objectId: cardObjectId, takeable: stock.takeable });
+			} catch {
+				if (active) addToast('Unable to see what is here to take', 'error');
+			}
+		};
+		void loadStock();
+		return () => { active = false; };
+	}, [cardObjectId, sessionId, worldId, regionId, stockVersion, addToast]);
+
+	const takeItem = useCallback(async (item) => {
+		try {
+			const response = await api.post(route('worlds.sessions.objects.take', { world: worldId, session: sessionId, object: cardObjectId }), { regionId, itemId: item.itemId });
+			const body = await response.json();
+			if (!response.ok) throw new Error(body.message);
+			onInventory?.(body.inventory);
+		} catch (error) {
+			addToast(error.message || `Unable to take ${item.name}`, 'error');
+		} finally {
+			setStockVersion((version) => version + 1);
+		}
+	}, [worldId, sessionId, cardObjectId, regionId, onInventory, addToast]);
+
+	/** Pays for and checks an activity's terms; resolves to whether the activity may start. */
+	const passTerms = useCallback(async (activityItem, attempt) => {
+		try {
+			const response = await api.post(route('worlds.sessions.activity-uses.store', { world: worldId, session: sessionId }), { regionId, objectId: cardObjectId, activityId: activityItem.id, attempt });
+			const body = await response.json();
+			if (!response.ok) throw new Error(body.message);
+			onInventory?.(body.inventory);
+			if (body.narration) onNarration?.(`${activityItem.name.toUpperCase()}`, { narration: body.narration, succeeded: body.allowed, changes: body.changes });
+			if (!body.allowed && body.reason) addToast(body.reason, 'info');
+			if (body.allowed) setStockVersion((version) => version + 1);
+			return { allowed: body.allowed, action: body.action ?? null };
+		} catch (error) {
+			addToast(error.message || `Unable to ${activityItem.name.toLowerCase()}`, 'error');
+			return { allowed: false, action: null };
+		}
+	}, [worldId, sessionId, cardObjectId, regionId, onInventory, onNarration, addToast]);
 
 	useEffect(() => {
 		if (!card) return undefined;
@@ -142,8 +248,21 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 		if (spotId) releaseHeldSpot(occupiedSpotsRef.current, spotId, 'user');
 	}, [occupiedSpotsRef]);
 
-	const start = useCallback(async (index) => {
+	const vendorNearby = useCallback((terms) => {
+		if (!terms?.vendorResidentId) return null;
+		const vendor = world?.residents?.find((resident) => resident.id === terms.vendorResidentId) ?? null;
+		const vendorPosition = vendor ? residentPositionsRef.current.get(vendor.id) : null;
+		const foot = playerStateRef.current?.footPosition;
+		if (!vendorPosition || !foot) return null;
+		return Math.hypot(vendorPosition.x - foot.x, vendorPosition.z - foot.z) <= VENDOR_REACH ? vendor : null;
+	}, [world, residentPositionsRef, playerStateRef]);
+
+	const start = useCallback(async (index, attempt, confirmed = false) => {
 		if (!cardView || !cardView.rows[index]) return;
+		if (cardView.rows[index].kind === 'take') {
+			await takeItem(cardView.rows[index].item);
+			return;
+		}
 		if (activity) {
 			showEntry('notice', activity.kind === 'resting' ? 'SPACE — GET UP FIRST' : 'FINISH WHAT YOU ARE DOING FIRST');
 			return;
@@ -168,6 +287,49 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			showEntry('notice', availability.total > 1 ? `NOTHING FREE — ALL ${availability.total} ARE TAKEN` : `TAKEN BY ${availability.takenBy[0]?.toUpperCase() ?? 'SOMEONE'}`);
 			return;
 		}
+		let narratedAction = null;
+		if (row.terms && sessionId) {
+			const vendor = vendorNearby(row.terms);
+			if (vendor) {
+				setCard(null);
+				onTalkToVendor?.(vendor, actionLine({ activity: chosen, object: cardObject }));
+				return;
+			}
+			const supplierIndex = row.terms.requiredItemId && !holds(inventory, row.terms.requiredItemId)
+				? cardView.rows.findIndex((candidate) => candidate.kind === 'activity' && candidate.terms?.gives?.some((given) => given.itemId === row.terms.requiredItemId))
+				: -1;
+			if (supplierIndex >= 0) {
+				const supplierRow = cardView.rows[supplierIndex];
+				const supplierActivity = uniqueActivities(cardObject).find((candidate) => candidate.id === supplierRow.id);
+				const supplierVendor = vendorNearby(supplierRow.terms);
+				if (supplierVendor) {
+					setCard(null);
+					onTalkToVendor?.(supplierVendor, actionLine({ activity: supplierActivity, object: cardObject }));
+					return;
+				}
+				if (!confirmed) {
+					setPendingPurchase({ index: supplierIndex, attempt: null, then: index });
+					return;
+				}
+				setPendingPurchase(null);
+				if (!(await passTerms(supplierActivity, null)).allowed) return;
+			}
+			if (row.needsAttempt && attempt === undefined) {
+				setAttemptIndex(index);
+				return;
+			}
+			setAttemptIndex(null);
+			if (row.terms.cost > 0 && !confirmed) {
+				setPendingPurchase({ index, attempt: attempt ?? null });
+				return;
+			}
+			setPendingPurchase(null);
+			const outcome = await passTerms(chosen, attempt ?? null);
+			if (!outcome.allowed) return;
+			narratedAction = outcome.action;
+		}
+		const spokenLine = narratedAction ? () => `*${narratedAction}*` : null;
+		const observedLine = narratedAction ? () => `*The user ${narratedAction}*` : null;
 		setCard(null);
 		claimSpot(occupiedSpotsRef.current, spot, 'user');
 		commands.setActivity({ spotId: spot.id, activityId: chosen.id });
@@ -177,16 +339,16 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			await commands.settleOnSpot({ spot, posture: chosen.posture, getTier: () => stackTier(occupiedSpotsRef.current, spot.id, 'user') });
 			setActivity((current) => (current?.spot?.id === spot.id ? { ...current, settling: false } : current));
 			deliver({
-				line: (onTopOf) => actionLine({ activity: chosen, object: cardObject, onTopOf }),
-				observation: (onTopOf) => observationLine({ activity: chosen, object: cardObject, onTopOf }),
+				line: spokenLine ?? ((onTopOf) => actionLine({ activity: chosen, object: cardObject, onTopOf })),
+				observation: observedLine ?? ((onTopOf) => observationLine({ activity: chosen, object: cardObject, onTopOf })),
 				partnerId: residentUnderUser(spot.id),
 			});
 			return;
 		}
 
-		setActivity({ key: crypto.randomUUID(), kind: 'standing', activity: chosen, object: cardObject, spot, cancelled: false });
-		void commands.faceToward(spot.position);
-	}, [cardView, activity, playerCommandsRef, cardZone, cardObject, playerStateRef, occupiedSpotsRef, residentNames, showEntry, deliver, residentUnderUser]);
+		setActivity({ key: crypto.randomUUID(), kind: 'standing', activity: chosen, object: cardObject, spot, cancelled: false, spokenLine, observedLine });
+		void commands.faceToward(cardObject.position);
+	}, [cardView, activity, playerCommandsRef, cardZone, cardObject, playerStateRef, occupiedSpotsRef, residentNames, showEntry, deliver, residentUnderUser, takeItem, passTerms, sessionId, vendorNearby, onTalkToVendor, inventory]);
 
 	const getUp = useCallback(async () => {
 		if (activity?.kind !== 'resting' || activity.settling || gettingUp.current) return;
@@ -218,7 +380,10 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 		if (!activity || activity.cancelled) return;
 		releaseSpot(activity.spot?.id);
 		playerCommandsRef.current?.setActivity({});
-		deliver({ line: () => actionLine({ activity: activity.activity, object: activity.object }), observation: () => observationLine({ activity: activity.activity, object: activity.object }) });
+		deliver({
+			line: activity.spokenLine ?? (() => actionLine({ activity: activity.activity, object: activity.object })),
+			observation: activity.observedLine ?? (() => observationLine({ activity: activity.activity, object: activity.object })),
+		});
 	}, [activity, releaseSpot, playerCommandsRef, deliver]);
 
 	const finish = useCallback(() => setActivity(null), []);
@@ -233,7 +398,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 	useEffect(() => {
 		const rowCount = cardView?.rows.length ?? 0;
 		const keyDown = (event) => {
-			if (isTypingTarget(event.target)) return;
+			if (isTypingTarget(event.target) || pendingPurchase) return;
 			switch (event.code) {
 				case 'KeyE':
 					if (card?.kind === 'object') setCard(null);
@@ -266,7 +431,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 		};
 		window.addEventListener('keydown', keyDown, true);
 		return () => window.removeEventListener('keydown', keyDown, true);
-	}, [card, cardView?.rows.length, focusedObject, location, highlightedIndex, start, openObjectCard]);
+	}, [card, cardView?.rows.length, focusedObject, location, highlightedIndex, start, openObjectCard, pendingPurchase]);
 
 	const releaseAll = useCallback(() => {
 		releaseAllSpots(occupiedSpotsRef.current, 'user');
@@ -281,6 +446,16 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 		highlightedIndex,
 		setHighlightedIndex,
 		chooseRow: start,
+		attemptRow: attemptIndex !== null ? cardView?.rows[attemptIndex] ?? null : null,
+		purchase: pendingPurchase && cardObject && cardView?.rows[pendingPurchase.index]?.terms ? purchaseOf(cardObject, cardView.rows[pendingPurchase.index], inventory) : null,
+		confirmPurchase: () => {
+			if (!pendingPurchase) return;
+			if (pendingPurchase.then !== undefined) void start(pendingPurchase.then, undefined, true);
+			else void start(pendingPurchase.index, pendingPurchase.attempt, true);
+		},
+		cancelPurchase: () => setPendingPurchase(null),
+		submitAttempt: (text) => { if (attemptIndex !== null) void start(attemptIndex, text); },
+		cancelAttempt: () => setAttemptIndex(null),
 		closeCard,
 		activity,
 		getUp,

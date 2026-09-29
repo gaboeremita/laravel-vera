@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import Accordion from './common/Accordion.jsx';
 import PassageSelect from './PassageSelect.jsx';
+import NarratorModelSelect from './NarratorModelSelect.jsx';
 import { FIELD_LABEL, FIELD_INPUT } from '../utils/formFieldStyles.js';
 
-export default function WorldForm({ value, onChange, regions = null, imagesEditor = null, isSaving, onSubmit }) {
+export default function WorldForm({ value, onChange, regions = null, imagesEditor = null, itemsEditor = null, playerInventoryEditor = null, isSaving, onSubmit }) {
 	const update = (field, fieldValue) => onChange({ ...value, [field]: fieldValue });
 	const [sections, setSections] = useState({ details: false, prompts: false, start: false });
 	const toggle = (section) => setSections((current) => ({ ...current, [section]: !current[section] }));
@@ -35,7 +36,9 @@ export default function WorldForm({ value, onChange, regions = null, imagesEdito
 					<label className={FIELD_LABEL}>NPC World Context</label>
 					<textarea value={value.npcContextPrompt} onChange={(event) => update('npcContextPrompt', event.target.value)} rows={4} className={`${FIELD_INPUT} resize-none`} required />
 				</div>
+				{regions && <NarratorModelSelect value={value.narratorModelId ?? null} onChange={(modelId) => update('narratorModelId', modelId)} />}
 			</Accordion>
+			{itemsEditor}
 			{regions && (
 				<Accordion label="START" collapsed={sections.start} onToggle={() => toggle('start')}>
 					<div>
@@ -43,6 +46,12 @@ export default function WorldForm({ value, onChange, regions = null, imagesEdito
 						<PassageSelect regions={regions} value={spawn} onChange={(passage) => onChange({ ...value, spawnRegionId: passage?.regionId ?? null, spawnPassageId: passage?.passageId ?? null })} emptyLabel="— none —" />
 						{!spawn && <p className="text-warning text-xs mt-2">⚠ Choose a spawn point before starting a session in this world.</p>}
 					</div>
+					{playerInventoryEditor && (
+						<div className="border-t border-line-1 pt-4">
+							<p className="text-fg-3 text-[0.65rem] tracking-[0.15em] mb-3">PLAYER STARTING INVENTORY <span className="normal-case tracking-normal">— what the player has when a new session begins</span></p>
+							{playerInventoryEditor}
+						</div>
+					)}
 				</Accordion>
 			)}
 			<div className="flex justify-end pt-2 pb-4">
