@@ -43,7 +43,7 @@ A quest that starts by offer can carry an `offerWhen` condition and an `offerQue
 - New UI follows the UI standard of [feature 018's tasks.md](../018-items-inventory-credits/tasks.md) and the existing quest editor (FR-025).
 
 **Scale/Scope**:
-- **Backend**: about 9 new files (migration, model, factory, `OfferMoment`, `DescribeCondition`, `LookUpOfferCondition`, two trigger events, the tool) and about 16 changed.
+- **Backend**: about 10 new files (migration, model, factory, `OfferMoment`, `DescribeCondition`, `LookUpOfferCondition`, `OfferQuestionStatus`, two trigger events, the tool) and about 16 changed.
 - **Frontend**: no new components; `ConditionBuilder`, `questConditionTypes`, `QuestEditor` and `QuestEventLog` change.
 
 ## Constitution Check
@@ -93,6 +93,7 @@ app/
 │   ├── Quests/OfferMoment.php              # new: the turn's giver, region, positions, messages (R7)
 │   ├── Quests/DescribeCondition.php        # new: plain words (R8)
 │   ├── Quests/LookUpOfferCondition.php     # new: a part's value and ask; whether offerWhen holds (R3)
+│   ├── Quests/OfferQuestionStatus.php      # new: whether the offerQuestion is met, and the latest reason (R6)
 │   ├── Quests/ValidateQuestDefinition.php  # changed: new leaves, scopes, ranges, offer-only keys
 │   ├── Quests/FindQuestReferences.php      # changed: new leaves, `quests` kind
 │   ├── Quests/StartQuestRun.php, EndQuestRun.php, WithdrawQuestOffers.php  # changed: QuestStateChanged
@@ -126,7 +127,7 @@ resources/js/
 ├── components/QuestEditor.jsx              # changed: Offer when, Offer question
 └── components/QuestEventLog.jsx            # changed: causes and lookups
 
-tests/Feature/QuestDefinitionValidationTest.php, QuestProgressTest.php, JudgeQuestionTest.php, TransferInventoryTest.php, Api/QuestControllerTest.php  # extended
+tests/Feature/QuestDefinitionValidationTest.php, QuestProgressTest.php, JudgeQuestionTest.php, TransferInventoryTest.php, Api/QuestControllerTest.php, Api/QuestPlayControllerTest.php  # extended
 tests/Feature/QuestOfferConditionsTest.php  # new: prompt, lookups, offers, moment leaves, offerQuestion
 ```
 
@@ -156,7 +157,7 @@ Approved in this session. Names from the spec (offerWhen, offerQuestion, the lea
 
 **Terms in code and docs**: offer moment (what only the current turn knows, research R7), lookup (one `check_offer_condition` call), moment leaves (`messagesWith`, `giverIn`, `othersInTheZone`), cause (a trigger's sentence for the log).
 
-**Tables and classes**: `item_transfers` / `ItemTransfer`; `OfferMoment`, `DescribeCondition`, `LookUpOfferCondition`, `CheckOfferConditionTool`, `ResidentFeelingsChanged`, `QuestStateChanged`.
+**Tables and classes**: `item_transfers` / `ItemTransfer`; `OfferMoment`, `DescribeCondition`, `LookUpOfferCondition`, `OfferQuestionStatus`, `CheckOfferConditionTool`, `ResidentFeelingsChanged`, `QuestStateChanged`.
 
 ## Complexity Tracking
 
