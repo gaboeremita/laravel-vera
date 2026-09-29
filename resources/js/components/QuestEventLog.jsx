@@ -4,7 +4,7 @@ import { api } from '../utils/api.js';
 import Accordion from './common/Accordion.jsx';
 import { FIELD_INPUT, FIELD_LABEL } from '../utils/formFieldStyles.js';
 
-const ENDINGS = ['completed', 'failed', 'abandoned', 'ending_written', 'ending_failed'];
+const ENDINGS = ['completed', 'failed', 'abandoned', 'ending_written', 'ending_failed', 'reward_given'];
 
 function payloadSummary(payload) {
 	return Object.entries(payload ?? {})

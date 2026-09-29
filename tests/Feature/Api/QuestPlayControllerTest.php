@@ -1,10 +1,12 @@
 <?php
 
+use App\Actions\BuildQuestsPrompt;
 use App\Actions\Quests\SyncSessionQuests;
 use App\Enums\EndingStatus;
 use App\Enums\QuestEventType;
 use App\Enums\QuestOfferStatus;
 use App\Enums\QuestStatus;
+use App\Enums\TurnMode;
 use App\Events\Quests\PlayerEnteredRegion;
 use App\Models\QuestEvent;
 use App\Models\QuestOffer;
@@ -63,6 +65,43 @@ it('shows the offer from the conversation, and accepting starts the quest and te
     expect($session->questRuns()->first()->status)->toBe(QuestStatus::Active);
 });
 
+it('tells the giver an offer is waiting, then that the user accepted it and what their next step is', function () {
+    [$user, , $conversation, $region, $resident, $session] = offerScenario();
+    $prompt = fn () => (string) app(BuildQuestsPrompt::class)->handle($session->fresh(), $resident, TurnMode::InCharacter);
+
+    expect($prompt())->toContain('You have tasks you can ask of the user')
+        ->not->toContain('waiting for their answer');
+
+    $tool = new OfferQuestTool($session, $conversation, $resident);
+    $tool->handle(['quest' => 'The Flooded Mill']);
+
+    expect($prompt())->toContain("waiting for their answer, which arrives as a bracketed line naming the task:\n- The Flooded Mill: Something needs doing.")
+        ->not->toContain('You have tasks you can ask of the user');
+
+    $this->actingAs($user)->postJson(route('worlds.sessions.quest-offers.answer', [$region->world_id, $session->id, $tool->offer->id]), ['accept' => true])->assertOk();
+
+    expect($prompt())->toContain("they accepted, and they are working on them now:\n- The Flooded Mill: Something needs doing. Their next step: Beat first.")
+        ->not->toContain('waiting for their answer');
+
+    $session->questRuns()->update(['status' => QuestStatus::Completed]);
+
+    expect($prompt())->not->toContain('they are working on them now');
+});
+
+it('keeps hidden beats out of the next step the giver hears', function () {
+    [, , , $region, $resident, $session] = worldStateScenario(fakeReply: false);
+    worldQuest($region->world, ['start' => ['mode' => 'offer', 'giver' => $resident->id], 'beats' => [
+        QuestFactory::beat('seen', ['text' => 'Find the miller.']),
+        QuestFactory::beat('secret', ['text' => 'Notice the broken sluice.', 'hidden' => true]),
+    ]]);
+    app(SyncSessionQuests::class)->handle($session->fresh());
+    $session->questRuns()->update(['status' => QuestStatus::Active]);
+
+    expect(app(BuildQuestsPrompt::class)->handle($session->fresh(), $resident, TurnMode::InCharacter))
+        ->toContain('Their next step: Find the miller.')
+        ->not->toContain('Notice the broken sluice.');
+});
+
 it('keeps a declined quest available to be offered again', function () {
     [$user, , $conversation, $region, $resident, $session] = offerScenario();
     $tool = new OfferQuestTool($session, $conversation, $resident);
@@ -113,7 +152,7 @@ it('gives a repeatable quest a new run that keeps the old one, and never another
 
     app(SyncSessionQuests::class)->handle($session->fresh());
 
-    expect($again->runs()->pluck('run')->all())->toBe([1, 2])
+    expect($again->runs()->orderBy('run')->pluck('run')->all())->toBe([1, 2])
         ->and($old->fresh()->ending_status)->toBe(EndingStatus::Written)
         ->and($once->runs()->count())->toBe(1);
 

@@ -60,7 +60,9 @@ it('runs no check until a named resident signals', function () {
     sendWorldMessage($this, $scenario, apologyPositions($scenario[4]))->assertOk();
 
     expect(QuestEvent::where('type', QuestEventType::QuestionJudged)->exists())->toBeFalse()
-        ->and(Http::recorded())->toHaveCount(1);
+        ->and(Http::recorded())->toHaveCount(1)
+        ->and(collect(Http::recorded()[0][0]['messages'])->firstWhere('role', 'system')['content'])
+        ->toContain("As soon as you believe the user has done one of them, call the signal_question tool in that same reply, alongside your words, with your reason:\n- Has the player apologised to them?");
 });
 
 it('finishes the beat when the check answers yes citing messages of the conversation', function () {

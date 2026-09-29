@@ -50,6 +50,7 @@ class UpsertWorldResidentRequest extends FormRequest
             'behaviorSettings.decisionSeconds.max' => ['required_with:behaviorSettings.decisionSeconds', 'numeric', 'gte:behaviorSettings.decisionSeconds.min', 'max:600'],
             'openingMessage' => ['nullable', 'string'],
             'customPrompt' => ['nullable', 'string'],
+            'publicDescription' => ['nullable', 'string', 'max:255'],
             'zoneAccess' => ['nullable', 'array:tags,zones'],
             'zoneAccess.tags' => ['sometimes', 'array', 'list'],
             'zoneAccess.tags.*' => ['required', 'string', 'distinct:ignore_case', 'max:64'],

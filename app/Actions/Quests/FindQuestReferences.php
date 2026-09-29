@@ -104,6 +104,8 @@ class FindQuestReferences
         };
 
         $add('residents', $definition['start']['giver'] ?? null);
+        $add('residents', $definition['reward']['from']['resident'] ?? null);
+        $add('regions', $definition['reward']['from']['object']['region'] ?? null);
         $walk($definition['start']['when'] ?? null);
         $walk($definition['complete'] ?? null);
         $walk($definition['fail'] ?? null);

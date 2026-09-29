@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Enums\EndingStatus;
+use App\Enums\QuestOfferStatus;
 use App\Enums\QuestStatus;
 use App\Enums\TurnMode;
 use App\Models\Quest;
@@ -27,12 +28,15 @@ class BuildQuestsPrompt
     {
         $runs = $session->questRuns()->with('quest')->orderBy('id')->get();
         $withUser = $mode->withUser() && $canUseTools;
+        $pendingRunIds = $session->questOffers()->where('world_resident_id', $resident->id)->where('status', QuestOfferStatus::Pending)->pluck('world_session_quest_id')->all();
 
         $parts = array_filter([
             $this->knowledge($runs, $resident),
+            $this->pendingOffers($runs, $pendingRunIds),
+            $this->underway($runs, $resident),
             $withUser ? $this->grants($runs, $resident) : null,
             $withUser ? $this->questions($runs, $resident) : null,
-            $withUser ? $this->offers($runs, $resident) : null,
+            $withUser ? $this->offers($runs, $resident, $pendingRunIds) : null,
             $this->endings($runs, $resident),
             $mode === TurnMode::Creator ? $this->everything($session, $runs) : null,
         ]);
@@ -65,7 +69,7 @@ class BuildQuestsPrompt
                 ->map(fn (array $grant) => "- {$grant['flag']}: for \"{$beat['text']}\" in {$run->quest->title}")))
             ->unique();
 
-        return $lines->isEmpty() ? null : "You decide in character whether the user has earned these. When they truly have, call the grant_flag tool with your reason:\n".$lines->implode("\n");
+        return $lines->isEmpty() ? null : "You decide in character whether the user has earned these. The moment they truly have, call the grant_flag tool in that same reply, alongside your words, with your reason:\n".$lines->implode("\n");
     }
 
     /**
@@ -79,15 +83,46 @@ class BuildQuestsPrompt
                 ->map(fn (array $question) => "- {$question['text']}")))
             ->unique();
 
-        return $lines->isEmpty() ? null : "Keep these questions in mind. When you believe the user has done one of them, call the signal_question tool with your reason:\n".$lines->implode("\n");
+        return $lines->isEmpty() ? null : "Keep these questions in mind and check them after every message from the user. As soon as you believe the user has done one of them, call the signal_question tool in that same reply, alongside your words, with your reason:\n".$lines->implode("\n");
     }
 
     /**
      * @param  Collection<int, WorldSessionQuest>  $runs
+     * @param  array<int, int>  $pendingRunIds  the runs they offered that are waiting for the user's answer
      */
-    private function offers(Collection $runs, WorldResident $resident): ?string
+    private function pendingOffers(Collection $runs, array $pendingRunIds): ?string
     {
-        $lines = $runs->filter(fn (WorldSessionQuest $run) => $run->status === QuestStatus::Available && $run->quest->giverId() === $resident->id)
+        $lines = $runs->filter(fn (WorldSessionQuest $run) => $run->status === QuestStatus::Available && in_array($run->id, $pendingRunIds, true))
+            ->map(fn (WorldSessionQuest $run) => "- {$run->quest->title}: {$run->quest->description()}");
+
+        return $lines->isEmpty() ? null : "You have asked the user to take these on and are waiting for their answer, which arrives as a bracketed line naming the task:\n".$lines->implode("\n");
+    }
+
+    /**
+     * The quests they gave that the user accepted and is working on, with
+     * the steps the user can see in front of them now.
+     *
+     * @param  Collection<int, WorldSessionQuest>  $runs
+     */
+    private function underway(Collection $runs, WorldResident $resident): ?string
+    {
+        $lines = $runs->filter(fn (WorldSessionQuest $run) => $run->status === QuestStatus::Active && $run->quest->giverId() === $resident->id)
+            ->map(function (WorldSessionQuest $run): string {
+                $steps = collect($run->currentBeats())->reject(fn (array $beat) => $beat['hidden'] ?? false)->pluck('text');
+
+                return "- {$run->quest->title}: {$run->quest->description()}".($steps->isEmpty() ? '' : ' Their next step: '.$steps->implode(' '));
+            });
+
+        return $lines->isEmpty() ? null : "You asked the user for these, they accepted, and they are working on them now:\n".$lines->implode("\n");
+    }
+
+    /**
+     * @param  Collection<int, WorldSessionQuest>  $runs
+     * @param  array<int, int>  $pendingRunIds
+     */
+    private function offers(Collection $runs, WorldResident $resident, array $pendingRunIds): ?string
+    {
+        $lines = $runs->filter(fn (WorldSessionQuest $run) => $run->status === QuestStatus::Available && $run->quest->giverId() === $resident->id && ! in_array($run->id, $pendingRunIds, true))
             ->map(fn (WorldSessionQuest $run) => "- {$run->quest->title}: {$run->quest->description()}");
 
         return $lines->isEmpty() ? null : "You have tasks you can ask of the user. When it suits the conversation, bring one up in your own words and call the offer_quest tool:\n".$lines->implode("\n");

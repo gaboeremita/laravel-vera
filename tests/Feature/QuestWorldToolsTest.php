@@ -59,6 +59,7 @@ it('gives a resident the beat\'s prose while it is current, and not after', func
 
     sendWorldMessage($this, $scenario, questChatPositions($resident))->assertOk();
     expect(questPromptOfRequest())->toContain('You trust only those who helped at the well.')
+        ->toContain('The moment they truly have, call the grant_flag tool in that same reply, alongside your words, with your reason:')
         ->and(questToolsOfRequest())->toContain('grant_flag');
 
     $run = $session->questRuns()->first();

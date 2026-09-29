@@ -11,7 +11,7 @@ use App\Models\WorldSessionQuest;
 class PlayerRunView
 {
     /**
-     * @return array{id: int, questId: int, key: string, title: string, description: string, campaignId: ?int, run: int, status: string, beats: array<int, array{id: string, text: string, finished: bool, current: bool}>, ending: ?array<string, mixed>, endingStatus: ?string, startedAt: ?string, endedAt: ?string}
+     * @return array{id: int, questId: int, key: string, title: string, description: string, campaignId: ?int, run: int, status: string, beats: array<int, array{id: string, text: string, finished: bool, current: bool}>, ending: ?array<string, mixed>, endingStatus: ?string, reward: ?array{giverName: string, line: string, credits: int, items: array<int, array{name: string, quantity: int}>}, startedAt: ?string, endedAt: ?string}
      */
     public function handle(WorldSessionQuest $run): array
     {
@@ -44,6 +44,7 @@ class PlayerRunView
                 'scores' => $run->ending['scores'] ?? [],
             ],
             'endingStatus' => $run->ending_status?->value,
+            'reward' => $run->state['reward'] ?? null,
             'startedAt' => $run->started_at?->toIso8601String(),
             'endedAt' => $run->ended_at?->toIso8601String(),
         ];

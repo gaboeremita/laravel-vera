@@ -8,6 +8,7 @@ use App\Actions\Quests\RecordQuestEvent;
 use App\Actions\Quests\SyncSessionQuests;
 use App\Enums\EndingStatus;
 use App\Enums\QuestEventType;
+use App\Enums\QuestStatus;
 use App\Events\Quests\QuestEndingReady;
 use App\Events\Quests\QuestFlagChanged;
 use App\Models\WorldSessionQuest;
@@ -61,6 +62,10 @@ class AssessQuestEnding implements ShouldQueue
         }
         $syncSessionQuests->handle($run->worldSession);
         $checkCampaignEnded->handle($run);
+
+        if ($run->quest->reward() !== null && $run->status === QuestStatus::Completed) {
+            GiveQuestReward::dispatch($run->id);
+        }
     }
 
     public function failed(?Throwable $exception): void

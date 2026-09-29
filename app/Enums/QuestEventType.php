@@ -21,4 +21,5 @@ enum QuestEventType: string
     case DefinitionEdited = 'definition_edited';
     case EndingWritten = 'ending_written';
     case EndingFailed = 'ending_failed';
+    case RewardGiven = 'reward_given';
 }

@@ -12,8 +12,9 @@ function mergeRuns(current, changed) {
 /**
  * The session's quests, kept current from the server's broadcasts: runs,
  * campaigns, a queue of notices to announce, and a queue of endings to show.
+ * A reward arrives with the player's inventory after it, handed to onInventory.
  */
-export default function useQuests(worldId, sessionId, addToast) {
+export default function useQuests(worldId, sessionId, addToast, onInventory) {
 	const [runs, setRuns] = useState([]);
 	const [campaigns, setCampaigns] = useState([]);
 	const [notices, setNotices] = useState([]);
@@ -43,6 +44,7 @@ export default function useQuests(worldId, sessionId, addToast) {
 		channel.listen('.quests.updated', (data) => {
 			if (cancelled) return;
 			setRuns((current) => mergeRuns(current, data.runs));
+			data.notices.filter((notice) => notice.inventory).forEach((notice) => onInventory?.(notice.inventory));
 			const shown = data.notices.filter((notice) => notice.type !== 'questAvailable');
 			if (shown.length > 0) setNotices((current) => [...current, ...shown.map((notice) => ({ ...notice, key: crypto.randomUUID() }))]);
 		});
@@ -59,7 +61,7 @@ export default function useQuests(worldId, sessionId, addToast) {
 			channel.stopListening('.quests.ending');
 			echo.leave(channelName);
 		};
-	}, [worldId, sessionId, addToast]);
+	}, [worldId, sessionId, addToast, onInventory]);
 
 	const dismissNotice = useCallback(() => setNotices((current) => current.slice(1)), []);
 	const dismissEnding = useCallback(() => setEndings((current) => current.slice(1)), []);

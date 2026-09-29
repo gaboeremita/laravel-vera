@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isTypingTarget } from '../keyboardFocus.js';
+import { totalScore } from '../../../utils/endingScore.js';
+import { rewardSummary } from '../../../utils/questReward.js';
 
 const ENDED_LABELS = { completed: 'QUEST COMPLETE', failed: 'QUEST FAILED', abandoned: 'QUEST ABANDONED' };
 
@@ -39,11 +41,16 @@ function EndingSummary({ run, onRetry, onShowEnding }) {
 		);
 	}
 	if (!run.ending) return null;
+	const total = totalScore(run.ending.scores);
 	return (
 		<button type="button" onClick={() => onShowEnding({ runId: run.id, title: run.title, endingStatus: run.endingStatus, ending: run.ending })} className="w-full border border-accent/40 bg-accent/5 px-3 py-2 text-left cursor-pointer transition-colors hover:bg-accent/10">
 			<span className="world-hud-glow block text-sm">{run.ending.title}</span>
-			{run.ending.tier && <span className="world-hud-label text-accent">{run.ending.tier.toUpperCase()}</span>}
-			<span className="mt-1 block line-clamp-2 text-fg-2 text-xs">{run.ending.epilogue}</span>
+			<span className="flex items-baseline gap-3">
+				{run.ending.tier && <span className="world-hud-label text-accent">{run.ending.tier.toUpperCase()}</span>}
+				{total !== null && <span className="world-hud-label">SCORE <span className="tabular-nums text-fg-1">{total}/10</span></span>}
+			</span>
+			<span className="mt-1 line-clamp-2 text-fg-2 text-xs">{run.ending.epilogue}</span>
+			{rewardSummary(run.reward) && <span className="mt-1 block world-hud-label">REWARD <span className="normal-case tracking-normal text-fg-1">{rewardSummary(run.reward)}</span></span>}
 		</button>
 	);
 }

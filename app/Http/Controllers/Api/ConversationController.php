@@ -6,6 +6,7 @@ use App\Actions\AppendExpressionTags;
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
 use App\Actions\BuildFactsPrompt;
+use App\Actions\BuildFeelingsPrompt;
 use App\Actions\BuildInventoryPrompt;
 use App\Actions\BuildQuestsPrompt;
 use App\Actions\CreatorModeTags;
@@ -36,6 +37,7 @@ use App\Models\Inventory;
 use App\Models\KnownFact;
 use App\Models\Message;
 use App\Models\Region;
+use App\Models\ResidentFeeling;
 use App\Models\Settings;
 use App\Models\World;
 use App\Models\WorldResident;
@@ -48,6 +50,7 @@ use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\AgentLoop\Tools\ImageGenerationTool;
 use App\Services\AgentLoop\Tools\World\AcknowledgeTool;
 use App\Services\AgentLoop\Tools\World\ActivityGate;
+use App\Services\AgentLoop\Tools\World\AdjustFeelingsTool;
 use App\Services\AgentLoop\Tools\World\AskForTool;
 use App\Services\AgentLoop\Tools\World\AssessQuestTool;
 use App\Services\AgentLoop\Tools\World\EditQuestTool;
@@ -459,6 +462,11 @@ class ConversationController extends Controller
             if ($questsPrompt !== null) {
                 $director->append('quests', $questsPrompt);
             }
+            $residentFeeling = ResidentFeeling::of($worldSession, $questsResident);
+            $feelingsPrompt = app(BuildFeelingsPrompt::class)->handle($residentFeeling, $turnMode, (bool) $aiModel?->supports_tools);
+            if ($feelingsPrompt !== null) {
+                $director->append('feelings', $feelingsPrompt);
+            }
         }
         $questTools = [];
 
@@ -528,7 +536,7 @@ class ConversationController extends Controller
             if ($factsResident !== null) {
                 $factTools = $this->factTools($worldSession, $conversation, $factsResident, $turnMode, $region, $validated['positions']['residents'][$factsResident->id] ?? null);
                 $questTools = $this->questTools($worldSession, $conversation, $factsResident, $turnMode);
-                $tools = [...$tools, ...array_values($factTools), ...array_values($questTools)];
+                $tools = [...$tools, ...array_values($factTools), ...array_values($questTools), new AdjustFeelingsTool(ResidentFeeling::of($worldSession, $factsResident), $turnMode)];
             }
 
             if ($tools !== []) {

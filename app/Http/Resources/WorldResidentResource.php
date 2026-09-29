@@ -40,6 +40,7 @@ class WorldResidentResource extends JsonResource
             'behaviorSettings' => $this->behavior_settings,
             'openingMessage' => $this->opening_message,
             'customPrompt' => $this->custom_prompt,
+            'publicDescription' => $this->public_description,
             'zoneAccess' => ['tags' => $this->accessTags(), 'zones' => $this->accessZoneIds()],
         ];
     }

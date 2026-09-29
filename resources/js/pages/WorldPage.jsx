@@ -93,7 +93,7 @@ export default function WorldPage() {
 	const [chatOpeningLine, setChatOpeningLine] = useState(null);
 	const { inventory, applyInventory } = useInventory(worldId, sessionId, addToast);
 	const { knownFacts, applyLearnedFacts } = useKnownFacts(worldId, sessionId, addToast);
-	const quests = useQuests(worldId, sessionId, addToast);
+	const quests = useQuests(worldId, sessionId, addToast, applyInventory);
 	const applyQuestRun = quests.applyRun;
 	const pendingPassageRef = useRef(null);
 	const passageActionsRef = useRef({ confirm: () => {}, cancel: () => {} });
@@ -886,7 +886,7 @@ export default function WorldPage() {
 				{narration && <NarrationCard key={narration.key} title={narration.title} narration={narration.narration} succeeded={narration.succeeded} changes={narration.changes} onDone={() => setNarration(null)} />}
 				{learnedOpen && <LearnedFactsPanel knownFacts={knownFacts} onClose={() => setLearnedOpen(false)} />}
 				{questLogOpen && <QuestLogPanel runs={quests.runs} campaigns={quests.campaigns} onAbandon={abandonQuest} onRetry={(runId) => void quests.retryEnding(runId)} onShowEnding={(ending) => { setQuestLogOpen(false); quests.showEnding(ending); }} onClose={() => setQuestLogOpen(false)} />}
-				{quests.ending && !handoverRequest && <EndingCard key={quests.ending.key} ending={quests.ending} onRetry={quests.ending.runId ? () => { void quests.retryEnding(quests.ending.runId); quests.dismissEnding(); } : null} onClose={quests.dismissEnding} />}
+				{quests.ending && !handoverRequest && <EndingCard key={quests.ending.key} ending={quests.ending} reward={quests.ending.runId ? quests.runs.find((run) => run.id === quests.ending.runId)?.reward ?? null : null} onRetry={quests.ending.runId ? () => { void quests.retryEnding(quests.ending.runId); quests.dismissEnding(); } : null} onClose={quests.dismissEnding} />}
 				{inventoryOpen && <InventoryPanel worldId={worldId} sessionId={sessionId} inventory={inventory} busyItemId={busyItemId} onExamine={examineItem} onUse={tryItem} onClose={() => setInventoryOpen(false)} />}
 				{player.purchase && !handoverRequest && <HandoverRequestConfirm key={player.purchase.id} request={player.purchase} isAnswering={false} label="A PURCHASE" verb="charges you" confirmLabel="PAY" declineLabel="CANCEL" onAccept={player.confirmPurchase} onDecline={player.cancelPurchase} />}
 				{questOffer && questOfferOpen && !handoverRequest && <QuestOfferCard key={questOffer.id} offer={questOffer} isAnswering={isAnsweringOffer} onAccept={() => void answerQuestOffer(true)} onDecline={() => void answerQuestOffer(false)} />}

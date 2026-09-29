@@ -65,6 +65,7 @@ it('writes the ending from the rubric, the log with creator steps marked, and co
     expect($sent)->toContain('Judge how honest the player was.')->toContain('(done through creator mode)')->toContain('I saw the sluice break.')->not->toContain('make them believe me')
         ->and($parameters['properties']['tier']['enum'])->toBe(['vindicated', 'scapegoated'])
         ->and($parameters['properties']['scores']['items']['properties']['dimension']['enum'])->toBe(['honesty'])
+        ->and($parameters['properties']['epilogue']['description'])->toBe('One short paragraph of two to four sentences telling how it ended, addressed to the user.')
         ->and($run->fresh())->ending_status->toBe(EndingStatus::Written)->ending->toMatchArray(['tier' => 'vindicated', 'title' => 'The Miller Cleared'])
         ->and(QuestEvent::where('type', QuestEventType::EndingWritten)->exists())->toBeTrue();
 });
