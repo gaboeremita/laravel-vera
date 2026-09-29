@@ -6,8 +6,12 @@ import { FIELD_INPUT, FIELD_LABEL } from '../utils/formFieldStyles.js';
 
 const ENDINGS = ['completed', 'failed', 'abandoned', 'ending_written', 'ending_failed', 'reward_given'];
 
+/** Payload keys shown in words of their own rather than in the summary. */
+const WORDED = ['because', 'lookups', 'offerWhenHeld', 'unmetParts'];
+
 function payloadSummary(payload) {
 	return Object.entries(payload ?? {})
+		.filter(([key]) => !WORDED.includes(key))
 		.filter(([, value]) => value !== null && value !== '' && !(Array.isArray(value) && value.length === 0))
 		.map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`)
 		.join(' · ');
@@ -27,6 +31,19 @@ function EventRow({ event }) {
 					{event.byCreator ? 'CREATOR · ' : ''}{new Date(event.createdAt).toLocaleString()}
 				</span>
 			</div>
+			{event.payload?.because && <p className="text-fg-1 text-xs mt-1 break-words">{event.payload.because}</p>}
+			{event.payload?.lookups?.length > 0 && (
+				<ul className="mt-1 space-y-0.5">
+					{event.payload.lookups.map((lookup, index) => (
+						<li key={index} className="text-fg-2 text-xs break-words">
+							{lookup.part}: <span className="text-fg-1">{lookup.value}</span>, asks {lookup.asks}
+						</li>
+					))}
+				</ul>
+			)}
+			{event.payload?.offerWhenHeld === false && (
+				<p className="text-danger text-xs mt-1 break-words">Offered while these didn't hold: {event.payload.unmetParts.join('; ')}</p>
+			)}
 			{summary && <p className="text-fg-2 text-xs mt-1 break-words">{summary}</p>}
 		</div>
 	);

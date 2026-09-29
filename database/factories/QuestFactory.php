@@ -78,6 +78,19 @@ class QuestFactory extends Factory
         return $this->withDefinition(['start' => ['mode' => 'offer', 'giver' => $giver->id]]);
     }
 
+    /**
+     * @param  array<string, mixed>  $condition
+     */
+    public function offerWhen(array $condition): static
+    {
+        return $this->withStart(['offerWhen' => $condition]);
+    }
+
+    public function offerQuestion(string $text): static
+    {
+        return $this->withStart(['offerQuestion' => $text]);
+    }
+
     public function repeatable(): static
     {
         return $this->withDefinition(['repeatable' => true]);
@@ -89,6 +102,21 @@ class QuestFactory extends Factory
     public function withBeats(array $beats): static
     {
         return $this->withDefinition(['beats' => $beats]);
+    }
+
+    /**
+     * Merges into `start`, making the quest start by offer and keeping the
+     * giver an earlier state set.
+     *
+     * @param  array<string, mixed>  $changes
+     */
+    private function withStart(array $changes): static
+    {
+        return $this->state(function (array $attributes) use ($changes): array {
+            $definition = $attributes['definition'] ?? self::defaultDefinition();
+
+            return ['definition' => [...$definition, 'start' => [...($definition['start'] ?? []), 'mode' => 'offer', ...$changes]]];
+        });
     }
 
     /**

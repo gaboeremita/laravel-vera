@@ -24,4 +24,10 @@ interface QuestTrigger
      * held returns false, since held things are read as they are.
      */
     public function matches(string $leaf, mixed $value): bool;
+
+    /**
+     * What happened, in plain words for the quest event log, when the
+     * trigger knows more than its name says.
+     */
+    public function cause(): ?string;
 }

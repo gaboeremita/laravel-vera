@@ -10,6 +10,7 @@ use App\Actions\Quests\WithdrawQuestOffers;
 use App\Enums\QuestEventType;
 use App\Enums\QuestOfferStatus;
 use App\Enums\QuestStatus;
+use App\Events\Quests\QuestStateChanged;
 use App\Http\Controllers\Controller;
 use App\Models\QuestOffer;
 use App\Traits\ResolvesWorldSession;
@@ -48,6 +49,7 @@ class QuestOfferController extends Controller
                 $this->startQuestRun->handle($pending->run, 'offer');
             } else {
                 $this->recordQuestEvent->handle($pending->run, QuestEventType::OfferDeclined);
+                QuestStateChanged::dispatch($worldSession->id, "The user declined \"{$pending->run->quest->title}\"");
             }
 
             return $pending;

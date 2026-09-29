@@ -9,6 +9,7 @@ use App\Models\CreditTransaction;
 use App\Models\Inventory;
 use App\Models\InventoryItem;
 use App\Models\Item;
+use App\Models\ItemTransfer;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -57,6 +58,7 @@ class TransferInventory
                 if ($receiver !== null) {
                     $this->add($receiver, $itemId, $quantity);
                 }
+                $this->recordItem($from, $to, $itemId, $quantity, $reason, $byCreator);
             }
         });
 
@@ -65,8 +67,42 @@ class TransferInventory
 
         $player = collect([$from, $to])->first(fn (?Inventory $side) => $side?->holder === InventoryHolder::Player);
         if ($player !== null) {
-            PlayerInventoryChanged::dispatch($player->world_session_id);
+            PlayerInventoryChanged::dispatch($player->world_session_id, $this->handover($from, $to, $credits, $items));
         }
+    }
+
+    /**
+     * What the player handed a resident, in plain words for the quest log.
+     *
+     * @param  array<int, int>  $items
+     */
+    private function handover(?Inventory $from, ?Inventory $to, int $credits, array $items): ?string
+    {
+        if ($from?->holder !== InventoryHolder::Player || $to?->holder !== InventoryHolder::Resident) {
+            return null;
+        }
+
+        $name = $to->displayName();
+        $names = Item::whereKey(array_keys($items))->pluck('name', 'id');
+        $given = collect($items)->map(fn (int $quantity, int $itemId) => "{$quantity} {$names[$itemId]}");
+
+        return implode(' and ', array_filter([
+            $given->isNotEmpty() ? "The user gave {$name} ".$given->implode(', ') : null,
+            $credits > 0 ? ($given->isNotEmpty() ? "paid them {$credits} credits" : "The user paid {$name} {$credits} credits") : null,
+        ]));
+    }
+
+    private function recordItem(?Inventory $from, ?Inventory $to, int $itemId, int $quantity, string $reason, bool $byCreator): void
+    {
+        ItemTransfer::create([
+            'world_session_id' => ($from ?? $to)->world_session_id,
+            'from_inventory_id' => $from?->id,
+            'to_inventory_id' => $to?->id,
+            'item_id' => $itemId,
+            'quantity' => $quantity,
+            'reason' => $reason,
+            'by_creator' => $byCreator,
+        ]);
     }
 
     /**

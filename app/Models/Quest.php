@@ -20,6 +20,12 @@ class Quest extends Model
     /** @use HasFactory<QuestFactory> */
     use HasFactory;
 
+    /**
+     * The id the offerQuestion is judged under. Beat question ids are
+     * lowercase letters, digits and dashes, so they can never be this.
+     */
+    public const OFFER_QUESTION_ID = ':offer';
+
     protected function casts(): array
     {
         return ['definition' => 'array'];
@@ -53,6 +59,23 @@ class Quest extends Model
     public function giverId(): ?int
     {
         return $this->startMode() === 'offer' ? (int) $this->definition['start']['giver'] : null;
+    }
+
+    /**
+     * What the giver checks before offering, when the quest starts by offer.
+     *
+     * @return ?array<string, mixed>
+     */
+    public function offerWhen(): ?array
+    {
+        return $this->startMode() === 'offer' ? ($this->definition['start']['offerWhen'] ?? null) : null;
+    }
+
+    public function offerQuestion(): ?string
+    {
+        $question = $this->startMode() === 'offer' ? trim((string) ($this->definition['start']['offerQuestion'] ?? '')) : '';
+
+        return $question === '' ? null : $question;
     }
 
     public function isRepeatable(): bool
@@ -89,6 +112,10 @@ class Quest extends Model
      */
     public function question(string $questionId): ?array
     {
+        if ($questionId === self::OFFER_QUESTION_ID) {
+            return $this->offerQuestion() === null ? null : ['id' => self::OFFER_QUESTION_ID, 'text' => $this->offerQuestion()];
+        }
+
         return collect($this->beats())->flatMap(fn (array $beat) => $beat['questions'] ?? [])->firstWhere('id', $questionId);
     }
 

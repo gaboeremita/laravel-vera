@@ -3,11 +3,13 @@
 namespace App\Jobs;
 
 use App\Actions\Quests\JudgeQuestionAction;
+use App\Actions\Quests\OfferQuestionStatus;
 use App\Actions\Quests\RecordQuestEvent;
 use App\Enums\QuestEventType;
 use App\Enums\QuestStatus;
 use App\Events\Quests\QuestQuestionJudged;
 use App\Models\Conversation;
+use App\Models\Quest;
 use App\Models\WorldResident;
 use App\Models\WorldSessionQuest;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -45,15 +47,15 @@ class JudgeQuestion implements ShouldBeUnique, ShouldQueue
             $answer = $judgeQuestion->handle($run, $question, $conversation, WorldResident::with('assistant')->find($this->residentId)?->assistant->name ?? 'The resident');
         } catch (Throwable $exception) {
             report($exception);
-            $recordQuestEvent->handle($run, QuestEventType::QuestionJudged, payload: ['question' => $this->questionId, 'met' => false, 'error' => $exception->getMessage()]);
+            $recordQuestEvent->handle($run, QuestEventType::QuestionJudged, payload: ['question' => $this->questionId, 'met' => false, 'error' => $exception->getMessage(), ...OfferQuestionStatus::textHash($run, $this->questionId)]);
 
             return;
         }
 
-        $recordQuestEvent->handle($run, QuestEventType::QuestionJudged, payload: ['question' => $this->questionId, ...$answer, 'conversationId' => $this->conversationId]);
+        $recordQuestEvent->handle($run, QuestEventType::QuestionJudged, payload: ['question' => $this->questionId, ...$answer, 'conversationId' => $this->conversationId, ...OfferQuestionStatus::textHash($run, $this->questionId)]);
 
         $run->refresh();
-        if ($answer['met'] && $run->status === QuestStatus::Active) {
+        if ($answer['met'] && $run->status === QuestStatus::Active && $this->questionId !== Quest::OFFER_QUESTION_ID) {
             $run->mergeState(['questions' => [...($run->state['questions'] ?? []), $this->questionId => true]]);
             $run->save();
             QuestQuestionJudged::dispatch($run->world_session_id);

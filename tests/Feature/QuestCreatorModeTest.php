@@ -94,3 +94,12 @@ it('refuses an edit that names something not in the world, with the configuratio
         ->toThrow(RuntimeException::class, 'Choose a region of this world.');
     expect(WorldSessionQuest::first()->quest->beats())->toHaveCount(4);
 });
+
+it('refuses an edit that puts a moment of the conversation in a beat, as the configuration does', function () {
+    [, , , , $resident, $session] = creatorQuestScenario();
+    $quest = WorldSessionQuest::first()->quest;
+    $beats = [QuestFactory::beat('a', ['when' => ['messagesWith' => ['resident' => $resident->id, 'atLeast' => 2]]])];
+
+    expect(fn () => (new EditQuestTool($session))->handle(['quest' => 'The Mill', 'definition' => json_encode([...$quest->definition, 'beats' => $beats])]))
+        ->toThrow(RuntimeException::class, 'This condition only works in Offer when.');
+});

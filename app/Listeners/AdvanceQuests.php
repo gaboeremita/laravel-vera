@@ -4,6 +4,7 @@ namespace App\Listeners;
 
 use App\Actions\Quests\BroadcastQuestRuns;
 use App\Actions\Quests\EndQuestRun;
+use App\Actions\Quests\LookUpOfferCondition;
 use App\Actions\Quests\QuestConditions;
 use App\Actions\Quests\QuestSessionState;
 use App\Actions\Quests\RecordQuestEvent;
@@ -106,6 +107,13 @@ class AdvanceQuests
         $concerns = fn (?array $condition): bool => $trigger instanceof QuestStarted
             || array_intersect($this->conditions->leavesOf($condition), $trigger->leaves()) !== [];
 
+        if ($run->status === QuestStatus::Available && $quest->startMode() === 'offer') {
+            if ($concerns($quest->offerWhen())) {
+                $this->conditions->latch($quest->offerWhen(), $run, $trigger, LookUpOfferCondition::SCOPE);
+            }
+
+            return [];
+        }
         if ($run->status === QuestStatus::Available) {
             $when = $quest->definition['start']['when'] ?? null;
             if ($quest->startMode() !== 'condition' || ! $concerns($when)) {
@@ -116,7 +124,7 @@ class AdvanceQuests
                 return [];
             }
             $run->save();
-            $this->startQuestRun->handle($run, 'condition');
+            $this->startQuestRun->handle($run, 'condition', payload: $this->because($trigger));
 
             return [BroadcastQuestRuns::notice('questStarted', $run, $quest->description())];
         }
@@ -153,7 +161,7 @@ class AdvanceQuests
 
             foreach ($finished as $beat) {
                 $run->mergeState(['finishedBeats' => [...$run->finishedBeats(), $beat['id']]]);
-                $this->recordQuestEvent->handle($run, QuestEventType::BeatFinished, $beat['id'], ['trigger' => class_basename($trigger)]);
+                $this->recordQuestEvent->handle($run, QuestEventType::BeatFinished, $beat['id'], ['trigger' => class_basename($trigger), ...$this->because($trigger)]);
                 $notices[] = BroadcastQuestRuns::notice('beatFinished', $run, $beat['text']);
             }
         } while ($finished->isNotEmpty());
@@ -182,8 +190,20 @@ class AdvanceQuests
 
         $run->save();
         $status = $fails ? QuestStatus::Failed : QuestStatus::Completed;
-        $this->endQuestRun->handle($run, $status, ['trigger' => class_basename($trigger), 'completeAlsoHeld' => $fails && $completes]);
+        $this->endQuestRun->handle($run, $status, ['trigger' => class_basename($trigger), 'completeAlsoHeld' => $fails && $completes, ...$this->because($trigger)]);
 
         return [BroadcastQuestRuns::notice('questEnded', $run, $status->value)];
+    }
+
+    /**
+     * The trigger's own account of what happened, for the event it caused.
+     *
+     * @return array{because?: string}
+     */
+    private function because(QuestTrigger $trigger): array
+    {
+        $cause = $trigger->cause();
+
+        return $cause === null ? [] : ['because' => $cause];
     }
 }

@@ -125,3 +125,101 @@ it('warns, without refusing, when a resident who grants flags cannot call tools'
     expect($result['errors'])->toBe([])
         ->and($result['warnings'][0])->toContain("model can't call tools");
 });
+
+it('accepts offer conditions with every new part, naming this quest or another', function () {
+    $scenario = worldStateScenario();
+    [, , , $region, $resident] = $scenario;
+    $item = worldItem($region);
+    worldQuest($region->world, [], ['key' => 'the-ledger']);
+
+    $result = checkQuest($scenario, [
+        'start' => ['mode' => 'offer', 'giver' => $resident->id, 'offerQuestion' => 'Has the user shown they can keep a secret?', 'offerWhen' => ['all' => [
+            ['feeling' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => 3, 'atMost' => 8.5]],
+            ['questState' => ['quest' => 'the-quest', 'state' => 'declined']],
+            ['declinedTimes' => ['quest' => 'the-ledger', 'atLeast' => 2]],
+            ['gaveTo' => ['resident' => $resident->id, 'item' => $item->id, 'atLeast' => 1]],
+            ['spentWith' => ['resident' => $resident->id, 'atLeast' => 10]],
+            ['messagesWith' => ['resident' => $resident->id, 'atLeast' => 5]],
+            ['giverIn' => ['region' => $region->id, 'zone' => 'studio']],
+            ['any' => [['othersInTheZone' => ['nobody' => true]], ['othersInTheZone' => ['resident' => $resident->id]]]],
+            ['enterRegion' => $region->id],
+        ]]],
+        'beats' => [QuestFactory::beat('go', ['when' => ['feeling' => ['resident' => $resident->id, 'kind' => 'liking', 'atMost' => -2]]])],
+    ]);
+
+    expect($result['errors'])->toBe([]);
+});
+
+it('refuses the new parts with unknown references, out of range or without a bound', function () {
+    $scenario = worldStateScenario();
+    [, , , $region, $resident] = $scenario;
+
+    $result = checkQuest($scenario, ['beats' => [QuestFactory::beat('go', ['when' => ['all' => [
+        ['feeling' => ['resident' => 999, 'kind' => 'awe', 'atLeast' => 12]],
+        ['feeling' => ['resident' => $resident->id, 'kind' => 'trust']],
+        ['feeling' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => 5, 'atMost' => 2]],
+        ['questState' => ['quest' => 'nowhere', 'state' => 'lost']],
+        ['declinedTimes' => ['quest' => 'the-quest', 'atLeast' => 0]],
+        ['gaveTo' => ['resident' => $resident->id, 'item' => 999, 'atLeast' => 1]],
+        ['spentWith' => ['resident' => $resident->id, 'atLeast' => 0]],
+    ]]])]]);
+
+    expect(array_keys($result['errors']))->toEqual([
+        'beats.0.when.all.0.feeling.resident',
+        'beats.0.when.all.0.feeling.kind',
+        'beats.0.when.all.0.feeling.atLeast',
+        'beats.0.when.all.1.feeling',
+        'beats.0.when.all.2.feeling.atMost',
+        'beats.0.when.all.3.questState.quest',
+        'beats.0.when.all.3.questState.state',
+        'beats.0.when.all.4.declinedTimes.atLeast',
+        'beats.0.when.all.5.gaveTo.item',
+        'beats.0.when.all.6.spentWith.atLeast',
+    ]);
+});
+
+it('refuses the moment parts outside Offer when, and beats and questions inside it', function () {
+    $scenario = worldStateScenario();
+    [, , , $region, $resident] = $scenario;
+    $messages = ['messagesWith' => ['resident' => $resident->id, 'atLeast' => 1]];
+
+    $result = checkQuest($scenario, [
+        'start' => ['mode' => 'offer', 'giver' => $resident->id, 'offerWhen' => ['any' => [['beat' => 'go'], ['question' => 'sorry']]]],
+        'beats' => [QuestFactory::beat('go', ['when' => $messages])],
+        'complete' => ['giverIn' => ['region' => $region->id, 'zone' => 'studio']],
+        'fail' => ['othersInTheZone' => ['nobody' => true]],
+    ]);
+
+    expect($result['errors'])->toMatchArray([
+        'start.offerWhen.any.0' => ['Offer when can\'t depend on this quest\'s own beats or questions.'],
+        'start.offerWhen.any.1' => ['Offer when can\'t depend on this quest\'s own beats or questions.'],
+        'beats.0.when' => ['This condition only works in Offer when.'],
+        'complete' => ['This condition only works in Offer when.'],
+        'fail' => ['This condition only works in Offer when.'],
+    ]);
+
+    $startWhen = checkQuest($scenario, ['start' => ['mode' => 'condition', 'when' => $messages]]);
+    expect($startWhen['errors'])->toHaveKey('start.when');
+});
+
+it('refuses offer conditions on a quest that doesn\'t start by offer', function () {
+    $scenario = worldStateScenario();
+    [, , , , $resident] = $scenario;
+
+    $result = checkQuest($scenario, ['start' => ['mode' => 'auto', 'offerWhen' => ['flag' => 'ready'], 'offerQuestion' => 'Ready?']]);
+    $blank = checkQuest($scenario, ['start' => ['mode' => 'offer', 'giver' => $resident->id, 'offerQuestion' => '  ']]);
+
+    expect($result['errors'])->toHaveKeys(['start.offerWhen', 'start.offerQuestion'])
+        ->and($blank['errors'])->toHaveKey('start.offerQuestion');
+});
+
+it('warns when the giver of a quest with offer conditions cannot call tools', function () {
+    $scenario = worldStateScenario();
+    [, , , , $resident] = $scenario;
+    AiModel::query()->update(['supports_tools' => false]);
+
+    $result = checkQuest($scenario, ['start' => ['mode' => 'offer', 'giver' => $resident->id, 'offerQuestion' => 'Ready?']]);
+
+    expect($result['errors'])->toBe([])
+        ->and($result['warnings'])->toContain("{$resident->assistant->name}'s model can't call tools, so they can't check what the quest asks before offering it.");
+});

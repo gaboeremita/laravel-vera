@@ -25,4 +25,9 @@ abstract class QuestTriggerEvent implements QuestTrigger, ShouldDispatchAfterCom
     {
         return false;
     }
+
+    public function cause(): ?string
+    {
+        return null;
+    }
 }

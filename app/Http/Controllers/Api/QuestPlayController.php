@@ -31,7 +31,7 @@ class QuestPlayController extends Controller
         $endings = $worldSession->campaignEndings()->get()->keyBy('campaign_id');
 
         return response()->json([
-            'runs' => $worldSession->questRuns()->with('quest')->orderBy('id')->get()
+            'runs' => $worldSession->questRuns()->with('quest')->where('status', '!=', QuestStatus::Available)->orderBy('id')->get()
                 ->map(fn (WorldSessionQuest $run) => $playerRunView->handle($run))
                 ->values(),
             'campaigns' => $worldSession->worldUser->world->campaigns()->with('quests:id,campaign_id')->orderBy('title')->get()
