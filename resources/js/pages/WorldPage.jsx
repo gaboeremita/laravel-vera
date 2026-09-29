@@ -41,6 +41,12 @@ import NarrationCard from '../components/world/hud/NarrationCard.jsx';
 import { changeLines } from '../components/world/inventoryChanges.js';
 import useInventory from '../hooks/useInventory.js';
 import useKnownFacts from '../hooks/useKnownFacts.js';
+import useQuests from '../hooks/useQuests.js';
+import QuestTracker from '../components/world/hud/QuestTracker.jsx';
+import BeatNotice from '../components/world/hud/BeatNotice.jsx';
+import EndingCard from '../components/world/hud/EndingCard.jsx';
+import QuestOfferCard from '../components/world/hud/QuestOfferCard.jsx';
+import QuestLogPanel from '../components/world/hud/QuestLogPanel.jsx';
 
 const INVITE_MS = 30000;
 const LISTEN_DISTANCE = 12;
@@ -76,13 +82,19 @@ export default function WorldPage() {
 	const [pendingPassage, setPendingPassage] = useState(null);
 	const [inventoryOpen, setInventoryOpen] = useState(false);
 	const [learnedOpen, setLearnedOpen] = useState(false);
+	const [questLogOpen, setQuestLogOpen] = useState(false);
 	const [handoverRequest, setHandoverRequest] = useState(null);
+	const [questOffer, setQuestOffer] = useState(null);
+	const [questOfferOpen, setQuestOfferOpen] = useState(false);
+	const [isAnsweringOffer, setIsAnsweringOffer] = useState(false);
 	const [isAnsweringRequest, setIsAnsweringRequest] = useState(false);
 	const [narration, setNarration] = useState(null);
 	const [busyItemId, setBusyItemId] = useState(null);
 	const [chatOpeningLine, setChatOpeningLine] = useState(null);
 	const { inventory, applyInventory } = useInventory(worldId, sessionId, addToast);
 	const { knownFacts, applyLearnedFacts } = useKnownFacts(worldId, sessionId, addToast);
+	const quests = useQuests(worldId, sessionId, addToast);
+	const applyQuestRun = quests.applyRun;
 	const pendingPassageRef = useRef(null);
 	const passageActionsRef = useRef({ confirm: () => {}, cancel: () => {} });
 	const chatResidentRef = useRef(null);
@@ -276,7 +288,27 @@ export default function WorldPage() {
 	const closeChat = useCallback(() => {
 		setChatResident(null);
 		setHandoverRequest(null);
+		setQuestOffer(null);
+		setQuestOfferOpen(false);
 	}, []);
+
+	const answerQuestOffer = useCallback(async (accept) => {
+		if (!questOffer) return;
+		setIsAnsweringOffer(true);
+		try {
+			const response = await api.post(route('worlds.sessions.quest-offers.answer', { world: worldId, session: sessionId, offer: questOffer.id }), { accept });
+			const body = await response.json();
+			if (!response.ok) throw new Error(body.message);
+			applyQuestRun(body.run);
+			actionSender.current?.(body.line);
+		} catch (error) {
+			addToast(error.message || 'Unable to answer the offer', 'error');
+		} finally {
+			setIsAnsweringOffer(false);
+			setQuestOffer(null);
+			setQuestOfferOpen(false);
+		}
+	}, [questOffer, worldId, sessionId, applyQuestRun, addToast]);
 
 	const showNarration = useCallback((title, body) => {
 		setNarration({ key: Date.now(), title, narration: body.narration, succeeded: body.succeeded ?? true, changes: changeLines(body.changes) });
@@ -348,6 +380,27 @@ export default function WorldPage() {
 		window.addEventListener('keydown', keyDown);
 		return () => window.removeEventListener('keydown', keyDown);
 	}, [sessionId]);
+
+	useEffect(() => {
+		const keyDown = (event) => {
+			if (event.code !== 'KeyK' || event.repeat || isTypingTarget(event.target) || !sessionId) return;
+			event.preventDefault();
+			setQuestLogOpen(true);
+		};
+		window.addEventListener('keydown', keyDown);
+		return () => window.removeEventListener('keydown', keyDown);
+	}, [sessionId]);
+
+	const abandonQuest = useCallback(async (runId) => {
+		try {
+			const response = await api.post(route('worlds.sessions.quest-runs.abandon', { world: worldId, session: sessionId, run: runId }), {});
+			const body = await response.json();
+			if (!response.ok) throw new Error(body.message);
+			applyQuestRun(body);
+		} catch (error) {
+			addToast(error.message || 'Unable to abandon the quest', 'error');
+		}
+	}, [worldId, sessionId, applyQuestRun, addToast]);
 
 	const travel = useCallback(async (passage) => {
 		if (travelingRef.current || !sessionId || !region) return;
@@ -474,13 +527,19 @@ export default function WorldPage() {
 	}, [toggleVoice]);
 
 	const hasMultipleFloors = (world?.layout?.floors?.length ?? 0) > 1;
+	const lastZoneIdRef = useRef(null);
 	const handleLocationChange = useCallback(({ floor, zone, zoneChain, announce }) => {
 		setLocation({ floor, zone, zoneChain });
+		// Quests hear zone crossings from saved positions, which otherwise save only every 10 seconds.
+		if ((zone?.id ?? null) !== lastZoneIdRef.current) {
+			lastZoneIdRef.current = zone?.id ?? null;
+			void persistPosition();
+		}
 		if (!announce || !zone) return;
 		const card = { key: crypto.randomUUID(), zoneName: zone.name, contextLine: contextLineFor(world.layout, zone, { withFloor: hasMultipleFloors }) };
 		if (mapExpanded) setPendingTitleCard(card);
 		else setTitleCard(card);
-	}, [world, hasMultipleFloors, mapExpanded]);
+	}, [world, hasMultipleFloors, mapExpanded, persistPosition]);
 
 	if (!mapExpanded && pendingTitleCard) {
 		setTitleCard(pendingTitleCard);
@@ -797,7 +856,7 @@ export default function WorldPage() {
 				)}
 				{chatResident && (
 					<div className="absolute left-5 top-16 bottom-5 z-20 w-[min(26rem,40%)] min-w-72">
-						<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} getResidentPosture={getResidentPosture} getResidentState={getResidentState} getUserState={getUserState} getOccupiedSpots={getOccupiedSpots} getStackedSpots={getStackedSpots} onVoiceAudio={playResidentVoice} onSilentReply={handleSilentReply} onAction={handleChatAction} actionSender={actionSender} inventory={inventory} onInventory={applyInventory} onLearnedFacts={applyLearnedFacts} onHandoverRequest={setHandoverRequest} openingLine={chatOpeningLine?.residentId === chatResident.id ? chatOpeningLine : null} />
+						<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} getResidentPosture={getResidentPosture} getResidentState={getResidentState} getUserState={getUserState} getOccupiedSpots={getOccupiedSpots} getStackedSpots={getStackedSpots} onVoiceAudio={playResidentVoice} onSilentReply={handleSilentReply} onAction={handleChatAction} actionSender={actionSender} inventory={inventory} onInventory={applyInventory} onLearnedFacts={applyLearnedFacts} onHandoverRequest={setHandoverRequest} questOffer={questOffer} onQuestOffer={setQuestOffer} onOpenQuestOffer={() => setQuestOfferOpen(true)} openingLine={chatOpeningLine?.residentId === chatResident.id ? chatOpeningLine : null} />
 					</div>
 				)}
 				{chatResident && conversationRange === 'warning' && (
@@ -806,8 +865,8 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready' && !paused} voiceUntil={voiceUntil} />
-				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !learnedOpen && !handoverRequest && !player.purchase} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
-				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} hasInventory={!!sessionId} />{hasZones && readoutText && <LocationReadout text={readoutText} />}{sessionId && <CreditsReadout credits={inventory?.credits} />}</div>} />}
+				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !learnedOpen && !questLogOpen && !handoverRequest && !player.purchase && !quests.ending && !questOfferOpen} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
+				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} hasInventory={!!sessionId} />{hasZones && readoutText && <LocationReadout text={readoutText} />}{sessionId && <CreditsReadout credits={inventory?.credits} />}{sessionId && <QuestTracker runs={quests.runs} />}{quests.notice && <BeatNotice key={quests.notice.key} notice={quests.notice} onDone={quests.dismissNotice} />}</div>} />}
 				{status === 'ready' && (
 					<>
 						<SwimOverlay active={movement === 'swimming'} />
@@ -826,8 +885,11 @@ export default function WorldPage() {
 				{chatResident && <OffscreenIndicator ref={offscreenIndicator} name={chatResident.assistant.name} />}
 				{narration && <NarrationCard key={narration.key} title={narration.title} narration={narration.narration} succeeded={narration.succeeded} changes={narration.changes} onDone={() => setNarration(null)} />}
 				{learnedOpen && <LearnedFactsPanel knownFacts={knownFacts} onClose={() => setLearnedOpen(false)} />}
+				{questLogOpen && <QuestLogPanel runs={quests.runs} campaigns={quests.campaigns} onAbandon={abandonQuest} onRetry={(runId) => void quests.retryEnding(runId)} onShowEnding={(ending) => { setQuestLogOpen(false); quests.showEnding(ending); }} onClose={() => setQuestLogOpen(false)} />}
+				{quests.ending && !handoverRequest && <EndingCard key={quests.ending.key} ending={quests.ending} onRetry={quests.ending.runId ? () => { void quests.retryEnding(quests.ending.runId); quests.dismissEnding(); } : null} onClose={quests.dismissEnding} />}
 				{inventoryOpen && <InventoryPanel worldId={worldId} sessionId={sessionId} inventory={inventory} busyItemId={busyItemId} onExamine={examineItem} onUse={tryItem} onClose={() => setInventoryOpen(false)} />}
 				{player.purchase && !handoverRequest && <HandoverRequestConfirm key={player.purchase.id} request={player.purchase} isAnswering={false} label="A PURCHASE" verb="charges you" confirmLabel="PAY" declineLabel="CANCEL" onAccept={player.confirmPurchase} onDecline={player.cancelPurchase} />}
+				{questOffer && questOfferOpen && !handoverRequest && <QuestOfferCard key={questOffer.id} offer={questOffer} isAnswering={isAnsweringOffer} onAccept={() => void answerQuestOffer(true)} onDecline={() => void answerQuestOffer(false)} />}
 				{handoverRequest && <HandoverRequestConfirm request={handoverRequest} isAnswering={isAnsweringRequest} onAccept={() => void answerHandoverRequest(true)} onDecline={() => void answerHandoverRequest(false)} />}
 				{pendingPassage && <PassageConfirm fromRegionName={region.name} toRegionName={pendingPassage.toRegionName} onConfirm={() => passageActionsRef.current.confirm()} onCancel={() => passageActionsRef.current.cancel()} />}
 				<PauseOverlay paused={paused} onResume={() => setPaused(false)} onExit={exit} />

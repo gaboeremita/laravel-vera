@@ -67,10 +67,10 @@ function RegionEditor({ world, inventoryConfig, regionId, onSaved, onDeleted, on
 		setConfirmingDelete(false);
 		try {
 			const response = await api.delete(route('worlds.regions.destroy', { world: world.id, region: regionId }));
-			if (!response.ok) throw new Error();
+			if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message);
 			addToast('Region deleted', 'success');
 			await onDeleted();
-		} catch { addToast('Failed to delete region', 'error'); }
+		} catch (error) { addToast(error.message || 'Failed to delete region', 'error'); }
 	};
 
 	if (!value) return <p className="text-fg-3 text-xs">Loading region...</p>;

@@ -7,6 +7,7 @@ use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
 use App\Actions\BuildFactsPrompt;
 use App\Actions\BuildInventoryPrompt;
+use App\Actions\BuildQuestsPrompt;
 use App\Actions\CreatorModeTags;
 use App\Actions\ResolveInventory;
 use App\Actions\ResolveSpotStacking;
@@ -22,6 +23,7 @@ use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
 use App\Enums\Posture;
 use App\Enums\TurnMode;
+use App\Events\Quests\PlayerTalkedTo;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAvatarBackground;
 use App\Jobs\SummarizeConversation;
@@ -46,11 +48,21 @@ use App\Services\AgentLoop\Tools\ImageGenerationTool;
 use App\Services\AgentLoop\Tools\World\AcknowledgeTool;
 use App\Services\AgentLoop\Tools\World\ActivityGate;
 use App\Services\AgentLoop\Tools\World\AskForTool;
+use App\Services\AgentLoop\Tools\World\AssessQuestTool;
+use App\Services\AgentLoop\Tools\World\EditQuestTool;
+use App\Services\AgentLoop\Tools\World\EndQuestTool;
 use App\Services\AgentLoop\Tools\World\GiveTool;
+use App\Services\AgentLoop\Tools\World\GrantFlagTool;
 use App\Services\AgentLoop\Tools\World\GrantTool;
+use App\Services\AgentLoop\Tools\World\OfferQuestTool;
 use App\Services\AgentLoop\Tools\World\RemoveTool;
+use App\Services\AgentLoop\Tools\World\ResetQuestTool;
 use App\Services\AgentLoop\Tools\World\RevealTool;
+use App\Services\AgentLoop\Tools\World\SetBeatTool;
 use App\Services\AgentLoop\Tools\World\SetFactKnownTool;
+use App\Services\AgentLoop\Tools\World\SetQuestFlagTool;
+use App\Services\AgentLoop\Tools\World\SignalQuestionTool;
+use App\Services\AgentLoop\Tools\World\StartQuestTool;
 use App\Services\AgentLoop\Tools\World\WorldToolbox;
 use App\Services\ImageGenProviders\ImageGenerationService;
 use App\Services\LlmProviders\LlmManager;
@@ -433,6 +445,14 @@ class ConversationController extends Controller
             }
         }
         $factTools = [];
+        $questsResident = $worldSession !== null ? $inventoryResident : null;
+        if ($questsResident !== null) {
+            $questsPrompt = app(BuildQuestsPrompt::class)->handle($worldSession, $questsResident, $turnMode, (bool) $aiModel?->supports_tools);
+            if ($questsPrompt !== null) {
+                $director->append('quests', $questsPrompt);
+            }
+        }
+        $questTools = [];
 
         $systemPrompt = $director->build();
 
@@ -495,7 +515,8 @@ class ConversationController extends Controller
 
             if ($factsResident !== null) {
                 $factTools = $this->factTools($worldSession, $conversation, $factsResident, $turnMode, $region, $validated['positions']['residents'][$factsResident->id] ?? null);
-                $tools = [...$tools, ...array_values($factTools)];
+                $questTools = $this->questTools($worldSession, $conversation, $factsResident, $turnMode);
+                $tools = [...$tools, ...array_values($factTools), ...array_values($questTools)];
             }
 
             if ($tools !== []) {
@@ -548,6 +569,11 @@ class ConversationController extends Controller
 
         $learnedFacts = $this->learnedFacts($factTools, $world, $assistantModel, $content);
 
+        $talkedTo = $worldSession !== null ? $world->residents()->where('assistant_id', $assistantModel->id)->first() : null;
+        if ($talkedTo !== null) {
+            PlayerTalkedTo::dispatch($worldSession->id, $talkedTo->id);
+        }
+
         $audioBase64 = null;
         $audioContentType = null;
         $audioError = null;
@@ -578,6 +604,7 @@ class ConversationController extends Controller
             'audioError' => $audioError,
             ...($playerInventory !== null ? ['inventory' => $playerAfter = $playerInventory->summary(), 'changes' => Inventory::changesBetween($playerBefore, $playerAfter)] : []),
             ...($askForTool?->request !== null ? ['handoverRequest' => $askForTool->request->toPayload($playerInventory)] : []),
+            ...(($questTools['offer_quest'] ?? null)?->offer !== null ? ['questOffer' => $questTools['offer_quest']->offer->toPayload()] : []),
             'userContent' => $lastUserMessage['content'] ?? null,
             'creatorMode' => $creatorMode,
             ...($worldSession !== null ? ['learnedFacts' => $learnedFacts] : []),
@@ -639,6 +666,39 @@ class ConversationController extends Controller
         $acknowledge = new AcknowledgeTool($session, $resident);
         if ($acknowledge->knownFacts()->isNotEmpty()) {
             $tools['acknowledge'] = $acknowledge;
+        }
+
+        return $tools;
+    }
+
+    /**
+     * The quest tools a resident has in the player's conversation, keyed by name.
+     *
+     * @return array<string, AgentTool>
+     */
+    private function questTools(WorldSession $session, Conversation $conversation, WorldResident $resident, TurnMode $mode): array
+    {
+        $tools = [];
+
+        $grantFlag = new GrantFlagTool($session, $resident);
+        if ($grantFlag->grantable()->isNotEmpty()) {
+            $tools['grant_flag'] = $grantFlag;
+        }
+
+        $signalQuestion = new SignalQuestionTool($session, $conversation, $resident);
+        if ($signalQuestion->signallable()->isNotEmpty()) {
+            $tools['signal_question'] = $signalQuestion;
+        }
+
+        $offerQuest = new OfferQuestTool($session, $conversation, $resident);
+        if ($offerQuest->offerable()->isNotEmpty()) {
+            $tools['offer_quest'] = $offerQuest;
+        }
+
+        if ($mode === TurnMode::Creator) {
+            foreach ([new StartQuestTool($session), new EndQuestTool($session), new ResetQuestTool($session), new SetBeatTool($session), new SetQuestFlagTool($session), new AssessQuestTool($session), new EditQuestTool($session)] as $tool) {
+                $tools[$tool->name()] = $tool;
+            }
         }
 
         return $tools;

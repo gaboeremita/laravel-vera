@@ -10,6 +10,9 @@ import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import ItemsEditor from '../components/ItemsEditor.jsx';
 import StartingInventoryEditor from '../components/StartingInventoryEditor.jsx';
 import useWorldInventoryConfig from '../hooks/useWorldInventoryConfig.js';
+import QuestsEditor from '../components/QuestsEditor.jsx';
+import CampaignsEditor from '../components/CampaignsEditor.jsx';
+import useCampaigns from '../hooks/useCampaigns.js';
 
 const TABS = [{ id: 'world', label: 'WORLD' }, { id: 'regions', label: 'REGIONS' }];
 
@@ -26,6 +29,12 @@ export default function EditWorldPage() {
 	const [isSaving, setIsSaving] = useState(false);
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const inventoryConfig = useWorldInventoryConfig(worldId, addToast);
+	const { campaigns, reload: reloadCampaigns } = useCampaigns(worldId, addToast);
+	const [questsVersion, setQuestsVersion] = useState(0);
+	const questsChanged = useCallback(async () => {
+		setQuestsVersion((version) => version + 1);
+		await reloadCampaigns();
+	}, [reloadCampaigns]);
 
 	const fetchWorld = useCallback(async () => {
 		const response = await api.get(route('worlds.show', { world: worldId }));
@@ -92,24 +101,28 @@ export default function EditWorldPage() {
 					))}
 				</div>
 				{tab === 'world' ? (
-					<WorldForm
-						value={value}
-						onChange={setValue}
-						regions={value.regions}
-						itemsEditor={<ItemsEditor worldId={value.id} items={inventoryConfig.items} facts={inventoryConfig.facts} onItemsChange={inventoryConfig.reloadItems} addToast={addToast} />}
-						playerInventoryEditor={
-							<StartingInventoryEditor
-								items={inventoryConfig.items}
-								value={inventoryConfig.starting.player}
-								allowUnlimited={false}
-								saveLabel="SAVE STARTING INVENTORY"
-								onSave={(draft) => inventoryConfig.saveStarting('worlds.starting-inventories.player.update', {}, draft, (current, saved) => ({ ...current, player: saved }))}
-							/>
-						}
-						imagesEditor={<WorldImagesEditor routePrefix="worlds.image" routeParams={{ world: value.id }} cardImageUrl={value.cardImageUrl} portraitImageUrl={value.portraitImageUrl} addToast={addToast} />}
-						isSaving={isSaving}
-						onSubmit={save}
-					/>
+					<>
+						<WorldForm
+							value={value}
+							onChange={setValue}
+							regions={value.regions}
+							itemsEditor={<ItemsEditor worldId={value.id} items={inventoryConfig.items} facts={inventoryConfig.facts} onItemsChange={inventoryConfig.reloadItems} addToast={addToast} />}
+							playerInventoryEditor={
+								<StartingInventoryEditor
+									items={inventoryConfig.items}
+									value={inventoryConfig.starting.player}
+									allowUnlimited={false}
+									saveLabel="SAVE STARTING INVENTORY"
+									onSave={(draft) => inventoryConfig.saveStarting('worlds.starting-inventories.player.update', {}, draft, (current, saved) => ({ ...current, player: saved }))}
+								/>
+							}
+							imagesEditor={<WorldImagesEditor routePrefix="worlds.image" routeParams={{ world: value.id }} cardImageUrl={value.cardImageUrl} portraitImageUrl={value.portraitImageUrl} addToast={addToast} />}
+							isSaving={isSaving}
+							onSubmit={save}
+						/>
+						<QuestsEditor worldId={value.id} campaigns={campaigns} onQuestsChange={questsChanged} addToast={addToast} />
+						<CampaignsEditor worldId={value.id} campaigns={campaigns} questsVersion={questsVersion} onChanged={reloadCampaigns} addToast={addToast} />
+					</>
 				) : (
 					<RegionsTab world={value} inventoryConfig={inventoryConfig} onWorldReload={reloadWorld} onResidentsChange={setResidents} addToast={addToast} />
 				)}

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\ParseEnvironmentLayout;
+use App\Actions\Quests\FindQuestReferences;
 use App\Actions\ReconcilePassages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRegionRequest;
@@ -112,9 +113,10 @@ class RegionController extends Controller
         ]);
     }
 
-    public function destroy(World $world, Region $region): JsonResponse
+    public function destroy(World $world, Region $region, FindQuestReferences $findQuestReferences): JsonResponse
     {
         Gate::authorize('update', $world);
+        $findQuestReferences->ensureRegionUnused($region);
 
         DB::transaction(function () use ($world, $region): void {
             if ($world->spawn_region_id === $region->id) {

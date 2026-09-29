@@ -65,6 +65,21 @@ class WorldSession extends Model
         return $this->hasMany(RevealAttempt::class);
     }
 
+    public function questRuns(): HasMany
+    {
+        return $this->hasMany(WorldSessionQuest::class);
+    }
+
+    public function questOffers(): HasMany
+    {
+        return $this->hasMany(QuestOffer::class);
+    }
+
+    public function campaignEndings(): HasMany
+    {
+        return $this->hasMany(WorldSessionCampaign::class);
+    }
+
     public function region(): BelongsTo
     {
         return $this->belongsTo(Region::class);

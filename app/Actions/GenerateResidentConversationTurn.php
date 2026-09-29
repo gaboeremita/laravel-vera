@@ -101,6 +101,10 @@ class GenerateResidentConversationTurn
         if ($factsPrompt !== null) {
             $director->append('facts', $factsPrompt);
         }
+        $questsPrompt = app(BuildQuestsPrompt::class)->handle($session, $speakerResident, TurnMode::BetweenResidents);
+        if ($questsPrompt !== null) {
+            $director->append('quests', $questsPrompt);
+        }
         $userChat = $assistantUser->conversations()->where('world_session_id', $session->id)->first();
         if ($userChat !== null) {
             $director->withLongTermMemory($userChat);

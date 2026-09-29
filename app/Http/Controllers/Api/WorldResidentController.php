@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Quests\FindQuestReferences;
 use App\Enums\AssistantKind;
 use App\Enums\AssistantPortraitType;
 use App\Http\Controllers\Controller;
@@ -97,10 +98,12 @@ class WorldResidentController extends Controller
         return response()->json((new WorldResidentResource($resident))->resolve());
     }
 
-    public function destroy(World $world, Region $region, Assistant $assistant): JsonResponse
+    public function destroy(World $world, Region $region, Assistant $assistant, FindQuestReferences $findQuestReferences): JsonResponse
     {
         Gate::authorize('update', $world);
-        $region->residents()->where('assistant_id', $assistant->id)->firstOrFail()->delete();
+        $resident = $region->residents()->where('assistant_id', $assistant->id)->firstOrFail();
+        $findQuestReferences->ensureResidentUnused($resident);
+        $resident->delete();
 
         return response()->json(status: 204);
     }

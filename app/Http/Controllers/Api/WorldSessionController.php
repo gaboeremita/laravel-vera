@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Quests\AnnounceZonesEntered;
+use App\Actions\Quests\SyncSessionQuests;
+use App\Actions\Quests\WithdrawQuestOffers;
 use App\Actions\StockSession;
 use App\Actions\TravelThroughPassage;
 use App\Enums\HandoverRequestStatus;
+use App\Events\Quests\PlayerEnteredRegion;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TravelRequest;
 use App\Models\World;
@@ -51,7 +55,7 @@ class WorldSessionController extends Controller
         return response()->json($sessions);
     }
 
-    public function store(Request $request, int $world, StockSession $stockSession): JsonResponse
+    public function store(Request $request, int $world, StockSession $stockSession, SyncSessionQuests $syncSessionQuests, AnnounceZonesEntered $announceZonesEntered): JsonResponse
     {
         $worldUser = $this->resolveWorldUser($request, $world);
         $spawn = $this->requireSpawn($worldUser->world);
@@ -63,22 +67,29 @@ class WorldSessionController extends Controller
             return $session;
         });
 
+        $syncSessionQuests->handle($session);
+        PlayerEnteredRegion::dispatch($session->id, $session->region_id);
+        $announceZonesEntered->handle($session->id, $worldUser->world->spawnRegion, null, $spawn['arrival']);
+
         return response()->json($session, 201);
     }
 
     /**
      * Puts a session whose region no longer exists in front of the spawn point.
      */
-    public function resume(Request $request, int $world, int $session): JsonResponse
+    public function resume(Request $request, int $world, int $session, SyncSessionQuests $syncSessionQuests, WithdrawQuestOffers $withdrawQuestOffers): JsonResponse
     {
         $worldUser = $this->resolveWorldUser($request, $world);
         $worldSession = $worldUser->sessions()->findOrFail($session);
         $worldSession->handoverRequests()->where('status', HandoverRequestStatus::Pending)->update(['status' => HandoverRequestStatus::Cancelled, 'answered_at' => now()]);
+        $withdrawQuestOffers->handle($worldSession->questOffers());
 
         if ($worldSession->region_id === null) {
             $spawn = $this->requireSpawn($worldUser->world);
             $worldSession->update(['region_id' => $worldUser->world->spawn_region_id, 'position' => $spawn['arrival'], 'arrival_facing' => $spawn['facing']]);
         }
+
+        $syncSessionQuests->handle($worldSession);
 
         return response()->json(['regionId' => $worldSession->region_id, 'position' => $worldSession->position, 'arrivalFacing' => $worldSession->arrival_facing]);
     }
@@ -108,7 +119,7 @@ class WorldSessionController extends Controller
         return response()->json($worldSession);
     }
 
-    public function updatePosition(Request $request, int $world, int $session): JsonResponse
+    public function updatePosition(Request $request, int $world, int $session, AnnounceZonesEntered $announceZonesEntered): JsonResponse
     {
         $worldUser = $this->resolveWorldUser($request, $world);
 
@@ -120,7 +131,12 @@ class WorldSessionController extends Controller
         ]);
 
         $worldSession = $worldUser->sessions()->findOrFail($session);
+        $from = $worldSession->position;
         $worldSession->update(['position' => $validated['position'], 'arrival_facing' => null]);
+        $region = $worldSession->region()->first();
+        if ($region !== null) {
+            $announceZonesEntered->handle($worldSession->id, $region, $from, $validated['position']);
+        }
 
         return response()->json($worldSession);
     }

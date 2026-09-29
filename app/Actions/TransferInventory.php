@@ -2,6 +2,8 @@
 
 namespace App\Actions;
 
+use App\Enums\InventoryHolder;
+use App\Events\Quests\PlayerInventoryChanged;
 use App\Exceptions\InsufficientInventory;
 use App\Models\CreditTransaction;
 use App\Models\Inventory;
@@ -60,6 +62,11 @@ class TransferInventory
 
         $from?->refresh();
         $to?->refresh();
+
+        $player = collect([$from, $to])->first(fn (?Inventory $side) => $side?->holder === InventoryHolder::Player);
+        if ($player !== null) {
+            PlayerInventoryChanged::dispatch($player->world_session_id);
+        }
     }
 
     /**

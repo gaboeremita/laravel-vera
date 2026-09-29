@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\DeleteItem;
+use App\Actions\Quests\FindQuestReferences;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SaveItemRequest;
 use App\Http\Resources\ItemResource;
@@ -41,9 +42,10 @@ class ItemController extends Controller
         return response()->json((new ItemResource($item->load(['cardImage', 'sound'])))->resolve());
     }
 
-    public function destroy(World $world, Item $item, DeleteItem $deleteItem): JsonResponse
+    public function destroy(World $world, Item $item, DeleteItem $deleteItem, FindQuestReferences $findQuestReferences): JsonResponse
     {
         Gate::authorize('update', $world);
+        $findQuestReferences->ensureItemUnused($item);
 
         $deleteItem->handle($item);
 

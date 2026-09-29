@@ -2,7 +2,9 @@
 
 namespace App\Actions;
 
+use App\Actions\Quests\AnnounceZonesEntered;
 use App\Enums\Posture;
+use App\Events\Quests\PlayerEnteredRegion;
 use App\Models\PassageLink;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
@@ -15,7 +17,10 @@ class TravelThroughPassage
 {
     private const FOLLOWER_SPACING = 0.8;
 
-    public function __construct(private readonly ResolveResidentRegion $resolveResidentRegion) {}
+    public function __construct(
+        private readonly ResolveResidentRegion $resolveResidentRegion,
+        private readonly AnnounceZonesEntered $announceZones,
+    ) {}
 
     /**
      * Moves the session, and the residents following the player, to the
@@ -56,6 +61,9 @@ class TravelThroughPassage
                 $placements[$follower->id] = ['position' => $position];
             }
         });
+
+        PlayerEnteredRegion::dispatch($session->id, $link->target_region_id);
+        $this->announceZones->handle($session->id, $link->targetRegion, null, $arrival['arrival']);
 
         return ['regionId' => $link->target_region_id, 'position' => $arrival['arrival'], 'facing' => $arrival['facing'], 'followers' => $placements];
     }

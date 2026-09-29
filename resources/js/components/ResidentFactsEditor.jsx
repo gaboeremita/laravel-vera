@@ -144,10 +144,10 @@ export default function ResidentFactsEditor({ worldId, resident, otherResidents,
 	const destroy = async (fact) => {
 		try {
 			const response = await api.delete(route('worlds.residents.facts.destroy', { world: worldId, resident: resident.id, fact: fact.id }));
-			if (!response.ok) throw new Error();
+			if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message);
 			setFacts((current) => current.filter((item) => item.id !== fact.id));
 			onFactsChange?.();
-		} catch { addToast('Unable to delete the fact', 'error'); }
+		} catch (error) { addToast(error.message || 'Unable to delete the fact', 'error'); }
 	};
 
 	if (isLoading) return <p className="text-fg-3 text-xs">Loading facts...</p>;
