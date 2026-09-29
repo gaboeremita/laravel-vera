@@ -153,13 +153,13 @@ tests/Feature/JudgeQuestionTest.php, AssessEndingTest.php, QuestCreatorModeTest.
 
 **Structure Decision**: The existing single Laravel + React repo layout. Quest-specific actions are grouped under `app/Actions/Quests/` and trigger events under `app/Events/Quests/`, because the feature adds about a dozen of each. Everything else sits beside the code it extends.
 
-## Names awaiting approval
+## Approved names
 
-Nothing below is used until you approve it. Names already in the spec's description (quest, beat, flag, rubric, tier, giver, epilogue, campaign, quest tracker, quest log, ending card, `record_ending`, and the condition keys you listed) are not repeated.
+These names are used in the code, tables and UI. Names already in the spec's description (quest, beat, flag, rubric, tier, giver, epilogue, campaign, quest tracker, quest log, ending card, `record_ending`, and the condition keys it lists) are not repeated.
 
 **UI labels**
 
-| Proposed | Where | Refers to |
+| Name | Where | Refers to |
 |---|---|---|
 | "Quests", "Campaigns" | accordion titles on the world edit page | the two editors |
 | "Key" | field label | a quest's or campaign's id that other quests name |
@@ -189,7 +189,7 @@ Nothing below is used until you approve it. Names already in the spec's descript
 
 **Tables and enums**: as in [data-model.md](data-model.md): `campaigns`, `quests`, `world_session_quests`, `quest_events`, `quest_offers`, `world_session_campaigns`; `QuestStatus`, `EndingStatus`, `QuestEventType`, `QuestOfferStatus`.
 
-**Condition keys you didn't list**, proposed: `question`, `beat`, and `flag` with `{ quest, name }` for another quest's resulting flags.
+**Condition keys beyond the spec's list**: `question`, `beat`, and `flag` with `{ quest, name }` for another quest's resulting flags.
 
 ## Complexity Tracking
 
