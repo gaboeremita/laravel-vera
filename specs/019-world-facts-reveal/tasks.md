@@ -197,8 +197,8 @@ description: "Task list for Facts and Reveal Safeguards"
 
 - [X] T056 Update the prompt-section table in `ARCHITECTURE.md` (`creator mode` only while active, `secret trigger` always excluded) and describe facts, the review and creator mode beside the inventory sections
 - [ ] T057 Review every new and changed screen against the UI standard: spacing, alignment, animations, empty states, long topics and summaries, keyboard use, and the look next to existing HUD pieces and editors; fix what doesn't match
-- [ ] T058 Search the repository and a fresh `npm run build` output in `public/build/` for the old hardcoded password and confirm no match (SC-007)
-- [ ] T059 Run the quality gates once: `vendor/bin/pint --dirty --format agent`, `npm run lint`, `php artisan test --compact`; fix everything that surfaces
+- [X] T058 Search the repository and a fresh `npm run build` output in `public/build/` for the old hardcoded password and confirm no match (SC-007)
+- [X] T059 Run the quality gates once: `vendor/bin/pint --dirty --format agent`, `npm run lint`, `php artisan test --compact`; fix everything that surfaces
 - [X] T060 Add to [quickstart.md](quickstart.md) at least ten scripted scenes for SC-005 (disclosure prose, a short conversation, location, expected verdict), mixing clear approvals, clear rejections and borderline cases, then hand the user the walkthrough including those scenes and the timing goal of SC-006
 
 ---

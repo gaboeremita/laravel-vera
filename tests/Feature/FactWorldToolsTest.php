@@ -5,6 +5,7 @@ use App\Models\AiModel;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
+use App\Models\Fact;
 use App\Models\FactAcknowledgement;
 use App\Models\KnownFact;
 use App\Models\RevealAttempt;
@@ -20,7 +21,7 @@ const KEEPER_SECRET = 'The keeper rowed out to meet a smuggler and never came ba
 /**
  * A world session whose resident keeps the keeper's secret, with the review on the fake model.
  *
- * @return array{0: mixed, 1: Assistant, 2: Conversation, 3: mixed, 4: WorldResident, 5: mixed, 6: mixed, 7: mixed, 8: \App\Models\Fact}
+ * @return array{0: mixed, 1: Assistant, 2: Conversation, 3: mixed, 4: WorldResident, 5: mixed, 6: mixed, 7: mixed, 8: Fact}
  */
 function keeperScenario(): array
 {

@@ -8,16 +8,18 @@ use App\Models\Conversation;
 use App\Models\CreditTransaction;
 use App\Models\KnownFact;
 use App\Models\RevealAttempt;
+use App\Models\User;
 use App\Models\WorldResident;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
 
 const CREATOR_PASSWORD = 'lighthouse keeper';
 
 /**
- * @return array{0: \App\Models\User, 1: Assistant, 2: Conversation}
+ * @return array{0: User, 1: Assistant, 2: Conversation}
  */
 function creatorChat(): array
 {
@@ -28,7 +30,7 @@ function creatorChat(): array
     return [$user, $assistant, $conversation];
 }
 
-function sendChat($test, array $chat, string $content, array $history = []): \Illuminate\Testing\TestResponse
+function sendChat($test, array $chat, string $content, array $history = []): TestResponse
 {
     [$user, $assistant, $conversation] = $chat;
 

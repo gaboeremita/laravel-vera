@@ -3,13 +3,18 @@
 use App\Actions\ReviewReveal;
 use App\Actions\TransferInventory;
 use App\Models\AiModel;
+use App\Models\Conversation;
+use App\Models\Fact;
+use App\Models\Region;
+use App\Models\WorldResident;
+use App\Models\WorldSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
 /**
- * @return array{0: mixed, 1: mixed, 2: \App\Models\Conversation, 3: \App\Models\Region, 4: \App\Models\WorldResident, 5: \App\Models\WorldSession, 6: mixed, 7: mixed, 8: \App\Models\Fact}
+ * @return array{0: mixed, 1: mixed, 2: Conversation, 3: Region, 4: WorldResident, 5: WorldSession, 6: mixed, 7: mixed, 8: Fact}
  */
 function reviewScenario(): array
 {

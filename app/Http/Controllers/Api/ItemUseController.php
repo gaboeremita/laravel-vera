@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\Narrate;
 use App\Actions\LearnFact;
+use App\Actions\Narrate;
 use App\Actions\ResolveInventory;
 use App\Actions\TransferInventory;
 use App\Enums\RevealSource;
