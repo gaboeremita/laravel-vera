@@ -58,4 +58,13 @@ class CreatorModeTags
             return '';
         }, $content));
     }
+
+    /**
+     * The message with every creator mode tag removed, for anything that
+     * judges the story, where the creator's directions are no part of it.
+     */
+    public function withoutCommands(string $content): string
+    {
+        return trim(preg_replace(self::TAG, '', $content));
+    }
 }

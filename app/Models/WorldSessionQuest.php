@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EndingStatus;
+use App\Enums\QuestEventType;
 use App\Enums\QuestStatus;
 use Database\Factories\WorldSessionQuestFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -110,6 +111,25 @@ class WorldSessionQuest extends Model
     public function mergeState(array $changes): void
     {
         $this->state = [...self::EMPTY_STATE, ...($this->state ?? []), ...$changes];
+    }
+
+    /**
+     * The residents who remember how the run ended: the giver, residents the
+     * definition names, and residents who granted a flag or signalled a
+     * question in it.
+     *
+     * @return array<int, int>
+     */
+    public function involvedResidentIds(): array
+    {
+        return collect($this->quest->namedResidentIds())
+            ->merge(collect($this->state['flags'] ?? [])->pluck('by'))
+            ->merge($this->events()->where('type', QuestEventType::QuestionSignalled)->get()->pluck('payload.residentId'))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

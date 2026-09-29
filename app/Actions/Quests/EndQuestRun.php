@@ -6,6 +6,7 @@ use App\Enums\EndingStatus;
 use App\Enums\QuestEventType;
 use App\Enums\QuestStatus;
 use App\Events\Quests\QuestEnded;
+use App\Jobs\AssessQuestEnding;
 use App\Models\WorldSessionQuest;
 
 /**
@@ -29,5 +30,6 @@ class EndQuestRun
         $this->recordQuestEvent->handle($run, $type, payload: $payload, byCreator: $byCreator);
 
         QuestEnded::dispatch($run->world_session_id, $run->id);
+        AssessQuestEnding::dispatch($run->id)->afterCommit();
     }
 }

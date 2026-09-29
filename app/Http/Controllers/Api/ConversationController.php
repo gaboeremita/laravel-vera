@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\BuildQuestsPrompt;
+use App\Services\AgentLoop\Tools\World\GrantFlagTool;
 use App\Events\Quests\PlayerTalkedTo;
 use App\Actions\AppendExpressionTags;
 use App\Actions\AppendWorldConversationContext;
@@ -434,6 +436,14 @@ class ConversationController extends Controller
             }
         }
         $factTools = [];
+        $questsResident = $worldSession !== null ? $inventoryResident : null;
+        if ($questsResident !== null) {
+            $questsPrompt = app(BuildQuestsPrompt::class)->handle($worldSession, $questsResident, $turnMode, (bool) $aiModel?->supports_tools);
+            if ($questsPrompt !== null) {
+                $director->append('quests', $questsPrompt);
+            }
+        }
+        $questTools = [];
 
         $systemPrompt = $director->build();
 
@@ -496,7 +506,8 @@ class ConversationController extends Controller
 
             if ($factsResident !== null) {
                 $factTools = $this->factTools($worldSession, $conversation, $factsResident, $turnMode, $region, $validated['positions']['residents'][$factsResident->id] ?? null);
-                $tools = [...$tools, ...array_values($factTools)];
+                $questTools = $this->questTools($worldSession, $conversation, $factsResident, $turnMode);
+                $tools = [...$tools, ...array_values($factTools), ...array_values($questTools)];
             }
 
             if ($tools !== []) {
@@ -645,6 +656,23 @@ class ConversationController extends Controller
         $acknowledge = new AcknowledgeTool($session, $resident);
         if ($acknowledge->knownFacts()->isNotEmpty()) {
             $tools['acknowledge'] = $acknowledge;
+        }
+
+        return $tools;
+    }
+
+    /**
+     * The quest tools a resident has in the player's conversation, keyed by name.
+     *
+     * @return array<string, AgentTool>
+     */
+    private function questTools(WorldSession $session, Conversation $conversation, WorldResident $resident, TurnMode $mode): array
+    {
+        $tools = [];
+
+        $grantFlag = new GrantFlagTool($session, $resident);
+        if ($grantFlag->grantable()->isNotEmpty()) {
+            $tools['grant_flag'] = $grantFlag;
         }
 
         return $tools;

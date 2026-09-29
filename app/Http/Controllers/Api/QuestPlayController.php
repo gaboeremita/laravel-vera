@@ -2,7 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Quests\BroadcastQuestRuns;
+use App\Actions\Quests\EndQuestRun;
 use App\Actions\Quests\PlayerRunView;
+use App\Enums\EndingStatus;
+use App\Enums\QuestStatus;
+use App\Jobs\AssessQuestEnding;
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\WorldSessionCampaign;
@@ -31,6 +36,40 @@ class QuestPlayController extends Controller
             'campaigns' => $worldSession->worldUser->world->campaigns()->with('quests:id,campaign_id')->orderBy('title')->get()
                 ->map(fn (Campaign $campaign) => $this->campaignView($campaign, $endings->get($campaign->id))),
         ]);
+    }
+
+    /**
+     * The player gives up an active quest; its ending is written like any other.
+     */
+    public function abandon(Request $request, int $world, int $session, int $run, EndQuestRun $endQuestRun, BroadcastQuestRuns $broadcastQuestRuns, PlayerRunView $playerRunView): JsonResponse
+    {
+        $worldSession = $this->resolveWorldSession($request, $world, $session);
+        $questRun = $worldSession->questRuns()->with('quest')->findOrFail($run);
+        if ($questRun->status !== QuestStatus::Active) {
+            return response()->json(['message' => 'Only a quest in progress can be abandoned.'], 422);
+        }
+
+        $endQuestRun->handle($questRun, QuestStatus::Abandoned, ['by' => 'player']);
+        $broadcastQuestRuns->handle($worldSession->id, [$questRun], [BroadcastQuestRuns::notice('questEnded', $questRun, QuestStatus::Abandoned->value)]);
+
+        return response()->json($playerRunView->handle($questRun->fresh('quest')));
+    }
+
+    /**
+     * Writes a run's ending again after it couldn't be written.
+     */
+    public function assess(Request $request, int $world, int $session, int $run): JsonResponse
+    {
+        $worldSession = $this->resolveWorldSession($request, $world, $session);
+        $questRun = $worldSession->questRuns()->findOrFail($run);
+        if ($questRun->ending_status !== EndingStatus::Failed) {
+            return response()->json(['message' => 'Only an ending that couldn\'t be written can be written again.'], 422);
+        }
+
+        $questRun->update(['ending_status' => EndingStatus::Pending]);
+        AssessQuestEnding::dispatch($questRun->id);
+
+        return response()->json(status: 202);
     }
 
     /**

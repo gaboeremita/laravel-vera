@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\TurnMode;
+use App\Actions\BuildQuestsPrompt;
 use App\Actions\RecordResidentActivity;
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
@@ -116,6 +118,10 @@ class ResidentDecisionController extends Controller
         }
         $companions = $this->companions($residentRegion, $worldResident, $worldSession, $positions, array_keys($busyWithOthers));
         $userInSight = $residentPoint !== null && isset($positions['user']) && $resolveWorldState->sharesRoom($residentRegion->layout ?? [], $residentPoint, $positions['user']);
+        $questsPrompt = app(BuildQuestsPrompt::class)->handle($worldSession, $worldResident, TurnMode::BetweenResidents);
+        if ($questsPrompt !== null) {
+            $director->append('quests', $questsPrompt);
+        }
         $recentConversation = $buildResidentWorldPrompt->recentConversation($conversation);
         if ($recentConversation !== null) {
             $director->append('recent conversation', $recentConversation);
