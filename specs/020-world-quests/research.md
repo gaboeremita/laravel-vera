@@ -82,11 +82,12 @@ An **event** leaf latches: once its event happens while the node is being watche
 
 | Event (in `app/Events/Quests/`) | Dispatched by | Leaves it can affect |
 |---|---|---|
-| `PlayerEnteredRegion` | `TravelThroughPassage`, after its transaction | `enterRegion` |
-| `PlayerEnteredZone` | `WorldSessionController::updatePosition`, only when `ResolveWorldState::zoneAt` differs between the stored and the new position | `enterZone` |
+| `PlayerEnteredRegion` | `TravelThroughPassage`, after its transaction; `WorldSessionController::store`, for the spawn region | `enterRegion` |
+| `PlayerEnteredZone` | `WorldSessionController::updatePosition`, once per zone in the new position's zone chain (`ResolveWorldState::locate`) that wasn't in the stored position's chain, so entering a room inside a building also enters the building; `WorldSessionController::store`, for the spawn position's zones | `enterZone` |
 | `PlayerTalkedTo` | `ConversationController::sendMessage`, after the reply is stored, in world sessions | `talkTo` |
 | `PlayerUsedActivity` | `ActivityUseController`, when the outcome is allowed | `use` |
-| `ResidentUsedActivity` | `ResidentActivityController::store` and decisions, when the verb is an activity use | `residentDid` |
+| `ResidentUsedActivity` | a `RecordResidentActivity` action shared by `ResidentActivityController::store` and `ResidentDecisionController::recordDecision`, the two places a resident's activity is recorded, when it names an activity | `residentDid` |
+| `QuestStarted` | wherever a run becomes active: `SyncSessionQuests` for `auto` quests, an accepted offer, `start.when`, `start_quest`, `reset_quest`; and `set_beat` when it undoes beats | every leaf of that run's watched conditions |
 | `PlayerInventoryChanged` | `TransferInventory`, after commit, when either side is a player inventory | `has`, `credits` |
 | `FactLearned` | `LearnFact::handle`, when the fact is newly known | `knows` |
 | `FactAcknowledged` | `AcknowledgeTool`, when the row is new | `acknowledged` |
@@ -94,13 +95,15 @@ An **event** leaf latches: once its event happens while the node is being watche
 | `QuestQuestionJudged` | `JudgeQuestion`, when the answer is yes | `question` |
 | `QuestEnded` | `AdvanceQuests` and creator tools | `flag` of other quests, `requires`, campaigns |
 
-Each event implements a small `QuestTrigger` interface (`sessionId()`, `leaf()`, and a `matches(array $leaf)` check). The `AdvanceQuests` listener handles every `QuestTrigger`: it loads the session's available and active runs, and for each one only the conditions being watched that contain a leaf of that kind. It latches matching event leaves, then evaluates in this order:
+Each event implements a small `QuestTrigger` interface (`sessionId()`, `leaf()`, and a `matches(array $leaf)` check). The `AdvanceQuests` listener handles every `QuestTrigger`: it loads the session's available and active runs, and for each one only the conditions being watched that contain a leaf of that kind. `QuestStarted` is the exception: it names one run, and that run's watched conditions are all evaluated, so a first beat about something the player already holds finishes the moment the quest starts.
+
+The client saves the player's position every 10 seconds, which is too slow for zone crossings (SC-003) and misses short visits. `WorldPage` therefore also saves the position immediately when its location tracking reports a new zone (`handleLocationChange`, the same moment `ZoneTitleCard` appears). It latches matching event leaves, then evaluates in this order:
 
 1. `fail`, then `complete`, for active runs (fail wins when both hold, spec edge case);
 2. current beats, repeatedly, so a beat whose requirements just finished can finish in the same pass (spec US2 scenario 4);
 3. `start.when` for available runs with `start.mode = condition`.
 
-The listener runs synchronously, after the triggering transaction commits (`ShouldHandleEventsAfterCommit`), under a per-session lock (`Cache::lock("quests:{session}")`) so two triggers can't finish the same beat twice. Changes are written to the run's `state`, logged as `quest_events`, and broadcast (R12).
+The listener runs synchronously, after the triggering transaction commits (`ShouldHandleEventsAfterCommit`), under a per-session lock (`Cache::lock("quests:{session}")->block(5, …)`) so two triggers can't finish the same beat twice. If the lock can't be taken within 5 seconds, the `LockTimeoutException` is reported and rethrown, so a trigger is never dropped silently (Principle V). Changes are written to the run's `state`, logged as `quest_events`, and broadcast (R12).
 
 A `QuestConditions` class evaluates a tree against a `QuestSessionState` snapshot (the player's inventory, known facts, acknowledgements, the run's state, other quests' latest runs), loaded once per trigger.
 
@@ -244,13 +247,13 @@ The player's view of a run never contains a hidden beat until it is finished (cl
 
 Warnings, which don't block saving: a resident on `grants` or `questions` whose model can't call tools (spec edge case). They're returned with the saved quest.
 
-A region layout re-import can remove a zone or object a quest names. The quests list re-runs the check and returns `problems` per quest so the editor shows them; at play time a missing reference never matches.
+A region layout re-import can remove a zone, object or activity a quest names; zones and activities exist only in layouts, so this is the only way they disappear. The quests list re-runs the check and returns `problems` per quest so the editor shows them; at play time a missing reference never matches.
 
 **Rationale**: FR-003 and SC-002. One action serves the form, the JSON mode and creator edits.
 
 ## R15. Deleting what quests use
 
-**Decision**: A `FindQuestReferences` action lists the quests whose definitions name a given region, resident, item, fact or activity. The destroy endpoints for items, facts and regions, and resident removal in the region's resident list, return 422 naming them (FR-004). Deleting a whole world still deletes everything.
+**Decision**: A `FindQuestReferences` action lists the quests whose definitions name a given region, resident, item or fact. The destroy endpoints for items, facts and regions, resident removal in the region's resident list, and deleting a world NPC (whose deletion cascades to their placements) return 422 naming them (FR-004). Deleting a whole world still deletes everything. Zones, objects and activities come from layouts and are covered by R14's problems.
 
 Deleting a quest cascades its runs, events and offers, and the editor warns first with the number of sessions that have a run (spec edge case). A quest in a campaign leaves the campaign when deleted; an empty campaign stays until the user deletes it.
 
@@ -307,6 +310,6 @@ Deleting a quest cascades its runs, events and offers, and the editor warns firs
 - **Quest log** (`QuestLogPanel`, key **K**, beside Learned on **J**): a panel in the style of `LearnedFactsPanel`. Campaigns group their quests; each quest shows its latest run's finished and current visible beats, or its ending; earlier runs are listed under it (spec edge case). Active quests have an abandon control behind `ConfirmationModal`-style confirmation; ended quests whose ending failed have a "write the ending again" control.
 - **Ending card** (`EndingCard`): a full-screen overlay in the style of `HandoverRequestConfirm`, showing the title, tier and epilogue, with a details toggle for each score and its reason (clarification Q3). It also serves campaigns.
 - **Offer**: a request line in `WorldChat`, and `QuestOfferCard` modeled on `HandoverRequestConfirm` with accept (Enter) and decline (Esc).
-- **Quest event log** (`QuestEventLog`) on the sessions page, beside `RevealLog`.
+- **Quest event log** (`QuestEventLog`) on the sessions page, beside `RevealLog`, for the world's author. Its approved section label is "Quest log"; in these documents it is always called the quest event log, and "quest log" means the player's panel.
 
 All follow the UI standard in [feature 1's tasks.md](../018-items-inventory-credits/tasks.md).

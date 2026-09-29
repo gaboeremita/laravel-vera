@@ -23,7 +23,7 @@ Shapes used below:
 | PATCH | /worlds/{world}/campaigns/{campaign} | worlds.campaigns.update | same fields |
 | DELETE | /worlds/{world}/campaigns/{campaign} | worlds.campaigns.destroy | 204 |
 
-The destroy endpoints for items, facts and regions, and removing a resident from a region, return 422 `{ message, quests: [{ id, title }] }` while a quest names them (research R15).
+The destroy endpoints for items, facts, regions and world NPCs, and removing a resident from a region, return 422 `{ message, quests: [{ id, title }] }` while a quest names them (research R15).
 
 ## Play
 

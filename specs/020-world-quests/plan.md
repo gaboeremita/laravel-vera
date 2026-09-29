@@ -67,7 +67,8 @@ Worlds get quests: beats joined by requirements, conditions made of tracked chec
   - Definition problems return 422 with every path. PASS.
 - **VI. Feature-Test-First, Factory-Backed**: a factory for every new model, with states for runs (active, ended, with ending), definitions (with beats, questions, grants) and offers. PASS.
 - **VII. No Speculative Abstraction**:
-  - `QuestTrigger` exists because eleven real events feed one listener.
+  - `QuestTrigger` exists because twelve real events feed one listener.
+  - `RecordResidentActivity` is extracted because the activity controller and decisions are its two real callers.
   - `AssessEnding` is shared because quests and campaigns are its two real callers.
   - No generic rule engine: the condition tree has exactly the leaves the spec lists. PASS.
 - **VIII. State Derivation During Render**: notices, the tracker and the ending card derive from `useQuests` state during render; the channel subscription and initial fetch use effect-local closures, as `useAvatarBackground` does. PASS.
@@ -106,12 +107,13 @@ app/
 │   ├── Quests/AssessEnding.php                 # new: forced record_ending call (R10, R11)
 │   ├── Quests/PlayerRunView.php                # new: a run as the player sees it
 │   ├── BuildQuestsPrompt.php                   # new: the quests prompt section (R8)
+│   ├── RecordResidentActivity.php              # new: extracted from the two places resident activities are recorded
 │   ├── CreatorModeTags.php                     # changed: withoutCommands
 │   ├── TransferInventory.php, TravelThroughPassage.php, LearnFact.php  # changed: dispatch triggers
 │   └── GenerateResidentConversationTurn.php    # changed: quests section
 ├── Contracts/QuestTrigger.php                  # new
 ├── Enums/QuestStatus.php, EndingStatus.php, QuestEventType.php, QuestOfferStatus.php
-├── Events/Quests/                              # new: the eleven triggers (R3) and QuestsUpdated, QuestEndingReady broadcasts
+├── Events/Quests/                              # new: the twelve triggers (R3) and QuestsUpdated, QuestEndingReady broadcasts
 ├── Listeners/AdvanceQuests.php, CheckCampaignEnded.php, UnlockQuests.php
 ├── Jobs/JudgeQuestion.php, AssessQuestEnding.php, AssessCampaignEnding.php
 ├── Http/Controllers/Api/
@@ -120,7 +122,7 @@ app/
 │   ├── ConversationController.php              # changed: quests section, tools, questOffer, PlayerTalkedTo
 │   ├── ResidentDecisionController.php, ResidentActivityController.php, ActivityUseController.php  # changed
 │   ├── WorldSessionController.php              # changed: sync on store and resume, zone crossings
-│   └── ItemController.php, FactController.php, RegionController.php, WorldResidentController.php  # changed: 422 when referenced
+│   └── ItemController.php, FactController.php, RegionController.php, WorldResidentController.php, NpcController.php  # changed: 422 when referenced
 ├── Http/Requests/StoreQuestRequest.php, UpdateQuestRequest.php, StoreCampaignRequest.php, UpdateCampaignRequest.php
 ├── Models/Quest.php, Campaign.php, WorldSessionQuest.php, QuestEvent.php, QuestOffer.php, WorldSessionCampaign.php; World, WorldSession (changed)
 └── Services/AgentLoop/Tools/World/
@@ -144,7 +146,7 @@ resources/js/
 │   ├── world/hud/ControlsLegend.jsx             # changed: K
 │   └── world/WorldChat.jsx                      # changed: offer request line
 ├── hooks/useQuests.js, useQuestOptions.js       # new
-└── pages/EditWorldPage.jsx, WorldPage.jsx, WorldSessionsPage.jsx  # changed
+└── pages/EditWorldPage.jsx, WorldPage.jsx, WorldSessionsPage.jsx  # changed; WorldPage also saves the position on zone changes
 
 tests/Feature/Api/QuestControllerTest.php, CampaignControllerTest.php, QuestPlayControllerTest.php
 tests/Feature/QuestDefinitionValidationTest.php, QuestProgressTest.php, QuestWorldToolsTest.php
