@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\Quests\PlayerTalkedTo;
 use App\Actions\AppendExpressionTags;
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
@@ -547,6 +548,11 @@ class ConversationController extends Controller
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
 
         $learnedFacts = $this->learnedFacts($factTools, $world, $assistantModel, $content);
+
+        $talkedTo = $worldSession !== null ? $world->residents()->where('assistant_id', $assistantModel->id)->first() : null;
+        if ($talkedTo !== null) {
+            PlayerTalkedTo::dispatch($worldSession->id, $talkedTo->id);
+        }
 
         $audioBase64 = null;
         $audioContentType = null;

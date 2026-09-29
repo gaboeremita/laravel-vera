@@ -41,6 +41,9 @@ import NarrationCard from '../components/world/hud/NarrationCard.jsx';
 import { changeLines } from '../components/world/inventoryChanges.js';
 import useInventory from '../hooks/useInventory.js';
 import useKnownFacts from '../hooks/useKnownFacts.js';
+import useQuests from '../hooks/useQuests.js';
+import QuestTracker from '../components/world/hud/QuestTracker.jsx';
+import BeatNotice from '../components/world/hud/BeatNotice.jsx';
 
 const INVITE_MS = 30000;
 const LISTEN_DISTANCE = 12;
@@ -83,6 +86,7 @@ export default function WorldPage() {
 	const [chatOpeningLine, setChatOpeningLine] = useState(null);
 	const { inventory, applyInventory } = useInventory(worldId, sessionId, addToast);
 	const { knownFacts, applyLearnedFacts } = useKnownFacts(worldId, sessionId, addToast);
+	const quests = useQuests(worldId, sessionId, addToast);
 	const pendingPassageRef = useRef(null);
 	const passageActionsRef = useRef({ confirm: () => {}, cancel: () => {} });
 	const chatResidentRef = useRef(null);
@@ -474,13 +478,19 @@ export default function WorldPage() {
 	}, [toggleVoice]);
 
 	const hasMultipleFloors = (world?.layout?.floors?.length ?? 0) > 1;
+	const lastZoneIdRef = useRef(null);
 	const handleLocationChange = useCallback(({ floor, zone, zoneChain, announce }) => {
 		setLocation({ floor, zone, zoneChain });
+		// Quests hear zone crossings from saved positions, which otherwise save only every 10 seconds.
+		if ((zone?.id ?? null) !== lastZoneIdRef.current) {
+			lastZoneIdRef.current = zone?.id ?? null;
+			void persistPosition();
+		}
 		if (!announce || !zone) return;
 		const card = { key: crypto.randomUUID(), zoneName: zone.name, contextLine: contextLineFor(world.layout, zone, { withFloor: hasMultipleFloors }) };
 		if (mapExpanded) setPendingTitleCard(card);
 		else setTitleCard(card);
-	}, [world, hasMultipleFloors, mapExpanded]);
+	}, [world, hasMultipleFloors, mapExpanded, persistPosition]);
 
 	if (!mapExpanded && pendingTitleCard) {
 		setTitleCard(pendingTitleCard);
@@ -807,7 +817,7 @@ export default function WorldPage() {
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready' && !paused} voiceUntil={voiceUntil} />
 				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !learnedOpen && !handoverRequest && !player.purchase} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
-				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} hasInventory={!!sessionId} />{hasZones && readoutText && <LocationReadout text={readoutText} />}{sessionId && <CreditsReadout credits={inventory?.credits} />}</div>} />}
+				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} hasInventory={!!sessionId} />{hasZones && readoutText && <LocationReadout text={readoutText} />}{sessionId && <CreditsReadout credits={inventory?.credits} />}{sessionId && <QuestTracker runs={quests.runs} />}{quests.notice && <BeatNotice key={quests.notice.key} notice={quests.notice} onDone={quests.dismissNotice} />}</div>} />}
 				{status === 'ready' && (
 					<>
 						<SwimOverlay active={movement === 'swimming'} />

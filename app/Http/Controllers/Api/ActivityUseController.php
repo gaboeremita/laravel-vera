@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\Quests\PlayerUsedActivity;
 use App\Actions\LearnFact;
 use App\Actions\ResolveInventory;
 use App\Actions\UseActivity;
@@ -41,6 +42,9 @@ class ActivityUseController extends Controller
         }
 
         $after = $player->summary();
+        if ($outcome['allowed']) {
+            PlayerUsedActivity::dispatch($worldSession->id, $region->id, $validated['objectId'], $validated['activityId']);
+        }
         $fact = $outcome['allowed'] ? $useActivity->terms($region, $validated['objectId'], $validated['activityId'])?->revealsFact : null;
         $learned = $fact !== null
             ? $learnFact->fromTheWorld($worldSession, $fact, RevealSource::Activity, $region->layoutObject($validated['objectId'])['name'] ?? $validated['objectId'], $outcome['narration'] ?? $fact->content)

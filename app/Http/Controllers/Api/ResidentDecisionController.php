@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\RecordResidentActivity;
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
 use App\Actions\BuildResidentWorldPrompt;
@@ -141,7 +142,7 @@ class ResidentDecisionController extends Controller
             return response()->json(['message' => $e->getMessage()], 502);
         }
 
-        return $this->recordDecision($result, $toolbox, $assistant, $conversation, $worldSession, $worldResident, $location);
+        return $this->recordDecision($result, $toolbox, $assistant, $conversation, $worldSession, $worldResident, $region, $location);
     }
 
     /**
@@ -187,7 +188,7 @@ class ResidentDecisionController extends Controller
     /**
      * @param  array{floor: ?array, zone: ?array, zoneChain: array<int, array>}  $location
      */
-    private function recordDecision(AgentRunResult $result, WorldToolbox $toolbox, Assistant $assistant, Conversation $conversation, WorldSession $session, WorldResident $resident, array $location): JsonResponse
+    private function recordDecision(AgentRunResult $result, WorldToolbox $toolbox, Assistant $assistant, Conversation $conversation, WorldSession $session, WorldResident $resident, Region $region, array $location): JsonResponse
     {
         $sessionId = $session->id;
         $residentId = $resident->id;
@@ -206,9 +207,7 @@ class ResidentDecisionController extends Controller
         $reason = preg_match($thought, $line, $match) === 1 ? trim($match[2]) : null;
         $narration = trim(preg_replace($thought, '', $line, 1));
 
-        $activity = ResidentActivity::create([
-            'world_session_id' => $sessionId,
-            'world_resident_id' => $residentId,
+        $activity = app(RecordResidentActivity::class)->handle($session, $resident, $region, [
             'source' => 'idle',
             'verb' => $action['verb'] ?? ($pose !== null ? 'pose' : 'stay'),
             'target' => $action['target'] ?? $pose,

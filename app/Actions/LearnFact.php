@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Events\Quests\FactLearned;
 use App\Enums\RevealSource;
 use App\Models\Fact;
 use App\Models\KnownFact;
@@ -58,6 +59,12 @@ class LearnFact
             ['source' => $source, 'source_name' => $sourceName, 'summary' => $summary],
         );
 
-        return $known->wasRecentlyCreated ? $known->setRelation('fact', $fact) : null;
+        if (! $known->wasRecentlyCreated) {
+            return null;
+        }
+
+        FactLearned::dispatch($session->id);
+
+        return $known->setRelation('fact', $fact);
     }
 }

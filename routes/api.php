@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\NpcController;
 use App\Http\Controllers\Api\PassageLinkController;
 use App\Http\Controllers\Api\QuestController;
 use App\Http\Controllers\Api\QuestOptionsController;
+use App\Http\Controllers\Api\QuestPlayController;
 use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\RegionImageController;
 use App\Http\Controllers\Api\RegionTrackController;
@@ -142,6 +143,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/worlds/{world}/sessions/{session}/residents/{resident}/goods', [InventoryController::class, 'goods'])->name('worlds.sessions.residents.goods.index');
     Route::get('/worlds/{world}/sessions/{session}/objects/{object}', [InventoryController::class, 'object'])->name('worlds.sessions.objects.show');
     Route::get('/worlds/{world}/sessions/{session}/known-facts', [FactPlayController::class, 'index'])->name('worlds.sessions.known-facts.index');
+    Route::get('/worlds/{world}/sessions/{session}/quests', [QuestPlayController::class, 'index'])->name('worlds.sessions.quests.index');
     Route::get('/worlds/{world}/sessions/{session}/reveal-attempts', [FactPlayController::class, 'revealAttempts'])->name('worlds.sessions.reveal-attempts.index');
     Route::get('/worlds/{world}/sessions/{session}/credit-history', [InventoryController::class, 'creditHistory'])->name('worlds.sessions.credit-history.index');
     Route::post('/worlds/{world}/sessions/{session}/activity-uses', [ActivityUseController::class, 'store'])->name('worlds.sessions.activity-uses.store');

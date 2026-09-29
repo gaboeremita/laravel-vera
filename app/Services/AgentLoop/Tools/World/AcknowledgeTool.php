@@ -2,6 +2,7 @@
 
 namespace App\Services\AgentLoop\Tools\World;
 
+use App\Events\Quests\FactAcknowledged;
 use App\Contracts\AgentTool;
 use App\Models\Fact;
 use App\Models\FactAcknowledgement;
@@ -44,7 +45,10 @@ class AcknowledgeTool implements AgentTool
         $fact = $this->knownFacts()->first(fn (Fact $candidate) => mb_strtolower($candidate->topic) === $wanted)
             ?? throw new RuntimeException('The user hasn\'t learned that, so they couldn\'t have told you.');
 
-        FactAcknowledgement::firstOrCreate(['world_session_id' => $this->session->id, 'fact_id' => $fact->id, 'world_resident_id' => $this->resident->id]);
+        $acknowledgement = FactAcknowledgement::firstOrCreate(['world_session_id' => $this->session->id, 'fact_id' => $fact->id, 'world_resident_id' => $this->resident->id]);
+        if ($acknowledgement->wasRecentlyCreated) {
+            FactAcknowledged::dispatch($this->session->id);
+        }
 
         return ['status' => 'acknowledged', 'note' => 'You know it now; act on it.'];
     }
