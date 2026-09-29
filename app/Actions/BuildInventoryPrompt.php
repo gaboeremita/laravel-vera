@@ -8,8 +8,9 @@ use App\Models\InventoryItem;
 class BuildInventoryPrompt
 {
     /**
-     * What the character carries, for their own prompt. Between residents
-     * credits are only played at, so they are left out.
+     * What the resident carries, for their own prompt. A resident has no
+     * credit balance: with the user they pay any amount, and between
+     * residents credits are only played at.
      */
     public function handle(Inventory $inventory, bool $talkingWithUser = true): string
     {
@@ -28,8 +29,6 @@ class BuildInventoryPrompt
             return "{$carrying}\nWhat you carry stays private until you mention or show it. You decide in character what to give, sell, trade or keep. Between you and other residents nothing really costs credits: name a price if it fits the moment and play along with paying, but hand over what you agree on with the give tool for free.";
         }
 
-        $credits = $inventory->credits === null ? 'as many credits as you need' : "{$inventory->credits} credits";
-
-        return "You carry {$credits}.{$carrying}\nWhat you carry stays private until you mention or show it. You decide in character what to give, sell, trade or keep, and at what price; hand things over with the give tool and ask the user for credits or items with the ask_for tool.";
+        return "You can pay or give the user any amount of credits the moment calls for.{$carrying}\nWhat you carry stays private until you mention or show it. You decide in character what to give, sell, trade or keep, and at what price; hand things over with the give tool and ask the user for credits or items with the ask_for tool.";
     }
 }

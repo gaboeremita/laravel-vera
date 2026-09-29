@@ -10,7 +10,7 @@
 
 ## R2. Unlimited amounts
 
-**Decision**: `null` means unlimited, for item quantities and credit balances. Taking from an unlimited amount leaves it `null`. The player's inventory never holds `null`.
+**Decision**: `null` means unlimited, for item quantities and credit balances. Taking from an unlimited amount leaves it `null`. The player's inventory never holds `null`, and a resident's credits are always `null`: a resident has no balance, so credits they give come from nothing, credits paid to them leave the player and go nowhere, and they never run out (FR-003a).
 
 **Rationale**: Covers endless merchant stock and endless wells with no extra flag, and every "enough?" check reads as `quantity === null || quantity >= wanted`.
 
@@ -86,13 +86,13 @@ For residents, `use`, `where_can_i` and `what_is_in` leave out activities whose 
 
 ## R13. What the resident knows about their inventory
 
-**Decision**: The resident's prompt gets a section listing their own items (with for-sale marks and base prices) and credits. It never includes the player's inventory.
+**Decision**: The resident's prompt gets a section listing their own items (with for-sale marks and base prices) and telling them they can pay or give the user any amount of credits. It never includes the player's inventory.
 
 **Rationale**: They need it to describe, haggle and decide what to give; they learn what the player has only by asking or being shown.
 
 ## R14. Residents whose model can't call tools
 
-**Decision**: Saving a starting inventory with items or credits for a resident whose model, for the saving user, does not support tools is refused with 422 and a message naming the reason (FR-002a).
+**Decision**: Saving a starting inventory with items for a resident whose model, for the saving user, does not support tools is refused with 422 and a message naming the reason (FR-002a).
 
 **Rationale**: Such a resident could never give or ask, so their stock would be dead weight.
 

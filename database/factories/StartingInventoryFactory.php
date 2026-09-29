@@ -32,7 +32,7 @@ class StartingInventoryFactory extends Factory
 
     public function forResident(WorldResident $resident): static
     {
-        return $this->state(fn () => ['holder' => InventoryHolder::Resident, 'world_id' => $resident->world_id, 'world_resident_id' => $resident->id]);
+        return $this->state(fn () => ['holder' => InventoryHolder::Resident, 'world_id' => $resident->world_id, 'world_resident_id' => $resident->id, 'credits' => null]);
     }
 
     public function forObject(int $regionId, string $objectId): static

@@ -29,7 +29,7 @@ abstract class CreatorInventoryTool implements AgentTool
             'type' => 'object',
             'properties' => [
                 'holder' => ['type' => 'string', 'enum' => [self::USER, ...WorldResident::with('assistant')->where('world_id', $worldId)->get()->map(fn (WorldResident $resident) => $resident->assistant->name)->all()]],
-                'credits' => ['type' => 'integer', 'minimum' => 0],
+                'credits' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Credits for the user; residents hold only items.'],
                 'items' => [
                     'type' => 'array',
                     'items' => [
@@ -75,7 +75,7 @@ abstract class CreatorInventoryTool implements AgentTool
      * @param  array<string, mixed>  $arguments
      * @return array{credits: int, items: array<int, int>}
      */
-    protected function amounts(array $arguments): array
+    protected function amounts(array $arguments, Inventory $holder): array
     {
         $worldId = $this->session->worldUser->world_id;
         $items = [];
@@ -85,6 +85,9 @@ abstract class CreatorInventoryTool implements AgentTool
             $items[$item->id] = ($items[$item->id] ?? 0) + max(1, (int) ($entry['quantity'] ?? 1));
         }
         $credits = max(0, (int) ($arguments['credits'] ?? 0));
+        if ($credits > 0 && ! $holder->holder->countsCredits()) {
+            throw new RuntimeException(sprintf('Credits belong to the user alone; for %s, name items.', $holder->displayName()));
+        }
         if ($credits === 0 && $items === []) {
             throw new RuntimeException('Name the credits or items.');
         }

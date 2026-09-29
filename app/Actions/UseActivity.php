@@ -2,7 +2,6 @@
 
 namespace App\Actions;
 
-use App\Enums\InventoryHolder;
 use App\Models\ActivityTerms;
 use App\Models\Inventory;
 use App\Models\Region;
@@ -38,7 +37,8 @@ class UseActivity
         if ($cost > 0 && $actor->credits !== null && $actor->credits < $cost) {
             return "Costs {$cost} credits.";
         }
-        if ($terms->gives_credits > 0 && $object->credits !== null && $object->credits < $terms->gives_credits) {
+        $payout = $this->payoutFor($terms, $actor);
+        if ($payout > 0 && $object->credits !== null && $object->credits < $payout) {
             return 'There is nothing left to get here.';
         }
         foreach ($terms->gives_items ?? [] as $entry) {
@@ -95,11 +95,12 @@ class UseActivity
 
         $reason = "{$layoutObject['name']}: {$activityName}";
         $cost = $this->costFor($terms, $actor);
-        DB::transaction(function () use ($terms, $actor, $object, $reason, $cost): void {
+        $payout = $this->payoutFor($terms, $actor);
+        DB::transaction(function () use ($terms, $actor, $object, $reason, $cost, $payout): void {
             $consumed = $terms->consumes_required && $terms->required_item_id !== null ? [$terms->required_item_id => 1] : [];
             $this->transferInventory->handle($actor, $object, $cost, $consumed, $reason);
             $gives = collect($terms->gives_items ?? [])->mapWithKeys(fn (array $entry) => [(int) $entry['itemId'] => (int) $entry['quantity']])->all();
-            $this->transferInventory->handle($object, $actor, $terms->gives_credits, $gives, $reason);
+            $this->transferInventory->handle($object, $actor, $payout, $gives, $reason);
         });
 
         return ['allowed' => true, 'reason' => null, 'narration' => $narration, 'action' => $action];
@@ -111,6 +112,15 @@ class UseActivity
      */
     private function costFor(ActivityTerms $terms, Inventory $actor): int
     {
-        return $actor->holder === InventoryHolder::Resident ? 0 : $terms->cost;
+        return $actor->holder->countsCredits() ? $terms->cost : 0;
+    }
+
+    /**
+     * The credits the activity pays the actor. A resident has no balance to
+     * pay into, so the object keeps its credits.
+     */
+    private function payoutFor(ActivityTerms $terms, Inventory $actor): int
+    {
+        return $actor->holder->countsCredits() ? $terms->gives_credits : 0;
     }
 }

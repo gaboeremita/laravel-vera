@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\ResolveInventory;
 use App\Enums\RevealSource;
 use App\Models\AiModel;
 use App\Models\Assistant;
@@ -132,6 +133,28 @@ it('lets the creator reveal any fact and grant credits, recorded as the creator\
         ->and(RevealAttempt::sole())->source->toBe(RevealSource::Creator)->reviewed->toBeFalse()
         ->and($player->fresh()->credits)->toBe(110)
         ->and(CreditTransaction::sole())->by_creator->toBeTrue();
+});
+
+it('grants a resident items and keeps credits for the user alone', function () {
+    $scenario = inventoryScenario();
+    [, $assistant, $conversation, $region, $resident, $session] = $scenario;
+    $conversation->update(['creator_mode_at' => now()]);
+    worldItem($region, ['name' => 'Lantern']);
+    fakeTurn(
+        toolCallResponse('call_1', 'grant', ['holder' => $assistant->name, 'credits' => 100]),
+        toolCallResponse('call_2', 'grant', ['holder' => $assistant->name, 'items' => [['item' => 'Lantern', 'quantity' => 1]]]),
+        finalAnswerResponse('Done.'),
+    );
+
+    sendWorldMessage($this, $scenario, ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]]], [
+        'messages' => [['role' => 'user', 'content' => '[creator mode: give them 100 credits and a lantern]']],
+    ])->assertOk();
+
+    $residentInventory = app(ResolveInventory::class)->forResident($session, $resident);
+    expect(toolResultSentBack())->toContain('Credits belong to the user alone')
+        ->and($residentInventory->credits)->toBeNull()
+        ->and($residentInventory->items()->count())->toBe(1)
+        ->and(CreditTransaction::count())->toBe(0);
 });
 
 it('makes a fact unknown on the creator\'s command', function () {

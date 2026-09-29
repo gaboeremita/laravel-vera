@@ -24,8 +24,8 @@ it('shows the player\'s credits and items', function () {
         ->assertJsonPath('items.0.description', 'Still warm.');
 });
 
-it('gives credits and items to a resident and returns the line they hear', function () {
-    [$user, $assistant, , $region, $resident, $session, $player, $residentInventory] = inventoryScenario(playerCredits: 100, residentCredits: 0);
+it('gives credits and items to a resident and returns the line they hear, the credits leaving only the player', function () {
+    [$user, $assistant, , $region, $resident, $session, $player, $residentInventory] = inventoryScenario(playerCredits: 100);
     $lantern = worldItem($region, ['name' => 'Lantern']);
     InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => $lantern->id, 'quantity' => 1]);
 
@@ -41,12 +41,12 @@ it('gives credits and items to a resident and returns the line they hear', funct
         ->assertJsonPath('changes.credits', -50)
         ->assertJsonPath('changes.items.0.delta', -1);
 
-    expect($residentInventory->fresh()->credits)->toBe(50)
+    expect($residentInventory->fresh()->credits)->toBeNull()
         ->and($residentInventory->items()->first()->item_id)->toBe($lantern->id);
 });
 
 it('refuses to give more than the player holds and moves nothing', function () {
-    [$user, , , $region, $resident, $session, $player, $residentInventory] = inventoryScenario(playerCredits: 20, residentCredits: 0);
+    [$user, , , $region, $resident, $session, $player, $residentInventory] = inventoryScenario(playerCredits: 20);
 
     $this->actingAs($user)->postJson(route('worlds.sessions.handovers.store', [$region->world_id, $session->id]), [
         'residentId' => $resident->id,
@@ -54,7 +54,7 @@ it('refuses to give more than the player holds and moves nothing', function () {
         'items' => [],
     ])->assertUnprocessable()->assertJsonPath('message', "{$user->name} has only 20 credits.");
 
-    expect($player->fresh()->credits)->toBe(20)->and($residentInventory->fresh()->credits)->toBe(0);
+    expect($player->fresh()->credits)->toBe(20)->and(CreditTransaction::count())->toBe(0);
 });
 
 it('keeps another user\'s session out of reach', function () {
@@ -89,7 +89,7 @@ function pendingRequest(array $scenario, int $credits, array $items = [], string
 }
 
 it('hands over credits and items together when the player accepts a request', function () {
-    $scenario = inventoryScenario(playerCredits: 50, residentCredits: 0);
+    $scenario = inventoryScenario(playerCredits: 50);
     [$user, , , $region, , $session, $player, $residentInventory] = $scenario;
     $lantern = worldItem($region, ['name' => 'Lantern']);
     InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => $lantern->id, 'quantity' => 1]);
@@ -101,13 +101,13 @@ it('hands over credits and items together when the player accepts a request', fu
         ->assertJsonPath('line', "[{$user->name} agrees and hands you 30 credits and the Lantern for the map]")
         ->assertJsonPath('inventory.credits', 20);
 
-    expect($residentInventory->fresh()->credits)->toBe(30)
+    expect($residentInventory->fresh()->credits)->toBeNull()
         ->and($residentInventory->items()->first()->item_id)->toBe($lantern->id)
         ->and(CreditTransaction::sole()->reason)->toBe('for the map');
 });
 
 it('moves nothing when the player declines or cannot afford a request', function () {
-    $scenario = inventoryScenario(playerCredits: 10, residentCredits: 0);
+    $scenario = inventoryScenario(playerCredits: 10);
     [$user, , , $region, , $session, $player] = $scenario;
     $declined = pendingRequest($scenario, 5);
     $unaffordable = pendingRequest($scenario, 30);
@@ -160,7 +160,7 @@ it('shows a vendor\'s goods for sale and nothing of anyone else\'s inventory', f
 });
 
 it('lists every credit change of the player, newest first, and keeps names of removed residents', function () {
-    $scenario = inventoryScenario(playerCredits: 100, residentCredits: 50);
+    $scenario = inventoryScenario(playerCredits: 100);
     [$user, $assistant, , $region, $resident, $session, $player, $residentInventory] = $scenario;
     app(TransferInventory::class)->handle($player, $residentInventory, 30, [], 'for the map');
     app(TransferInventory::class)->handle($residentInventory, $player, 10, [], 'gift');

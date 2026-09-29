@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * What one holder has in one session. A null credits balance or item quantity is unlimited.
+ * What one holder has in one session. A null credits balance or item quantity is unlimited;
+ * a resident's credits are always null, since only the player and objects keep a balance.
  */
 #[Fillable(['world_session_id', 'holder', 'world_resident_id', 'region_id', 'object_id', 'credits'])]
 class Inventory extends Model
