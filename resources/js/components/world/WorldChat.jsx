@@ -14,7 +14,7 @@ import GivePanel from './GivePanel.jsx';
 import GoodsStrip from './GoodsStrip.jsx';
 import { askForLine } from './inventoryChanges.js';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getResidentState, getUserState, getOccupiedSpots, getStackedSpots, onVoiceAudio, onSilentReply, onAction, actionSender: actionSenderRef, inventory, onInventory, onLearnedFacts, onHandoverRequest, openingLine = null }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getResidentState, getUserState, getOccupiedSpots, getStackedSpots, onVoiceAudio, onSilentReply, onAction, actionSender: actionSenderRef, inventory, onInventory, onLearnedFacts, onHandoverRequest, questOffer = null, onQuestOffer, onOpenQuestOffer, openingLine = null }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
 	const [pendingImage, setPendingImage] = useState(null);
@@ -50,6 +50,9 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		void api.post(route('worlds.sessions.conversations.handover-requests.cancel', { world: worldId, session: worldSessionId, conversation: conversationIdRef.current }))
 			.then((response) => { if (!response.ok) throw new Error(); })
 			.catch(() => addToast('Unable to withdraw the unanswered request', 'error'));
+		void api.post(route('worlds.sessions.conversations.quest-offers.withdraw', { world: worldId, session: worldSessionId, conversation: conversationIdRef.current }))
+			.then((response) => { if (!response.ok) throw new Error(); })
+			.catch(() => addToast('Unable to withdraw the unanswered offer', 'error'));
 	}, [worldId, worldSessionId, addToast]);
 
 	useEffect(() => {
@@ -160,6 +163,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 			if (data.inventory) onInventory?.(data.inventory);
 			if (data.learnedFacts?.length) onLearnedFacts?.(data.learnedFacts);
 			if (data.handoverRequest) onHandoverRequest?.(data.handoverRequest);
+			if (data.questOffer) onQuestOffer?.(data.questOffer);
 			if (goods.length > 0 || data.changes?.items?.length) setGoodsVersion((version) => version + 1);
 		},
 		extraParams: worldSessionId && getPositions
@@ -299,6 +303,15 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 				{messages.map((msg) => (
 					<ChatMessage key={msg.id} msg={msg} assistantName={resident.assistant.name} />
 				))}
+				{questOffer && (
+					<button type="button" onClick={() => onOpenQuestOffer?.()} className="hud-enter-rise flex w-full items-center gap-3 border border-accent/50 bg-accent/10 px-3 py-2 text-left cursor-pointer transition-colors hover:bg-accent/20">
+						<span className="h-2 w-2 shrink-0 rotate-45 border border-accent shadow-[0_0_8px_var(--accent)]" />
+						<span className="min-w-0 flex-1">
+							<span className="block text-accent text-[0.6rem] tracking-[0.16em]">A QUEST</span>
+							<span className="block truncate text-fg-1 text-sm">{questOffer.questTitle}</span>
+						</span>
+					</button>
+				)}
 			</div>
 			{isGiveOpen && <GivePanel inventory={inventory} recipientName={resident.assistant.name} isGiving={isGiving} onGive={give} onClose={() => setIsGiveOpen(false)} />}
 			{pendingImage && (

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\BuildQuestsPrompt;
 use App\Services\AgentLoop\Tools\World\GrantFlagTool;
+use App\Services\AgentLoop\Tools\World\OfferQuestTool;
+use App\Services\AgentLoop\Tools\World\SignalQuestionTool;
 use App\Events\Quests\PlayerTalkedTo;
 use App\Actions\AppendExpressionTags;
 use App\Actions\AppendWorldConversationContext;
@@ -595,6 +597,7 @@ class ConversationController extends Controller
             'audioError' => $audioError,
             ...($playerInventory !== null ? ['inventory' => $playerAfter = $playerInventory->summary(), 'changes' => Inventory::changesBetween($playerBefore, $playerAfter)] : []),
             ...($askForTool?->request !== null ? ['handoverRequest' => $askForTool->request->toPayload($playerInventory)] : []),
+            ...(($questTools['offer_quest'] ?? null)?->offer !== null ? ['questOffer' => $questTools['offer_quest']->offer->toPayload()] : []),
             'userContent' => $lastUserMessage['content'] ?? null,
             'creatorMode' => $creatorMode,
             ...($worldSession !== null ? ['learnedFacts' => $learnedFacts] : []),
@@ -673,6 +676,16 @@ class ConversationController extends Controller
         $grantFlag = new GrantFlagTool($session, $resident);
         if ($grantFlag->grantable()->isNotEmpty()) {
             $tools['grant_flag'] = $grantFlag;
+        }
+
+        $signalQuestion = new SignalQuestionTool($session, $conversation, $resident);
+        if ($signalQuestion->signallable()->isNotEmpty()) {
+            $tools['signal_question'] = $signalQuestion;
+        }
+
+        $offerQuest = new OfferQuestTool($session, $conversation, $resident);
+        if ($offerQuest->offerable()->isNotEmpty()) {
+            $tools['offer_quest'] = $offerQuest;
         }
 
         return $tools;

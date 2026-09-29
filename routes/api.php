@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\ItemUseController;
 use App\Http\Controllers\Api\NpcController;
 use App\Http\Controllers\Api\PassageLinkController;
 use App\Http\Controllers\Api\QuestController;
+use App\Http\Controllers\Api\QuestOfferController;
 use App\Http\Controllers\Api\QuestOptionsController;
 use App\Http\Controllers\Api\QuestPlayController;
 use App\Http\Controllers\Api\RegionController;
@@ -145,6 +146,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/worlds/{world}/sessions/{session}/known-facts', [FactPlayController::class, 'index'])->name('worlds.sessions.known-facts.index');
     Route::get('/worlds/{world}/sessions/{session}/quests', [QuestPlayController::class, 'index'])->name('worlds.sessions.quests.index');
     Route::post('/worlds/{world}/sessions/{session}/quest-runs/{run}/abandon', [QuestPlayController::class, 'abandon'])->name('worlds.sessions.quest-runs.abandon');
+    Route::post('/worlds/{world}/sessions/{session}/quest-offers/{offer}/answer', [QuestOfferController::class, 'answer'])->name('worlds.sessions.quest-offers.answer');
+    Route::post('/worlds/{world}/sessions/{session}/conversations/{conversation}/quest-offers/withdraw', [QuestOfferController::class, 'withdraw'])->name('worlds.sessions.conversations.quest-offers.withdraw');
     Route::post('/worlds/{world}/sessions/{session}/quest-runs/{run}/assess', [QuestPlayController::class, 'assess'])->name('worlds.sessions.quest-runs.assess');
     Route::get('/worlds/{world}/sessions/{session}/reveal-attempts', [FactPlayController::class, 'revealAttempts'])->name('worlds.sessions.reveal-attempts.index');
     Route::get('/worlds/{world}/sessions/{session}/credit-history', [InventoryController::class, 'creditHistory'])->name('worlds.sessions.credit-history.index');

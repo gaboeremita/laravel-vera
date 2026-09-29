@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Quests\AnnounceZonesEntered;
 use App\Actions\Quests\SyncSessionQuests;
+use App\Actions\Quests\WithdrawQuestOffers;
 use App\Events\Quests\PlayerEnteredRegion;
 use App\Actions\StockSession;
 use App\Actions\TravelThroughPassage;
@@ -76,11 +77,12 @@ class WorldSessionController extends Controller
     /**
      * Puts a session whose region no longer exists in front of the spawn point.
      */
-    public function resume(Request $request, int $world, int $session, SyncSessionQuests $syncSessionQuests): JsonResponse
+    public function resume(Request $request, int $world, int $session, SyncSessionQuests $syncSessionQuests, WithdrawQuestOffers $withdrawQuestOffers): JsonResponse
     {
         $worldUser = $this->resolveWorldUser($request, $world);
         $worldSession = $worldUser->sessions()->findOrFail($session);
         $worldSession->handoverRequests()->where('status', HandoverRequestStatus::Pending)->update(['status' => HandoverRequestStatus::Cancelled, 'answered_at' => now()]);
+        $withdrawQuestOffers->handle($worldSession->questOffers());
 
         if ($worldSession->region_id === null) {
             $spawn = $this->requireSpawn($worldUser->world);
