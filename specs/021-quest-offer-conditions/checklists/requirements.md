@@ -31,5 +31,5 @@
 
 ## Notes
 
-- Both clarifications are resolved: the session-age part is out of scope, and othersInTheZone is one part with two forms.
+- Clarifications are resolved: the session-age part is out of scope, othersInTheZone is one part with two forms, the player sees nothing before an offer, and the giver alone decides whether to offer after looking up offerWhen's parts.
 - The condition part names (offerWhen, gaveTo, and so on) are the author-facing names from the feature description, so they are kept in the spec.
