@@ -12,7 +12,7 @@
 
 ### Session 2026-09-29
 
-- Q: How often are judged beats checked? → A: Nothing checks on a schedule or after every turn. What happens in the game is announced as it happens, and quests react to the things their current beats depend on. For a question judged from conversation, the announcement is a named resident signalling in character that they believe it has been met; the judge then verifies it.
+- Q: How often are judged beats checked? → A: Nothing checks on a schedule or after every turn. Every trigger announces itself when it happens, and quests listen for the announcements their current beats depend on. For a question judged from conversation, the trigger is a named resident signalling in character that they believe it has been met; that signal is announced, and the judge verifies it before the beat finishes.
 - Q: Is a campaign its own concept? → A: Yes: a named group of quests with its own view and an overall ending assessed against its own rubric.
 - Q: How is an offered quest shown? → A: Both: the giver's offer appears as a request in the conversation, and it opens a card with the quest's details and accept and decline.
 
