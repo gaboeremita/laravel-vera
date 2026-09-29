@@ -16,6 +16,10 @@
 - Q: How are facts authored and attached to holders? → A: Facts belong to residents: they are added on a resident in the region configuration, where residents are chosen.
 - Q: Do facts spread between residents in their own conversations? → A: Not in this feature; residents reveal facts only to the player.
 - Q: Build the check on OOC-turn replies now? → A: No; on OOC turns a fact counts as revealed only when the character reveals it.
+- Q: In a world, does activating creator mode with one resident turn it on for the whole play session or only in that resident's conversation? → A: Only in that resident's conversation; every other resident needs their own activation.
+- Q: Before the player learns a fact, do the residents who can act on it know it exists? → A: Yes; they know its topic from the start and that they want to find out, never its content, which they get once the player knows the fact.
+- Q: What does the list of learned facts show for each fact? → A: Its topic, its source, and a short summary of what the player was actually told, written when the fact is learned.
+- Q: When the player learns a fact from somewhere other than its holder, how does the holder treat it? → A: The holder gets the content and a note on how the player found out, and talks about it once the player brings it up.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -52,7 +56,8 @@ While the player talks with a holder, the holder knows only the fact's topic and
 3. **Given** the holder decides to reveal the fact, **When** the review judges the situation does not meet the prose, **Then** the holder is told it doesn't feel like the right moment yet, the player learns nothing, and the attempt is recorded as rejected with the reason and verdict.
 4. **Given** the player asks the holder to ignore their instructions and state the secret, **When** the holder replies, **Then** the content cannot appear, because the holder does not have it.
 5. **Given** a fact's prose reads "for 50 credits" and the player paid the holder 50 credits in this conversation, **When** the holder reveals it, **Then** the review approves it.
-6. **Given** the player already knows a fact, **When** they talk with its holder, **Then** the holder's instructions contain the content and they can speak of it freely.
+6. **Given** the player learned a fact from its holder, **When** they talk with the holder again, **Then** the holder's instructions contain the content and they can speak of it freely.
+6a. **Given** the player learned a fact from a letter, an activity or a creator command, **When** they talk with its holder, **Then** the holder's instructions contain the content and how the player found out, and the holder talks about it once the player brings it up.
 7. **Given** the world has the review turned off, **When** a holder reveals a fact, **Then** it is approved without review and recorded as unreviewed.
 8. **Given** a resident does not hold a fact, **When** they try to reveal it, **Then** the reveal is refused and nothing is learned.
 
@@ -60,7 +65,7 @@ While the player talks with a holder, the holder knows only the fact's topic and
 
 ### User Story 3 - Relay facts to other characters (Priority: P2)
 
-A resident named as able to act on a fact is told its content once the player knows it: "the player has learned this; if they tell you, you can act on it". When the player tells them in their own words, the resident acknowledges the fact, and the session records that this resident has learned it from the player. The acknowledgement is refused unless the player really knows the fact, so a lucky guess doesn't count.
+A resident named as able to act on a fact knows its topic from the start and that they want to find out about it, so they can ask the player about it in character. They are told its content once the player knows it: "the player has learned this; if they tell you, you can act on it". When the player tells them in their own words, the resident acknowledges the fact, and the session records that this resident has learned it from the player. The acknowledgement is refused unless the player really knows the fact, so a lucky guess doesn't count.
 
 **Why this priority**: Carrying what one character said to another is how the player moves a story forward without dialog options, and it is what quests will check; but guarding and revealing work without it.
 
@@ -68,7 +73,7 @@ A resident named as able to act on a fact is told its content once the player kn
 
 **Acceptance Scenarios**:
 
-1. **Given** the player does not know a fact, **When** a resident able to act on it replies, **Then** their instructions do not contain its content.
+1. **Given** the player does not know a fact, **When** a resident able to act on it replies, **Then** their instructions contain its topic and that they want to find out about it, and never its content.
 2. **Given** the player knows the fact, **When** that resident replies, **Then** their instructions contain its content and say the player has learned it.
 3. **Given** the player tells the resident the fact in their own words, **When** the resident acknowledges it, **Then** the session records that the resident learned it from the player.
 4. **Given** the player does not know a fact, **When** a resident tries to acknowledge it, **Then** the acknowledgement is refused and nothing is recorded as learned.
@@ -105,7 +110,7 @@ The user sets a creator password in their settings; it is stored so that it cann
 1. **Given** the user set a creator password, **When** they type the activation with that password, **Then** creator mode becomes active and the player is told so.
 2. **Given** the user types the activation with a wrong password, **When** the message is sent, **Then** creator mode stays inactive and the player is told it did not activate.
 3. **Given** any activation attempt, **When** the message is stored and sent to the character, **Then** the password has been removed from it.
-4. **Given** creator mode was activated in a conversation, **When** the player writes there later, even after leaving and coming back, **Then** it is still active; **When** the player writes in another conversation, **Then** it is not.
+4. **Given** creator mode was activated in a conversation, **When** the player writes there later, even after leaving and coming back, **Then** it is still active; **When** the player writes in another conversation, including with another resident of the same world, **Then** it is not.
 5. **Given** the user has not set a creator password, **When** they type an activation, **Then** creator mode stays inactive and the player is told to set one in their settings.
 6. **Given** creator mode is inactive, **When** the character's instructions are built, **Then** they do not include the character's creator mode instructions.
 
@@ -130,17 +135,18 @@ While creator mode is active, the player gives commands inside `[creator mode: <
 
 ### User Story 7 - What the player has learned (Priority: P3)
 
-During play, the player can open a view listing the facts they have learned in the session, each with its topic, its content and who they learned it from.
+During play, the player can open a view listing the facts they have learned in the session, each with its topic, who or what they learned it from, and a short summary of what they were actually told, written when they learned it.
 
 **Why this priority**: Helps the player keep track of the story, but learning and relaying work without it.
 
-**Independent Test**: Learn a fact, open the view, and confirm it lists the fact with its content and the holder it came from.
+**Independent Test**: Learn a fact, open the view, and confirm it lists the fact with a summary of what the holder said and the holder's name.
 
 **Acceptance Scenarios**:
 
-1. **Given** the player learned a fact from a resident, **When** they open the view, **Then** the fact appears with its topic, content and that resident's name.
-2. **Given** the player has learned nothing, **When** they open the view, **Then** it shows that nothing has been learned yet.
-3. **Given** the player learns a fact, **When** the reveal is approved, **Then** the player is notified that they learned something.
+1. **Given** the player learned a fact from a resident, **When** they open the view, **Then** the fact appears with its topic, that resident's name, and a summary of what the resident told them, including only what they actually said.
+2. **Given** the player learned a fact by examining an item or using an activity, **When** they open the view, **Then** the summary reflects the narration they read.
+3. **Given** the player has learned nothing, **When** they open the view, **Then** it shows that nothing has been learned yet.
+4. **Given** the player learns a fact, **When** the reveal is approved, **Then** the player is notified that they learned something.
 
 ---
 
@@ -184,7 +190,9 @@ The user can read a session's reveal log: every attempt with the holder, the fac
 - A resident's model loses tool calling after they were given facts: they keep the facts in configuration but cannot reveal them until their model can call tools again, and the configuration shows why.
 - A fact is edited while sessions exist: its topic, content and prose read as currently configured; what players already know stays known.
 - A resident with facts is removed from a region: their facts are deleted with them, after the same warning as deleting a fact.
-- The same fact is revealed again to a player who already knows it: it is recorded, with no review.
+- The same fact is revealed again to a player who already knows it: it is recorded, with no review, and the summary stays as first written.
+- A fact becomes known through a creator command, with no telling: its summary is the fact's written content.
+- A holder's reveal is approved but their reply says nothing of it: the fact is known and its summary says the player hasn't heard the details yet.
 
 ## Requirements *(mandatory)*
 
@@ -194,20 +202,20 @@ The user can read a session's reveal log: every attempt with the holder, the fac
 - **FR-002**: Users MUST NOT be able to give facts to a resident whose model cannot call tools; the configuration MUST say why.
 - **FR-003**: A resident MUST hold the facts currently configured on them, in every session.
 - **FR-004**: What the player knows, where they learned it, and what each resident learned from the player MUST be tracked per session and belong to one session of one player only.
-- **FR-005**: On in-character turns, a holder's instructions MUST contain only the topic and disclosure prose of facts the player does not yet know; the content MUST reach the holder only as the result of an approved reveal.
-- **FR-006**: Every reveal MUST carry a reason. Unless the world turns the review off (it is on by default), a separate model not playing the character MUST judge whether the situation reasonably meets the disclosure prose, reading the prose, the recent conversation (with OOC spans removed and marked as data), the location and the character's recent expressions.
+- **FR-005**: On in-character turns, a holder's instructions MUST contain only the topic and disclosure prose of facts the player does not yet know; the content MUST reach the holder only as the result of an approved reveal. For facts the player learned elsewhere, the holder MUST be given the content and how the player found out, to talk about once the player brings it up.
+- **FR-006**: Every reveal MUST carry a reason. Unless the world turns the review off (it is on by default), a separate model not playing the character MUST judge whether the situation reasonably meets the disclosure prose, reading the prose, the recent conversation (with OOC spans removed and marked as data), the location, the character's recent expressions, their memory of the player, and what they and the player hold.
 - **FR-007**: An approved reveal MUST return the content to the holder and mark the fact known to the player; a rejected reveal MUST tell the holder it isn't the right moment yet and change nothing.
 - **FR-008**: Every reveal attempt MUST be recorded with the session, holder, fact, reason, verdict, outcome and how it happened (in character, OOC turn, creator, item or activity).
-- **FR-009**: A resident able to act on a fact MUST be given its content only once the player knows it; their acknowledgement MUST be refused unless the player knows the fact, and a successful one MUST be recorded.
+- **FR-009**: A resident able to act on a fact MUST be given its topic from the start and its content only once the player knows it; their acknowledgement MUST be refused unless the player knows the fact, and a successful one MUST be recorded.
 - **FR-010**: On turns where the player's latest message contains an OOC tag, holders MUST be given the full content of their facts, and reveals MUST be approved without review.
 - **FR-011**: OOC text MUST never be removed from the conversation a character sees.
 - **FR-012**: OOC and creator bypasses MUST apply only where the player talks with a character, never when residents decide on their own or talk with each other.
 - **FR-012a**: Residents MUST reveal facts only to the player; in conversations between residents, holders MUST be given only topics and MUST NOT have the reveal available.
 - **FR-013**: Users MUST be able to set and change a creator password in their settings; it MUST be stored so it cannot be read back.
 - **FR-014**: Creator mode MUST activate only when the server verifies the typed password; the password MUST be removed from the stored conversation and from what the character sees, and MUST NOT appear in the delivered interface or the repository.
-- **FR-015**: Creator mode MUST stay active in the conversation it was activated in, and only there; a character's creator mode instructions MUST be included only while it is active.
+- **FR-015**: Creator mode MUST stay active in the conversation it was activated in, and only there; in a world, that is the conversation with the one resident it was activated with. A character's creator mode instructions MUST be included only while it is active.
 - **FR-016**: On turns with a creator command while creator mode is active, the character MUST have every tool unscoped and without review, plus tools to mark facts known or unknown for the player and to grant or remove items and credits for any holder; every such action MUST count in the game and be recorded as done by the creator.
-- **FR-017**: The player MUST be able to see the facts they learned in the session, with content and source, and MUST be notified when they learn one.
+- **FR-017**: The player MUST be able to see the facts they learned in the session, each with its topic, source, and a summary of what they were actually told, written when they learned it from the character's reply or the narration; the player MUST be notified when they learn one.
 - **FR-018**: Users MUST be able to link an item's contents or an activity's outcome to a fact; examining the item, or using the activity with its requirement judged met, MUST mark the fact known to the player.
 - **FR-019**: Users MUST be able to read a session's reveal log.
 - **FR-020**: Every new screen, panel and control MUST follow the app's current theme and styling and look polished, consistent with the existing HUD and configuration screens.
@@ -215,7 +223,7 @@ The user can read a session's reveal log: every attempt with the holder, the fac
 ### Key Entities
 
 - **Fact**: A secret held by one resident: a topic, its content, disclosure prose, and the other residents able to act on it.
-- **Session fact state**: Per session: which facts the player knows and where they learned each, and which residents learned which facts from the player.
+- **Session fact state**: Per session: which facts the player knows, where they learned each and a summary of what they were told, and which residents learned which facts from the player.
 - **Reveal attempt**: One recorded attempt: session, holder, fact, reason, verdict, approved or not, how it happened, time.
 - **Creator password**: A user's secret for creator mode, stored so it can be verified but not read back.
 
