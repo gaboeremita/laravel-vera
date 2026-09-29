@@ -17,7 +17,7 @@ class ItemController extends Controller
     {
         Gate::authorize('view', $world);
 
-        $items = $world->items()->with('cardImage')->orderBy('name')->get()
+        $items = $world->items()->with(['cardImage', 'sound'])->orderBy('name')->get()
             ->each(fn (Item $item) => $item->usage = $deleteItem->usage($item));
 
         return response()->json(ItemResource::collection($items)->resolve());
@@ -29,7 +29,7 @@ class ItemController extends Controller
 
         $item = $world->items()->create($request->attributesForItem());
 
-        return response()->json((new ItemResource($item->load('cardImage')))->resolve(), 201);
+        return response()->json((new ItemResource($item->load(['cardImage', 'sound'])))->resolve(), 201);
     }
 
     public function update(SaveItemRequest $request, World $world, Item $item): JsonResponse
@@ -38,7 +38,7 @@ class ItemController extends Controller
 
         $item->update($request->attributesForItem());
 
-        return response()->json((new ItemResource($item->load('cardImage')))->resolve());
+        return response()->json((new ItemResource($item->load(['cardImage', 'sound'])))->resolve());
     }
 
     public function destroy(World $world, Item $item, DeleteItem $deleteItem): JsonResponse

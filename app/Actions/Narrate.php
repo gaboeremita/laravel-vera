@@ -21,7 +21,7 @@ class Narrate
 {
     /**
      * @param  array<string, string>  $situation  labelled facts about the attempt
-     * @return array{succeeded: bool, narration: string}
+     * @return array{succeeded: bool, narration: string, action: ?string}
      *
      * @throws NarratorUnavailable when the world has no narrator model and the app has no default one
      */

@@ -2,15 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\BuildInventoryPrompt;
-use App\Actions\ResolveInventory;
-use App\Models\Inventory;
-use App\Services\AgentLoop\Tools\World\ActivityGate;
-use App\Services\AgentLoop\Tools\World\AskForTool;
-use App\Services\AgentLoop\Tools\World\GiveTool;
 use App\Actions\AppendExpressionTags;
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
+use App\Actions\BuildInventoryPrompt;
+use App\Actions\ResolveInventory;
 use App\Actions\ResolveSpotStacking;
 use App\Actions\ResolveUserActivity;
 use App\Actions\ResolveWorldState;
@@ -29,6 +25,7 @@ use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\DiscordChannel;
 use App\Models\Image;
+use App\Models\Inventory;
 use App\Models\Message;
 use App\Models\Settings;
 use App\Models\WorldUser;
@@ -36,6 +33,9 @@ use App\Services\AgentLoop\AgentLoopRunner;
 use App\Services\AgentLoop\Tools\BasicCalculatorTool;
 use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\AgentLoop\Tools\ImageGenerationTool;
+use App\Services\AgentLoop\Tools\World\ActivityGate;
+use App\Services\AgentLoop\Tools\World\AskForTool;
+use App\Services\AgentLoop\Tools\World\GiveTool;
 use App\Services\AgentLoop\Tools\World\WorldToolbox;
 use App\Services\ImageGenProviders\ImageGenerationService;
 use App\Services\LlmProviders\LlmManager;

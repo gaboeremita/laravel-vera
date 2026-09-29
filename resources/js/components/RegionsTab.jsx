@@ -98,7 +98,7 @@ function RegionEditor({ world, inventoryConfig, regionId, onSaved, onDeleted, on
 				{regionId !== null && (
 					<>
 						<RegionPassagesEditor worldId={world.id} region={value} regions={world.regions} spawn={spawn} onLinksChange={onWorldReload} addToast={addToast} />
-						{inventoryConfig && <RegionObjectsEditor worldId={world.id} region={value} inventoryConfig={inventoryConfig} onTermsChange={reloadTerms} addToast={addToast} />}
+						{inventoryConfig && <RegionObjectsEditor worldId={world.id} region={value} residents={world.residents.filter((resident) => resident.regionId === value.id)} inventoryConfig={inventoryConfig} onTermsChange={reloadTerms} addToast={addToast} />}
 						<WorldResidentsEditor worldId={world.id} region={value} residents={world.residents} regionNames={regionNames} inventoryConfig={inventoryConfig} onResidentsChange={onResidentsChange} addToast={addToast} />
 					</>
 				)}

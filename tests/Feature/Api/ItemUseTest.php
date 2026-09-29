@@ -35,11 +35,13 @@ it('releases and consumes an item only when the narrator judges the attempt righ
     $lockbox = worldItem($region, ['name' => 'Lockbox', 'use_requirement' => 'Opens with the code 4471.', 'consumed_on_use' => true, 'releases_credits' => 40, 'releases_items' => [['itemId' => $ring->id, 'quantity' => 1]]]);
     InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => $lockbox->id]);
 
-    fakeTurn(toolCallResponse('call_1', 'narrate', ['succeeded' => false, 'narration' => 'The dial clicks back to zero.']));
+    fakeTurn(
+        toolCallResponse('call_1', 'narrate', ['succeeded' => false, 'narration' => 'The dial clicks back to zero.', 'action' => 'spins the dial']),
+        toolCallResponse('call_2', 'narrate', ['succeeded' => true, 'narration' => 'The lid springs open.', 'action' => 'opens the lockbox']),
+    );
     $this->actingAs($user)->postJson(route('worlds.sessions.items.use', [$region->world_id, $session->id, $lockbox->id]), ['attempt' => 'I enter 1234'])
         ->assertOk()->assertJsonPath('succeeded', false)->assertJsonPath('inventory.credits', 0);
 
-    fakeTurn(toolCallResponse('call_1', 'narrate', ['succeeded' => true, 'narration' => 'The lid springs open.']));
     $this->postJson(route('worlds.sessions.items.use', [$region->world_id, $session->id, $lockbox->id]), ['attempt' => 'I enter 4471'])
         ->assertOk()
         ->assertJsonPath('succeeded', true)

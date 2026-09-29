@@ -34,6 +34,7 @@ class UpdateActivityTermsRequest extends FormRequest
             'givesItems.*.quantity' => ['required', 'integer', 'min:1'],
             'requirement' => ['nullable', 'string'],
             'outcome' => ['nullable', 'string'],
+            'vendorResidentId' => ['nullable', 'integer', Rule::exists('world_residents', 'id')->where('world_id', $world->id)],
         ];
     }
 
@@ -68,6 +69,7 @@ class UpdateActivityTermsRequest extends FormRequest
             'gives_items' => collect($validated['givesItems'] ?? [])->map(fn (array $entry) => ['itemId' => (int) $entry['itemId'], 'quantity' => (int) $entry['quantity']])->values()->all(),
             'requirement' => filled($validated['requirement'] ?? null) ? $validated['requirement'] : null,
             'outcome' => filled($validated['outcome'] ?? null) ? $validated['outcome'] : null,
+            'vendor_resident_id' => $validated['vendorResidentId'] ?? null,
         ];
     }
 }

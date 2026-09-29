@@ -12,8 +12,9 @@ import { useTheme } from '../../contexts/ThemeContext.jsx';
 import ChatMessage from '../ChatMessage.jsx';
 import GivePanel from './GivePanel.jsx';
 import GoodsStrip from './GoodsStrip.jsx';
+import { askForLine } from './inventoryChanges.js';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getResidentState, getUserState, getOccupiedSpots, getStackedSpots, onVoiceAudio, onSilentReply, onAction, actionSender: actionSenderRef, inventory, onInventory, onHandoverRequest }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getResidentState, getUserState, getOccupiedSpots, getStackedSpots, onVoiceAudio, onSilentReply, onAction, actionSender: actionSenderRef, inventory, onInventory, onHandoverRequest, openingLine = null }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
 	const [pendingImage, setPendingImage] = useState(null);
@@ -33,6 +34,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 	const [goods, setGoods] = useState([]);
 	const [goodsVersion, setGoodsVersion] = useState(0);
 	const conversationIdRef = useRef(null);
+	const sentOpeningKeyRef = useRef(null);
 	const queueLine = (line) => {
 		queuedLines.current.push(line);
 		setQueueVersion((version) => version + 1);
@@ -42,12 +44,13 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		conversationIdRef.current = conversationId;
 	}, [conversationId]);
 
+	const worldId = world.id;
 	useEffect(() => () => {
 		if (!worldSessionId || !conversationIdRef.current) return;
-		void api.post(route('worlds.sessions.conversations.handover-requests.cancel', { world: world.id, session: worldSessionId, conversation: conversationIdRef.current }))
+		void api.post(route('worlds.sessions.conversations.handover-requests.cancel', { world: worldId, session: worldSessionId, conversation: conversationIdRef.current }))
 			.then((response) => { if (!response.ok) throw new Error(); })
 			.catch(() => addToast('Unable to withdraw the unanswered request', 'error'));
-	}, []);
+	}, [worldId, worldSessionId, addToast]);
 
 	useEffect(() => {
 		if (!worldSessionId) return undefined;
@@ -215,9 +218,13 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 	}, [actionSenderRef]);
 
 	useEffect(() => {
+		if (openingLine?.text && sentOpeningKeyRef.current !== openingLine.key) {
+			sentOpeningKeyRef.current = openingLine.key;
+			queuedLines.current.push(openingLine.text);
+		}
 		if (queuedLines.current.length === 0 || !conversationId || isLoading) return;
 		void sendMessage(joinLines(queuedLines.current.splice(0)), { voiceMode: isListening });
-	}, [queueVersion, conversationId, isLoading, sendMessage, isListening]);
+	}, [queueVersion, conversationId, isLoading, sendMessage, isListening, openingLine]);
 
 	useEffect(() => {
 		const keyDown = (event) => {
@@ -286,7 +293,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 					<button type="button" onClick={onClose} className="text-fg-3 text-xs hover:text-fg-1 cursor-pointer">END (C)</button>
 				</div>
 			</header>
-			<GoodsStrip goods={goods} />
+			<GoodsStrip goods={goods} onPick={(item) => queueLine(askForLine(item))} />
 			<div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4 custom-scrollbar">
 				{messages.map((msg) => (
 					<ChatMessage key={msg.id} msg={msg} assistantName={resident.assistant.name} />

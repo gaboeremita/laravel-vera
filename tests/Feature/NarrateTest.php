@@ -11,11 +11,11 @@ uses(RefreshDatabase::class);
 it('returns the narrator\'s verdict and describes the attempt to it', function () {
     [, , , $region] = worldStateScenario(fakeReply: false);
     $region->world->update(['narrator_model_id' => AiModel::first()->id]);
-    fakeTurn(toolCallResponse('call_1', 'narrate', ['succeeded' => false, 'narration' => 'The lock does not budge.']));
+    fakeTurn(toolCallResponse('call_1', 'narrate', ['succeeded' => false, 'narration' => 'The lock does not budge.', 'action' => '*rattles the gate.*']));
 
     $verdict = app(Narrate::class)->handle($region->world, $region, ['Doing' => 'opening the gate', 'Requirement' => 'the iron key']);
 
-    expect($verdict)->toBe(['succeeded' => false, 'narration' => 'The lock does not budge.']);
+    expect($verdict)->toBe(['succeeded' => false, 'narration' => 'The lock does not budge.', 'action' => 'rattles the gate']);
     $request = Http::recorded()[0][0];
     expect(collect($request['tools'])->pluck('function.name')->all())->toBe(['narrate'])
         ->and(collect($request['messages'])->firstWhere('role', 'user')['content'])->toContain('Requirement: the iron key')

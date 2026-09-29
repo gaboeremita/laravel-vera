@@ -91,7 +91,7 @@ it('tells a resident what they carry and never what the player carries', functio
 
     expect(sentSystemPrompt())
         ->toContain('You carry 12 credits.')
-        ->toContain('4 Bread (for sale, usually 2 credits each)')
+        ->toContain('4 Bread (for sale, usually 2 credits for one Bread)')
         ->not->toContain('Secret map')
         ->not->toContain('777');
 });

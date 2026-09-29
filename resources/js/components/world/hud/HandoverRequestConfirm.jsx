@@ -2,8 +2,30 @@ import { useEffect } from 'react';
 import ItemThumb from '../../ItemThumb.jsx';
 import { isTypingTarget } from '../keyboardFocus.js';
 
-/** A character asks the player for credits or items; nothing moves unless the player accepts. */
-export default function HandoverRequestConfirm({ request, isAnswering, onAccept, onDecline }) {
+function Offer({ credits, items }) {
+	return (
+		<>
+			{credits > 0 && (
+				<div className="world-hud-panel flex min-w-28 flex-col items-center justify-center gap-1 px-4 py-3">
+					<span className="world-hud-glow font-display text-2xl tabular-nums">{credits.toLocaleString()}</span>
+					<span className="world-hud-label">CREDITS</span>
+				</div>
+			)}
+			{items.map((item) => (
+				<div key={item.itemId} className="world-hud-panel flex min-w-28 flex-col items-center gap-2 px-4 py-3">
+					<ItemThumb item={item} size="lg" />
+					<span className="text-fg-1 text-sm">{item.quantity > 1 ? `${item.quantity} × ` : ''}{item.name}</span>
+				</div>
+			))}
+		</>
+	);
+}
+
+/**
+ * Someone or something asks the player for credits or items: a character's
+ * request, or what an activity costs. Nothing moves unless the player accepts.
+ */
+export default function HandoverRequestConfirm({ request, isAnswering, onAccept, onDecline, label = 'A REQUEST', verb = 'asks you for', confirmLabel = 'HAND OVER', declineLabel = 'DECLINE' }) {
 	useEffect(() => {
 		const keyDown = (event) => {
 			if (isTypingTarget(event.target) || event.code === 'KeyP') return;
@@ -21,37 +43,34 @@ export default function HandoverRequestConfirm({ request, isAnswering, onAccept,
 			<div className="flex max-w-xl flex-col items-center px-6 text-center">
 				<div className="world-hud-label hud-enter-fade flex items-center gap-3">
 					<span className="h-px w-10 bg-gradient-to-r from-transparent to-accent" />
-					<span>A REQUEST</span>
+					<span>{label}</span>
 					<span className="h-px w-10 bg-gradient-to-l from-transparent to-accent" />
 				</div>
 				<p className="hud-enter-rise mt-5 text-fg-1 text-base leading-relaxed tracking-[0.04em]">
-					<span className="world-hud-glow text-accent">{request.askedBy}</span> asks you for
+					<span className="world-hud-glow text-accent">{request.askedBy}</span> {verb}
 				</p>
 				<div className="hud-enter-rise mt-4 flex flex-wrap items-stretch justify-center gap-3" style={{ animationDelay: '80ms' }}>
-					{request.credits > 0 && (
-						<div className="world-hud-panel flex min-w-28 flex-col items-center justify-center gap-1 px-4 py-3">
-							<span className="world-hud-glow font-display text-2xl tabular-nums">{request.credits.toLocaleString()}</span>
-							<span className="world-hud-label">CREDITS</span>
-						</div>
-					)}
-					{request.items.map((item) => (
-						<div key={item.itemId} className="world-hud-panel flex min-w-28 flex-col items-center gap-2 px-4 py-3">
-							<ItemThumb item={item} size="lg" />
-							<span className="text-fg-1 text-sm">{item.quantity > 1 ? `${item.quantity} × ` : ''}{item.name}</span>
-						</div>
-					))}
+					<Offer credits={request.credits} items={request.items} />
 				</div>
 				<p className="hud-enter-rise mt-4 text-fg-2 text-sm italic" style={{ animationDelay: '120ms' }}>{request.reason}</p>
+				{request.gives?.length > 0 && (
+					<div className="hud-enter-rise mt-5 flex flex-col items-center gap-3" style={{ animationDelay: '160ms' }}>
+						<span className="world-hud-label">YOU GET</span>
+						<div className="flex flex-wrap items-stretch justify-center gap-3">
+							<Offer credits={0} items={request.gives} />
+						</div>
+					</div>
+				)}
 				<span className="hud-enter-rule mt-5 block h-px w-80 origin-center bg-gradient-to-r from-transparent via-accent to-transparent shadow-[0_0_12px_var(--accent)]" />
 				{!request.affordable && <p className="hud-enter-fade mt-4 text-warning text-[0.7rem] tracking-[0.12em]">YOU DON'T HAVE ALL OF THIS</p>}
 				<div className="hud-enter-rise mt-6 flex items-center gap-3" style={{ animationDelay: '200ms' }}>
 					<button type="button" onClick={onAccept} disabled={!request.affordable || isAnswering} className="world-hud-panel relative flex items-center gap-3 px-5 py-2 text-fg-1 text-[0.7rem] tracking-[0.16em] hover:text-accent cursor-pointer disabled:opacity-40 disabled:cursor-default disabled:hover:text-fg-1">
 						<span className="world-hud-key">ENTER</span>
-						<span>{isAnswering ? 'HANDING OVER...' : 'HAND OVER'}</span>
+						<span>{isAnswering ? 'HANDING OVER...' : confirmLabel}</span>
 					</button>
 					<button type="button" onClick={onDecline} disabled={isAnswering} className="world-hud-panel relative flex items-center gap-3 px-5 py-2 text-fg-2 text-[0.7rem] tracking-[0.16em] hover:text-fg-1 cursor-pointer disabled:opacity-40">
 						<span className="world-hud-key">ESC</span>
-						<span>DECLINE</span>
+						<span>{declineLabel}</span>
 					</button>
 				</div>
 			</div>

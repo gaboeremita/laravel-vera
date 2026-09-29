@@ -15,7 +15,7 @@ class BuildInventoryPrompt
         $credits = $inventory->credits === null ? 'as many credits as you need' : "{$inventory->credits} credits";
         $items = $inventory->items()->with('item')->get()->map(function (InventoryItem $held): string {
             $amount = $held->quantity === null ? 'plenty of' : ($held->quantity === 1 ? 'one' : (string) $held->quantity);
-            $sale = $held->for_sale ? ' (for sale'.($held->item->base_price !== null ? ", usually {$held->item->base_price} credits each" : '').')' : '';
+            $sale = $held->for_sale ? ' (for sale'.($held->item->base_price !== null ? ", usually {$held->item->base_price} credits for one {$held->item->name}" : '').')' : '';
 
             return "{$amount} {$held->item->name}{$sale}: {$held->item->description}";
         });

@@ -53,24 +53,25 @@ class UseActivity
      * Checks the activity's terms, asks the narrator about plain-language ones,
      * and applies what it costs and gives.
      *
-     * @return array{allowed: bool, reason: ?string, narration: ?string}
+     * @return array{allowed: bool, reason: ?string, narration: ?string, action: ?string}
      */
     public function handle(WorldSession $session, Region $region, string $objectId, string $activityId, Inventory $actor, string $actorName, ?string $attempt): array
     {
         $terms = $this->terms($region, $objectId, $activityId);
         if ($terms === null) {
-            return ['allowed' => true, 'reason' => null, 'narration' => null];
+            return ['allowed' => true, 'reason' => null, 'narration' => null, 'action' => null];
         }
 
         $object = $this->resolveInventory->forObject($session, $region, $objectId);
         $missing = $this->missing($terms, $actor, $object);
         if ($missing !== null) {
-            return ['allowed' => false, 'reason' => $missing, 'narration' => null];
+            return ['allowed' => false, 'reason' => $missing, 'narration' => null, 'action' => null];
         }
 
         $layoutObject = $region->layoutObject($objectId);
         $activityName = $region->objectActivities($objectId)[$activityId]['name'] ?? $activityId;
         $narration = null;
+        $action = null;
         if ($terms->hasPlainLanguageTerms()) {
             $verdict = $this->narrate->handle($session->worldUser->world, $region, [
                 'Who' => $actorName,
@@ -81,9 +82,10 @@ class UseActivity
                 'What they do or say' => $attempt ?: 'nothing in particular',
             ]);
             if (! $verdict['succeeded']) {
-                return ['allowed' => false, 'reason' => null, 'narration' => $verdict['narration']];
+                return ['allowed' => false, 'reason' => null, 'narration' => $verdict['narration'], 'action' => $verdict['action']];
             }
             $narration = $verdict['narration'];
+            $action = $verdict['action'];
         }
 
         $reason = "{$layoutObject['name']}: {$activityName}";
@@ -94,6 +96,6 @@ class UseActivity
             $this->transferInventory->handle($object, $actor, $terms->gives_credits, $gives, $reason);
         });
 
-        return ['allowed' => true, 'reason' => null, 'narration' => $narration];
+        return ['allowed' => true, 'reason' => null, 'narration' => $narration, 'action' => $action];
     }
 }

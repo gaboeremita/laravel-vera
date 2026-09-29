@@ -77,6 +77,7 @@ export default function WorldPage() {
 	const [isAnsweringRequest, setIsAnsweringRequest] = useState(false);
 	const [narration, setNarration] = useState(null);
 	const [busyItemId, setBusyItemId] = useState(null);
+	const [chatOpeningLine, setChatOpeningLine] = useState(null);
 	const { inventory, applyInventory } = useInventory(worldId, sessionId, addToast);
 	const pendingPassageRef = useRef(null);
 	const passageActionsRef = useRef({ confirm: () => {}, cancel: () => {} });
@@ -264,6 +265,10 @@ export default function WorldPage() {
 		setChatResident(resident);
 		setInvite((current) => (current?.residentId === resident.id ? null : current));
 	}, []);
+	const talkToVendor = useCallback((resident, line) => {
+		openChat(resident);
+		setChatOpeningLine({ key: Date.now(), residentId: resident.id, text: line });
+	}, [openChat]);
 	const closeChat = useCallback(() => {
 		setChatResident(null);
 		setHandoverRequest(null);
@@ -557,13 +562,15 @@ export default function WorldPage() {
 	}, [chatResident]);
 
 	const activeSession = sessionId && String(session?.id) === String(sessionId) ? session : null;
-	const greetedSessionRef = useRef(null);
-	useEffect(() => {
-		if (status !== 'ready' || !activeSession || greetedSessionRef.current === activeSession.id) return;
-		greetedSessionRef.current = activeSession.id;
-		const resident = greetingResident(world?.residents ?? [], activeSession);
-		if (resident) openChat(resident);
-	}, [status, activeSession, world, openChat]);
+	const [greetedSessionId, setGreetedSessionId] = useState(null);
+	if (status === 'ready' && activeSession && greetedSessionId !== activeSession.id) {
+		setGreetedSessionId(activeSession.id);
+		const greeter = greetingResident(world?.residents ?? [], activeSession);
+		if (greeter) {
+			setChatResident(greeter);
+			setInvite((current) => (current?.residentId === greeter.id ? null : current));
+		}
+	}
 	const handleThought = useCallback((residentId, line) => setThoughts((current) => ({ ...current, [residentId]: line })), []);
 	const handleSpeech = useCallback((residentId, line) => {
 		setSpeech((current) => ({ ...current, [residentId]: line }));
@@ -745,6 +752,8 @@ export default function WorldPage() {
 		addToast,
 		onInventory: applyInventory,
 		onNarration: showNarration,
+		inventory,
+		onTalkToVendor: talkToVendor,
 	});
 	const hasZones = (world?.layout?.zones?.length ?? 0) > 0;
 	const readoutText = location?.zone
@@ -772,7 +781,7 @@ export default function WorldPage() {
 				)}
 				{chatResident && (
 					<div className="absolute left-5 top-16 bottom-5 z-20 w-[min(26rem,40%)] min-w-72">
-						<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} getResidentPosture={getResidentPosture} getResidentState={getResidentState} getUserState={getUserState} getOccupiedSpots={getOccupiedSpots} getStackedSpots={getStackedSpots} onVoiceAudio={playResidentVoice} onSilentReply={handleSilentReply} onAction={handleChatAction} actionSender={actionSender} inventory={inventory} onInventory={applyInventory} onHandoverRequest={setHandoverRequest} />
+						<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} getResidentPosture={getResidentPosture} getResidentState={getResidentState} getUserState={getUserState} getOccupiedSpots={getOccupiedSpots} getStackedSpots={getStackedSpots} onVoiceAudio={playResidentVoice} onSilentReply={handleSilentReply} onAction={handleChatAction} actionSender={actionSender} inventory={inventory} onInventory={applyInventory} onHandoverRequest={setHandoverRequest} openingLine={chatOpeningLine?.residentId === chatResident.id ? chatOpeningLine : null} />
 					</div>
 				)}
 				{chatResident && conversationRange === 'warning' && (
@@ -781,7 +790,7 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready' && !paused} voiceUntil={voiceUntil} />
-				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !handoverRequest} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
+				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !handoverRequest && !player.purchase} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
 				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} hasInventory={!!sessionId} />{hasZones && readoutText && <LocationReadout text={readoutText} />}{sessionId && <CreditsReadout credits={inventory?.credits} />}</div>} />}
 				{status === 'ready' && (
 					<>
@@ -801,6 +810,7 @@ export default function WorldPage() {
 				{chatResident && <OffscreenIndicator ref={offscreenIndicator} name={chatResident.assistant.name} />}
 				{narration && <NarrationCard key={narration.key} title={narration.title} narration={narration.narration} succeeded={narration.succeeded} changes={narration.changes} onDone={() => setNarration(null)} />}
 				{inventoryOpen && <InventoryPanel worldId={worldId} sessionId={sessionId} inventory={inventory} busyItemId={busyItemId} onExamine={examineItem} onUse={tryItem} onClose={() => setInventoryOpen(false)} />}
+				{player.purchase && !handoverRequest && <HandoverRequestConfirm key={player.purchase.id} request={player.purchase} isAnswering={false} label="A PURCHASE" verb="charges you" confirmLabel="PAY" declineLabel="CANCEL" onAccept={player.confirmPurchase} onDecline={player.cancelPurchase} />}
 				{handoverRequest && <HandoverRequestConfirm request={handoverRequest} isAnswering={isAnsweringRequest} onAccept={() => void answerHandoverRequest(true)} onDecline={() => void answerHandoverRequest(false)} />}
 				{pendingPassage && <PassageConfirm fromRegionName={region.name} toRegionName={pendingPassage.toRegionName} onConfirm={() => passageActionsRef.current.confirm()} onCancel={() => passageActionsRef.current.cancel()} />}
 				<PauseOverlay paused={paused} onResume={() => setPaused(false)} onExit={exit} />

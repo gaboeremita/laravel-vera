@@ -40,7 +40,7 @@ class ActivityGate
     }
 
     /**
-     * @return array{allowed: bool, reason: ?string, narration: ?string}
+     * @return array{allowed: bool, reason: ?string, narration: ?string, action: ?string}
      */
     public function use(string $objectId, string $activityId): array
     {

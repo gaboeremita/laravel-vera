@@ -7,16 +7,17 @@ import ItemListField from './ItemListField.jsx';
 import UnlimitedAmountInput from './UnlimitedAmountInput.jsx';
 import { FIELD_INPUT, FIELD_LABEL } from '../utils/formFieldStyles.js';
 
-const NO_TERMS = { requiredItemId: null, consumesRequired: false, cost: 0, givesCredits: 0, givesItems: [], requirement: '', outcome: '' };
+const NO_TERMS = { requiredItemId: null, consumesRequired: false, cost: 0, givesCredits: 0, givesItems: [], requirement: '', outcome: '', vendorResidentId: null };
 const HINT = 'normal-case text-fg-3';
 
 function toDraft(terms) {
 	return { ...NO_TERMS, ...terms, requirement: terms?.requirement ?? '', outcome: terms?.outcome ?? '', givesItems: terms?.givesItems ?? [] };
 }
 
-function summary(terms, itemsById) {
+function summary(terms, itemsById, residentsById) {
 	if (!terms) return [];
 	return [
+		terms.vendorResidentId && `VENDOR ${residentsById.get(terms.vendorResidentId)?.assistant.name.toUpperCase() ?? ''}`.trim(),
 		terms.requiredItemId && `NEEDS ${itemsById.get(terms.requiredItemId)?.name?.toUpperCase() ?? 'AN ITEM'}`,
 		terms.cost > 0 && `${terms.cost} CR`,
 		(terms.givesCredits > 0 || terms.givesItems.length > 0) && 'GIVES',
@@ -25,12 +26,13 @@ function summary(terms, itemsById) {
 }
 
 /** What one activity of an object requires, costs and gives. */
-export default function ActivityTermsEditor({ worldId, regionId, objectId, activity, terms, items, onSaved, addToast }) {
+export default function ActivityTermsEditor({ worldId, regionId, objectId, activity, terms, items, residents = [], onSaved, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [draft, setDraft] = useState(toDraft(terms));
 	const [previous, setPrevious] = useState(terms);
 	const [isSaving, setIsSaving] = useState(false);
 	const itemsById = new Map(items.map((item) => [item.id, item]));
+	const residentsById = new Map(residents.map((resident) => [resident.id, resident]));
 
 	if (previous !== terms) {
 		setPrevious(terms);
@@ -68,7 +70,7 @@ export default function ActivityTermsEditor({ worldId, regionId, objectId, activ
 			onToggle={() => setCollapsed((current) => !current)}
 			badge={
 				<span className="flex flex-wrap gap-1">
-					{summary(terms, itemsById).map((chip) => <span key={chip} className="border border-accent/40 px-1.5 py-0.5 text-[0.6rem] tracking-[0.1em] text-accent">{chip}</span>)}
+					{summary(terms, itemsById, residentsById).map((chip) => <span key={chip} className="border border-accent/40 px-1.5 py-0.5 text-[0.6rem] tracking-[0.1em] text-accent">{chip}</span>)}
 					{!terms && <span className="text-fg-3 text-[0.6rem] tracking-[0.1em]">FREE</span>}
 				</span>
 			}
@@ -101,6 +103,13 @@ export default function ActivityTermsEditor({ worldId, regionId, objectId, activ
 					<p className={FIELD_LABEL}>Gives items <span className={HINT}>(from the object's stock)</span></p>
 					<ItemListField items={items} value={draft.givesItems} onChange={(value) => update('givesItems', value)} />
 				</div>
+			</div>
+			<div>
+				<label className={FIELD_LABEL}>Vendor <span className={HINT}>(when they are nearby, choosing this activity starts a conversation with them instead)</span></label>
+				<select value={draft.vendorResidentId ?? ''} onChange={(event) => update('vendorResidentId', event.target.value === '' ? null : Number(event.target.value))} className={FIELD_INPUT}>
+					<option value="">— nobody, it serves itself —</option>
+					{residents.map((resident) => <option key={resident.id} value={resident.id}>{resident.assistant.name}</option>)}
+				</select>
 			</div>
 			<div className="border-l border-line-1 pl-4 space-y-3">
 				<p className="text-fg-3 text-[0.65rem] tracking-[0.15em]">STORY <span className="normal-case tracking-normal">— plain language, judged and narrated by the narrator</span></p>

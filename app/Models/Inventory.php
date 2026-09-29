@@ -50,11 +50,11 @@ class Inventory extends Model
     }
 
     /**
-     * @return array{credits: ?int, items: array<int, array{itemId: int, name: string, description: string, quantity: ?int, basePrice: ?int, cardImageUrl: ?string, canExamine: bool, canUse: bool}>}
+     * @return array{credits: ?int, items: array<int, array{itemId: int, name: string, description: string, quantity: ?int, basePrice: ?int, cardImageUrl: ?string, soundUrl: ?string, soundHash: ?string, canExamine: bool, canUse: bool}>}
      */
     public function summary(bool $forSaleOnly = false): array
     {
-        $items = $this->items()->with('item.cardImage')->when($forSaleOnly, fn ($query) => $query->where('for_sale', true))->get();
+        $items = $this->items()->with(['item.cardImage', 'item.sound'])->when($forSaleOnly, fn ($query) => $query->where('for_sale', true))->get();
 
         return [
             'credits' => $this->credits,
@@ -65,6 +65,8 @@ class Inventory extends Model
                 'quantity' => $held->quantity,
                 'basePrice' => $held->item->base_price,
                 'cardImageUrl' => $held->item->cardImage?->url,
+                'soundUrl' => $held->item->sound?->url(),
+                'soundHash' => $held->item->sound?->hash,
                 'canExamine' => filled($held->item->contents),
                 'canUse' => filled($held->item->use_requirement) || $held->item->releases_credits > 0 || ! empty($held->item->releases_items),
             ])->values()->all(),

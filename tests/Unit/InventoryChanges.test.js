@@ -26,3 +26,16 @@ test('turns the server changes into short lines', async () => {
 	assert.deepEqual(changeLines({ credits: -5, items: [{ itemId: 1, name: 'Drink', delta: 1 }] }), ['-5 credits', '+1 Drink']);
 	assert.deepEqual(changeLines(null), []);
 });
+
+test('carries each changed item\'s image and sound', async () => {
+	const { inventoryChangeEntries } = await import('../../resources/js/components/world/inventoryChanges.js');
+	const tacos = { itemId: 7, name: 'Order of tacos al pastor', quantity: 1, cardImageUrl: '/tacos.png', soundUrl: '/sounds/abc.wav', soundHash: 'abc' };
+	const [entry] = inventoryChangeEntries({ credits: 0, items: [] }, { credits: 0, items: [tacos] });
+	assert.deepEqual(entry, { text: '+1 Order of tacos al pastor', delta: 1, imageUrl: '/tacos.png', sound: { url: '/sounds/abc.wav', hash: 'abc' } });
+});
+
+test('picking a vendor\'s item asks for one of it', async () => {
+	const { askForLine } = await import('../../resources/js/components/world/inventoryChanges.js');
+	assert.equal(askForLine({ name: 'Order of tacos al pastor' }), '*asks for an order of tacos al pastor*');
+	assert.equal(askForLine({ name: 'Canned coffee' }), '*asks for a canned coffee*');
+});

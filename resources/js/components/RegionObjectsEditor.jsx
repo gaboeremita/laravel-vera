@@ -11,7 +11,7 @@ function uniqueActivities(object) {
 	return [...seen.values()];
 }
 
-function ObjectRow({ worldId, region, object, inventoryConfig, onTermsChange, addToast }) {
+function ObjectRow({ worldId, region, object, residents, inventoryConfig, onTermsChange, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const stock = inventoryConfig.starting.objects[region.id]?.[object.id];
 	const activities = uniqueActivities(object);
@@ -52,7 +52,7 @@ function ObjectRow({ worldId, region, object, inventoryConfig, onTermsChange, ad
 				{activities.length === 0 ? (
 					<p className="text-fg-3 text-xs">This object offers no activities.</p>
 				) : activities.map((activity) => (
-					<ActivityTermsEditor key={activity.id} worldId={worldId} regionId={region.id} objectId={object.id} activity={activity} terms={termsFor(activity.id)} items={inventoryConfig.items} onSaved={onTermsChange} addToast={addToast} />
+					<ActivityTermsEditor key={activity.id} worldId={worldId} regionId={region.id} objectId={object.id} activity={activity} terms={termsFor(activity.id)} items={inventoryConfig.items} residents={residents} onSaved={onTermsChange} addToast={addToast} />
 				))}
 			</div>
 		</Accordion>
@@ -60,7 +60,7 @@ function ObjectRow({ worldId, region, object, inventoryConfig, onTermsChange, ad
 }
 
 /** Every object of the region's environment: its stock and its activities' terms. */
-export default function RegionObjectsEditor({ worldId, region, inventoryConfig, onTermsChange, addToast }) {
+export default function RegionObjectsEditor({ worldId, region, residents = [], inventoryConfig, onTermsChange, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const objects = region.layout?.objects ?? [];
 
@@ -71,7 +71,7 @@ export default function RegionObjectsEditor({ worldId, region, inventoryConfig, 
 			) : (
 				<div className="space-y-2">
 					{objects.map((object) => (
-						<ObjectRow key={object.id} worldId={worldId} region={region} object={object} inventoryConfig={inventoryConfig} onTermsChange={onTermsChange} addToast={addToast} />
+						<ObjectRow key={object.id} worldId={worldId} region={region} object={object} residents={residents} inventoryConfig={inventoryConfig} onTermsChange={onTermsChange} addToast={addToast} />
 					))}
 				</div>
 			)}

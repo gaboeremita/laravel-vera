@@ -1159,6 +1159,28 @@ A resident is always standing, sitting, lying, reclining or swimming. Poses carr
 
 For autonomous residents, `useResidentAgency` asks `ResidentDecisionController` for a decision 10–30 s after each step ends, staggered between residents, while the user is in the world, not talking to her, the page is visible, and there has been input in the last 5 minutes. The server builds her prompt with her persona, world state, recent activity, the poses and spots available (free or taken), and a short instruction; her own model answers with a `(reason) *action*` line and optionally a tool call or pose tag. The line is stored in her session conversation and shown in a thought bubble (`ThoughtBubble`) while the step runs. Decisions are at least 8 s apart per resident (429). `ResidentStateController` saves each resident's position, spot, activity and posture per session (`world_session_residents`) so she is where the user left her on return.
 
+### Items, Inventory and Credits
+
+Specified in `specs/018-items-inventory-credits/`.
+
+**Definitions and configuration.** `Item` (`world_id`, `name` unique per world, `description`, `base_price`, plain-language `contents` and `use_requirement`, `consumed_on_use`, `releases_credits`, `releases_items` JSON, an `images` card image and an optional `sound_id`). What anyone starts with is a `StartingInventory` (`holder`: `InventoryHolder` enum `player` / `resident` / `object`, with `world_resident_id` or `region_id` + layout `object_id`, and `credits`) with `StartingInventoryItem` rows (`quantity`, `for_sale`, `takeable`). `null` credits or quantity means unlimited. `SaveStartingInventory` replaces a holder's starting inventory; `UpdateResidentStartingInventoryRequest` refuses stock for a resident whose model cannot call tools.
+
+**Sessions.** `StockSession` copies every starting inventory into `Inventory` / `InventoryItem` rows when a session starts. `ResolveInventory` returns a holder's session inventory and copies it on first use for sessions or holders that predate it. Everything is scoped to the session.
+
+**Transfers.** `TransferInventory` is the only code that moves items and credits: it locks both inventories, checks the giver has enough (unlimited always has), moves credits and items, deletes rows that reach zero and records a `CreditTransaction` (amount, both display names, reason). A `null` side creates or destroys (an item releasing its contents, an item used up). It throws `InsufficientInventory`, surfaced as 422 or as a tool error.
+
+**Player endpoints** (all under `/worlds/{world}/sessions/{session}`, returning the player's `inventory` and signed `changes` whenever it can change): `InventoryController` (inventory, credit history, a vendor's goods, what an object offers, take), `HandoverController` (give, answer or cancel a request), `ActivityUseController`, `ItemUseController` (examine, use). Only these move things out of the player's inventory.
+
+**Residents.** `BuildInventoryPrompt` adds the resident's own inventory (never the player's) to their prompt. `GiveTool` hands their own items and credits to whoever they are talking with; `AskForTool` creates a pending `HandoverRequest` (credits and items, reason, `HandoverRequestStatus`) that the player accepts, declines, or cannot afford; ending the conversation or resuming the session cancels it. The server writes the line the character hears about every handover, and the client sends it as the player's next message.
+
+**Activity terms.** `ActivityTerms` per region, layout object and activity: `required_item_id` + `consumes_required`, `cost`, `gives_credits` / `gives_items` from the object's inventory, `vendor_resident_id`, and plain-language `requirement` / `outcome`. `UseActivity` checks item, cost and stock, asks the narrator about plain-language terms, and applies the transfers. For residents, `ActivityGate` hides activities they cannot afford from `WorldToolbox::spots()` and applies terms when `use` runs. `ReconcilePassages` drops terms and inventories of objects a re-uploaded layout no longer has.
+
+**Narrator.** `Narrate` makes one call on the world's `narrator_model_id` (else the default model) with a single `narrate` tool returning `succeeded`, a second-person `narration` and a short third-person `action` line. `NarratorUnavailable` becomes a 422 naming the missing model.
+
+**Sounds.** `Sound` rows are stored once per SHA-256 content hash at `sounds/{hash}.{ext}` (`StoreSound`), so anything that uses the same sound shares one file; a sound is deleted when nothing references it. On the client, `utils/soundCache.js` keeps decoded buffers by hash.
+
+**Frontend.** Configuration: `ItemsEditor`, `StartingInventoryEditor`, `RegionObjectsEditor` with `ActivityTermsEditor`, `NarratorModelSelect`, backed by `useWorldInventoryConfig`. Play: `useInventory` (inventory state; toasts with item images and sounds for every change), `CreditsReadout`, `InventoryPanel` (`Tab`), `GivePanel` and `GoodsStrip` in `WorldChat`, `HandoverRequestConfirm` for requests and purchases, `NarrationCard`, and take rows, costs, vendors and attempts in `usePlayerActivities` and `InspectCard`.
+
 ### Runtime (3D Scene)
 
 **`WorldEnvironment`** loads the environment GLB, builds a `WorldCollision` (`collisionCheck.js`) from it, resolves a spawn position near the room's center, and adds the scene graph — errors (a failed load, or a GLB with no collision geometry at all) surface via `onError` rather than leaving the scene half-initialized.

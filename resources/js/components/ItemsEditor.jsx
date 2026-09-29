@@ -8,6 +8,7 @@ import ItemListField from './ItemListField.jsx';
 import ItemThumb from './ItemThumb.jsx';
 import UnlimitedAmountInput from './UnlimitedAmountInput.jsx';
 import { ImageUploadField } from './WorldImagesEditor.jsx';
+import SoundUploadField from './SoundUploadField.jsx';
 import { FIELD_INPUT, FIELD_LABEL } from '../utils/formFieldStyles.js';
 
 const NEW_ITEM = { name: '', description: '', basePrice: null, contents: '', useRequirement: '', consumedOnUse: false, releasesCredits: 0, releasesItems: [] };
@@ -122,6 +123,28 @@ function ItemRow({ worldId, item, items, onSaved, onDeleted, addToast }) {
 		} catch { addToast('Failed to delete item', 'error'); }
 	};
 
+	const [isUploadingSound, setIsUploadingSound] = useState(false);
+	const itemSound = item.soundUrl ? { url: item.soundUrl, hash: item.soundHash } : null;
+
+	const uploadSound = async (file) => {
+		setIsUploadingSound(true);
+		try {
+			const form = new FormData();
+			form.append('sound', file);
+			const response = await api.postForm(route('worlds.items.sound.store', { world: worldId, item: item.id }), form);
+			if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message);
+			await onSaved();
+		} catch (error) { addToast(error.message || 'Failed to upload sound', 'error'); } finally { setIsUploadingSound(false); }
+	};
+
+	const removeSound = async () => {
+		try {
+			const response = await api.delete(route('worlds.items.sound.destroy', { world: worldId, item: item.id }));
+			if (!response.ok) throw new Error();
+			await onSaved();
+		} catch { addToast('Failed to remove sound', 'error'); }
+	};
+
 	const uploadImage = async (file) => {
 		setIsUploading(true);
 		try {
@@ -147,7 +170,10 @@ function ItemRow({ worldId, item, items, onSaved, onDeleted, addToast }) {
 			}
 		>
 			<div className="flex gap-5 items-start">
-				<ImageUploadField label="Image" hint="shown in inventories" previewUrl={item.cardImageUrl} isUploading={isUploading} onUpload={uploadImage} />
+				<div className="space-y-4">
+					<ImageUploadField label="Image" hint="optional, shown in inventories" previewUrl={item.cardImageUrl} isUploading={isUploading} onUpload={uploadImage} />
+					<SoundUploadField sound={itemSound} isUploading={isUploadingSound} onPick={uploadSound} onRemove={removeSound} onError={(message) => addToast(message, 'error')} />
+				</div>
 				<div className="flex-1 min-w-0">
 					<ItemFields draft={draft} setDraft={setDraft} items={items} itemId={item.id} />
 				</div>
@@ -174,6 +200,8 @@ function ItemRow({ worldId, item, items, onSaved, onDeleted, addToast }) {
 function NewItem({ worldId, items, onCreated, onCancel, addToast }) {
 	const [draft, setDraft] = useState(NEW_ITEM);
 	const [isSaving, setIsSaving] = useState(false);
+	const [image, setImage] = useState(null);
+	const [sound, setSound] = useState(null);
 
 	const create = async () => {
 		setIsSaving(true);
@@ -181,6 +209,18 @@ function NewItem({ worldId, items, onCreated, onCancel, addToast }) {
 			const response = await api.post(route('worlds.items.store', { world: worldId }), toPayload(draft));
 			const body = await response.json();
 			if (!response.ok) throw new Error(body.message);
+			if (image) {
+				const form = new FormData();
+				form.append('image', image.file);
+				const uploaded = await api.postForm(route('worlds.items.image.card.store', { world: worldId, item: body.id }), form);
+				if (!uploaded.ok) addToast(`${body.name} was created, but its image failed to upload`, 'error');
+			}
+			if (sound) {
+				const form = new FormData();
+				form.append('sound', sound.file);
+				const uploaded = await api.postForm(route('worlds.items.sound.store', { world: worldId, item: body.id }), form);
+				if (!uploaded.ok) addToast(`${body.name} was created, but its sound failed to upload`, 'error');
+			}
 			addToast(`${body.name} created`, 'success');
 			await onCreated();
 		} catch (error) { addToast(error.message || 'Failed to create item', 'error'); } finally { setIsSaving(false); }
@@ -189,7 +229,15 @@ function NewItem({ worldId, items, onCreated, onCancel, addToast }) {
 	return (
 		<div className="border border-accent/40 bg-accent/5 p-4 space-y-3 hud-enter-fade">
 			<p className="text-accent text-[0.65rem] tracking-[0.15em]">NEW ITEM</p>
-			<ItemFields draft={draft} setDraft={setDraft} items={items} itemId={null} />
+			<div className="flex gap-5 items-start">
+				<div className="space-y-4">
+					<ImageUploadField label="Image" hint="optional" previewUrl={image?.previewUrl ?? null} isUploading={false} onUpload={(file) => setImage({ file, previewUrl: URL.createObjectURL(file) })} />
+					<SoundUploadField sound={sound} isUploading={false} onPick={(file) => setSound({ file, previewUrl: URL.createObjectURL(file) })} onRemove={() => setSound(null)} onError={(message) => addToast(message, 'error')} />
+				</div>
+				<div className="flex-1 min-w-0">
+					<ItemFields draft={draft} setDraft={setDraft} items={items} itemId={null} />
+				</div>
+			</div>
 			<div className="flex justify-end gap-3">
 				<button type="button" onClick={onCancel} className="text-fg-3 text-[0.7rem] tracking-[0.1em] px-4 py-1.5 cursor-pointer hover:text-fg-1 transition-colors">CANCEL</button>
 				<button type="button" onClick={create} disabled={isSaving || !draft.name.trim() || !draft.description.trim()} className={`text-[0.7rem] tracking-[0.1em] px-4 py-1.5 transition-colors ${isSaving || !draft.name.trim() || !draft.description.trim() ? 'bg-bg-3 text-fg-3 cursor-default' : 'button-success cursor-pointer'}`}>

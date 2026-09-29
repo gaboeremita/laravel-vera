@@ -275,7 +275,7 @@ function toolResultSentBack(int $requestIndex = 1): string
  */
 function inventoryScenario(int $playerCredits = 100, ?int $residentCredits = 50): array
 {
-    $scenario = worldStateScenario();
+    $scenario = worldStateScenario(fakeReply: false);
     [, , , $region, $resident, $session] = $scenario;
 
     $player = Inventory::factory()->forPlayer()->create(['world_session_id' => $session->id, 'credits' => $playerCredits]);

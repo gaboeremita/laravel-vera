@@ -27,7 +27,11 @@ class DeleteItem
                 Storage::disk($item->cardImage->disk)->delete($item->cardImage->path);
                 $item->cardImage->delete();
             }
+            $sound = $item->sound;
             $item->delete();
+            if ($sound !== null) {
+                app(StoreSound::class)->releaseIfUnused($sound);
+            }
         });
     }
 

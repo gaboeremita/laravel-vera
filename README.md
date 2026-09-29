@@ -375,6 +375,22 @@ Poses belong to a posture — standing, sitting, lying, reclining or swimming �
 
 A resident set to **Autonomous** chooses what to do on her own while you are in the world and not talking to her: 10–30 seconds after each step she decides her next one with her own model, shown in a thought bubble as `(reason) *action*` and saved in her conversation. Decisions pause after 5 minutes without any input from you. Where each resident is, and in which posture, is saved per session.
 
+### Items, Inventory and Credits
+
+A world defines its own **items** (Worlds → edit → World tab → ITEMS): a name, a description, an optional base price, an optional image and an optional sound that plays when the player receives one. An item can also carry plain-language story text: what examining it reveals, what it takes to use it, the credits and items using it releases, and whether it is used up.
+
+The player, every resident and every object of a region hold an **inventory** of items and **credits**. What each starts with is configured once per world, and every new session gets its own copy:
+
+- **Player** — World tab → START → Player starting inventory.
+- **Resident** — Regions tab → region → RESIDENTS → a resident → Starting inventory. Items marked **For sale** make the resident a vendor.
+- **Object** — Regions tab → region → OBJECTS → an object → STOCK. Items marked **Can be taken** can be taken directly by the player.
+
+Quantities and residents' and objects' credits can be unlimited (∞). A resident only holds items or credits if their model supports tool calling.
+
+In play, `Tab` opens the inventory (items with examine and use, and the credit history), and the credit balance stays on screen. In a conversation, the gift button hands the resident credits or items, and a vendor's goods for sale are listed at the top; picking one asks for it. Residents decide in character what to give, sell or keep: they hand things over with a `give` tool and ask for credits or items with an `ask_for` tool, which the player accepts or declines on a request card. Nothing leaves the player's inventory unless the player gives it, accepts a request, or pays for something they chose.
+
+Each object activity can have **activity terms** (Regions tab → OBJECTS → an object → ACTIVITIES): an item it requires (kept or used up), a credit cost, credits and items it gives from the object's stock, a **vendor** who takes over when they are nearby, and a plain-language requirement and outcome. Paid activities ask for confirmation first. Plain-language terms, and examining or using an item, are judged and narrated by the **narrator**: an LLM chosen per world (World tab → WORLD PROMPTS → Narrator model, a model with tool calling), falling back to the default model.
+
 ## Project Structure
 
 ```
@@ -674,6 +690,7 @@ laravel-vera/
 - **Per-provider/per-model voice prompts** — backend-specific instructions (e.g. Orpheus's inline vocal tags) live on the `VoiceProvider`/`VoiceModel` record and are injected only while that backend is active, via the same visual prompt-tree editor used for assistant prompts
 - **Agent mode** — assistants can be switched to an agentic loop that calls tools (`get_current_datetime`, `basic_calculator`, `generate_image`) across multiple steps before replying, with a step limit, per-tool timeout/retry, and a live progress indicator in the chat UI. See [Agent Mode](#agent-mode)
 - **Image generation** — DB-managed, user-editable provider/model catalog (same pattern as LLM providers); generate an image manually via `/create-image <description>` in chat, or let an agent-mode assistant call it as a tool. See [Image Generation Providers](#image-generation-providers)
+- **Items, inventory and credits in worlds** — per-world items with images and sounds, inventories for the player, residents and objects, vendors, residents who give and ask for things in character, and object activities that cost, give and require items, judged and narrated by an LLM. See [Items, Inventory and Credits](#items-inventory-and-credits)
 - **Configurable 3D worlds** — shared, single-room 3D spaces you explore in first person, with assistant and NPC residents you approach and chat with in place, organized into per-user sessions you can resume, start fresh, or delete. See [Worlds](#worlds)
 
 ### Planned / Nice-to-Have

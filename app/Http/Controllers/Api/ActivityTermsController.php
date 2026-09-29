@@ -52,6 +52,7 @@ class ActivityTermsController extends Controller
             'givesItems' => $terms->gives_items ?? [],
             'requirement' => $terms->requirement,
             'outcome' => $terms->outcome,
+            'vendorResidentId' => $terms->vendor_resident_id,
         ];
     }
 }
