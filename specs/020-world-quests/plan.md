@@ -114,7 +114,7 @@ app/
 ├── Contracts/QuestTrigger.php                  # new
 ├── Enums/QuestStatus.php, EndingStatus.php, QuestEventType.php, QuestOfferStatus.php
 ├── Events/Quests/                              # new: the twelve triggers (R3) and QuestsUpdated, QuestEndingReady broadcasts
-├── Listeners/AdvanceQuests.php, CheckCampaignEnded.php, UnlockQuests.php
+├── Listeners/AdvanceQuests.php, UnlockQuests.php
 ├── Jobs/JudgeQuestion.php, AssessQuestEnding.php, AssessCampaignEnding.php
 ├── Http/Controllers/Api/
 │   ├── QuestController.php, CampaignController.php, QuestOptionsController.php   # new

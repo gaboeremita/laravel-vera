@@ -11,6 +11,8 @@ import ItemsEditor from '../components/ItemsEditor.jsx';
 import StartingInventoryEditor from '../components/StartingInventoryEditor.jsx';
 import useWorldInventoryConfig from '../hooks/useWorldInventoryConfig.js';
 import QuestsEditor from '../components/QuestsEditor.jsx';
+import CampaignsEditor from '../components/CampaignsEditor.jsx';
+import useCampaigns from '../hooks/useCampaigns.js';
 
 const TABS = [{ id: 'world', label: 'WORLD' }, { id: 'regions', label: 'REGIONS' }];
 
@@ -27,6 +29,12 @@ export default function EditWorldPage() {
 	const [isSaving, setIsSaving] = useState(false);
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const inventoryConfig = useWorldInventoryConfig(worldId, addToast);
+	const { campaigns, reload: reloadCampaigns } = useCampaigns(worldId, addToast);
+	const [questsVersion, setQuestsVersion] = useState(0);
+	const questsChanged = useCallback(async () => {
+		setQuestsVersion((version) => version + 1);
+		await reloadCampaigns();
+	}, [reloadCampaigns]);
 
 	const fetchWorld = useCallback(async () => {
 		const response = await api.get(route('worlds.show', { world: worldId }));
@@ -112,7 +120,8 @@ export default function EditWorldPage() {
 							isSaving={isSaving}
 							onSubmit={save}
 						/>
-						<QuestsEditor worldId={value.id} addToast={addToast} />
+						<QuestsEditor worldId={value.id} campaigns={campaigns} onQuestsChange={questsChanged} addToast={addToast} />
+						<CampaignsEditor worldId={value.id} campaigns={campaigns} questsVersion={questsVersion} onChanged={reloadCampaigns} addToast={addToast} />
 					</>
 				) : (
 					<RegionsTab world={value} inventoryConfig={inventoryConfig} onWorldReload={reloadWorld} onResidentsChange={setResidents} addToast={addToast} />

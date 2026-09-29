@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\ActivityTermsController;
 use App\Http\Controllers\Api\ActivityUseController;
 use App\Http\Controllers\Api\AgentProgressController;
@@ -112,6 +113,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/worlds/{world}/quests/{quest}', [QuestController::class, 'update'])->name('worlds.quests.update');
         Route::delete('/worlds/{world}/quests/{quest}', [QuestController::class, 'destroy'])->name('worlds.quests.destroy');
         Route::get('/worlds/{world}/quest-options', QuestOptionsController::class)->name('worlds.quest-options');
+        Route::get('/worlds/{world}/campaigns', [CampaignController::class, 'index'])->name('worlds.campaigns.index');
+        Route::post('/worlds/{world}/campaigns', [CampaignController::class, 'store'])->name('worlds.campaigns.store');
+        Route::patch('/worlds/{world}/campaigns/{campaign}', [CampaignController::class, 'update'])->name('worlds.campaigns.update');
+        Route::delete('/worlds/{world}/campaigns/{campaign}', [CampaignController::class, 'destroy'])->name('worlds.campaigns.destroy');
         Route::get('/worlds/{world}/regions/{region}/activity-terms', [ActivityTermsController::class, 'index'])->name('worlds.regions.activity-terms.index');
         Route::put('/worlds/{world}/regions/{region}/objects/{object}/activities/{activity}/terms', [ActivityTermsController::class, 'update'])->name('worlds.regions.activity-terms.update');
         Route::delete('/worlds/{world}/regions/{region}/objects/{object}/activities/{activity}/terms', [ActivityTermsController::class, 'destroy'])->name('worlds.regions.activity-terms.destroy');

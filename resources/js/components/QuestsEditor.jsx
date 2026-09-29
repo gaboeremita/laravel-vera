@@ -83,7 +83,7 @@ export default function QuestsEditor({ worldId, campaigns = [], onQuestsChange, 
 		};
 		void load();
 		return () => { active = false; };
-	}, [fetchQuests, addToast]);
+	}, [fetchQuests, campaigns, addToast]);
 
 	const reload = useCallback(async () => {
 		try {

@@ -170,11 +170,11 @@ description: "Task list for Quests for Worlds"
 
 **Independent Test**: [quickstart.md](quickstart.md) step 7.
 
-- [ ] T060 [P] [US7] Create `app/Http/Requests/StoreCampaignRequest.php` and `UpdateCampaignRequest.php`: key, title, definition (description and a rubric with at least one dimension), `questIds` of this world, 422 when a quest is in another campaign
-- [ ] T061 [US7] Implement `app/Http/Controllers/Api/CampaignController.php` and its routes per [contracts/api.md](contracts/api.md) in `routes/api.php`; accept `{ campaign, outcome }` requirements in `app/Actions/Quests/ValidateQuestDefinition.php` and `app/Actions/Quests/SyncSessionQuests.php`
-- [ ] T062 [US7] Implement `app/Listeners/CheckCampaignEnded.php` and `app/Jobs/AssessCampaignEnding.php` per research R11, reusing `app/Actions/Quests/AssessEnding.php` with the campaign's rubric and its quests' endings as evidence; add campaigns to `index` in `app/Http/Controllers/Api/QuestPlayController.php`
-- [ ] T063 [P] [US7] Write `tests/Feature/Api/CampaignControllerTest.php` (CRUD, one campaign per quest, another world's quests refused) and campaign cases in `tests/Feature/AssessEndingTest.php` (assessed once after the last quest; a repeatable quest counts after its first run; tier from the campaign's list; a later quest can require the campaign's outcome)
-- [ ] T064 [US7] Build `resources/js/components/CampaignsEditor.jsx` (title, key, description, quest multi-select, `RubricEditor`, delete through `ConfirmationModal`, empty state) and add it as the "Campaigns" accordion in `resources/js/pages/EditWorldPage.jsx`; show campaign endings with `EndingCard`; follow the UI standard
+- [X] T060 [P] [US7] Create `app/Http/Requests/SaveCampaignRequest.php`, used by store and update: key, title, definition (description and a rubric with at least one dimension), `questIds` of this world, 422 when a quest is in another campaign
+- [X] T061 [US7] Implement `app/Http/Controllers/Api/CampaignController.php` and its routes per [contracts/api.md](contracts/api.md) in `routes/api.php`; accept `{ campaign, outcome }` requirements in `app/Actions/Quests/ValidateQuestDefinition.php` and `app/Actions/Quests/SyncSessionQuests.php`
+- [X] T062 [US7] Implement `app/Actions/Quests/CheckCampaignEnded.php` (called by the quest ending job once an ending is settled) and `app/Jobs/AssessCampaignEnding.php` per research R11, reusing `app/Actions/Quests/AssessEnding.php` with the campaign's rubric and its quests' endings as evidence; add campaigns to `index` in `app/Http/Controllers/Api/QuestPlayController.php`
+- [X] T063 [P] [US7] Write `tests/Feature/Api/CampaignControllerTest.php` (CRUD, one campaign per quest, another world's quests refused) and campaign cases in `tests/Feature/AssessEndingTest.php` (assessed once after the last quest; a repeatable quest counts after its first run; tier from the campaign's list; a later quest can require the campaign's outcome)
+- [X] T064 [US7] Build `resources/js/components/CampaignsEditor.jsx` (title, key, description, quest multi-select, `RubricEditor`, delete through `ConfirmationModal`, empty state) and add it as the "Campaigns" accordion in `resources/js/pages/EditWorldPage.jsx`; show campaign endings with `EndingCard`; follow the UI standard
 
 **Checkpoint**: Chained quests become one story.
 

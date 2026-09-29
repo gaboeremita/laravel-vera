@@ -2,14 +2,17 @@
 
 use App\Actions\BuildQuestsPrompt;
 use App\Actions\Quests\RecordQuestEvent;
+use App\Actions\Quests\SyncSessionQuests;
 use App\Enums\EndingStatus;
 use App\Enums\QuestEventType;
 use App\Enums\QuestStatus;
 use App\Enums\TurnMode;
 use App\Jobs\AssessQuestEnding;
 use App\Models\AiModel;
+use App\Models\Campaign;
 use App\Models\QuestEvent;
 use App\Models\WorldSession;
+use App\Models\WorldSessionCampaign;
 use App\Models\WorldSessionQuest;
 use Database\Factories\QuestFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -110,4 +113,37 @@ it('lets involved residents remember an ending in its own session only', functio
 
     expect(app(BuildQuestsPrompt::class)->handle($session, $resident, TurnMode::InCharacter))->toContain('The mill turned again.')
         ->and(app(BuildQuestsPrompt::class)->handle($other, $resident, TurnMode::InCharacter))->toBeNull();
+});
+
+it('writes a campaign\'s ending once, after its last quest ends, with a tier from its own list', function () {
+    [, , , $region, , $session] = worldStateScenario(fakeReply: false);
+    $region->world->update(['narrator_model_id' => AiModel::first()->id]);
+    $campaign = Campaign::factory()->create(['world_id' => $region->world_id, 'definition' => ['description' => 'The valley.', 'rubric' => ['guidance' => '', 'dimensions' => [['name' => 'resolve']], 'tiers' => ['saved', 'lost']]]]);
+    $first = worldQuest($region->world, ['repeatable' => true], ['key' => 'first', 'campaign_id' => $campaign->id]);
+    $second = worldQuest($region->world, [], ['key' => 'second', 'campaign_id' => $campaign->id]);
+    WorldSessionQuest::factory()->withEnding()->create(['world_session_id' => $session->id, 'quest_id' => $first->id]);
+    WorldSessionQuest::factory()->create(['world_session_id' => $session->id, 'quest_id' => $first->id, 'run' => 2]);
+    $last = WorldSessionQuest::factory()->ended()->create(['world_session_id' => $session->id, 'quest_id' => $second->id]);
+    fakeTurn(endingResponse(['tier' => null, 'scores' => []]), toolCallResponse('ending_2', 'record_ending', ['tier' => 'saved', 'title' => 'The Valley Saved', 'epilogue' => 'The river kept its banks.', 'scores' => [['dimension' => 'resolve', 'score' => 9, 'reason' => 'You saw it through.']], 'resultingFlags' => []]));
+
+    AssessQuestEnding::dispatchSync($last->id);
+
+    $ending = WorldSessionCampaign::sole();
+    expect($ending->ending_status)->toBe(EndingStatus::Written)
+        ->and($ending->ending['tier'])->toBe('saved')
+        ->and(Http::recorded()[1][0]['tools'][0]['function']['parameters']['properties']['tier']['enum'])->toBe(['saved', 'lost']);
+});
+
+it('lets a later quest require a campaign\'s outcome', function () {
+    [, , , $region, , $session] = worldStateScenario();
+    $campaign = Campaign::factory()->create(['world_id' => $region->world_id, 'key' => 'the-river']);
+    worldQuest($region->world, ['requires' => [['campaign' => 'the-river', 'outcome' => 'tier:saved']]], ['key' => 'after']);
+
+    app(SyncSessionQuests::class)->handle($session->fresh());
+    expect($session->questRuns()->count())->toBe(0);
+
+    WorldSessionCampaign::factory()->create(['world_session_id' => $session->id, 'campaign_id' => $campaign->id, 'ending_status' => EndingStatus::Written, 'ending' => ['tier' => 'saved', 'title' => 'Saved', 'epilogue' => 'Saved.', 'scores' => [], 'resultingFlags' => []]]);
+    app(SyncSessionQuests::class)->handle($session->fresh());
+
+    expect($session->questRuns()->count())->toBe(1);
 });
