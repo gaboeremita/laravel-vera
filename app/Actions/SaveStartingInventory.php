@@ -20,7 +20,7 @@ class SaveStartingInventory
         return DB::transaction(function () use ($world, $key, $credits, $items): StartingInventory {
             $starting = $world->startingInventories()->where($key)->first()
                 ?? $world->startingInventories()->make($key);
-            $starting->credits = $credits;
+            $starting->credits = $key['holder']->countsCredits() ? $credits : null;
             $starting->save();
 
             $starting->items()->delete();

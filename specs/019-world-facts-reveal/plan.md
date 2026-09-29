@@ -157,7 +157,7 @@ These names are used in the code, tables and UI:
 | "Reveals fact" | field label on items and activity terms, `reveals_fact_id` | the fact the player learns from them |
 | `reveal`, `acknowledge` | LLM tool names | the holder sharing a fact; a relay resident taking in what the player told them |
 | `verdict` | LLM tool name | the review's forced answer |
-| `set_fact_known`, `grant`, `remove` | LLM tool names, creator turns | marking a fact known or unknown; creating or destroying items and credits for any holder |
+| `set_fact_known`, `grant`, `remove` | LLM tool names, creator turns | marking a fact known or unknown; creating or destroying items for any holder, and credits for the player |
 | "Learned" | HUD panel title and key label | the facts the player knows in the session |
 | "You learned something" | toast | a fact became known |
 | "You haven't heard the details yet." | learned-facts panel | the summary when the holder's reply told nothing of the fact |

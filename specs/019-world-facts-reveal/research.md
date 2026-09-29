@@ -93,7 +93,7 @@ Creator mode stays on for the conversation it was activated in (clarification); 
 **Decision**: On a creator turn in a world session:
 - the world toolbox is built without zone access limits, the post restriction and the activity gate;
 - `reveal` lists every fact of the world (as "holder: topic") and approves without review;
-- three admin tools are added: `set_fact_known(fact, known)`, `grant(holder, credits, items)` and `remove(holder, credits, items)`, where `holder` is "the user" or a resident of the world. `grant` creates from nothing and `remove` destroys, through `TransferInventory` with a null side.
+- three admin tools are added: `set_fact_known(fact, known)`, `grant(holder, credits, items)` and `remove(holder, credits, items)`, where `holder` is "the user" or a resident of the world. `grant` creates from nothing and `remove` destroys, through `TransferInventory` with a null side. Credits apply to the user only, since residents have no credit balance; credits named for a resident return an error to the model.
 
 Every creator action counts: reveals and `set_fact_known` write `reveal_attempts` with source `creator`, and credit changes set `credit_transactions.by_creator`. Outside a world session a creator turn only includes the `creator mode` section.
 

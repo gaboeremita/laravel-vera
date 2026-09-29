@@ -58,15 +58,17 @@ class ImageGenPromptEnhancer
     }
 
     /**
-     * @return array<int, array{role: string, content: string}>
-     */
-    /**
      * Skips the most recent message: it's the raw /create-image command itself,
      * already persisted before this runs, and is re-appended separately as the final turn.
+     *
+     * @return array<int, array{role: string, content: string}>
      */
     private function recentHistory(Conversation $conversation): array
     {
         return $conversation->messages()
+            ->whereIn('role', ['user', 'assistant'])
+            ->whereNotNull('content')
+            ->where('content', '!=', '')
             ->orderByDesc('created_at')
             ->skip(1)
             ->take(self::HISTORY_LIMIT)

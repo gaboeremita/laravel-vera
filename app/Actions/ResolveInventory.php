@@ -37,7 +37,7 @@ class ResolveInventory
             'world_resident_id' => $starting->world_resident_id,
             'region_id' => $starting->region_id,
             'object_id' => $starting->object_id,
-            'credits' => $starting->credits,
+            'credits' => $starting->holder->countsCredits() ? $starting->credits : null,
         ]);
 
         foreach ($starting->items as $item) {
@@ -81,7 +81,7 @@ class ResolveInventory
 
             return $starting !== null
                 ? $this->copy($starting, $session)
-                : $session->inventories()->create([...$key, 'credits' => 0]);
+                : $session->inventories()->create([...$key, 'credits' => $key['holder']->countsCredits() ? 0 : null]);
         });
     }
 }

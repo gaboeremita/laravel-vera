@@ -13,9 +13,10 @@ function sameInventory(a, b) {
 
 /**
  * Credits and items a holder starts every session with. `flag` adds a per-item toggle:
- * forSale for residents, takeable for objects.
+ * forSale for residents, takeable for objects. Residents have no credit balance, so
+ * their editor leaves credits out.
  */
-export default function StartingInventoryEditor({ items, value, allowUnlimited, flag = null, flagLabel = '', onSave, saveLabel = 'SAVE' }) {
+export default function StartingInventoryEditor({ items, value, allowUnlimited, holdsCredits = true, flag = null, flagLabel = '', onSave, saveLabel = 'SAVE' }) {
 	const saved = value ?? EMPTY;
 	const [draft, setDraft] = useState(saved);
 	const [previousSaved, setPreviousSaved] = useState(saved);
@@ -46,10 +47,12 @@ export default function StartingInventoryEditor({ items, value, allowUnlimited, 
 
 	return (
 		<div className="space-y-3">
-			<div className="grid grid-cols-[minmax(0,14rem)] gap-1">
-				<label className={FIELD_LABEL}>Credits</label>
-				<UnlimitedAmountInput value={draft.credits} allowUnlimited={allowUnlimited} ariaLabel="Credits" onChange={(credits) => setDraft((current) => ({ ...current, credits }))} />
-			</div>
+			{holdsCredits && (
+				<div className="grid grid-cols-[minmax(0,14rem)] gap-1">
+					<label className={FIELD_LABEL}>Credits</label>
+					<UnlimitedAmountInput value={draft.credits} allowUnlimited={allowUnlimited} ariaLabel="Credits" onChange={(credits) => setDraft((current) => ({ ...current, credits }))} />
+				</div>
+			)}
 			<div>
 				<p className={FIELD_LABEL}>Items</p>
 				{items.length === 0 ? (

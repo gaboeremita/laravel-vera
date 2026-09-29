@@ -52,8 +52,10 @@ class Narrate
     {
         $items = $inventory->items()->with('item')->get()
             ->map(fn (InventoryItem $held) => ($held->quantity === null ? 'plenty of ' : ($held->quantity > 1 ? "{$held->quantity} " : '')).$held->item->name.' ('.$held->item->description.')');
-        $credits = $inventory->credits === null ? 'unlimited credits' : "{$inventory->credits} credits";
+        if ($inventory->holder->countsCredits()) {
+            $items->prepend($inventory->credits === null ? 'unlimited credits' : "{$inventory->credits} credits");
+        }
 
-        return $items->isEmpty() ? $credits : $credits.'; '.$items->implode('; ');
+        return $items->isEmpty() ? 'nothing' : $items->implode('; ');
     }
 }

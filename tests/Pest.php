@@ -274,13 +274,13 @@ function toolResultSentBack(int $requestIndex = 1): string
  *
  * @return array{0: User, 1: Assistant, 2: Conversation, 3: Region, 4: WorldResident, 5: WorldSession, 6: Inventory, 7: Inventory}
  */
-function inventoryScenario(int $playerCredits = 100, ?int $residentCredits = 50): array
+function inventoryScenario(int $playerCredits = 100): array
 {
     $scenario = worldStateScenario(fakeReply: false);
     [, , , $region, $resident, $session] = $scenario;
 
     $player = Inventory::factory()->forPlayer()->create(['world_session_id' => $session->id, 'credits' => $playerCredits]);
-    $residentInventory = Inventory::factory()->forResident($resident)->create(['world_session_id' => $session->id, 'credits' => $residentCredits]);
+    $residentInventory = Inventory::factory()->forResident($resident)->create(['world_session_id' => $session->id]);
 
     return [...$scenario, $player, $residentInventory];
 }

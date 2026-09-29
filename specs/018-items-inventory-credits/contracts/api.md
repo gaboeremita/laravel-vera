@@ -25,7 +25,7 @@ Shapes used below:
 |---|---|---|---|
 | GET | /worlds/{world}/starting-inventories | worlds.starting-inventories.index | `{ player, residents: { [residentId]: … }, objects: { [regionId]: { [objectId]: … } } }`, each `{ credits, items: [{ itemId, quantity, forSale?, takeable? }] }` |
 | PUT | /worlds/{world}/starting-inventories/player | worlds.starting-inventories.player.update | `{ credits, items }`; 422 on `null` credits or quantities |
-| PUT | /worlds/{world}/starting-inventories/residents/{resident} | worlds.starting-inventories.residents.update | `{ credits, items: [{ itemId, quantity, forSale }] }`; 422 when the resident's model can't call tools and anything is non-empty (FR-002a) |
+| PUT | /worlds/{world}/starting-inventories/residents/{resident} | worlds.starting-inventories.residents.update | `{ items: [{ itemId, quantity, forSale }] }`, returning `credits: null`; 422 when the resident's model can't call tools and items is non-empty (FR-002a) |
 | PUT | /worlds/{world}/regions/{region}/objects/{object}/starting-inventory | worlds.regions.objects.starting-inventory.update | `{ credits, items: [{ itemId, quantity, takeable }] }`; 422 when the object is not in the layout |
 
 ### Activity terms
@@ -73,7 +73,7 @@ All under `/worlds/{world}/sessions/{session}`. Every response that can change t
 
 | Tool | Available | Arguments | Result to the model |
 |---|---|---|---|
-| `give` | conversations with the player and with residents, when the model supports tools and the resident holds anything | `{ credits?, items?: [{ item, quantity }] }`, `item` by name | what was handed over, or why not ("you only have 1 key") |
+| `give` | conversations with the player and with residents, when the model supports tools | `{ credits?, items?: [{ item, quantity }] }`, `item` by name; `credits` only with the player, any amount | what was handed over, or why not ("you only have 1 key") |
 | `ask_for` | conversations with the player | `{ credits?, items?: [{ item, quantity }], reason }` | "You asked; they will answer." |
 | `use` (changed) | as today | as today | leaves out activities whose item or credit terms the resident can't meet; applies the terms, or explains a refusal from the narrator |
 | `narrate` (narrator only) | the narrator call | `{ succeeded: bool, narration: string }` | |

@@ -92,6 +92,9 @@ class AvatarBackgroundPromptEnhancer
     private function recentHistory(Conversation $conversation): array
     {
         return $conversation->messages()
+            ->whereIn('role', ['user', 'assistant'])
+            ->whereNotNull('content')
+            ->where('content', '!=', '')
             ->orderByDesc('created_at')
             ->take(self::HISTORY_LIMIT)
             ->get(['role', 'content'])

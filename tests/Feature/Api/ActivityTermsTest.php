@@ -4,6 +4,7 @@ use App\Actions\ResolveInventory;
 use App\Models\ActivityTerms;
 use App\Models\AiModel;
 use App\Models\Assistant;
+use App\Models\CreditTransaction;
 use App\Models\InventoryItem;
 use App\Models\Region;
 use App\Models\ResidentActivity;
@@ -109,13 +110,29 @@ it('lets a resident use a paid activity without charging them', function () {
     $scenario = autonomousTermsScenario();
     [, , , , $resident, $session] = $scenario;
     $residentInventory = app(ResolveInventory::class)->forResident($session, $resident);
-    $residentInventory->update(['credits' => 0]);
     loungerTerms($scenario, ['cost' => 5]);
     fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline']), finalAnswerResponse('(Sun) *stretches out*'));
 
     requestTermsDecision($this, $scenario)->assertCreated();
 
-    expect($residentInventory->fresh()->credits)->toBe(0)
+    expect($residentInventory->fresh()->credits)->toBeNull()
+        ->and(CreditTransaction::count())->toBe(0)
+        ->and(ResidentActivity::where('verb', 'use')->count())->toBe(1);
+});
+
+it('keeps an activity\'s credits in the object when a resident uses it', function () {
+    $scenario = autonomousTermsScenario();
+    [, , , $region, $resident, $session] = $scenario;
+    $object = app(ResolveInventory::class)->forObject($session, $region, 'pool-lounger-1');
+    $object->update(['credits' => 20]);
+    loungerTerms($scenario, ['gives_credits' => 10]);
+    fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline']), finalAnswerResponse('(Sun) *stretches out*'));
+
+    requestTermsDecision($this, $scenario)->assertCreated();
+
+    expect($object->fresh()->credits)->toBe(20)
+        ->and(app(ResolveInventory::class)->forResident($session, $resident)->credits)->toBeNull()
+        ->and(CreditTransaction::count())->toBe(0)
         ->and(ResidentActivity::where('verb', 'use')->count())->toBe(1);
 });
 

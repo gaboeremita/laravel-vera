@@ -15,14 +15,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 it('moves items and credits between two inventories and records the credits', function () {
-    [$user, $assistant, , $region, , , $player, $resident] = inventoryScenario(playerCredits: 100, residentCredits: 5);
+    [$user, $assistant, , $region, , , $player, $resident] = inventoryScenario(playerCredits: 100);
     $bread = worldItem($region, ['name' => 'Bread']);
     InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => $bread->id, 'quantity' => 3]);
 
     app(TransferInventory::class)->handle($player, $resident, 40, [$bread->id => 2], 'gift');
 
     expect($player->fresh()->credits)->toBe(60)
-        ->and($resident->fresh()->credits)->toBe(45)
+        ->and($resident->fresh()->credits)->toBeNull()
         ->and($player->items()->first()->quantity)->toBe(1)
         ->and($resident->items()->first()->quantity)->toBe(2);
 
@@ -34,7 +34,7 @@ it('moves items and credits between two inventories and records the credits', fu
 });
 
 it('never runs out of an unlimited amount', function () {
-    [, , , $region, , , $player, $resident] = inventoryScenario(residentCredits: null);
+    [, , , $region, , , $player, $resident] = inventoryScenario();
     $bread = worldItem($region);
     InventoryItem::factory()->unlimited()->create(['inventory_id' => $resident->id, 'item_id' => $bread->id]);
 
@@ -107,13 +107,31 @@ it('stocks a new session with a copy of the starting inventories', function () {
 it('copies a starting inventory the first time an older session needs it', function () {
     [, , , $region, $resident, $session] = inventoryScenario();
     $session->inventories()->delete();
-    StartingInventory::factory()->forResident($resident)->create(['credits' => 12]);
+    $bread = worldItem($region);
+    $starting = StartingInventory::factory()->forResident($resident)->create();
+    StartingInventoryItem::factory()->create(['starting_inventory_id' => $starting->id, 'item_id' => $bread->id, 'quantity' => 3]);
 
     $first = app(ResolveInventory::class)->forResident($session, $resident);
     $second = app(ResolveInventory::class)->forResident($session, $resident);
 
-    expect($first->credits)->toBe(12)
+    expect($first->items()->first()->quantity)->toBe(3)
         ->and($second->id)->toBe($first->id)
+        ->and(app(ResolveInventory::class)->forPlayer($session)->credits)->toBe(0);
+});
+
+it('leaves a resident\'s credits uncounted whatever their starting inventory held', function () {
+    [, , , , $resident, $session] = inventoryScenario();
+    $session->inventories()->delete();
+    StartingInventory::factory()->forResident($resident)->create(['credits' => 12]);
+
+    expect(app(ResolveInventory::class)->forResident($session, $resident)->credits)->toBeNull();
+});
+
+it('starts a resident with no starting inventory with uncounted credits', function () {
+    [, , , , $resident, $session] = inventoryScenario();
+    $session->inventories()->delete();
+
+    expect(app(ResolveInventory::class)->forResident($session, $resident)->credits)->toBeNull()
         ->and(app(ResolveInventory::class)->forPlayer($session)->credits)->toBe(0);
 });
 

@@ -77,7 +77,7 @@ class WorldResident extends Model
 
     /**
      * Whether their model, as chosen by this user, can call tools, which
-     * holding items, credits or facts depends on.
+     * holding items or facts depends on.
      */
     public function canCallToolsFor(User $user): bool
     {

@@ -33,7 +33,7 @@ What a holder starts every session with.
 | `world_resident_id` | FK `world_residents`, nullable, cascade | set when `holder = resident` |
 | `region_id` | FK `regions`, nullable, cascade | set when `holder = object` |
 | `object_id` | string, nullable | layout object id, set when `holder = object` |
-| `credits` | uint, nullable | `null` = unlimited; never `null` for the player |
+| `credits` | uint, nullable | `null` = unlimited; never `null` for the player; always `null` for a resident, whose credits are never counted (FR-003a) |
 
 At most one row per world for the player, per resident, and per region object; enforced by the action that saves them.
 
@@ -116,7 +116,8 @@ Unique `(region_id, object_id, activity_id)`.
 - `for_sale` only on resident rows, `takeable` only on object rows.
 - An object's `object_id` must exist in the region's layout; an `activity_terms` `activity_id` must be offered by one of that object's spots.
 - Items referenced in `releases_items`, `gives_items`, `required_item_id` and handover requests must belong to the same world.
-- A resident's starting inventory with any items or credits requires their model to support tools (FR-002a).
+- A resident's starting inventory and session inventory always have `null` credits; credits sent for a resident's starting inventory are ignored (FR-003a).
+- A resident's starting inventory with any items requires their model to support tools (FR-002a).
 - `narrator_model_id` must be one of the requesting user's models.
 
 ## Lifecycle

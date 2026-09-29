@@ -52,5 +52,5 @@ Shapes used below:
 | `acknowledge` | player conversation, resident relays a fact the player knows | `{ fact: enum of topics }` | `{ status: "acknowledged" }`; error when the player doesn't know it |
 | `verdict` | forced, in the review call only | `{ approved: bool, verdict: string }` | read by `ReviewReveal` |
 | `set_fact_known` | creator turns | `{ fact: enum "holder: topic", known: bool }` | `{ status }` |
-| `grant` | creator turns | `{ holder: enum, credits?: int, items?: [{ item, quantity }] }` | `{ status, note }` |
+| `grant` | creator turns | `{ holder: enum, credits?: int, items?: [{ item, quantity }] }`; `credits` only for "the user" | `{ status, note }`; error when credits are named for a resident |
 | `remove` | creator turns | same as `grant` | `{ status, note }`; error when the holder has less |

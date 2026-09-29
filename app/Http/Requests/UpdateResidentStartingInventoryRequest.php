@@ -18,6 +18,11 @@ class UpdateResidentStartingInventoryRequest extends StartingInventoryRequest
         return 'forSale';
     }
 
+    protected function holdsCredits(): bool
+    {
+        return false;
+    }
+
     /**
      * @return array<int, callable>
      */
@@ -25,14 +30,14 @@ class UpdateResidentStartingInventoryRequest extends StartingInventoryRequest
     {
         return [
             function (Validator $validator): void {
-                if ($validator->errors()->isNotEmpty() || ($this->input('items') === [] && $this->input('credits') === 0)) {
+                if ($validator->errors()->isNotEmpty() || $this->input('items') === []) {
                     return;
                 }
 
                 /** @var WorldResident $resident */
                 $resident = $this->route('resident');
                 if ($resident->assistant->kind === AssistantKind::WorldNpc && ! $resident->canCallToolsFor($this->user())) {
-                    $validator->errors()->add('credits', "{$resident->assistant->name}'s model can't call tools, so they could never give or ask for anything. Choose a model with tool calling for them to hold items or credits.");
+                    $validator->errors()->add('items', "{$resident->assistant->name}'s model can't call tools, so they could never give or ask for anything. Choose a model with tool calling for them to hold items.");
                 }
             },
         ];

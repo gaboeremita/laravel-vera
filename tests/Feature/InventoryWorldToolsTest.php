@@ -19,7 +19,7 @@ function chatPositions(array $scenario): array
 }
 
 it('lets a resident hand the player credits and items from their own inventory', function () {
-    $scenario = inventoryScenario(playerCredits: 10, residentCredits: 50);
+    $scenario = inventoryScenario(playerCredits: 10);
     [, , , $region, , , $player, $resident] = $scenario;
     $bread = worldItem($region, ['name' => 'Bread']);
     InventoryItem::factory()->create(['inventory_id' => $resident->id, 'item_id' => $bread->id, 'quantity' => 3]);
@@ -31,35 +31,40 @@ it('lets a resident hand the player credits and items from their own inventory',
         ->assertJsonPath('changes.credits', 20)
         ->assertJsonPath('changes.items.0.delta', 2);
 
-    expect($resident->fresh()->credits)->toBe(30)
+    expect($resident->fresh()->credits)->toBeNull()
         ->and($resident->items()->first()->quantity)->toBe(1)
         ->and($player->items()->first()->quantity)->toBe(2);
 });
 
 it('refuses a hand-over beyond what the resident carries and tells them why', function () {
-    $scenario = inventoryScenario(playerCredits: 10, residentCredits: 5);
-    [, $assistant, , , , , $player, $resident] = $scenario;
-    fakeTurn(toolCallResponse('call_1', 'give', ['credits' => 40]), finalAnswerResponse('Ah, I am short.'));
+    $scenario = inventoryScenario(playerCredits: 10);
+    [, $assistant, , $region, , , $player, $resident] = $scenario;
+    InventoryItem::factory()->create(['inventory_id' => $resident->id, 'item_id' => worldItem($region, ['name' => 'Bread'])->id, 'quantity' => 1]);
+    fakeTurn(toolCallResponse('call_1', 'give', ['items' => [['item' => 'Bread', 'quantity' => 3]]]), finalAnswerResponse('Ah, I am short.'));
 
     sendWorldMessage($this, $scenario, chatPositions($scenario))->assertOk()->assertJsonPath('inventory.credits', 10);
 
-    expect(toolResultSentBack())->toContain("{$assistant->name} has only 5 credits")
-        ->and($resident->fresh()->credits)->toBe(5)
-        ->and($player->fresh()->credits)->toBe(10);
+    expect(toolResultSentBack())->toContain("{$assistant->name} has only 1 Bread")
+        ->and($resident->items()->first()->quantity)->toBe(1)
+        ->and($player->items()->count())->toBe(0);
 });
 
-it('keeps an unlimited stock unlimited', function () {
-    $scenario = inventoryScenario(playerCredits: 0, residentCredits: null);
+it('lets a resident give any amount of credits without ever running out', function () {
+    $scenario = inventoryScenario(playerCredits: 0);
     [, , , , , , $player, $resident] = $scenario;
-    fakeTurn(toolCallResponse('call_1', 'give', ['credits' => 1000]), finalAnswerResponse('A fortune.'));
+    fakeTurn(
+        toolCallResponse('call_1', 'give', ['credits' => 1000]),
+        toolCallResponse('call_2', 'give', ['credits' => 1000]),
+        finalAnswerResponse('A fortune.'),
+    );
 
     sendWorldMessage($this, $scenario, chatPositions($scenario))->assertOk();
 
-    expect($resident->fresh()->credits)->toBeNull()->and($player->fresh()->credits)->toBe(1000);
+    expect($resident->fresh()->credits)->toBeNull()->and($player->fresh()->credits)->toBe(2000);
 });
 
 it('never takes from the player through the resident\'s tools', function () {
-    $scenario = inventoryScenario(playerCredits: 100, residentCredits: 0);
+    $scenario = inventoryScenario(playerCredits: 100);
     [, , , $region, , , $player] = $scenario;
     $key = worldItem($region, ['name' => 'Iron key']);
     InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => $key->id, 'quantity' => 1]);
@@ -81,7 +86,7 @@ it('never takes from the player through the resident\'s tools', function () {
 });
 
 it('tells a resident what they carry and never what the player carries', function () {
-    $scenario = inventoryScenario(playerCredits: 777, residentCredits: 12);
+    $scenario = inventoryScenario(playerCredits: 777);
     [, , , $region, , , $player, $resident] = $scenario;
     InventoryItem::factory()->forSale()->create(['inventory_id' => $resident->id, 'item_id' => worldItem($region, ['name' => 'Bread', 'base_price' => 2])->id, 'quantity' => 4]);
     InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => worldItem($region, ['name' => 'Secret map'])->id]);
@@ -90,7 +95,7 @@ it('tells a resident what they carry and never what the player carries', functio
     sendWorldMessage($this, $scenario, chatPositions($scenario))->assertOk();
 
     expect(sentSystemPrompt())
-        ->toContain('You carry 12 credits.')
+        ->toContain('You can pay or give the user any amount of credits the moment calls for.')
         ->toContain('4 Bread (for sale, usually 2 credits for one Bread)')
         ->not->toContain('Secret map')
         ->not->toContain('777');
@@ -103,7 +108,6 @@ it('lets residents hand each other items for free while they talk', function () 
     Settings::create(['user_id' => $user->id, 'assistant_id' => $vera->id, 'data' => Settings::where('user_id', $user->id)->where('assistant_id', $yinlin->id)->first()->data]);
     $second = $region->residents()->create(['assistant_id' => $vera->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'autonomous']);
     $veraInventory = app(ResolveInventory::class)->forResident($session, $second);
-    $veraInventory->update(['credits' => 30]);
     InventoryItem::factory()->forSale()->create(['inventory_id' => $veraInventory->id, 'item_id' => worldItem($region, ['name' => 'Tacos', 'base_price' => 15])->id, 'quantity' => 3]);
     $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera)->forWorldSession($session)->create(['resumed_at' => now()->subMinute()]);
     $conversation->messages()->create(['role' => 'assistant', 'content' => 'Two tacos, please!', 'speaker_type' => $yinlin->getMorphClass(), 'speaker_id' => $yinlin->id])->forceFill(['created_at' => now()->subMinute()])->save();
@@ -116,8 +120,8 @@ it('lets residents hand each other items for free while they talk', function () 
     $giveTool = collect(Http::recorded()[0][0]['tools'])->firstWhere('function.name', 'give');
     $yinlinInventory = app(ResolveInventory::class)->forResident($session, $first);
     expect($giveTool['function']['parameters']['properties'])->not->toHaveKey('credits')
-        ->and(sentSystemPrompt())->toContain('nothing really costs credits')->not->toContain('You carry 30 credits')
-        ->and($veraInventory->fresh()->credits)->toBe(30)
+        ->and(sentSystemPrompt())->toContain('nothing really costs credits')->not->toContain('any amount of credits')
+        ->and($veraInventory->fresh()->credits)->toBeNull()
         ->and($veraInventory->items()->first()->quantity)->toBe(1)
         ->and($yinlinInventory->items()->first()->quantity)->toBe(2);
 });

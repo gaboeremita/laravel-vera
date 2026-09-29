@@ -18,6 +18,14 @@ abstract class StartingInventoryRequest extends FormRequest
      */
     abstract protected function itemFlag(): ?string;
 
+    /**
+     * Whether this holder starts with a credit balance.
+     */
+    protected function holdsCredits(): bool
+    {
+        return true;
+    }
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -33,7 +41,7 @@ abstract class StartingInventoryRequest extends FormRequest
         $amount = $this->allowsUnlimited() ? ['present', 'nullable', 'integer', 'min:0'] : ['required', 'integer', 'min:0'];
 
         return [
-            'credits' => $amount,
+            ...($this->holdsCredits() ? ['credits' => $amount] : []),
             'items' => ['present', 'array'],
             'items.*.itemId' => ['required', 'integer', 'distinct', Rule::exists('items', 'id')->where('world_id', $world->id)],
             'items.*.quantity' => $this->allowsUnlimited() ? ['present', 'nullable', 'integer', 'min:1'] : ['required', 'integer', 'min:1'],
@@ -55,6 +63,10 @@ abstract class StartingInventoryRequest extends FormRequest
 
     public function credits(): ?int
     {
+        if (! $this->holdsCredits()) {
+            return null;
+        }
+
         $credits = $this->validated('credits');
 
         return $credits === null ? null : (int) $credits;

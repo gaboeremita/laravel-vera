@@ -18,7 +18,7 @@ uses(RefreshDatabase::class);
  */
 function reviewScenario(): array
 {
-    $scenario = inventoryScenario(playerCredits: 100, residentCredits: 0);
+    $scenario = inventoryScenario(playerCredits: 100);
     [, , $conversation, $region, $resident, , $player, $holder] = $scenario;
     $region->world->update(['narrator_model_id' => AiModel::first()->id]);
     $conversation->update(['long_term_memory' => 'The user once saved their cat from the harbor.']);

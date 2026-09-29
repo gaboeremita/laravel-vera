@@ -257,6 +257,7 @@ function ResidentRow({ worldId, candidate, resident, otherResidents, regionId, r
 							items={inventoryConfig.items}
 							value={inventoryConfig.starting.residents[resident.id]}
 							allowUnlimited
+							holdsCredits={false}
 							flag="forSale"
 							flagLabel="For sale"
 							saveLabel="SAVE STARTING INVENTORY"

@@ -6,14 +6,14 @@
 
 ## Summary
 
-Worlds get items, and the player, residents and region objects get inventories of items and credits, configured per world and copied into each session.
+Worlds get items, and the player, residents and region objects get inventories, configured per world and copied into each session. The player and objects hold items and credits; residents hold items and give or receive credits without a balance.
 
 - **Schema**: `items`, `starting_inventories` and their items for configuration; `inventories` and their items per session; `activity_terms`, `handover_requests`, `credit_transactions`; `worlds.narrator_model_id` ([data-model.md](data-model.md)).
 - **Transfers**: one `TransferInventory` action moves items and credits between any two inventories under row locks and records credit transactions. Only player endpoints can take from the player's inventory (research R4, R5).
 - **Residents**: `give` and `ask_for` world tools; their own inventory in their prompt; `use` respects activity terms (R6, R8, R13).
 - **Player**: give from the conversation panel, answer handover requests, see vendors' goods, take from objects, use activities with terms, examine and use items, credit history. The server writes the line the character hears about each handover (R7, R9, R11, R12, R15).
 - **Narrator**: one forced-tool LLM call judges plain-language requirements and narrates outcomes for activities and items, on the world's narrator model (R10).
-- **Configuration UI**: items editor and player starting inventory on the World tab; starting inventory, credits and for-sale marks in the residents editor; object inventories and activity terms in the region form.
+- **Configuration UI**: items editor and player starting inventory on the World tab; starting inventory and for-sale marks in the residents editor; object inventories and activity terms in the region form.
 
 ## Technical Context
 

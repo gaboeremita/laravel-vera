@@ -18,12 +18,13 @@
 - Q: Can the player see what a resident is carrying? → A: Vendors show the player their items for sale; every other resident's inventory stays hidden, and they may tell the player what they carry, or not.
 - Q: Do residents pay credits when they trade with each other or use a paid activity? → A: No. Between residents credits are only played at: they may name a price and act out paying, but only items change hands, for free, and residents are never charged an activity's cost.
 - Q: How far do residents look for vendors? → A: Within their own region.
+- Q: Do residents have a credit balance? → A: No. Only the player's credits are counted. Residents give and receive credits freely: what a resident gives the player appears from nothing, what the player pays a resident leaves the player and goes nowhere, and a resident never runs out.
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Define items and starting stock (Priority: P1)
 
-In a world's configuration, the user defines the world's items: a name, a description, an optional image and an optional base price. The user sets what the player starts every session with (items and credits), and, on each resident, what that resident starts with. A quantity can be a number or unlimited for residents, so a merchant can have endless bread or endless credits.
+In a world's configuration, the user defines the world's items: a name, a description, an optional image and an optional base price. The user sets what the player starts every session with (items and credits), and, on each resident, the items that resident starts with. A quantity can be a number or unlimited for residents, so a merchant can have endless bread.
 
 **Why this priority**: Nothing else in the feature has anything to act on until items exist and someone holds them.
 
@@ -50,7 +51,7 @@ During play, the player sees their credits and opens their inventory to see ever
 **Acceptance Scenarios**:
 
 1. **Given** the player holds items and credits, **When** the player opens the inventory, **Then** every held item is shown with its quantity, and the credit balance is shown.
-2. **Given** the player is talking with a resident and holds 100 credits, **When** the player gives them 50 credits, **Then** the player holds 50, the resident's balance grows by 50, and the resident's next reply is generated knowing they received 50 credits.
+2. **Given** the player is talking with a resident and holds 100 credits, **When** the player gives them 50 credits, **Then** the player holds 50, the 50 credits leave the player without being added to any balance, and the resident's next reply is generated knowing they received 50 credits.
 3. **Given** the player holds 1 key, **When** the player gives the key to the resident, **Then** the key leaves the player's inventory and appears in the resident's.
 4. **Given** the player holds 20 credits, **When** the player tries to give 50, **Then** the interface does not allow it and nothing changes.
 
@@ -58,7 +59,7 @@ During play, the player sees their credits and opens their inventory to see ever
 
 ### User Story 3 - Residents give and ask for payment (Priority: P1)
 
-A resident can decide, in character, to give the player (or another character they are talking with) items or credits from their own inventory. A resident can also ask the player for anything: credits, an item, a piece of information, a certain answer. When the request includes credits or items, the player sees it with what is asked and why, and accepts or declines it; anything else is simply said and answered in conversation, and the resident judges whether the player delivered. Nothing leaves the player's inventory unless the player gives it or accepts a request.
+A resident can decide, in character, to give the player (or another character they are talking with) items from their own inventory, and to give the player any amount of credits. A resident can also ask the player for anything: credits, an item, a piece of information, a certain answer. When the request includes credits or items, the player sees it with what is asked and why, and accepts or declines it; anything else is simply said and answered in conversation, and the resident judges whether the player delivered. Nothing leaves the player's inventory unless the player gives it or accepts a request.
 
 **Why this priority**: This is what makes trading, rewards and merchants possible while keeping the player's inventory safe from a character's mistaken or invented actions.
 
@@ -68,14 +69,14 @@ A resident can decide, in character, to give the player (or another character th
 
 1. **Given** a resident holds 10 bread, **When** the resident decides to give the player 2, **Then** the resident holds 8, the player holds 2, and the player is notified of what they received.
 2. **Given** a resident holds 1 key, **When** the resident tries to give 2 keys, **Then** the handover is refused, nothing moves, and the resident is told they only have 1.
-3. **Given** a resident asks the player for 30 credits "for the map", **When** the player accepts, **Then** 30 credits move from the player to the resident and the resident is told the payment was made.
+3. **Given** a resident asks the player for 30 credits "for the map", **When** the player accepts, **Then** 30 credits leave the player and the resident is told the payment was made.
 4. **Given** a resident asks for 30 credits, **When** the player declines, **Then** nothing moves and the resident is told the player declined.
 5. **Given** the player holds 10 credits, **When** a resident asks for 30, **Then** the player sees the request but cannot accept it, and the resident is told the player can't afford it.
-6. **Given** a resident has unlimited credits, **When** they give the player 1,000 credits, **Then** the player gains 1,000 and the resident's credits stay unlimited.
+6. **Given** any resident, **When** they give the player 1,000 credits twice, **Then** the player gains 2,000 and the resident could give again, since a resident never runs out of credits.
 7. **Given** a resident is a vendor with 3 of their items marked for sale, **When** the player talks with them, **Then** the player can see those 3 items with their base prices, and nothing else the vendor carries.
 8. **Given** a resident is not a vendor, **When** the player talks with them, **Then** their inventory is never shown; the resident may describe what they carry, in character, or keep it to themselves.
 9. **Given** the player agrees on a price with a vendor, **When** the vendor asks for the credits and the player accepts, **Then** the vendor hands over the item, and the price paid may differ from the base price.
-10. **Given** a resident asks for 10 credits and the lantern, **When** the player accepts, **Then** both move to the resident together.
+10. **Given** a resident asks for 10 credits and the lantern, **When** the player accepts, **Then** the credits leave the player and the lantern moves to the resident, together.
 11. **Given** a resident asks the player where the harbor master lives, **When** the player answers in conversation, **Then** no confirmation is shown and the resident judges the answer in character.
 
 ---
@@ -113,7 +114,8 @@ Beyond items and credits, an activity can have a requirement and an outcome writ
 2. **Given** the player holds the key and the requirement keeps the item, **When** the player uses the activity, **Then** it works and the player still holds the key.
 3. **Given** the requirement consumes the item and the player holds 2 coins, **When** the player uses the activity, **Then** it works and the player holds 1 coin.
 4. **Given** an activity requires a key, **When** a resident without the key considers what to do, **Then** that activity is not offered to them.
-4a. **Given** an activity costs 5 credits, **When** a resident with no credits uses it, **Then** it works and the resident's credits do not change.
+4a. **Given** an activity costs 5 credits, **When** a resident uses it, **Then** it works and no credits change hands.
+4b. **Given** an activity gives 20 credits and its object has 30 credits, **When** a resident uses it, **Then** it works and the object still has 30 credits.
 5. **Given** an activity costs 5 credits and gives 1 drink, **When** the player with 12 credits uses it, **Then** the player holds 7 credits and 1 more drink, and the object holds 1 drink less.
 6. **Given** an activity costs 5 credits, **When** the player with 3 credits tries to use it, **Then** the activity does not start and the player is told it costs 5 credits.
 7. **Given** an activity gives 20 credits and its object has 30 credits, **When** the player uses it twice, **Then** the first use gives 20 and the second is not offered, because the object has only 10 left.
@@ -166,20 +168,20 @@ Residents know which other residents of their region sell something, what they s
 
 1. **Given** a resident of the region sells tacos and serves at the taco stand, **When** another resident of that region decides what to do, **Then** they are told who sells tacos, where they serve and where they are now.
 2. **Given** a vendor also carries items not for sale, **When** another resident is told what the vendor sells, **Then** only the items for sale are named.
-3. **Given** two residents are talking, **When** one hands the other 2 tacos, **Then** the tacos move, and neither is offered credits to hand over nor told their credit balance.
+3. **Given** two residents are talking, **When** one hands the other 2 tacos, **Then** the tacos move, and neither is offered credits to hand over.
 4. **Given** an activity names a vendor, **When** the vendor is in the same room as another resident, **Then** that activity is not offered to the other resident; **When** the vendor is elsewhere, **Then** it is offered as usual.
 
 ---
 
 ### Edge Cases
 
-- A resident's model cannot hand over items or ask for payment: the resident configuration does not allow giving that resident a starting inventory or credits, and says why.
+- A resident's model cannot hand over items or ask for payment: the resident configuration does not allow giving that resident a starting inventory, and says why.
 - The player gives an item to a resident in the middle of that resident's reply: the handover is applied once and appears in the conversation before the next reply.
 - Two handover requests arrive before the player answers the first: each is shown and answered separately; accepting one that is no longer affordable is refused.
 - The player ends a conversation while a request from that character is still unanswered: the request is cancelled; nothing moves, and the character must ask again in a later conversation.
 - A resident is removed from a region while holding items from the player: the items are lost with the resident's session state.
 - An item's quantity reaches 0 in an inventory: it disappears from that inventory; unlimited quantities never reach 0.
-- Credits never go below 0 for any holder.
+- The player's and objects' credits never go below 0.
 - The same item is placed on several objects: each object keeps its own count.
 - An object's activity requires an item that was deleted: the requirement is removed along with the item.
 
@@ -188,25 +190,26 @@ Residents know which other residents of their region sell something, what they s
 ### Functional Requirements
 
 - **FR-001**: Users MUST be able to create, edit and delete items per world, each with a name, description, optional image and optional base price.
-- **FR-002**: Users MUST be able to set a starting inventory of items and credits for the player per world, and for each resident.
-- **FR-002a**: Users MUST NOT be able to give a starting inventory or credits to a resident whose model cannot hand over items or ask for payment; the configuration MUST say why.
-- **FR-003**: Quantities and credit balances MUST be whole numbers of 0 or more; residents' and objects' quantities and credits MAY be unlimited.
+- **FR-002**: Users MUST be able to set a starting inventory of items and credits for the player per world, and a starting inventory of items for each resident.
+- **FR-002a**: Users MUST NOT be able to give a starting inventory to a resident whose model cannot hand over items or ask for payment; the configuration MUST say why.
+- **FR-003**: Quantities and credit balances MUST be whole numbers of 0 or more; residents' and objects' quantities, and objects' credits, MAY be unlimited.
+- **FR-003a**: Residents MUST NOT have a credit balance. Credits a resident gives MUST come from nothing, credits paid to a resident MUST leave the payer and go nowhere, and a resident MUST never run out of credits.
 - **FR-004**: Every new session MUST start with a copy of the configured starting inventories; changes to configuration MUST NOT affect existing sessions.
 - **FR-005**: The player MUST be able to see their credit balance at all times during play and open a view of every held item with its quantity.
 - **FR-006**: While in a conversation with a character, the player MUST be able to give that character any held item or any amount of credits up to their balance.
 - **FR-007**: A handover from the player MUST be added to the conversation so the receiving character generates their next reply knowing about it.
-- **FR-008**: A resident MUST be able to give items or credits from their own inventory to whoever they are talking with; a handover larger than what they hold MUST be refused and the resident told why.
+- **FR-008**: A resident MUST be able to give items from their own inventory to whoever they are talking with, and any amount of credits to the player; an item handover larger than what they hold MUST be refused and the resident told why.
 - **FR-009**: A resident MUST be able to ask the player for credits, items, or both, with a stated reason; they MUST move only when the player accepts, and the resident MUST be told whether the player accepted, declined or could not provide them. Requests for anything else (information, an answer, an action) happen in conversation and are judged by the resident.
 - **FR-009a**: Users MUST be able to mark items in a resident's inventory as for sale, which makes that resident a vendor; while talking with a vendor, the player MUST be able to see the items for sale, with quantities and base prices. The inventory of a resident who is not a vendor, and a vendor's items not for sale, MUST never be shown to the player.
 - **FR-010**: Nothing MUST ever leave the player's inventory other than through the player giving it, the player accepting a handover request, or the player using an activity or item whose terms cost credits, consume a required item, or consume the item itself.
 - **FR-011**: The player MUST be notified whenever their inventory or balance changes.
 - **FR-012**: Users MUST be able to place items with a quantity or unlimited amount on objects in a region's configuration; the player MUST be able to take one of an item from an object while it has any left.
 - **FR-013**: Objects' remaining amounts MUST be tracked per session.
-- **FR-008a**: Between residents, handovers MUST be items only; credits MUST NOT move between residents, and a resident talking with another resident MUST NOT be told their credit balance.
+- **FR-008a**: Between residents, handovers MUST be items only; credits MUST NOT move between residents.
 - **FR-008b**: When a resident decides what to do on their own, they MUST be told which other residents of their region sell something, what they sell (never items not for sale), where they serve and where they are.
 - **FR-014**: Users MUST be able to set, per object activity, a required item (kept or consumed), a credit cost, or both; the required item MUST apply to the player and to residents, and the cost MUST apply to the player only.
 - **FR-014e**: Users MUST be able to name a resident as the vendor of an object activity; while the vendor is in the same room as another resident, that activity MUST NOT be offered to the other resident.
-- **FR-014a**: Users MUST be able to set, per object activity, credits and items it gives on each use; what it gives MUST come from the object's stock, and the activity MUST NOT be offered once the stock cannot cover it.
+- **FR-014a**: Users MUST be able to set, per object activity, credits and items it gives on each use; what it gives MUST come from the object's stock, and the activity MUST NOT be offered once the stock cannot cover it. A resident using the activity MUST receive only its items; the object keeps its credits.
 - **FR-014b**: Users MUST be able to give objects a stock of credits, as a number or unlimited, tracked per session like their items.
 - **FR-014c**: Users MUST be able to give an object activity a requirement and an outcome in plain language; the LLM MUST judge the requirement from what the user of the activity holds and the situation, and narrate the outcome, including information it reveals.
 - **FR-014d**: Users MUST be able to give an item a plain-language description of what examining it reveals and what it takes to use it, plus credits and items it releases when used; the player MUST be able to examine and try to use held items, with the LLM judging and narrating the result.
@@ -219,8 +222,8 @@ Residents know which other residents of their region sell something, what they s
 
 - **Item**: A thing defined once per world: name, description, optional image, optional base price, and optional plain-language contents, use requirement, and credits and items it releases.
 - **Inventory entry**: How many of an item a holder has in one session; the holder is the player, a resident or an object; the quantity is a number or unlimited; a resident's entry can be marked for sale.
-- **Credit balance**: How many credits a holder has in one session; unlimited is possible for residents and objects.
-- **Starting inventory**: The items and credits the player or a resident is configured to start each session with.
+- **Credit balance**: How many credits the player or an object has in one session; unlimited is possible for objects. Residents have no credit balance.
+- **Starting inventory**: What a holder is configured to start each session with: items and credits for the player and objects, items for a resident.
 - **Activity terms**: For one object activity: the item it requires and whether it is consumed, its credit cost, the credits and items it gives per use, and a plain-language requirement and outcome.
 - **Credit transaction**: One recorded balance change: amount, from, to, reason, time.
 
