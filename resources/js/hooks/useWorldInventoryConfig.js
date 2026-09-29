@@ -5,18 +5,20 @@ import { api } from '../utils/api.js';
 const EMPTY_STARTING = { player: { credits: 0, items: [] }, residents: {}, objects: {} };
 
 async function fetchConfig(worldId) {
-	const [itemsResponse, startingResponse] = await Promise.all([
+	const [itemsResponse, startingResponse, factsResponse] = await Promise.all([
 		api.get(route('worlds.items.index', { world: worldId })),
 		api.get(route('worlds.starting-inventories.index', { world: worldId })),
+		api.get(route('worlds.facts.index', { world: worldId })),
 	]);
-	if (!itemsResponse.ok || !startingResponse.ok) throw new Error();
-	const [items, starting] = await Promise.all([itemsResponse.json(), startingResponse.json()]);
-	return { items, starting: { player: starting.player, residents: { ...starting.residents }, objects: { ...starting.objects } } };
+	if (!itemsResponse.ok || !startingResponse.ok || !factsResponse.ok) throw new Error();
+	const [items, starting, facts] = await Promise.all([itemsResponse.json(), startingResponse.json(), factsResponse.json()]);
+	return { items, facts, starting: { player: starting.player, residents: { ...starting.residents }, objects: { ...starting.objects } } };
 }
 
-/** A world's items and starting inventories, for its configuration page. */
+/** A world's items, facts and starting inventories, for its configuration page. */
 export default function useWorldInventoryConfig(worldId, addToast) {
 	const [items, setItems] = useState([]);
+	const [facts, setFacts] = useState([]);
 	const [starting, setStarting] = useState(EMPTY_STARTING);
 
 	useEffect(() => {
@@ -26,6 +28,7 @@ export default function useWorldInventoryConfig(worldId, addToast) {
 				const config = await fetchConfig(worldId);
 				if (!active) return;
 				setItems(config.items);
+				setFacts(config.facts);
 				setStarting(config.starting);
 			} catch {
 				addToast('Failed to load items', 'error');
@@ -39,6 +42,7 @@ export default function useWorldInventoryConfig(worldId, addToast) {
 		try {
 			const config = await fetchConfig(worldId);
 			setItems(config.items);
+			setFacts(config.facts);
 			setStarting(config.starting);
 		} catch {
 			addToast('Failed to load items', 'error');
@@ -55,5 +59,5 @@ export default function useWorldInventoryConfig(worldId, addToast) {
 		return null;
 	}, [worldId, addToast]);
 
-	return { items, reloadItems: reload, starting, saveStarting };
+	return { items, facts, reloadItems: reload, starting, saveStarting };
 }

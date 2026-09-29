@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\LearnFact;
 use App\Actions\Narrate;
 use App\Actions\ResolveInventory;
 use App\Actions\TransferInventory;
+use App\Enums\RevealSource;
 use App\Exceptions\NarratorUnavailable;
 use App\Http\Controllers\Controller;
 use App\Models\Inventory;
@@ -33,19 +35,24 @@ class ItemUseController extends Controller
         }
 
         try {
-            $verdict = $this->narrate->handle($worldSession->worldUser->world, $worldSession->region, [
+            $verdict = $this->narrate->handle($worldSession->worldUser->world, $worldSession->region, array_filter([
                 'Who' => $player->displayName(),
                 'Doing' => "examining the {$held->name} ({$held->description})",
                 'What examining it reveals' => $held->contents ?: 'nothing more than what is plain to see',
+                'What they learn from it' => $held->revealsFact?->content,
                 'Verdict' => 'this always succeeds; describe what they find',
-            ]);
+            ]));
         } catch (NarratorUnavailable $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         } catch (\RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 502);
         }
 
-        return response()->json(['narration' => $verdict['narration'], 'succeeded' => true]);
+        $learned = $held->revealsFact !== null
+            ? app(LearnFact::class)->fromTheWorld($worldSession, $held->revealsFact, RevealSource::Item, $held->name, $verdict['narration'])
+            : null;
+
+        return response()->json(['narration' => $verdict['narration'], 'succeeded' => true, 'learnedFacts' => $learned !== null ? [$learned->toPayload()] : []]);
     }
 
     public function use(Request $request, int $world, int $session, int $item): JsonResponse

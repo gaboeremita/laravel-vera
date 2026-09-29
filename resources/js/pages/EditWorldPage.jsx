@@ -57,7 +57,7 @@ export default function EditWorldPage() {
 			const response = await api.patch(route('worlds.update', { world: worldId }), {
 				name: value.name, slug: value.slug, description: value.description,
 				assistantContextPrompt: value.assistantContextPrompt, npcContextPrompt: value.npcContextPrompt,
-				spawnRegionId: value.spawnRegionId, spawnPassageId: value.spawnPassageId, narratorModelId: value.narratorModelId ?? null,
+				spawnRegionId: value.spawnRegionId, spawnPassageId: value.spawnPassageId, narratorModelId: value.narratorModelId ?? null, reviewReveals: value.reviewReveals ?? true,
 			});
 			const saved = await response.json();
 			if (!response.ok) throw new Error(saved.message);
@@ -96,7 +96,7 @@ export default function EditWorldPage() {
 						value={value}
 						onChange={setValue}
 						regions={value.regions}
-						itemsEditor={<ItemsEditor worldId={value.id} items={inventoryConfig.items} onItemsChange={inventoryConfig.reloadItems} addToast={addToast} />}
+						itemsEditor={<ItemsEditor worldId={value.id} items={inventoryConfig.items} facts={inventoryConfig.facts} onItemsChange={inventoryConfig.reloadItems} addToast={addToast} />}
 						playerInventoryEditor={
 							<StartingInventoryEditor
 								items={inventoryConfig.items}

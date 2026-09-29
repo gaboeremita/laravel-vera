@@ -55,9 +55,10 @@ class UseActivity
      * Checks the activity's terms, asks the narrator about plain-language ones,
      * and applies what it costs and gives.
      *
+     * @param  bool  $byPlayer  whether the player is the one using it; only the player learns the secret it may reveal
      * @return array{allowed: bool, reason: ?string, narration: ?string, action: ?string}
      */
-    public function handle(WorldSession $session, Region $region, string $objectId, string $activityId, Inventory $actor, string $actorName, ?string $attempt): array
+    public function handle(WorldSession $session, Region $region, string $objectId, string $activityId, Inventory $actor, string $actorName, ?string $attempt, bool $byPlayer = false): array
     {
         $terms = $this->terms($region, $objectId, $activityId);
         if ($terms === null) {
@@ -74,15 +75,17 @@ class UseActivity
         $activityName = $region->objectActivities($objectId)[$activityId]['name'] ?? $activityId;
         $narration = null;
         $action = null;
-        if ($terms->hasPlainLanguageTerms()) {
-            $verdict = $this->narrate->handle($session->worldUser->world, $region, [
+        $revealed = $byPlayer ? $terms->revealsFact : null;
+        if ($terms->hasPlainLanguageTerms() || $revealed !== null) {
+            $verdict = $this->narrate->handle($session->worldUser->world, $region, array_filter([
                 'Who' => $actorName,
                 'Doing' => "{$activityName} at the {$layoutObject['name']} ({$layoutObject['description']})",
                 'Requirement' => $terms->requirement ?: 'none; it succeeds',
                 'Outcome when it succeeds' => $terms->outcome ?: 'the activity simply happens',
                 "{$actorName} carries" => $this->narrate->holdings($actor),
                 'What they do or say' => $attempt ?: 'nothing in particular',
-            ]);
+                'What they learn when it succeeds' => $revealed?->content,
+            ]));
             if (! $verdict['succeeded']) {
                 return ['allowed' => false, 'reason' => null, 'narration' => $verdict['narration'], 'action' => $verdict['action']];
             }

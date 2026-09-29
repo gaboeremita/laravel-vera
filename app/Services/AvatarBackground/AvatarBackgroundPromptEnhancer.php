@@ -74,7 +74,7 @@ class AvatarBackgroundPromptEnhancer
     private function buildSystemPrompt(AssistantUser $assistantUser, Conversation $conversation, string $rawDescription): string
     {
         $director = (new PromptDirector($assistantUser->assistant->prompt))
-            ->except(['emotion tags', 'secret trigger', 'voice mode', 'OOC mode', 'image handling', 'style rules', 'background tags']);
+            ->except(['emotion tags', 'secret trigger', 'creator mode', 'voice mode', 'OOC mode', 'image handling', 'style rules', 'background tags']);
 
         $archive = $assistantUser->assistant->archive;
         if ($archive) {

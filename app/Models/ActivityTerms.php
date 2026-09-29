@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['region_id', 'object_id', 'activity_id', 'required_item_id', 'consumes_required', 'cost', 'gives_credits', 'gives_items', 'requirement', 'outcome', 'vendor_resident_id'])]
+#[Fillable(['region_id', 'object_id', 'activity_id', 'required_item_id', 'consumes_required', 'cost', 'gives_credits', 'gives_items', 'requirement', 'outcome', 'vendor_resident_id', 'reveals_fact_id'])]
 class ActivityTerms extends Model
 {
     /** @use HasFactory<ActivityTermsFactory> */
@@ -34,6 +34,11 @@ class ActivityTerms extends Model
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(WorldResident::class, 'vendor_resident_id');
+    }
+
+    public function revealsFact(): BelongsTo
+    {
+        return $this->belongsTo(Fact::class, 'reveals_fact_id');
     }
 
     public function hasPlainLanguageTerms(): bool

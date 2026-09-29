@@ -120,7 +120,7 @@ class ResidentDecisionController extends Controller
             $director->append('recent conversation', $recentConversation);
         }
         $director->append('next step', $buildResidentWorldPrompt->idleInstruction());
-        $director->except(['opening_message', 'voice mode', 'image handling', 'OOC mode', 'emotion tags', 'pose tags']);
+        $director->except(['opening_message', 'voice mode', 'image handling', 'OOC mode', 'emotion tags', 'pose tags', 'secret trigger', 'creator mode']);
         $director->withLongTermMemory($conversation);
 
         $toolbox = new WorldToolbox($residentRegion, $location['zoneChain'], $occupiedSpots, $assistant->posturesByPoseName(), $companions, userAvailable: $busyWith === null, userInSight: $userInSight, residentPoint: $residentPoint, recall: fn () => app(RecallResidentMemory::class)->handle($assistant, $request->user()));

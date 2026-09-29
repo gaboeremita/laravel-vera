@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * Always between two parties: the owner, who started it, and the counterpart
  * they talk to. Either can be a user or an assistant.
  */
-#[Fillable(['owner_type', 'owner_id', 'counterpart_type', 'counterpart_id', 'status', 'resumed_at', 'world_session_id', 'discord_channel_id', 'title', 'long_term_memory', 'memory_checkpoint_message_id', 'memory_summarizing_at', 'auto_summarize_enabled'])]
+#[Fillable(['owner_type', 'owner_id', 'counterpart_type', 'counterpart_id', 'status', 'resumed_at', 'world_session_id', 'discord_channel_id', 'title', 'long_term_memory', 'memory_checkpoint_message_id', 'memory_summarizing_at', 'auto_summarize_enabled', 'creator_mode_at'])]
 class Conversation extends Model
 {
     /** @use HasFactory<ConversationFactory> */
@@ -37,6 +37,7 @@ class Conversation extends Model
         return [
             'status' => ConversationStatus::class,
             'resumed_at' => 'datetime',
+            'creator_mode_at' => 'datetime',
         ];
     }
 

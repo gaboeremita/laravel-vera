@@ -42,6 +42,11 @@ class ConversationFactory extends Factory
         });
     }
 
+    public function creatorMode(): static
+    {
+        return $this->state(['creator_mode_at' => now()]);
+    }
+
     public function forAssistantUser(AssistantUser $assistantUser): static
     {
         return $this->state(fn () => ['owner_id' => $assistantUser->user_id, 'counterpart_id' => $assistantUser->assistant_id]);

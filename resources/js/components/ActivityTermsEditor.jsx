@@ -3,11 +3,12 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import Accordion from './common/Accordion.jsx';
 import Toggle from './common/Toggle.jsx';
+import FactSelect from './FactSelect.jsx';
 import ItemListField from './ItemListField.jsx';
 import UnlimitedAmountInput from './UnlimitedAmountInput.jsx';
 import { FIELD_INPUT, FIELD_LABEL } from '../utils/formFieldStyles.js';
 
-const NO_TERMS = { requiredItemId: null, consumesRequired: false, cost: 0, givesCredits: 0, givesItems: [], requirement: '', outcome: '', vendorResidentId: null };
+const NO_TERMS = { requiredItemId: null, consumesRequired: false, cost: 0, givesCredits: 0, givesItems: [], requirement: '', outcome: '', vendorResidentId: null, revealsFactId: null };
 const HINT = 'normal-case text-fg-3';
 
 function toDraft(terms) {
@@ -22,11 +23,12 @@ function summary(terms, itemsById, residentsById) {
 		terms.cost > 0 && `${terms.cost} CR`,
 		(terms.givesCredits > 0 || terms.givesItems.length > 0) && 'GIVES',
 		(terms.requirement || terms.outcome) && 'NARRATED',
+		terms.revealsFactId && 'REVEALS A FACT',
 	].filter(Boolean);
 }
 
 /** What one activity of an object requires, costs and gives. */
-export default function ActivityTermsEditor({ worldId, regionId, objectId, activity, terms, items, residents = [], onSaved, addToast }) {
+export default function ActivityTermsEditor({ worldId, regionId, objectId, activity, terms, items, facts = [], residents = [], onSaved, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [draft, setDraft] = useState(toDraft(terms));
 	const [previous, setPrevious] = useState(terms);
@@ -121,6 +123,12 @@ export default function ActivityTermsEditor({ worldId, regionId, objectId, activ
 					<label className={FIELD_LABEL}>Outcome</label>
 					<textarea value={draft.outcome} onChange={(event) => update('outcome', event.target.value)} rows={2} placeholder="The terminal shows the last message sent from it." className={`${FIELD_INPUT} resize-none placeholder:text-fg-3/60`} />
 				</div>
+				{facts.length > 0 && (
+					<div>
+						<label className={FIELD_LABEL}>Reveals fact <span className={HINT}>(the player learns it when the activity succeeds)</span></label>
+						<FactSelect facts={facts} value={draft.revealsFactId} onChange={(value) => update('revealsFactId', value)} />
+					</div>
+				)}
 			</div>
 			<div className="flex justify-end gap-3">
 				{terms && <button type="button" onClick={clear} className="text-danger text-[0.7rem] tracking-[0.1em] px-4 py-1.5 cursor-pointer hover:text-danger transition-colors">CLEAR</button>}

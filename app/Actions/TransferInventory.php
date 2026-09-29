@@ -18,17 +18,18 @@ class TransferInventory
 {
     /**
      * @param  array<int, int>  $items  quantity by item id
+     * @param  bool  $byCreator  whether creator mode made the change
      *
      * @throws InsufficientInventory
      */
-    public function handle(?Inventory $from, ?Inventory $to, int $credits, array $items, string $reason): void
+    public function handle(?Inventory $from, ?Inventory $to, int $credits, array $items, string $reason, bool $byCreator = false): void
     {
         $items = array_filter($items, fn (int $quantity) => $quantity > 0);
         if ($credits <= 0 && $items === []) {
             return;
         }
 
-        DB::transaction(function () use ($from, $to, $credits, $items, $reason): void {
+        DB::transaction(function () use ($from, $to, $credits, $items, $reason, $byCreator): void {
             $locked = Inventory::whereKey(array_filter([$from?->id, $to?->id]))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $giver = $from !== null ? $locked[$from->id] : null;
             $receiver = $to !== null ? $locked[$to->id] : null;
@@ -44,7 +45,7 @@ class TransferInventory
                 if ($receiver !== null && $receiver->credits !== null) {
                     $receiver->increment('credits', $credits);
                 }
-                $this->recordCredits($from, $to, $credits, $reason);
+                $this->recordCredits($from, $to, $credits, $reason, $byCreator);
             }
 
             foreach ($items as $itemId => $quantity) {
@@ -105,7 +106,7 @@ class TransferInventory
         }
     }
 
-    private function recordCredits(?Inventory $from, ?Inventory $to, int $credits, string $reason): void
+    private function recordCredits(?Inventory $from, ?Inventory $to, int $credits, string $reason, bool $byCreator): void
     {
         CreditTransaction::create([
             'world_session_id' => ($from ?? $to)->world_session_id,
@@ -115,6 +116,7 @@ class TransferInventory
             'to_name' => $to?->displayName() ?? $reason,
             'amount' => $credits,
             'reason' => $reason,
+            'by_creator' => $byCreator,
         ]);
     }
 }

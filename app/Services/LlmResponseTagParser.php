@@ -9,6 +9,8 @@ class LlmResponseTagParser
 {
     private const STRAY_TAG = '/\[\s*[\p{L}][\p{L}\'-]*(?:\s+[\p{L}][\p{L}\'-]*){0,2}\s*\]/u';
 
+    private const OUT_OF_CHARACTER = '/\[\s*ooc\s*(?::[^\]\r\n]*)?\]/iu';
+
     /**
      * @return array{
      *     content: string,
@@ -166,6 +168,23 @@ class LlmResponseTagParser
         preg_match_all(self::STRAY_TAG, $content, $matches);
 
         return array_map(fn (string $tag) => trim($tag, "[] \t"), $matches[0]);
+    }
+
+    /**
+     * Whether the text has an out-of-character span, [ooc: …] or a bare [ooc].
+     */
+    public function hasOutOfCharacter(string $text): bool
+    {
+        return preg_match(self::OUT_OF_CHARACTER, $text) === 1;
+    }
+
+    /**
+     * The text without its out-of-character spans, for anything that judges
+     * what happened in the story.
+     */
+    public function stripOutOfCharacter(string $text): string
+    {
+        return $this->cleanContent(preg_replace(self::OUT_OF_CHARACTER, '', $text));
     }
 
     private function cleanContent(string $content): string

@@ -6,6 +6,7 @@ use App\Directors\PromptDirector;
 use App\Enums\AssistantKind;
 use App\Enums\ConversationStatus;
 use App\Enums\Posture;
+use App\Enums\TurnMode;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
@@ -90,12 +91,16 @@ class GenerateResidentConversationTurn
 
         $director = new PromptDirector($this->appendWorldConversationContext->handle($speaker, $region, $positions, $session));
         $director->append('talking with', $this->buildResidentWorldPrompt->conversationTurnInstruction($other->name));
-        $excluded = ['opening_message', 'voice mode', 'image handling', 'OOC mode', 'conversations_with_others'];
+        $excluded = ['opening_message', 'voice mode', 'image handling', 'OOC mode', 'conversations_with_others', 'secret trigger', 'creator mode'];
         $this->appendExpressionTags->handle($director, $speaker, $excluded, $posturesByAssistantId[$speaker->id] ?? Posture::Standing);
         $director->except($excluded);
         $otherResident = $session->worldUser->world->residents()->where('assistant_id', $other->id)->first();
         $speakerInventory = app(ResolveInventory::class)->forResident($session, $speakerResident);
         $director->append('inventory', app(BuildInventoryPrompt::class)->handle($speakerInventory, talkingWithUser: false));
+        $factsPrompt = app(BuildFactsPrompt::class)->handle($session, $speakerResident, TurnMode::BetweenResidents);
+        if ($factsPrompt !== null) {
+            $director->append('facts', $factsPrompt);
+        }
         $userChat = $assistantUser->conversations()->where('world_session_id', $session->id)->first();
         if ($userChat !== null) {
             $director->withLongTermMemory($userChat);

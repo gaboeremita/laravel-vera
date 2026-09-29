@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\LearnFact;
 use App\Actions\ResolveInventory;
 use App\Actions\UseActivity;
+use App\Enums\RevealSource;
 use App\Exceptions\NarratorUnavailable;
 use App\Http\Controllers\Controller;
 use App\Models\Inventory;
@@ -15,7 +17,7 @@ class ActivityUseController extends Controller
 {
     use ResolvesWorldSession;
 
-    public function store(Request $request, int $world, int $session, ResolveInventory $resolveInventory, UseActivity $useActivity): JsonResponse
+    public function store(Request $request, int $world, int $session, ResolveInventory $resolveInventory, UseActivity $useActivity, LearnFact $learnFact): JsonResponse
     {
         $validated = $request->validate([
             'regionId' => ['required', 'integer'],
@@ -31,7 +33,7 @@ class ActivityUseController extends Controller
         $before = $player->summary();
 
         try {
-            $outcome = $useActivity->handle($worldSession, $region, $validated['objectId'], $validated['activityId'], $player, $player->displayName(), $validated['attempt'] ?? null);
+            $outcome = $useActivity->handle($worldSession, $region, $validated['objectId'], $validated['activityId'], $player, $player->displayName(), $validated['attempt'] ?? null, byPlayer: true);
         } catch (NarratorUnavailable $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         } catch (\RuntimeException $exception) {
@@ -39,7 +41,11 @@ class ActivityUseController extends Controller
         }
 
         $after = $player->summary();
+        $fact = $outcome['allowed'] ? $useActivity->terms($region, $validated['objectId'], $validated['activityId'])?->revealsFact : null;
+        $learned = $fact !== null
+            ? $learnFact->fromTheWorld($worldSession, $fact, RevealSource::Activity, $region->layoutObject($validated['objectId'])['name'] ?? $validated['objectId'], $outcome['narration'] ?? $fact->content)
+            : null;
 
-        return response()->json([...$outcome, 'inventory' => $after, 'changes' => Inventory::changesBetween($before, $after)]);
+        return response()->json([...$outcome, 'inventory' => $after, 'changes' => Inventory::changesBetween($before, $after), 'learnedFacts' => $learned !== null ? [$learned->toPayload()] : []]);
     }
 }

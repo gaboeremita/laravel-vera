@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Item;
 use App\Models\World;
+use App\Models\WorldResident;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -34,6 +35,7 @@ class SaveItemRequest extends FormRequest
             'releasesItems' => ['array'],
             'releasesItems.*.itemId' => ['required', 'integer', Rule::exists('items', 'id')->where('world_id', $world->id)],
             'releasesItems.*.quantity' => ['required', 'integer', 'min:1'],
+            'revealsFactId' => ['nullable', 'integer', Rule::exists('facts', 'id')->where(fn ($query) => $query->whereIn('world_resident_id', WorldResident::where('world_id', $world->id)->select('id')))],
         ];
     }
 
@@ -53,6 +55,7 @@ class SaveItemRequest extends FormRequest
             'consumed_on_use' => $validated['consumedOnUse'] ?? false,
             'releases_credits' => $validated['releasesCredits'] ?? 0,
             'releases_items' => collect($validated['releasesItems'] ?? [])->map(fn (array $entry) => ['itemId' => (int) $entry['itemId'], 'quantity' => (int) $entry['quantity']])->values()->all(),
+            'reveals_fact_id' => $validated['revealsFactId'] ?? null,
         ];
     }
 }

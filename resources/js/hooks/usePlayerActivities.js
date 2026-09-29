@@ -68,7 +68,7 @@ export function contextLineFor(layout, zone, { withFloor, includeZone = false })
  * The user's side of the world's activities: object and zone cards, starting
  * and leaving activities, and telling the residents who saw it.
  */
-export function usePlayerActivities({ world, worldId, sessionId, location, focusedObject, occupiedSpots: occupiedSpotsRef, playerState: playerStateRef, playerCommands: playerCommandsRef, residentPositions: residentPositionsRef, residentCommands: residentCommandsRef, collisionWorldRef, chatResident, actionSender: actionSenderRef, addToast, onInventory, onNarration, inventory, onTalkToVendor }) {
+export function usePlayerActivities({ world, worldId, sessionId, location, focusedObject, occupiedSpots: occupiedSpotsRef, playerState: playerStateRef, playerCommands: playerCommandsRef, residentPositions: residentPositionsRef, residentCommands: residentCommandsRef, collisionWorldRef, chatResident, actionSender: actionSenderRef, addToast, onInventory, onLearnedFacts, onNarration, inventory, onTalkToVendor }) {
 	const layout = world?.layout;
 	const withFloor = (layout?.floors?.length ?? 0) > 1;
 	const [card, setCard] = useState(null);
@@ -178,6 +178,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			const body = await response.json();
 			if (!response.ok) throw new Error(body.message);
 			onInventory?.(body.inventory);
+			onLearnedFacts?.(body.learnedFacts);
 			if (body.narration) onNarration?.(`${activityItem.name.toUpperCase()}`, { narration: body.narration, succeeded: body.allowed, changes: body.changes });
 			if (!body.allowed && body.reason) addToast(body.reason, 'info');
 			if (body.allowed) setStockVersion((version) => version + 1);
@@ -186,7 +187,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			addToast(error.message || `Unable to ${activityItem.name.toLowerCase()}`, 'error');
 			return { allowed: false, action: null };
 		}
-	}, [worldId, sessionId, cardObjectId, regionId, onInventory, onNarration, addToast]);
+	}, [worldId, sessionId, cardObjectId, regionId, onInventory, onLearnedFacts, onNarration, addToast]);
 
 	useEffect(() => {
 		if (!card) return undefined;

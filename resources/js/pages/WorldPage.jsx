@@ -35,10 +35,12 @@ import { useResidentRoutes } from '../hooks/useResidentRoutes.js';
 import PerformanceOverlay from '../components/world/hud/PerformanceOverlay.jsx';
 import CreditsReadout from '../components/world/hud/CreditsReadout.jsx';
 import InventoryPanel from '../components/world/hud/InventoryPanel.jsx';
+import LearnedFactsPanel from '../components/world/hud/LearnedFactsPanel.jsx';
 import HandoverRequestConfirm from '../components/world/hud/HandoverRequestConfirm.jsx';
 import NarrationCard from '../components/world/hud/NarrationCard.jsx';
 import { changeLines } from '../components/world/inventoryChanges.js';
 import useInventory from '../hooks/useInventory.js';
+import useKnownFacts from '../hooks/useKnownFacts.js';
 
 const INVITE_MS = 30000;
 const LISTEN_DISTANCE = 12;
@@ -73,12 +75,14 @@ export default function WorldPage() {
 	const pausedRef = useRef(false);
 	const [pendingPassage, setPendingPassage] = useState(null);
 	const [inventoryOpen, setInventoryOpen] = useState(false);
+	const [learnedOpen, setLearnedOpen] = useState(false);
 	const [handoverRequest, setHandoverRequest] = useState(null);
 	const [isAnsweringRequest, setIsAnsweringRequest] = useState(false);
 	const [narration, setNarration] = useState(null);
 	const [busyItemId, setBusyItemId] = useState(null);
 	const [chatOpeningLine, setChatOpeningLine] = useState(null);
 	const { inventory, applyInventory } = useInventory(worldId, sessionId, addToast);
+	const { knownFacts, applyLearnedFacts } = useKnownFacts(worldId, sessionId, addToast);
 	const pendingPassageRef = useRef(null);
 	const passageActionsRef = useRef({ confirm: () => {}, cancel: () => {} });
 	const chatResidentRef = useRef(null);
@@ -302,12 +306,13 @@ export default function WorldPage() {
 			const body = await response.json();
 			if (!response.ok) throw new Error(body.message);
 			showNarration(`EXAMINING ${item.name.toUpperCase()}`, body);
+			applyLearnedFacts(body.learnedFacts);
 		} catch (error) {
 			addToast(error.message || `Unable to examine ${item.name}`, 'error');
 		} finally {
 			setBusyItemId(null);
 		}
-	}, [worldId, sessionId, showNarration, addToast]);
+	}, [worldId, sessionId, showNarration, applyLearnedFacts, addToast]);
 
 	const tryItem = useCallback(async (item, attempt) => {
 		setBusyItemId(item.itemId);
@@ -329,6 +334,16 @@ export default function WorldPage() {
 			if (event.code !== 'Tab' || event.repeat || isTypingTarget(event.target) || !sessionId) return;
 			event.preventDefault();
 			setInventoryOpen(true);
+		};
+		window.addEventListener('keydown', keyDown);
+		return () => window.removeEventListener('keydown', keyDown);
+	}, [sessionId]);
+
+	useEffect(() => {
+		const keyDown = (event) => {
+			if (event.code !== 'KeyJ' || event.repeat || isTypingTarget(event.target) || !sessionId) return;
+			event.preventDefault();
+			setLearnedOpen(true);
 		};
 		window.addEventListener('keydown', keyDown);
 		return () => window.removeEventListener('keydown', keyDown);
@@ -751,6 +766,7 @@ export default function WorldPage() {
 		actionSender,
 		addToast,
 		onInventory: applyInventory,
+		onLearnedFacts: applyLearnedFacts,
 		onNarration: showNarration,
 		inventory,
 		onTalkToVendor: talkToVendor,
@@ -781,7 +797,7 @@ export default function WorldPage() {
 				)}
 				{chatResident && (
 					<div className="absolute left-5 top-16 bottom-5 z-20 w-[min(26rem,40%)] min-w-72">
-						<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} getResidentPosture={getResidentPosture} getResidentState={getResidentState} getUserState={getUserState} getOccupiedSpots={getOccupiedSpots} getStackedSpots={getStackedSpots} onVoiceAudio={playResidentVoice} onSilentReply={handleSilentReply} onAction={handleChatAction} actionSender={actionSender} inventory={inventory} onInventory={applyInventory} onHandoverRequest={setHandoverRequest} openingLine={chatOpeningLine?.residentId === chatResident.id ? chatOpeningLine : null} />
+						<WorldChat world={world} resident={chatResident} onClose={closeChat} addToast={addToast} onPoseTrigger={setActivePose} worldSessionId={sessionId} getPositions={getPositions} getResidentPosture={getResidentPosture} getResidentState={getResidentState} getUserState={getUserState} getOccupiedSpots={getOccupiedSpots} getStackedSpots={getStackedSpots} onVoiceAudio={playResidentVoice} onSilentReply={handleSilentReply} onAction={handleChatAction} actionSender={actionSender} inventory={inventory} onInventory={applyInventory} onLearnedFacts={applyLearnedFacts} onHandoverRequest={setHandoverRequest} openingLine={chatOpeningLine?.residentId === chatResident.id ? chatOpeningLine : null} />
 					</div>
 				)}
 				{chatResident && conversationRange === 'warning' && (
@@ -790,7 +806,7 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready' && !paused} voiceUntil={voiceUntil} />
-				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !handoverRequest && !player.purchase} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
+				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !learnedOpen && !handoverRequest && !player.purchase} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} />
 				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} hasInventory={!!sessionId} />{hasZones && readoutText && <LocationReadout text={readoutText} />}{sessionId && <CreditsReadout credits={inventory?.credits} />}</div>} />}
 				{status === 'ready' && (
 					<>
@@ -809,6 +825,7 @@ export default function WorldPage() {
 				)}
 				{chatResident && <OffscreenIndicator ref={offscreenIndicator} name={chatResident.assistant.name} />}
 				{narration && <NarrationCard key={narration.key} title={narration.title} narration={narration.narration} succeeded={narration.succeeded} changes={narration.changes} onDone={() => setNarration(null)} />}
+				{learnedOpen && <LearnedFactsPanel knownFacts={knownFacts} onClose={() => setLearnedOpen(false)} />}
 				{inventoryOpen && <InventoryPanel worldId={worldId} sessionId={sessionId} inventory={inventory} busyItemId={busyItemId} onExamine={examineItem} onUse={tryItem} onClose={() => setInventoryOpen(false)} />}
 				{player.purchase && !handoverRequest && <HandoverRequestConfirm key={player.purchase.id} request={player.purchase} isAnswering={false} label="A PURCHASE" verb="charges you" confirmLabel="PAY" declineLabel="CANCEL" onAccept={player.confirmPurchase} onDecline={player.cancelPurchase} />}
 				{handoverRequest && <HandoverRequestConfirm request={handoverRequest} isAnswering={isAnsweringRequest} onAccept={() => void answerHandoverRequest(true)} onDecline={() => void answerHandoverRequest(false)} />}

@@ -22,6 +22,7 @@ class ItemResource extends JsonResource
             'consumedOnUse' => $this->consumed_on_use,
             'releasesCredits' => $this->releases_credits,
             'releasesItems' => $this->releases_items ?? [],
+            'revealsFactId' => $this->reveals_fact_id,
             'cardImageUrl' => $this->whenLoaded('cardImage', fn () => $this->cardImage?->url),
             'soundUrl' => $this->whenLoaded('sound', fn () => $this->sound?->url()),
             'soundHash' => $this->whenLoaded('sound', fn () => $this->sound?->hash),

@@ -2,15 +2,12 @@
 
 namespace App\Actions;
 
-use App\Contracts\LlmProvider;
 use App\Exceptions\NarratorUnavailable;
 use App\Models\Inventory;
 use App\Models\InventoryItem;
 use App\Models\Region;
 use App\Models\World;
 use App\Services\AgentLoop\Tools\World\NarrateTool;
-use App\Services\LlmProviders\LlmManager;
-use InvalidArgumentException;
 use RuntimeException;
 
 /**
@@ -35,7 +32,7 @@ class Narrate
         ])->filter()->implode("\n\n");
         $details = collect($situation)->map(fn (string $value, string $label) => "{$label}: {$value}")->implode("\n");
 
-        $response = $this->llm($world)->chat(
+        $response = app(ResolveNarratorModel::class)->handle($world)->chat(
             messages: [['role' => 'system', 'content' => $system], ['role' => 'user', 'content' => $details]],
             tools: [['name' => $tool->name(), 'description' => $tool->description(), 'parameters' => $tool->parameters()]],
         );
@@ -58,20 +55,5 @@ class Narrate
         $credits = $inventory->credits === null ? 'unlimited credits' : "{$inventory->credits} credits";
 
         return $items->isEmpty() ? $credits : $credits.'; '.$items->implode('; ');
-    }
-
-    private function llm(World $world): LlmProvider
-    {
-        $llmManager = new LlmManager;
-        $model = $world->narratorModel()->with('provider')->first();
-        if ($model !== null) {
-            return $llmManager->fromModel($model);
-        }
-
-        try {
-            return $llmManager->fromConfig();
-        } catch (InvalidArgumentException) {
-            throw new NarratorUnavailable('No narrator model is set for this world. Choose one in the world\'s configuration.');
-        }
     }
 }

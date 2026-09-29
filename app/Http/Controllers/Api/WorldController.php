@@ -61,6 +61,7 @@ class WorldController extends Controller
             'spawn_region_id' => $validated['spawnRegionId'] ?? null,
             'spawn_passage_id' => $validated['spawnPassageId'] ?? null,
             'narrator_model_id' => $validated['narratorModelId'] ?? null,
+            'review_reveals' => $validated['reviewReveals'] ?? $world->review_reveals,
         ]);
 
         return $this->show($world->fresh());
