@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\InventoryHolder;
 use App\Models\ActivityTerms;
 use App\Models\Inventory;
 use App\Models\Region;
@@ -33,8 +34,9 @@ class UseActivity
                 return "Needs the {$terms->requiredItem->name}.";
             }
         }
-        if ($terms->cost > 0 && $actor->credits !== null && $actor->credits < $terms->cost) {
-            return "Costs {$terms->cost} credits.";
+        $cost = $this->costFor($terms, $actor);
+        if ($cost > 0 && $actor->credits !== null && $actor->credits < $cost) {
+            return "Costs {$cost} credits.";
         }
         if ($terms->gives_credits > 0 && $object->credits !== null && $object->credits < $terms->gives_credits) {
             return 'There is nothing left to get here.';
@@ -89,13 +91,23 @@ class UseActivity
         }
 
         $reason = "{$layoutObject['name']}: {$activityName}";
-        DB::transaction(function () use ($terms, $actor, $object, $reason): void {
+        $cost = $this->costFor($terms, $actor);
+        DB::transaction(function () use ($terms, $actor, $object, $reason, $cost): void {
             $consumed = $terms->consumes_required && $terms->required_item_id !== null ? [$terms->required_item_id => 1] : [];
-            $this->transferInventory->handle($actor, $object, $terms->cost, $consumed, $reason);
+            $this->transferInventory->handle($actor, $object, $cost, $consumed, $reason);
             $gives = collect($terms->gives_items ?? [])->mapWithKeys(fn (array $entry) => [(int) $entry['itemId'] => (int) $entry['quantity']])->all();
             $this->transferInventory->handle($object, $actor, $terms->gives_credits, $gives, $reason);
         });
 
         return ['allowed' => true, 'reason' => null, 'narration' => $narration, 'action' => $action];
+    }
+
+    /**
+     * What the actor pays for the activity. Residents only play at paying, so
+     * nothing is charged to them.
+     */
+    private function costFor(ActivityTerms $terms, Inventory $actor): int
+    {
+        return $actor->holder === InventoryHolder::Resident ? 0 : $terms->cost;
     }
 }

@@ -164,7 +164,7 @@ class WorldToolbox
     {
         return collect($this->objects())
             ->flatMap(fn (array $object) => collect($object['spots'])->map(fn (array $spot) => [...$spot, 'objectId' => $object['id'], 'objectName' => $object['name']]))
-            ->map(fn (array $spot) => $this->activityGate === null ? $spot : [...$spot, 'activities' => collect($spot['activities'])->filter(fn (array $activity) => $this->activityGate->canAfford($spot['objectId'], $activity['id']))->values()->all()])
+            ->map(fn (array $spot) => $this->activityGate === null ? $spot : [...$spot, 'activities' => collect($spot['activities'])->filter(fn (array $activity) => $this->activityGate->canUse($spot['objectId'], $activity['id']))->values()->all()])
             ->filter(fn (array $spot) => $spot['activities'] !== [])
             ->values()
             ->all();

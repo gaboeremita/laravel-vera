@@ -95,7 +95,7 @@ class GenerateResidentConversationTurn
         $director->except($excluded);
         $otherResident = $session->worldUser->world->residents()->where('assistant_id', $other->id)->first();
         $speakerInventory = app(ResolveInventory::class)->forResident($session, $speakerResident);
-        $director->append('inventory', app(BuildInventoryPrompt::class)->handle($speakerInventory, canAskUser: false));
+        $director->append('inventory', app(BuildInventoryPrompt::class)->handle($speakerInventory, talkingWithUser: false));
         $userChat = $assistantUser->conversations()->where('world_session_id', $session->id)->first();
         if ($userChat !== null) {
             $director->withLongTermMemory($userChat);
@@ -114,7 +114,7 @@ class GenerateResidentConversationTurn
         $stop = new StopConversationTool;
         $tools = [$stop];
         if ($otherResident !== null) {
-            $tools[] = new GiveTool($speakerInventory, app(ResolveInventory::class)->forResident($session, $otherResident), $other->name);
+            $tools[] = new GiveTool($speakerInventory, app(ResolveInventory::class)->forResident($session, $otherResident), $other->name, withCredits: false);
         }
         $result = (new AgentLoopRunner($llm, $aiModel?->supports_tools ? $tools : []))->run(
             assistant: $speaker,
