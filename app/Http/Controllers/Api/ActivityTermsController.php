@@ -53,6 +53,7 @@ class ActivityTermsController extends Controller
             'requirement' => $terms->requirement,
             'outcome' => $terms->outcome,
             'vendorResidentId' => $terms->vendor_resident_id,
+            'revealsFactId' => $terms->reveals_fact_id,
         ];
     }
 }

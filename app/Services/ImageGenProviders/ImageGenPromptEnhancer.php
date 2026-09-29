@@ -41,7 +41,7 @@ class ImageGenPromptEnhancer
     private function buildSystemPrompt(AssistantUser $assistantUser, Conversation $conversation, string $rawPrompt, ?ImageGenModel $imageGenModel): string
     {
         $director = (new PromptDirector($assistantUser->assistant->prompt))
-            ->except(['emotion tags', 'secret trigger', 'voice mode', 'OOC mode', 'image handling', 'style rules']);
+            ->except(['emotion tags', 'secret trigger', 'creator mode', 'voice mode', 'OOC mode', 'image handling', 'style rules']);
 
         $archive = $assistantUser->assistant->archive;
         if ($archive) {

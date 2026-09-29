@@ -50,6 +50,21 @@ class WorldSession extends Model
         return $this->hasMany(HandoverRequest::class);
     }
 
+    public function knownFacts(): HasMany
+    {
+        return $this->hasMany(KnownFact::class);
+    }
+
+    public function factAcknowledgements(): HasMany
+    {
+        return $this->hasMany(FactAcknowledgement::class);
+    }
+
+    public function revealAttempts(): HasMany
+    {
+        return $this->hasMany(RevealAttempt::class);
+    }
+
     public function region(): BelongsTo
     {
         return $this->belongsTo(Region::class);

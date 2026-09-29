@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Accordion from './common/Accordion.jsx';
 import PassageSelect from './PassageSelect.jsx';
 import NarratorModelSelect from './NarratorModelSelect.jsx';
+import Toggle from './common/Toggle.jsx';
 import { FIELD_LABEL, FIELD_INPUT } from '../utils/formFieldStyles.js';
 
 export default function WorldForm({ value, onChange, regions = null, imagesEditor = null, itemsEditor = null, playerInventoryEditor = null, isSaving, onSubmit }) {
@@ -37,6 +38,12 @@ export default function WorldForm({ value, onChange, regions = null, imagesEdito
 					<textarea value={value.npcContextPrompt} onChange={(event) => update('npcContextPrompt', event.target.value)} rows={4} className={`${FIELD_INPUT} resize-none`} required />
 				</div>
 				{regions && <NarratorModelSelect value={value.narratorModelId ?? null} onChange={(modelId) => update('narratorModelId', modelId)} />}
+				{regions && (
+					<div className="flex items-center gap-3">
+						<Toggle checked={value.reviewReveals ?? true} onChange={() => update('reviewReveals', !(value.reviewReveals ?? true))} />
+						<span className="text-fg-2 text-sm">Review reveals <span className="text-fg-3 text-xs">— the narrator model checks that the moment fits before a character shares a secret</span></span>
+					</div>
+				)}
 			</Accordion>
 			{itemsEditor}
 			{regions && (

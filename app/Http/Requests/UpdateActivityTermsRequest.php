@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Region;
 use App\Models\World;
+use App\Models\WorldResident;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -35,6 +36,7 @@ class UpdateActivityTermsRequest extends FormRequest
             'requirement' => ['nullable', 'string'],
             'outcome' => ['nullable', 'string'],
             'vendorResidentId' => ['nullable', 'integer', Rule::exists('world_residents', 'id')->where('world_id', $world->id)],
+            'revealsFactId' => ['nullable', 'integer', Rule::exists('facts', 'id')->where(fn ($query) => $query->whereIn('world_resident_id', WorldResident::where('world_id', $world->id)->select('id')))],
         ];
     }
 
@@ -70,6 +72,7 @@ class UpdateActivityTermsRequest extends FormRequest
             'requirement' => filled($validated['requirement'] ?? null) ? $validated['requirement'] : null,
             'outcome' => filled($validated['outcome'] ?? null) ? $validated['outcome'] : null,
             'vendor_resident_id' => $validated['vendorResidentId'] ?? null,
+            'reveals_fact_id' => $validated['revealsFactId'] ?? null,
         ];
     }
 }

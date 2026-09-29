@@ -4,6 +4,7 @@ import { api } from '../utils/api.js';
 import Accordion from './common/Accordion.jsx';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
 import Toggle from './common/Toggle.jsx';
+import FactSelect from './FactSelect.jsx';
 import ItemListField from './ItemListField.jsx';
 import ItemThumb from './ItemThumb.jsx';
 import UnlimitedAmountInput from './UnlimitedAmountInput.jsx';
@@ -11,7 +12,7 @@ import { ImageUploadField } from './WorldImagesEditor.jsx';
 import SoundUploadField from './SoundUploadField.jsx';
 import { FIELD_INPUT, FIELD_LABEL } from '../utils/formFieldStyles.js';
 
-const NEW_ITEM = { name: '', description: '', basePrice: null, contents: '', useRequirement: '', consumedOnUse: false, releasesCredits: 0, releasesItems: [] };
+const NEW_ITEM = { name: '', description: '', basePrice: null, contents: '', useRequirement: '', consumedOnUse: false, releasesCredits: 0, releasesItems: [], revealsFactId: null };
 const HINT = 'normal-case text-fg-3';
 
 function toDraft(item) {
@@ -28,10 +29,11 @@ function toPayload(draft) {
 		consumedOnUse: draft.consumedOnUse,
 		releasesCredits: draft.releasesCredits,
 		releasesItems: draft.releasesItems,
+		revealsFactId: draft.revealsFactId ?? null,
 	};
 }
 
-function ItemFields({ draft, setDraft, items, itemId }) {
+function ItemFields({ draft, setDraft, items, facts, itemId }) {
 	const update = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
 	const others = items.filter((item) => item.id !== itemId);
 
@@ -64,6 +66,12 @@ function ItemFields({ draft, setDraft, items, itemId }) {
 					<label className={FIELD_LABEL}>Examining it reveals</label>
 					<textarea value={draft.contents} onChange={(event) => update('contents', event.target.value)} rows={2} placeholder="A letter signed only with an initial, asking to meet at the old pier." className={`${FIELD_INPUT} resize-none placeholder:text-fg-3/60`} />
 				</div>
+				{facts.length > 0 && (
+					<div>
+						<label className={FIELD_LABEL}>Reveals fact <span className="normal-case text-fg-3">(the player learns it when they examine the item)</span></label>
+						<FactSelect facts={facts} value={draft.revealsFactId} onChange={(value) => update('revealsFactId', value)} />
+					</div>
+				)}
 				<div>
 					<label className={FIELD_LABEL}>Using it takes</label>
 					<textarea value={draft.useRequirement} onChange={(event) => update('useRequirement', event.target.value)} rows={2} placeholder="The lockbox opens with the four-digit code its owner chose." className={`${FIELD_INPUT} resize-none placeholder:text-fg-3/60`} />
@@ -87,7 +95,7 @@ function ItemFields({ draft, setDraft, items, itemId }) {
 	);
 }
 
-function ItemRow({ worldId, item, items, onSaved, onDeleted, addToast }) {
+function ItemRow({ worldId, item, items, facts, onSaved, onDeleted, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [draft, setDraft] = useState(toDraft(item));
 	const [previous, setPrevious] = useState(item);
@@ -175,7 +183,7 @@ function ItemRow({ worldId, item, items, onSaved, onDeleted, addToast }) {
 					<SoundUploadField sound={itemSound} isUploading={isUploadingSound} onPick={uploadSound} onRemove={removeSound} onError={(message) => addToast(message, 'error')} />
 				</div>
 				<div className="flex-1 min-w-0">
-					<ItemFields draft={draft} setDraft={setDraft} items={items} itemId={item.id} />
+					<ItemFields draft={draft} setDraft={setDraft} items={items} facts={facts} itemId={item.id} />
 				</div>
 			</div>
 			<div className="flex justify-end">
@@ -197,7 +205,7 @@ function ItemRow({ worldId, item, items, onSaved, onDeleted, addToast }) {
 	);
 }
 
-function NewItem({ worldId, items, onCreated, onCancel, addToast }) {
+function NewItem({ worldId, items, facts, onCreated, onCancel, addToast }) {
 	const [draft, setDraft] = useState(NEW_ITEM);
 	const [isSaving, setIsSaving] = useState(false);
 	const [image, setImage] = useState(null);
@@ -235,7 +243,7 @@ function NewItem({ worldId, items, onCreated, onCancel, addToast }) {
 					<SoundUploadField sound={sound} isUploading={false} onPick={(file) => setSound({ file, previewUrl: URL.createObjectURL(file) })} onRemove={() => setSound(null)} onError={(message) => addToast(message, 'error')} />
 				</div>
 				<div className="flex-1 min-w-0">
-					<ItemFields draft={draft} setDraft={setDraft} items={items} itemId={null} />
+					<ItemFields draft={draft} setDraft={setDraft} items={items} facts={facts} itemId={null} />
 				</div>
 			</div>
 			<div className="flex justify-end gap-3">
@@ -248,7 +256,7 @@ function NewItem({ worldId, items, onCreated, onCancel, addToast }) {
 	);
 }
 
-export default function ItemsEditor({ worldId, items, onItemsChange, addToast }) {
+export default function ItemsEditor({ worldId, items, facts = [], onItemsChange, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [adding, setAdding] = useState(false);
 
@@ -262,10 +270,10 @@ export default function ItemsEditor({ worldId, items, onItemsChange, addToast })
 					</div>
 				)}
 				{items.map((item) => (
-					<ItemRow key={item.id} worldId={worldId} item={item} items={items} onSaved={onItemsChange} onDeleted={onItemsChange} addToast={addToast} />
+					<ItemRow key={item.id} worldId={worldId} item={item} items={items} facts={facts} onSaved={onItemsChange} onDeleted={onItemsChange} addToast={addToast} />
 				))}
 				{adding ? (
-					<NewItem worldId={worldId} items={items} addToast={addToast} onCancel={() => setAdding(false)} onCreated={async () => { setAdding(false); await onItemsChange(); }} />
+					<NewItem worldId={worldId} items={items} facts={facts} addToast={addToast} onCancel={() => setAdding(false)} onCreated={async () => { setAdding(false); await onItemsChange(); }} />
 				) : (
 					<button type="button" onClick={() => setAdding(true)} className="w-full border border-dashed border-line-1 px-3 py-2 text-[0.7rem] tracking-[0.1em] text-fg-3 hover:text-accent hover:border-accent/50 transition-colors cursor-pointer">
 						+ NEW ITEM

@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Actions\AppendExpressionTags;
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
+use App\Actions\BuildFactsPrompt;
 use App\Actions\BuildInventoryPrompt;
+use App\Actions\CreatorModeTags;
 use App\Actions\ResolveInventory;
 use App\Actions\ResolveSpotStacking;
 use App\Actions\ResolveUserActivity;
 use App\Actions\ResolveWorldState;
+use App\Actions\SummarizeLearnedFact;
+use App\Contracts\AgentTool;
 use App\Contracts\SttProvider;
 use App\Directors\PromptDirector;
 use App\DTOs\LlmResponse;
@@ -17,6 +21,7 @@ use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
 use App\Enums\Posture;
+use App\Enums\TurnMode;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAvatarBackground;
 use App\Jobs\SummarizeConversation;
@@ -26,16 +31,26 @@ use App\Models\Conversation;
 use App\Models\DiscordChannel;
 use App\Models\Image;
 use App\Models\Inventory;
+use App\Models\KnownFact;
 use App\Models\Message;
+use App\Models\Region;
 use App\Models\Settings;
+use App\Models\World;
+use App\Models\WorldResident;
+use App\Models\WorldSession;
 use App\Models\WorldUser;
 use App\Services\AgentLoop\AgentLoopRunner;
 use App\Services\AgentLoop\Tools\BasicCalculatorTool;
 use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\AgentLoop\Tools\ImageGenerationTool;
+use App\Services\AgentLoop\Tools\World\AcknowledgeTool;
 use App\Services\AgentLoop\Tools\World\ActivityGate;
 use App\Services\AgentLoop\Tools\World\AskForTool;
 use App\Services\AgentLoop\Tools\World\GiveTool;
+use App\Services\AgentLoop\Tools\World\GrantTool;
+use App\Services\AgentLoop\Tools\World\RemoveTool;
+use App\Services\AgentLoop\Tools\World\RevealTool;
+use App\Services\AgentLoop\Tools\World\SetFactKnownTool;
 use App\Services\AgentLoop\Tools\World\WorldToolbox;
 use App\Services\ImageGenProviders\ImageGenerationService;
 use App\Services\LlmProviders\LlmManager;
@@ -44,6 +59,7 @@ use App\Services\TtsProviders\TtsManager;
 use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class ConversationController extends Controller
@@ -57,6 +73,8 @@ class ConversationController extends Controller
     private const IMAGE_GEN_COMMAND = '/create-image ';
 
     private const TTS_TRUNCATION_LENGTH = 200;
+
+    private const CREATOR_MODE_ON = 'Creator mode is on.';
 
     public function index(Request $request, int $assistant): JsonResponse
     {
@@ -231,6 +249,28 @@ class ConversationController extends Controller
             $validated['messages'] = $messages;
         }
 
+        $creatorModeTags = app(CreatorModeTags::class);
+        $creatorNotice = null;
+        $password = $creatorModeTags->password($lastUserMessage['content'] ?? '');
+        if ($password !== null) {
+            $creatorNotice = $this->activateCreatorMode($request, $conversation, $password);
+        }
+        $creatorTurn = $conversation->creator_mode_at !== null && $creatorModeTags->hasCommand($lastUserMessage['content'] ?? '');
+        $lastUserIndex = array_key_last(array_filter($validated['messages'], fn (array $message) => $message['role'] === 'user'));
+        foreach ($validated['messages'] as $index => $message) {
+            if ($message['role'] === 'user') {
+                $validated['messages'][$index]['content'] = $creatorModeTags->withoutActivations($message['content'] ?? '', $index === $lastUserIndex && $creatorNotice === self::CREATOR_MODE_ON);
+            }
+        }
+        if ($lastUserMessage) {
+            $lastUserMessage['content'] = $validated['messages'][$lastUserIndex]['content'];
+        }
+        $creatorMode = ['active' => $conversation->creator_mode_at !== null, 'notice' => $creatorNotice];
+
+        if ($password !== null && $creatorNotice !== self::CREATOR_MODE_ON && trim($lastUserMessage['content'] ?? '') === '' && empty($lastUserMessage['images'][0])) {
+            return response()->json(['conversation_id' => $conversation->id, 'content' => null, 'userContent' => '', 'creatorMode' => $creatorMode]);
+        }
+
         if ($lastUserMessage) {
             $message = $conversation->messages()->create([
                 'role' => 'user',
@@ -311,7 +351,7 @@ class ConversationController extends Controller
 
         $archive = $assistantModel->archive;
 
-        $excludedSections = ['opening_message'];
+        $excludedSections = ['opening_message', ...$this->creatorSectionsExcluded($conversation)];
 
         if (! empty($validated['voice_mode'])) {
             $excludedSections[] = 'style rules';
@@ -382,14 +422,24 @@ class ConversationController extends Controller
         $playerBefore = $playerInventory?->summary();
         $askForTool = null;
 
+        $llmManager = new LlmManager;
+        $aiModel = $llmManager->resolveModelForAssistantUser($assistantUser);
+        $turnMode = $creatorTurn ? TurnMode::Creator : (app(LlmResponseTagParser::class)->hasOutOfCharacter($lastUserMessage['content'] ?? '') ? TurnMode::OocTurn : TurnMode::InCharacter);
+        $factsResident = $worldSession !== null && $aiModel?->supports_tools ? $inventoryResident : null;
+        if ($factsResident !== null) {
+            $factsPrompt = app(BuildFactsPrompt::class)->handle($worldSession, $factsResident, $turnMode);
+            if ($factsPrompt !== null) {
+                $director->append('facts', $factsPrompt);
+            }
+        }
+        $factTools = [];
+
         $systemPrompt = $director->build();
 
         $tts = $voiceModel ? (new TtsManager)->fromModel($voiceModel) : null;
         $agentToolCalls = null;
 
         try {
-            $llmManager = new LlmManager;
-            $aiModel = $llmManager->resolveModelForAssistantUser($assistantUser);
             $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
 
             $tools = [];
@@ -421,7 +471,7 @@ class ConversationController extends Controller
                 }
 
                 $resident = $world->residents()->where('assistant_id', $assistantModel->id)->firstOrFail();
-                $residentRegion = app(ApplyResidentZoneAccess::class)->handle($region, $resident);
+                $residentRegion = $creatorTurn ? $region : app(ApplyResidentZoneAccess::class)->handle($region, $resident);
                 $residentPoint = $validated['positions']['residents'][$resident->id] ?? null;
                 $worldToolbox = new WorldToolbox(
                     $residentRegion,
@@ -429,9 +479,9 @@ class ConversationController extends Controller
                     occupiedSpots: $validated['occupiedSpots'] ?? [],
                     posePostures: $assistantModel->posturesByPoseName(),
                     residentPoint: $residentPoint,
-                    staysAtPost: $resident->staysAtPost(),
+                    staysAtPost: ! $creatorTurn && $resident->staysAtPost(),
                 );
-                if ($residentInventory !== null) {
+                if ($residentInventory !== null && ! $creatorTurn) {
                     $residentIdsInRoom = $residentPoint !== null ? app(ResolveWorldState::class)->residentIdsInRoom($region->layout ?? [], $residentPoint, $validated['positions']['residents'] ?? []) : [];
                     $worldToolbox->withActivityGate(new ActivityGate($worldSession, $region, $residentInventory, $assistantModel->name, $residentIdsInRoom));
                 }
@@ -441,6 +491,11 @@ class ConversationController extends Controller
             if ($residentInventory !== null && $aiModel?->supports_tools) {
                 $askForTool = new AskForTool($residentInventory, $conversation);
                 $tools = [...$tools, new GiveTool($residentInventory, $playerInventory, 'the user'), $askForTool];
+            }
+
+            if ($factsResident !== null) {
+                $factTools = $this->factTools($worldSession, $conversation, $factsResident, $turnMode, $region, $validated['positions']['residents'][$factsResident->id] ?? null);
+                $tools = [...$tools, ...array_values($factTools)];
             }
 
             if ($tools !== []) {
@@ -491,6 +546,8 @@ class ConversationController extends Controller
 
         $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
 
+        $learnedFacts = $this->learnedFacts($factTools, $world, $assistantModel, $content);
+
         $audioBase64 = null;
         $audioContentType = null;
         $audioError = null;
@@ -521,7 +578,94 @@ class ConversationController extends Controller
             'audioError' => $audioError,
             ...($playerInventory !== null ? ['inventory' => $playerAfter = $playerInventory->summary(), 'changes' => Inventory::changesBetween($playerBefore, $playerAfter)] : []),
             ...($askForTool?->request !== null ? ['handoverRequest' => $askForTool->request->toPayload($playerInventory)] : []),
+            'userContent' => $lastUserMessage['content'] ?? null,
+            'creatorMode' => $creatorMode,
+            ...($worldSession !== null ? ['learnedFacts' => $learnedFacts] : []),
         ]);
+    }
+
+    /**
+     * Checks the typed password against the user's creator password and turns
+     * creator mode on for this conversation when it matches.
+     *
+     * @return string the notice the player sees
+     */
+    private function activateCreatorMode(Request $request, Conversation $conversation, string $password): string
+    {
+        $hash = $request->user()->creator_password;
+        if ($hash === null) {
+            return 'Set a creator password in Settings first.';
+        }
+        if (! Hash::check($password, $hash)) {
+            return 'Creator mode didn\'t activate.';
+        }
+
+        $conversation->update(['creator_mode_at' => $conversation->creator_mode_at ?? now()]);
+
+        return self::CREATOR_MODE_ON;
+    }
+
+    /**
+     * The server checks the creator password itself, so the character never
+     * gets the section that used to hold it, and gets the creator mode
+     * section only while creator mode is on in this conversation.
+     *
+     * @return array<int, string>
+     */
+    private function creatorSectionsExcluded(Conversation $conversation): array
+    {
+        return $conversation->creator_mode_at === null ? ['secret trigger', 'creator mode'] : ['secret trigger'];
+    }
+
+    /**
+     * The tools for secrets a resident keeps or wants to learn, keyed by name.
+     *
+     * @param  ?array{x: float, y: float, z: float}  $residentPoint
+     * @return array<string, AgentTool>
+     */
+    private function factTools(WorldSession $session, Conversation $conversation, WorldResident $resident, TurnMode $mode, Region $region, ?array $residentPoint): array
+    {
+        $zone = $residentPoint !== null ? app(ResolveWorldState::class)->locate($region->layout ?? [], $residentPoint)['zone'] : null;
+        $tools = [];
+
+        if ($mode === TurnMode::Creator || $resident->facts()->exists()) {
+            $tools['reveal'] = new RevealTool($session, $conversation, $resident, $mode, $region, $zone['name'] ?? $zone['id'] ?? null);
+        }
+
+        if ($mode === TurnMode::Creator) {
+            return [...$tools, 'set_fact_known' => new SetFactKnownTool($session), 'grant' => new GrantTool($session), 'remove' => new RemoveTool($session)];
+        }
+
+        $acknowledge = new AcknowledgeTool($session, $resident);
+        if ($acknowledge->knownFacts()->isNotEmpty()) {
+            $tools['acknowledge'] = $acknowledge;
+        }
+
+        return $tools;
+    }
+
+    /**
+     * The facts the player learned during this reply, with the summary of
+     * what the character told them written for those they heard from them.
+     *
+     * @param  array<string, AgentTool>  $factTools
+     * @return array<int, array{factId: int, topic: string, summary: string, sourceName: string, learnedAt: string}>
+     */
+    private function learnedFacts(array $factTools, ?World $world, Assistant $assistant, string $reply): array
+    {
+        $learned = [...($factTools['reveal']->learned ?? []), ...($factTools['set_fact_known']->learned ?? [])];
+        if ($learned === []) {
+            return [];
+        }
+
+        $tagParser = app(LlmResponseTagParser::class);
+        $inStory = $tagParser->stripOutOfCharacter($tagParser->parse($reply, $assistant)['content']);
+
+        return collect($learned)
+            ->map(fn (KnownFact $known) => $known->summary === '' ? app(SummarizeLearnedFact::class)->handle($world, $known, $assistant->name, $inStory) : $known)
+            ->map(fn (KnownFact $known) => $known->toPayload())
+            ->values()
+            ->all();
     }
 
     private function extractImageGenPrompt(?string $content): ?string
@@ -695,7 +839,7 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $excludedSections = ['opening_message', 'voice mode'];
+        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation)];
 
         if ($conversation->discord_channel_id) {
             // Discord has no UI to render an emotion/pose tag against — same reasoning as the normal Discord reply flow.
@@ -745,7 +889,7 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $excludedSections = ['opening_message', 'voice mode'];
+        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation)];
 
         if ($conversation->discord_channel_id) {
             $excludedSections[] = 'emotion tags';
@@ -898,7 +1042,7 @@ class ConversationController extends Controller
         $willSynthesize = $forceVoice
             || ($hasAudio && in_array($voiceMode, ['both', 'voiceOnly'], true));
 
-        $excludedSections = ['opening_message', 'emotion tags'];
+        $excludedSections = ['opening_message', 'emotion tags', 'secret trigger', 'creator mode'];
         if (! $willSynthesize) {
             $excludedSections[] = 'voice mode';
         }

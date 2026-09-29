@@ -8,6 +8,7 @@ use App\Models\AssistantUser;
 use App\Models\Conversation;
 use App\Models\ImageGenModel;
 use App\Models\ImageGenProvider;
+use App\Models\Fact;
 use App\Models\Inventory;
 use App\Models\Item;
 use App\Models\Region;
@@ -287,4 +288,9 @@ function inventoryScenario(int $playerCredits = 100, ?int $residentCredits = 50)
 function worldItem(Region $region, array $attributes = []): Item
 {
     return Item::factory()->create(['world_id' => $region->world_id, ...$attributes]);
+}
+
+function worldFact(WorldResident $holder, array $attributes = []): Fact
+{
+    return Fact::factory()->create(['world_resident_id' => $holder->id, ...$attributes]);
 }

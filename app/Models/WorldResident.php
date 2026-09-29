@@ -4,11 +4,14 @@ namespace App\Models;
 
 use App\Enums\AssistantKind;
 use App\Enums\WorldResidentBehavior;
+use App\Services\LlmProviders\LlmManager;
 use Database\Factories\WorldResidentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['region_id', 'assistant_id', 'position', 'rotation', 'behavior', 'behavior_settings', 'opening_message', 'custom_prompt', 'zone_access'])]
 class WorldResident extends Model
@@ -72,6 +75,17 @@ class WorldResident extends Model
         });
     }
 
+    /**
+     * Whether their model, as chosen by this user, can call tools, which
+     * holding items, credits or facts depends on.
+     */
+    public function canCallToolsFor(User $user): bool
+    {
+        $assistantUser = AssistantUser::where('assistant_id', $this->assistant_id)->where('user_id', $user->id)->first();
+
+        return $assistantUser !== null && (new LlmManager)->resolveModelForAssistantUser($assistantUser)?->supports_tools === true;
+    }
+
     public function world(): BelongsTo
     {
         return $this->belongsTo(World::class);
@@ -85,5 +99,18 @@ class WorldResident extends Model
     public function region(): BelongsTo
     {
         return $this->belongsTo(Region::class);
+    }
+
+    public function facts(): HasMany
+    {
+        return $this->hasMany(Fact::class);
+    }
+
+    /**
+     * The facts they can act on once the player knows them.
+     */
+    public function relayedFacts(): BelongsToMany
+    {
+        return $this->belongsToMany(Fact::class, 'fact_relays');
     }
 }

@@ -12,11 +12,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['name', 'slug', 'description', 'assistant_context_prompt', 'npc_context_prompt', 'spawn_region_id', 'spawn_passage_id', 'narrator_model_id'])]
+#[Fillable(['name', 'slug', 'description', 'assistant_context_prompt', 'npc_context_prompt', 'spawn_region_id', 'spawn_passage_id', 'narrator_model_id', 'review_reveals'])]
 class World extends Model
 {
     /** @use HasFactory<WorldFactory> */
     use HasFactory;
+
+    protected function casts(): array
+    {
+        return ['review_reveals' => 'boolean'];
+    }
 
     public function users(): BelongsToMany
     {

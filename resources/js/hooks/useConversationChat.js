@@ -3,8 +3,6 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { parseEmotionFromResponse, parsePoseFromResponse } from '../utils/parsers.js';
 
-const CREATOR_MODE_TRIGGER = '[creator mode: "tsuru tuneado"]';
-
 function mapMessage(msg, portraitType, poseNames, emotionNames) {
 	if (msg.role !== 'assistant') {
 		return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
@@ -135,10 +133,6 @@ export function useConversationChat({
 
 		for (let attempt = 1; attempt <= maxRetries; attempt++) {
 			try {
-				if (trimmed.toLowerCase().includes(CREATOR_MODE_TRIGGER.toLowerCase())) {
-					fetchEmotions?.(assistantId);
-				}
-
 				const response = await api.post(route('conversations.sendMessage', { assistant: assistantId, id: conversationId }), {
 					messages: apiMessages,
 					...(voiceMode ? { voice_mode: true } : {}),
@@ -152,6 +146,20 @@ export function useConversationChat({
 
 				const data = await response.json();
 
+				// The server removes a creator password from the message before storing it, so the local copy is swapped for the stored one.
+				const sent = data.userContent === undefined ? updatedMessages : updatedMessages.map((m) => (m.id === userMsg.id ? { ...m, content: data.userContent } : m));
+				if (data.creatorMode?.notice) {
+					addToast?.(data.creatorMode.notice, data.creatorMode.active ? 'success' : 'error');
+					if (data.creatorMode.active) fetchEmotions?.(assistantId);
+				}
+
+				if (data.content === null) {
+					setMessages(data.userContent ? sent : messages);
+					setIsLoading(false);
+					onResponse?.(data);
+					return;
+				}
+
 				if (data.image_url) {
 					if (data.intimate !== unlocked) fetchEmotions?.(assistantId);
 
@@ -162,7 +170,7 @@ export function useConversationChat({
 					}
 
 					setHasError(false);
-					setMessages([...updatedMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: data.content || '', thinking: data.thinking || null, image: data.image_url }]);
+					setMessages([...sent, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: data.content || '', thinking: data.thinking || null, image: data.image_url }]);
 					setIsLoading(false);
 					return;
 				}
@@ -204,7 +212,7 @@ export function useConversationChat({
 				if (data.audioError) addToast?.(data.audioError, 'error');
 
 				setHasError(false);
-				setMessages([...updatedMessages, ...generatedImageMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions, toolCalls: data.tool_calls || null, audioBase64: data.audioBase64 || null, audioContentType: data.audioContentType || null }]);
+				setMessages([...sent, ...generatedImageMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions, toolCalls: data.tool_calls || null, audioBase64: data.audioBase64 || null, audioContentType: data.audioContentType || null }]);
 				setIsLoading(false);
 				if (voiceMode) onVoiceReply?.(cleanText, ttsInstructions);
 				if (data.action) onAction?.(data.action, cleanText);

@@ -14,7 +14,7 @@ import GivePanel from './GivePanel.jsx';
 import GoodsStrip from './GoodsStrip.jsx';
 import { askForLine } from './inventoryChanges.js';
 
-export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getResidentState, getUserState, getOccupiedSpots, getStackedSpots, onVoiceAudio, onSilentReply, onAction, actionSender: actionSenderRef, inventory, onInventory, onHandoverRequest, openingLine = null }) {
+export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getResidentState, getUserState, getOccupiedSpots, getStackedSpots, onVoiceAudio, onSilentReply, onAction, actionSender: actionSenderRef, inventory, onInventory, onLearnedFacts, onHandoverRequest, openingLine = null }) {
 	const [conversationId, setConversationId] = useState(null);
 	const [input, setInput] = useState('');
 	const [pendingImage, setPendingImage] = useState(null);
@@ -158,6 +158,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		onAction,
 		onResponse: (data) => {
 			if (data.inventory) onInventory?.(data.inventory);
+			if (data.learnedFacts?.length) onLearnedFacts?.(data.learnedFacts);
 			if (data.handoverRequest) onHandoverRequest?.(data.handoverRequest);
 			if (goods.length > 0 || data.changes?.items?.length) setGoodsVersion((version) => version + 1);
 		},

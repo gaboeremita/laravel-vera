@@ -897,7 +897,8 @@ The `sendMessage` request accepts an optional `voice_mode: true` flag. When set,
 | `OOC mode` | included | **excluded** | a typed-parenthetical convention; unreachable via a transcribed voice message, no persistent state lost by omitting it |
 | `image handling` | included | **excluded** | voice mode's input path is mic-only; there's no image attachment |
 | `voice mode` | **excluded** | included | see below |
-| `creator mode`, `secret trigger` | included | included | intentionally **not** excluded — `creator mode` describes state that can persist across a conversation regardless of input modality (typed earlier, still true once voice mode is toggled on); excluding it risks the model "forgetting" it's talking to The Creator mid-conversation |
+| `creator mode` | included while creator mode is on | included while creator mode is on | the server checks the creator password and sets `conversations.creator_mode_at`; the section is included in every mode of that conversation once it is set, and excluded otherwise (see [Facts and Reveals](#facts-and-reveals)) |
+| `secret trigger` | **excluded** | **excluded** | the server checks the creator password itself, so the character is never given the section that used to hold it |
 
 **`voice mode` is DB-authored content, not hardcoded PHP.** It's just another top-level key in `Assistant->prompt`, edited the same way as `personality` or `style rules` via the Prompt page — no separate settings mechanism. If an assistant hasn't authored one, voice mode simply contributes nothing to the prompt; nothing crashes or falls back to a hardcoded default (this was an explicit design requirement — see the "graceful, not hardcoded" note below).
 
@@ -1180,6 +1181,20 @@ Specified in `specs/018-items-inventory-credits/`.
 **Sounds.** `Sound` rows are stored once per SHA-256 content hash at `sounds/{hash}.{ext}` (`StoreSound`), so anything that uses the same sound shares one file; a sound is deleted when nothing references it. On the client, `utils/soundCache.js` keeps decoded buffers by hash.
 
 **Frontend.** Configuration: `ItemsEditor`, `StartingInventoryEditor`, `RegionObjectsEditor` with `ActivityTermsEditor`, `NarratorModelSelect`, backed by `useWorldInventoryConfig`. Play: `useInventory` (inventory state; toasts with item images and sounds for every change), `CreditsReadout`, `InventoryPanel` (`Tab`), `GivePanel` and `GoodsStrip` in `WorldChat`, `HandoverRequestConfirm` for requests and purchases, `NarrationCard`, and take rows, costs, vendors and attempts in `usePlayerActivities` and `InspectCard`.
+
+### Facts and Reveals
+
+Specified in `specs/019-world-facts-reveal/`.
+
+**Facts.** A `Fact` belongs to one resident placement (`world_resident_id`, `topic` unique per resident, `content`, plain-language `disclosure`), with `fact_relays` naming the other residents who can act on it once the player knows it. Nothing is copied into sessions: a resident holds the facts configured on them now. Per session, `known_facts` records what the player knows (`RevealSource`, source name, and a summary of what they were told), `fact_acknowledgements` what residents learned from the player, and `reveal_attempts` every attempt (reason, whether reviewed, approved, verdict, with the topic and holder name copied so the log survives deletion). `LearnFact` is the only code that writes `known_facts`. Facts need a model with tool calling, like starting inventories.
+
+**Prompts.** `BuildFactsPrompt` adds a `facts` section per turn (`TurnMode`): a holder sees only the topic and disclosure prose until the player knows the fact; once the player learned it from them they speak of it freely, and when the player found out elsewhere they get the content and the source, to talk about once the player brings it up. Relay residents know the topics they want to find out and get the content once the player knows it. On OOC turns (the player's latest message has an `[ooc: …]` span, `LlmResponseTagParser::hasOutOfCharacter`) holders get the content; OOC text is never removed from the conversation. Between residents holders get topics and prose only, and neither tool.
+
+**Tools.** `RevealTool` (`reveal`, with a reason) returns the content only when approved: `ReviewReveal` makes one call on the narrator model (`ResolveNarratorModel`) with the forced `verdict` tool, reading the prose, reason, place, recent expressions, memory, both sides' holdings, credits handed over and the stored conversation with OOC spans removed, and never the content. A failed review rejects the reveal. The review is skipped on OOC turns, when the player already knows the fact, or when the world's `review_reveals` is off; a fact is reviewed at most once per turn. `AcknowledgeTool` (`acknowledge`) is offered for facts the player knows and refused otherwise. After the reply, `SummarizeLearnedFact` writes what the player was told from the in-story reply. Items and activity terms can name a `reveals_fact_id`, which the player learns on examine or on a successful use, with the narration as its summary.
+
+**Creator mode.** `users.creator_password` is hashed. `CreatorModeTags` reads `[creator mode: "<password>"]` (activation) and `[creator mode: <instruction>]` (command); `sendMessage` removes activations from every user message before storing or sending anything, checks the password, and sets `conversations.creator_mode_at`, which keeps creator mode on for that conversation only. On a command turn the world toolbox is unscoped, `reveal` covers every fact without review, and `set_fact_known`, `grant` and `remove` are added; their credit changes set `credit_transactions.by_creator` and their reveals are logged with source `creator`. Discord conversations never have creator mode.
+
+**Frontend.** `ResidentFactsEditor` in each resident's section of the region editor, `FactSelect` on items and activity terms, the review toggle in `WorldForm`, the creator password in `SettingsPage`, `useKnownFacts` with `LearnedFactsPanel` (`J`), and `RevealLog` on the sessions page. `useConversationChat` swaps the sent message for the stored `userContent` and shows creator mode notices.
 
 ### Runtime (3D Scene)
 

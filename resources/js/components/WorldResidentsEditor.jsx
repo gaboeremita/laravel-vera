@@ -7,6 +7,7 @@ import ConfirmationModal from './common/ConfirmationModal.jsx';
 import { parseZoneAccess } from './world/zoneAccess.js';
 import { behaviorSettingsText, parseBehaviorSettings, withGreetOnArrival } from './world/behaviorSettings.js';
 import StartingInventoryEditor from './StartingInventoryEditor.jsx';
+import ResidentFactsEditor from './ResidentFactsEditor.jsx';
 
 const DEFAULT_PLACEMENT = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, behavior: 'stationary', behaviorSettings: null, openingMessage: '', customPrompt: '', zoneAccess: null };
 const ZONE_ACCESS_EXAMPLE = '{ "tags": ["deprecated"], "zones": ["mona-house"] }';
@@ -83,8 +84,9 @@ function OtherRegionRow({ candidate, regionName, onMove }) {
 	);
 }
 
-function ResidentRow({ candidate, resident, regionId, regionNames, privateZones, inventoryConfig, onAdd, onRemove, onUpdate, onMove }) {
+function ResidentRow({ worldId, candidate, resident, otherResidents, regionId, regionNames, privateZones, inventoryConfig, onAdd, onRemove, onUpdate, onMove, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
+	const [removingFacts, setRemovingFacts] = useState(null);
 	const [draft, setDraft] = useState(toDraft(resident ?? DEFAULT_PLACEMENT));
 	const [isSaving, setIsSaving] = useState(false);
 
@@ -116,144 +118,170 @@ function ResidentRow({ candidate, resident, regionId, regionNames, privateZones,
 		await onUpdate(candidate, toPlacement(draft));
 		setIsSaving(false);
 	};
+	const requestRemove = async () => {
+		try {
+			const response = await api.get(route('worlds.residents.facts.index', { world: worldId, resident: resident.id }));
+			if (!response.ok) throw new Error();
+			const { facts } = await response.json();
+			if (facts.length === 0) {
+				onRemove(resident);
+				return;
+			}
+			setRemovingFacts({ count: facts.length, sessions: facts.reduce((total, fact) => total + fact.usage, 0) });
+		} catch { addToast('Unable to check their facts', 'error'); }
+	};
 
 	return (
-		<Accordion
-			title={candidate.name}
-			collapsed={collapsed}
-			onToggle={() => setCollapsed((current) => !current)}
-			actions={<button type="button" onClick={() => onRemove(resident)} aria-label="Remove resident" className="text-success cursor-pointer hover:text-danger transition-colors"><SquareCheck size={18} /></button>}
-			className="bg-success/5"
-		>
-			<div>
-				<p className={FIELD_LABEL}>Spawn Position <span className="normal-case text-fg-3">(from the room origin)</span></p>
-				<div className="grid grid-cols-3 gap-2">
-					{['x', 'y', 'z'].map((axis) => (
-						<div key={axis}>
-							<label className={FIELD_LABEL}>{axis.toUpperCase()}</label>
-							<input
-								type="number"
-								value={draft.position[axis]}
-								onWheel={blurOnWheel}
-								onChange={(event) => setDraft((current) => ({ ...current, position: { ...current.position, [axis]: Number(event.target.value) } }))}
-								className={FIELD_INPUT}
-							/>
-						</div>
-					))}
-				</div>
-			</div>
-			<div className="grid grid-cols-3 gap-2">
+		<>
+			<Accordion
+				title={candidate.name}
+				collapsed={collapsed}
+				onToggle={() => setCollapsed((current) => !current)}
+				actions={<button type="button" onClick={requestRemove} aria-label="Remove resident" className="text-success cursor-pointer hover:text-danger transition-colors"><SquareCheck size={18} /></button>}
+				className="bg-success/5"
+			>
 				<div>
-					<label className={FIELD_LABEL}>Facing <span className="normal-case text-fg-3">(degrees)</span></label>
-					<input
-						type="number"
-						value={draft.facing}
-						onWheel={blurOnWheel}
-						onChange={(event) => setDraft((current) => ({ ...current, facing: Number(event.target.value) }))}
+					<p className={FIELD_LABEL}>Spawn Position <span className="normal-case text-fg-3">(from the room origin)</span></p>
+					<div className="grid grid-cols-3 gap-2">
+						{['x', 'y', 'z'].map((axis) => (
+							<div key={axis}>
+								<label className={FIELD_LABEL}>{axis.toUpperCase()}</label>
+								<input
+									type="number"
+									value={draft.position[axis]}
+									onWheel={blurOnWheel}
+									onChange={(event) => setDraft((current) => ({ ...current, position: { ...current.position, [axis]: Number(event.target.value) } }))}
+									className={FIELD_INPUT}
+								/>
+							</div>
+						))}
+					</div>
+				</div>
+				<div className="grid grid-cols-3 gap-2">
+					<div>
+						<label className={FIELD_LABEL}>Facing <span className="normal-case text-fg-3">(degrees)</span></label>
+						<input
+							type="number"
+							value={draft.facing}
+							onWheel={blurOnWheel}
+							onChange={(event) => setDraft((current) => ({ ...current, facing: Number(event.target.value) }))}
+							className={FIELD_INPUT}
+						/>
+					</div>
+				</div>
+				<div>
+					<label className={FIELD_LABEL}>Behavior</label>
+					<select
+						value={draft.behavior}
+						onChange={(event) => setDraft((current) => ({ ...current, behavior: event.target.value }))}
 						className={FIELD_INPUT}
+					>
+						<option value="stationary">Stationary</option>
+						<option value="roam">Roam</option>
+						<option value="autonomous">Autonomous</option>
+						<option value="route">Route</option>
+					</select>
+				</div>
+				<div>
+					<label className={FIELD_LABEL}>Behavior Settings <span className="normal-case text-fg-3">(JSON: homeSpot, route stops, the area they keep to, decisionSeconds)</span></label>
+					<textarea
+						value={draft.behaviorSettings}
+						onChange={(event) => setDraft((current) => ({ ...current, behaviorSettings: event.target.value }))}
+						placeholder={BEHAVIOR_SETTINGS_EXAMPLE}
+						rows={3}
+						spellCheck={false}
+						className={`${FIELD_INPUT} resize-none font-mono`}
+					/>
+					{behaviorSettingsError && <p className="text-danger text-xs mt-1">{behaviorSettingsError}</p>}
+				</div>
+				<label className="flex items-center gap-2 text-fg-2 text-sm cursor-pointer">
+					<input
+						type="checkbox"
+						checked={parseBehaviorSettings(draft.behaviorSettings).behaviorSettings?.greetOnArrival === true}
+						disabled={behaviorSettingsError !== null}
+						onChange={(event) => setDraft((current) => ({ ...current, behaviorSettings: withGreetOnArrival(current.behaviorSettings, event.target.checked) }))}
+					/>
+					<span>Greet on arrival <span className="normal-case text-fg-3">(opens a conversation when a session begins)</span></span>
+				</label>
+				<div>
+					<label className={FIELD_LABEL}>Opening Message <span className="normal-case text-fg-3">(overrides the default greeting, only in this world)</span></label>
+					<textarea
+						value={draft.openingMessage}
+						onChange={(event) => setDraft((current) => ({ ...current, openingMessage: event.target.value }))}
+						rows={2}
+						className={`${FIELD_INPUT} resize-none`}
 					/>
 				</div>
-			</div>
-			<div>
-				<label className={FIELD_LABEL}>Behavior</label>
-				<select
-					value={draft.behavior}
-					onChange={(event) => setDraft((current) => ({ ...current, behavior: event.target.value }))}
-					className={FIELD_INPUT}
-				>
-					<option value="stationary">Stationary</option>
-					<option value="roam">Roam</option>
-					<option value="autonomous">Autonomous</option>
-					<option value="route">Route</option>
-				</select>
-			</div>
-			<div>
-				<label className={FIELD_LABEL}>Behavior Settings <span className="normal-case text-fg-3">(JSON: homeSpot, route stops, the area they keep to, decisionSeconds)</span></label>
-				<textarea
-					value={draft.behaviorSettings}
-					onChange={(event) => setDraft((current) => ({ ...current, behaviorSettings: event.target.value }))}
-					placeholder={BEHAVIOR_SETTINGS_EXAMPLE}
-					rows={3}
-					spellCheck={false}
-					className={`${FIELD_INPUT} resize-none font-mono`}
-				/>
-				{behaviorSettingsError && <p className="text-danger text-xs mt-1">{behaviorSettingsError}</p>}
-			</div>
-			<label className="flex items-center gap-2 text-fg-2 text-sm cursor-pointer">
-				<input
-					type="checkbox"
-					checked={parseBehaviorSettings(draft.behaviorSettings).behaviorSettings?.greetOnArrival === true}
-					disabled={behaviorSettingsError !== null}
-					onChange={(event) => setDraft((current) => ({ ...current, behaviorSettings: withGreetOnArrival(current.behaviorSettings, event.target.checked) }))}
-				/>
-				<span>Greet on arrival <span className="normal-case text-fg-3">(opens a conversation when a session begins)</span></span>
-			</label>
-			<div>
-				<label className={FIELD_LABEL}>Opening Message <span className="normal-case text-fg-3">(overrides the default greeting, only in this world)</span></label>
-				<textarea
-					value={draft.openingMessage}
-					onChange={(event) => setDraft((current) => ({ ...current, openingMessage: event.target.value }))}
-					rows={2}
-					className={`${FIELD_INPUT} resize-none`}
-				/>
-			</div>
-			<div>
-				<label className={FIELD_LABEL}>Custom Prompt <span className="normal-case text-fg-3">(added on top of this world's own context, only for this resident)</span></label>
-				<textarea
-					value={draft.customPrompt}
-					onChange={(event) => setDraft((current) => ({ ...current, customPrompt: event.target.value }))}
-					rows={3}
-					className={`${FIELD_INPUT} resize-none`}
-				/>
-			</div>
-			<div>
-				<label className={FIELD_LABEL}>Zone Access <span className="normal-case text-fg-3">(JSON: the groups they belong to and the private places they may enter on their own)</span></label>
-				<textarea
-					value={draft.zoneAccess}
-					onChange={(event) => setDraft((current) => ({ ...current, zoneAccess: event.target.value }))}
-					placeholder={ZONE_ACCESS_EXAMPLE}
-					rows={2}
-					spellCheck={false}
-					className={`${FIELD_INPUT} resize-none font-mono`}
-				/>
-				{zoneAccessError && <p className="text-danger text-xs mt-1">{zoneAccessError}</p>}
-				{privateZones.length > 0 && (
-					<p className="text-fg-3 text-xs mt-1">
-						Private places: {privateZones.map((zone) => `${zone.id}${zone.accessTags?.length ? ` (${zone.accessTags.join(', ')})` : ''}${zone.secret ? ' [secret]' : ''}`).join(', ')}
-					</p>
+				<div>
+					<label className={FIELD_LABEL}>Custom Prompt <span className="normal-case text-fg-3">(added on top of this world's own context, only for this resident)</span></label>
+					<textarea
+						value={draft.customPrompt}
+						onChange={(event) => setDraft((current) => ({ ...current, customPrompt: event.target.value }))}
+						rows={3}
+						className={`${FIELD_INPUT} resize-none`}
+					/>
+				</div>
+				<div>
+					<label className={FIELD_LABEL}>Zone Access <span className="normal-case text-fg-3">(JSON: the groups they belong to and the private places they may enter on their own)</span></label>
+					<textarea
+						value={draft.zoneAccess}
+						onChange={(event) => setDraft((current) => ({ ...current, zoneAccess: event.target.value }))}
+						placeholder={ZONE_ACCESS_EXAMPLE}
+						rows={2}
+						spellCheck={false}
+						className={`${FIELD_INPUT} resize-none font-mono`}
+					/>
+					{zoneAccessError && <p className="text-danger text-xs mt-1">{zoneAccessError}</p>}
+					{privateZones.length > 0 && (
+						<p className="text-fg-3 text-xs mt-1">
+							Private places: {privateZones.map((zone) => `${zone.id}${zone.accessTags?.length ? ` (${zone.accessTags.join(', ')})` : ''}${zone.secret ? ' [secret]' : ''}`).join(', ')}
+						</p>
+					)}
+				</div>
+				<div className="flex justify-end">
+					<button
+						type="button"
+						onClick={save}
+						disabled={!dirty || isSaving || invalid}
+						className={`text-[0.7rem] tracking-[0.1em] px-4 py-1.5 transition-colors ${
+							!dirty || isSaving || invalid ? 'bg-bg-3 text-fg-3 cursor-default' : 'button-success cursor-pointer'
+						}`}
+					>
+						{isSaving ? 'SAVING...' : 'SAVE'}
+					</button>
+				</div>
+				{inventoryConfig && (
+					<div className="border-t border-line-1 pt-4">
+						<p className="text-fg-3 text-[0.65rem] tracking-[0.15em] mb-3">STARTING INVENTORY <span className="normal-case tracking-normal">— items marked for sale make them a vendor</span></p>
+						<StartingInventoryEditor
+							items={inventoryConfig.items}
+							value={inventoryConfig.starting.residents[resident.id]}
+							allowUnlimited
+							flag="forSale"
+							flagLabel="For sale"
+							saveLabel="SAVE STARTING INVENTORY"
+							onSave={(draft) => inventoryConfig.saveStarting('worlds.starting-inventories.residents.update', { resident: resident.id }, draft, (current, saved) => ({ ...current, residents: { ...current.residents, [resident.id]: saved } }))}
+						/>
+					</div>
 				)}
-			</div>
-			<div className="flex justify-end">
-				<button
-					type="button"
-					onClick={save}
-					disabled={!dirty || isSaving || invalid}
-					className={`text-[0.7rem] tracking-[0.1em] px-4 py-1.5 transition-colors ${
-						!dirty || isSaving || invalid ? 'bg-bg-3 text-fg-3 cursor-default' : 'button-success cursor-pointer'
-					}`}
-				>
-					{isSaving ? 'SAVING...' : 'SAVE'}
-				</button>
-			</div>
-			{inventoryConfig && (
 				<div className="border-t border-line-1 pt-4">
-					<p className="text-fg-3 text-[0.65rem] tracking-[0.15em] mb-3">STARTING INVENTORY <span className="normal-case tracking-normal">— items marked for sale make them a vendor</span></p>
-					<StartingInventoryEditor
-						items={inventoryConfig.items}
-						value={inventoryConfig.starting.residents[resident.id]}
-						allowUnlimited
-						flag="forSale"
-						flagLabel="For sale"
-						saveLabel="SAVE STARTING INVENTORY"
-						onSave={(draft) => inventoryConfig.saveStarting('worlds.starting-inventories.residents.update', { resident: resident.id }, draft, (current, saved) => ({ ...current, residents: { ...current.residents, [resident.id]: saved } }))}
-					/>
+					<p className="text-fg-3 text-[0.65rem] tracking-[0.15em] mb-3">FACTS <span className="normal-case tracking-normal">— secrets they share in character when the moment is right</span></p>
+					<ResidentFactsEditor worldId={worldId} resident={resident} otherResidents={otherResidents} onFactsChange={inventoryConfig?.reloadItems} addToast={addToast} />
 				</div>
+			</Accordion>
+			{removingFacts && (
+				<ConfirmationModal
+					title="Remove resident"
+					message={`${candidate.name} holds ${removingFacts.count} fact${removingFacts.count === 1 ? '' : 's'}${removingFacts.sessions > 0 ? `, known in ${removingFacts.sessions} session${removingFacts.sessions === 1 ? '' : 's'}` : ''}. Removing them deletes their facts too.`}
+					options={[{ label: 'REMOVE', value: 'confirm' }, { label: 'CANCEL', value: 'cancel', cancel: true }]}
+					onSelect={(selected) => { setRemovingFacts(null); if (selected === 'confirm') onRemove(resident); }}
+				/>
 			)}
-		</Accordion>
+		</>
 	);
 }
 
-function KindList({ label, candidates, residentsByAssistantId, regionId, regionNames, privateZones, inventoryConfig, onAdd, onRemove, onUpdate, onMove }) {
+function KindList({ worldId, label, candidates, residents, residentsByAssistantId, regionId, regionNames, privateZones, inventoryConfig, onAdd, onRemove, onUpdate, onMove, addToast }) {
 	const rows = candidates.filter((candidate) => isEligible(candidate) || residentsByAssistantId.has(candidate.id));
 	if (rows.length === 0) return null;
 
@@ -264,8 +292,10 @@ function KindList({ label, candidates, residentsByAssistantId, regionId, regionN
 				{rows.map((candidate) => (
 					<ResidentRow
 						key={candidate.id}
+						worldId={worldId}
 						candidate={candidate}
 						resident={residentsByAssistantId.get(candidate.id) ?? null}
+						otherResidents={residents.filter((other) => other.assistant.id !== candidate.id)}
 						regionId={regionId}
 						regionNames={regionNames}
 						privateZones={privateZones}
@@ -274,6 +304,7 @@ function KindList({ label, candidates, residentsByAssistantId, regionId, regionN
 						onRemove={onRemove}
 						onUpdate={onUpdate}
 						onMove={onMove}
+						addToast={addToast}
 					/>
 				))}
 			</div>
@@ -340,8 +371,8 @@ export default function WorldResidentsEditor({ worldId, region, residents, regio
 					<p className="text-fg-3 text-xs">Loading eligible characters...</p>
 				) : (
 					<>
-						<KindList label="Assistants" candidates={assistantCandidates} residentsByAssistantId={residentsByAssistantId} regionId={region.id} regionNames={regionNames} privateZones={privateZones} inventoryConfig={inventoryConfig} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} onMove={moveResident} />
-						<KindList label="NPCs" candidates={npcCandidates} residentsByAssistantId={residentsByAssistantId} regionId={region.id} regionNames={regionNames} privateZones={privateZones} inventoryConfig={inventoryConfig} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} onMove={moveResident} />
+						<KindList worldId={worldId} label="Assistants" candidates={assistantCandidates} residents={residents} residentsByAssistantId={residentsByAssistantId} regionId={region.id} regionNames={regionNames} privateZones={privateZones} inventoryConfig={inventoryConfig} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} onMove={moveResident} addToast={addToast} />
+						<KindList worldId={worldId} label="NPCs" candidates={npcCandidates} residents={residents} residentsByAssistantId={residentsByAssistantId} regionId={region.id} regionNames={regionNames} privateZones={privateZones} inventoryConfig={inventoryConfig} onAdd={(candidate) => updateResident(candidate, DEFAULT_PLACEMENT)} onRemove={removeResident} onUpdate={updateResident} onMove={moveResident} addToast={addToast} />
 					</>
 				)}
 			</div>

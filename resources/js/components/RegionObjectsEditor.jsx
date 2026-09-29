@@ -52,7 +52,7 @@ function ObjectRow({ worldId, region, object, residents, inventoryConfig, onTerm
 				{activities.length === 0 ? (
 					<p className="text-fg-3 text-xs">This object offers no activities.</p>
 				) : activities.map((activity) => (
-					<ActivityTermsEditor key={activity.id} worldId={worldId} regionId={region.id} objectId={object.id} activity={activity} terms={termsFor(activity.id)} items={inventoryConfig.items} residents={residents} onSaved={onTermsChange} addToast={addToast} />
+					<ActivityTermsEditor key={activity.id} worldId={worldId} regionId={region.id} objectId={object.id} activity={activity} terms={termsFor(activity.id)} items={inventoryConfig.items} facts={inventoryConfig.facts} residents={residents} onSaved={onTermsChange} addToast={addToast} />
 				))}
 			</div>
 		</Accordion>
