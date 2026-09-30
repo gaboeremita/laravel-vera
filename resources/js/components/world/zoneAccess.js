@@ -17,6 +17,11 @@ export function parseZoneAccess(text) {
 	return { zoneAccess: { tags: value.tags ?? [], zones: value.zones ?? [] }, error: null };
 }
 
+/** The area a resident keeps to on their own where they are: their area in their home region, none anywhere else. */
+export function areaIn(resident, regionId) {
+	return resident.regionId === regionId ? resident.behaviorSettings?.area ?? [] : [];
+}
+
 /**
  * Whether a zone is one of the area's zones or lies inside one; any zone is
  * within an empty area. Mirrors the area rule in ApplyResidentZoneAccess.

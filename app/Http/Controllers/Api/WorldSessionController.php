@@ -13,6 +13,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\TravelRequest;
 use App\Models\World;
 use App\Models\WorldSession;
+use App\Models\WorldSessionObject;
 use App\Models\WorldSessionResident;
 use App\Traits\ResolvesWorldUser;
 use Illuminate\Http\JsonResponse;
@@ -29,7 +30,7 @@ class WorldSessionController extends Controller
         $worldUser = $this->resolveWorldUser($request, $world);
 
         $sessions = $worldUser->sessions()
-            ->with('residentStates')
+            ->with(['residentStates', 'objectStates'])
             ->withCount('conversations')
             ->orderByDesc('updated_at')
             ->get(['id', 'title', 'region_id', 'position', 'arrival_facing', 'updated_at'])
@@ -50,6 +51,11 @@ class WorldSessionController extends Controller
                     'posture' => $state->posture->value,
                     'exitPosition' => $state->exit_position,
                 ]]),
+                'objectStates' => $session->objectStates->map(fn (WorldSessionObject $state) => [
+                    'regionId' => $state->region_id,
+                    'objectId' => $state->object_id,
+                    'state' => $state->state,
+                ])->values(),
             ]);
 
         return response()->json($sessions);

@@ -10,6 +10,8 @@ const SURFACE_MERGE_DISTANCE = 0.05;
 const NEAREST_SEARCH_RINGS = 3;
 const NEAREST_MAX_HEIGHT_DIFFERENCE = 1;
 const APPROACH_RADIUS = 1.2;
+const STANDING_RADIUS = 1.5;
+const ISLAND_NODES = 30;
 const LEVEL_TOLERANCE = 0.05;
 const DROP_SEARCH_DEPTH = 3;
 const WALL_MARGIN = 0.2;
@@ -174,6 +176,70 @@ class NavigationGrid {
 	nearestPoint(point) {
 		const node = this.nearestNode(point);
 		return node === -1 ? null : this.nodePosition(node);
+	}
+
+	/**
+	 * Whether the node is on a patch of ground too small to lead anywhere,
+	 * such as the top of a seat or a platform with no way down.
+	 */
+	isIsland(start) {
+		const seen = new Set([start]);
+		const queue = [start];
+		while (queue.length > 0) {
+			const node = queue.shift();
+			for (let direction = 0; direction < DIRECTIONS.length; direction++) {
+				if (!this.edgeOpen(node, direction)) continue;
+				const next = this.neighbour(node, direction);
+				if (seen.has(next)) continue;
+				seen.add(next);
+				if (seen.size >= ISLAND_NODES) return false;
+				queue.push(next);
+			}
+		}
+		return true;
+	}
+
+	/** Whether no route can start from a point, because the ground under it is an island. */
+	isStranded(point) {
+		if (!this.isComplete) return false;
+		const node = this.nearestNode(point);
+		return node !== -1 && this.isIsland(node);
+	}
+
+	/**
+	 * The nearest ground within reach of a point where a body fits and can
+	 * walk on from, for someone standing up from a seat or stranded where no
+	 * route starts; null when there is none.
+	 */
+	standingPointNear(point, radius = STANDING_RADIUS) {
+		if (!this.isComplete) return null;
+		const centerI = Math.round((point.x - this.minX) / this.cellSize);
+		const centerJ = Math.round((point.z - this.minZ) / this.cellSize);
+		const rings = Math.ceil(radius / this.cellSize);
+		const candidates = [];
+		for (let j = centerJ - rings; j <= centerJ + rings; j++) {
+			for (let i = centerI - rings; i <= centerI + rings; i++) {
+				if (i < 0 || j < 0 || i >= this.columns || j >= this.rows) continue;
+				const distance = Math.hypot(this.minX + i * this.cellSize - point.x, this.minZ + j * this.cellSize - point.z);
+				if (distance > radius) continue;
+				for (let level = 0; level < LEVELS; level++) {
+					const node = (j * this.columns + i) * LEVELS + level;
+					const height = this.heights[node];
+					if (Number.isNaN(height)) break;
+					const rise = Math.abs(height - point.y);
+					if (rise <= NEAREST_MAX_HEIGHT_DIFFERENCE) candidates.push({ node, score: distance + rise * 0.5 });
+				}
+			}
+		}
+		candidates.sort((a, b) => a.score - b.score);
+		for (const { node } of candidates) {
+			if (this.failedNodes.has(node)) continue;
+			const position = this.nodePosition(node);
+			this.probe.set(position.x, position.y, position.z);
+			if (this.collisionWorld.isBodyStuck(this.probe) || this.isIsland(node)) continue;
+			return position;
+		}
+		return null;
 	}
 
 	/** Neighbour node in a direction, choosing the level reachable by a step or small drop. */

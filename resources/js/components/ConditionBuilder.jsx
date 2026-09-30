@@ -8,6 +8,7 @@ const GROUP_LABELS = { all: 'All of', any: 'Any of', none: 'None of' };
 const FEELINGS = [['romance', 'Romance'], ['trust', 'Trust'], ['liking', 'Liking']];
 const FEELING_BOUNDS = [['atLeast', 'at least'], ['atMost', 'at most'], ['between', 'between']];
 const QUEST_STATES = [['offered', 'Offered'], ['active', 'Active'], ['declined', 'Declined'], ['abandoned', 'Abandoned']];
+const OBJECT_STATES = [['passable', 'Passable']];
 const NO_ERRORS = () => [];
 
 function isGroup(node) {
@@ -68,7 +69,7 @@ function defaultCondition(type, options, context) {
 		case 'credits': return { credits: { atLeast: 1 } };
 		case 'knows': return { knows: factId };
 		case 'acknowledged': return { acknowledged: { fact: factId, resident: residentId } };
-		case 'flag': return { flag: context.flags[0] ?? '' };
+		case 'flag': return context.outsideQuest ? { flag: { quest: options.quests[0]?.key ?? '', name: options.quests[0]?.flags[0] ?? '' } } : { flag: context.flags[0] ?? '' };
 		case 'question': return { question: context.questions[0]?.id ?? '' };
 		case 'feeling': return { feeling: { resident: residentId, kind: 'trust', atLeast: 1 } };
 		case 'questState': return { questState: { quest: context.questKey || options.quests[0]?.key || '', state: 'declined' } };
@@ -78,6 +79,8 @@ function defaultCondition(type, options, context) {
 		case 'messagesWith': return { messagesWith: { resident: residentId, atLeast: 1 } };
 		case 'giverIn': return { giverIn: { region: region?.id ?? null, zone: region?.zones[0]?.id ?? '' } };
 		case 'othersInTheZone': return { othersInTheZone: { nobody: true } };
+		case 'objectState': return { objectState: OBJECT_STATES[0][0] };
+		case 'narrator': return { narrator: { requirement: '', outcome: '' } };
 		default: return { beat: context.beats[0]?.id ?? '' };
 	}
 }
@@ -220,7 +223,7 @@ function FlagFields({ value, onChange, options, context }) {
 	return (
 		<>
 			<select value={source} onChange={(event) => onChange(event.target.value === '' ? name : { quest: event.target.value, name })} className={SELECT} aria-label="Flag of">
-				<option value="">This quest</option>
+				{!context.outsideQuest && <option value="">This quest</option>}
 				{options.quests.filter((quest) => quest.key !== context.questKey).map((quest) => <option key={quest.key} value={quest.key}>{quest.title}</option>)}
 			</select>
 			<input list={listId} value={name} onChange={(event) => onChange(isOwn ? event.target.value : { quest: source, name: event.target.value })} placeholder="flagName" className={`${SELECT} w-36 placeholder:text-fg-3/60`} aria-label="Flag name" />
@@ -310,6 +313,19 @@ function ConditionFields({ type, value, onChange, options, context }) {
 			);
 		case 'flag':
 			return <FlagFields value={value} onChange={onChange} options={options} context={context} />;
+		case 'objectState':
+			return (
+				<select value={value} onChange={(event) => onChange(event.target.value)} className={SELECT} aria-label="Object state">
+					{OBJECT_STATES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+				</select>
+			);
+		case 'narrator':
+			return (
+				<div className="flex w-full flex-col gap-2">
+					<textarea value={value.requirement} onChange={(event) => onChange({ ...value, requirement: event.target.value })} rows={2} placeholder="Requirement: opens for anyone who can show they work for the Guild." className={`${SELECT} resize-none placeholder:text-fg-3/60`} aria-label="Requirement" />
+					<textarea value={value.outcome} onChange={(event) => onChange({ ...value, outcome: event.target.value })} rows={2} placeholder="Outcome: the terminal shows the last message sent from it." className={`${SELECT} resize-none placeholder:text-fg-3/60`} aria-label="Outcome" />
+				</div>
+			);
 		case 'question':
 			return (
 				<select value={value} onChange={(event) => onChange(event.target.value)} className={`${SELECT} max-w-md`} aria-label="Question">
@@ -381,7 +397,8 @@ function ConditionGroup({ node, onChange, onRemove, options, context, depth, pat
  * path is where the tree sits in the definition, so each row shows the
  * server's errors for it.
  *
- * context: { questKey, flags: string[], questions: [{ id, text }], beats: [{ id }], types: string[] }
+ * context: { questKey, flags: string[], questions: [{ id, text }], beats: [{ id }], types: string[], outsideQuest?: boolean }
+ * outsideQuest is for trees that belong to no quest, where a flag always names the quest it came from.
  */
 export default function ConditionBuilder({ value, onChange, options, context, path = '', errorsAt = NO_ERRORS }) {
 	const wrapped = value === null || !isGroup(value);

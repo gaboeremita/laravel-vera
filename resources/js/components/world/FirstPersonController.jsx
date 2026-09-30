@@ -36,7 +36,7 @@ function lerpAngle(from, to, t) {
 	return from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * t;
 }
 
-export default function FirstPersonController({ collisionWorld, navigation, spawnPosition, spawnYaw = null, enabled, onPositionChange, playerState: playerStateRef, playerCommands: playerCommandsRef, onMovementChange, onGetUpIntent, onMoveIntent }) {
+export default function FirstPersonController({ collisionWorld, navigation, spawnPosition, spawnYaw = null, enabled, onPositionChange, playerState: playerStateRef, playerCommands: playerCommandsRef, onMovementChange, onGetUpIntent, onMoveIntent, onBlockedByObject }) {
 	const { camera, gl } = useThree();
 	const keys = useRef(new Set());
 	const runHeld = useRef(false);
@@ -59,10 +59,11 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 	const dip = useRef(0);
 	const dragging = useRef(false);
 	const embedded = useRef({ since: null, checkAt: 0 });
+	const blockingObjectId = useRef(null);
 	const callbacks = useRef({});
 
 	useEffect(() => {
-		callbacks.current = { onPositionChange, onMovementChange, onGetUpIntent, onMoveIntent };
+		callbacks.current = { onPositionChange, onMovementChange, onGetUpIntent, onMoveIntent, onBlockedByObject };
 	});
 
 	useEffect(() => {
@@ -317,7 +318,7 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 		if (airborne.current) {
 			airborne.current.velocityY -= GRAVITY * step;
 			const velocity = { x: direction.current.x, y: airborne.current.velocityY, z: direction.current.z };
-			const { landed } = collisionWorld.airStep(foot, velocity, step);
+			const { landed } = collisionWorld.airStep(foot, velocity, step, true);
 			airborne.current.velocityY = velocity.y;
 			if (landed) {
 				const fallSpeed = airborne.current.velocityY;
@@ -326,8 +327,14 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 				playSound(playLanding, fallSpeed);
 			}
 		} else if (direction.current.lengthSq() > 0) {
-			const result = collisionWorld.move(foot, direction.current.x * step, direction.current.z * step, { canFall: mode.current !== 'swimming' });
+			const result = collisionWorld.move(foot, direction.current.x * step, direction.current.z * step, { canFall: mode.current !== 'swimming', withBlockers: true });
 			if (result === 'falling') airborne.current = { velocityY: 0 };
+			if (collisionWorld.blockedBy !== blockingObjectId.current) {
+				blockingObjectId.current = collisionWorld.blockedBy;
+				if (blockingObjectId.current) callbacks.current.onBlockedByObject?.(blockingObjectId.current);
+			}
+		} else {
+			blockingObjectId.current = null;
 		}
 
 		if (airborne.current || mode.current === 'swimming') embedded.current.since = null;

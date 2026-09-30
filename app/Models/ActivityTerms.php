@@ -8,7 +8,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['region_id', 'object_id', 'activity_id', 'required_item_id', 'consumes_required', 'cost', 'gives_credits', 'gives_items', 'requirement', 'outcome', 'vendor_resident_id', 'reveals_fact_id'])]
+/**
+ * What happens when the player uses one activity of an object: an ordered
+ * list of responses, each a condition and the effects that run when it is the
+ * first one met.
+ */
+#[Fillable(['region_id', 'object_id', 'activity_id', 'responses', 'vendor_resident_id'])]
 class ActivityTerms extends Model
 {
     /** @use HasFactory<ActivityTermsFactory> */
@@ -18,7 +23,7 @@ class ActivityTerms extends Model
 
     protected function casts(): array
     {
-        return ['consumes_required' => 'boolean', 'cost' => 'integer', 'gives_credits' => 'integer', 'gives_items' => 'array', 'vendor_resident_id' => 'integer'];
+        return ['responses' => 'array', 'vendor_resident_id' => 'integer'];
     }
 
     public function region(): BelongsTo
@@ -26,23 +31,16 @@ class ActivityTerms extends Model
         return $this->belongsTo(Region::class);
     }
 
-    public function requiredItem(): BelongsTo
-    {
-        return $this->belongsTo(Item::class, 'required_item_id');
-    }
-
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(WorldResident::class, 'vendor_resident_id');
     }
 
-    public function revealsFact(): BelongsTo
+    /**
+     * @return array<int, array{condition: ?array, effects: array<int, array<string, mixed>>}>
+     */
+    public function responseList(): array
     {
-        return $this->belongsTo(Fact::class, 'reveals_fact_id');
-    }
-
-    public function hasPlainLanguageTerms(): bool
-    {
-        return filled($this->requirement) || filled($this->outcome);
+        return $this->responses ?? [];
     }
 }

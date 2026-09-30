@@ -5,7 +5,7 @@ import { VRMUtils } from '@pixiv/three-vrm';
 import { WorldCollision } from './collisionCheck.js';
 import { createGltfLoader } from '../../utils/vrmLoader.js';
 
-export default function WorldEnvironment({ url, onReady, onError }) {
+export default function WorldEnvironment({ url, blockingObjectIds, onReady, onError }) {
 	const { scene, gl } = useThree();
 
 	useEffect(() => {
@@ -18,7 +18,7 @@ export default function WorldEnvironment({ url, onReady, onError }) {
 			if (disposed) { VRMUtils.deepDispose(gltf.scene); return; }
 			loadedAsset = gltf.scene;
 			try {
-				collisionWorld = new WorldCollision(loadedAsset);
+				collisionWorld = new WorldCollision(loadedAsset, { blockingObjectIds });
 				const center = collisionWorld.bounds.getCenter(new Vector3()).setY(0);
 				const spawnPosition = collisionWorld.findSpawn(center);
 				if (!spawnPosition) throw new Error('No walkable spawn with enough headroom was found in this environment.');
@@ -39,7 +39,7 @@ export default function WorldEnvironment({ url, onReady, onError }) {
 				VRMUtils.deepDispose(loadedAsset);
 			}
 		};
-	}, [gl, onError, onReady, scene, url]);
+	}, [gl, onError, onReady, scene, url, blockingObjectIds]);
 
 	return null;
 }

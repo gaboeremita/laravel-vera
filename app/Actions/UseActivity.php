@@ -2,49 +2,93 @@
 
 namespace App\Actions;
 
+use App\Actions\Activities\ActivityConditions;
+use App\Actions\Activities\ActivityEffects;
+use App\Actions\Activities\ActivityUse;
+use App\Actions\Quests\QuestSessionState;
 use App\Models\ActivityTerms;
 use App\Models\Inventory;
 use App\Models\Region;
 use App\Models\WorldSession;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * The player uses an object's activity. The first response whose conditions
+ * the session meets and whose effects can apply is the candidate; one
+ * narrator call judges its narrator conditions, if it has any, and narrates
+ * what happens, and the effects of the response that happened then run. An
+ * activity without responses simply happens, with no call.
+ */
 class UseActivity
 {
     public function __construct(
         private readonly ResolveInventory $resolveInventory,
-        private readonly TransferInventory $transferInventory,
+        private readonly ActivityConditions $conditions,
+        private readonly ActivityEffects $effects,
         private readonly Narrate $narrate,
     ) {}
 
     public function terms(Region $region, string $objectId, string $activityId): ?ActivityTerms
     {
-        return $region->activityTerms()->with('requiredItem')->where('object_id', $objectId)->where('activity_id', $activityId)->first();
+        return $region->activityTerms()->where('object_id', $objectId)->where('activity_id', $activityId)->first();
     }
 
     /**
-     * Why the actor cannot use the activity for lack of an item, credits or
-     * the object's stock; null when nothing like that stands in the way.
+     * @return array{allowed: bool, narration: ?string, action: ?string, use: ?ActivityUse}
      */
-    public function missing(ActivityTerms $terms, Inventory $actor, Inventory $object): ?string
+    public function handle(WorldSession $session, Region $region, string $objectId, string $activityId, Inventory $player, string $playerName, ?string $attempt): array
     {
-        if ($terms->required_item_id !== null) {
-            $held = $actor->items()->where('item_id', $terms->required_item_id)->first();
-            if ($held === null || ($held->quantity !== null && $held->quantity < 1)) {
-                return "Needs the {$terms->requiredItem->name}.";
-            }
+        $responses = $this->terms($region, $objectId, $activityId)?->responseList() ?? [];
+        if ($responses === []) {
+            return ['allowed' => true, 'narration' => null, 'action' => null, 'use' => null];
         }
-        $cost = $this->costFor($terms, $actor);
-        if ($cost > 0 && $actor->credits !== null && $actor->credits < $cost) {
-            return "Costs {$cost} credits.";
+
+        $use = new ActivityUse($session, $region, $objectId, $activityId, $player, $this->resolveInventory->forObject($session, $region, $objectId), $playerName, $attempt);
+        $state = QuestSessionState::for($session);
+        $met = collect($responses)->filter(fn (array $response) => $this->conditions->holds($response['condition'] ?? null, $use, $state))->values();
+
+        $candidate = $met->first();
+        if ($candidate === null) {
+            $this->tellNarrator($use, ['Requirement' => 'it fails, because '.($this->conditions->unmetReason($responses[0]['condition'] ?? null, $use, $state) ?? 'nothing the player can do here works right now.')]);
+
+            return $this->outcome(null, $use);
         }
-        $payout = $this->payoutFor($terms, $actor);
-        if ($payout > 0 && $object->credits !== null && $object->credits < $payout) {
-            return 'There is nothing left to get here.';
+
+        $missing = $this->missing($candidate, $use);
+        if ($missing !== null) {
+            $this->tellNarrator($use, ['Requirement' => "it fails, because {$missing}"]);
+
+            return $this->outcome(null, $use);
         }
-        foreach ($terms->gives_items ?? [] as $entry) {
-            $stock = $object->items()->where('item_id', $entry['itemId'])->first();
-            if ($stock === null || ($stock->quantity !== null && $stock->quantity < $entry['quantity'])) {
-                return 'There is nothing left to get here.';
+
+        $judged = $this->conditions->narratorLeaves($candidate['condition'] ?? null);
+        if ($judged === []) {
+            $this->tellNarrator($use, ['Requirement' => 'none; it succeeds', 'Outcome when it succeeds' => $this->describe($candidate, $use)]);
+
+            return $this->outcome($candidate, $use);
+        }
+
+        $fallback = $met->slice(1)->first(fn (array $response) => $this->conditions->narratorLeaves($response['condition'] ?? null) === [] && $this->missing($response, $use) === null);
+        $succeeded = $this->tellNarrator($use, [
+            'Requirement' => collect($judged)->pluck('requirement')->filter()->implode(' ') ?: 'none; it succeeds',
+            'Outcome when it succeeds' => $this->describe($candidate, $use),
+            'Outcome when it fails' => $fallback !== null ? $this->describe($fallback, $use) : 'nothing happens',
+        ]);
+
+        return $this->outcome($succeeded ? $candidate : $fallback, $use);
+    }
+
+    /**
+     * Why the response's effects cannot apply, for the narrator; null when they all can.
+     *
+     * @param  array{condition: ?array, effects: array<int, array<string, mixed>>}  $response
+     */
+    private function missing(array $response, ActivityUse $use): ?string
+    {
+        foreach ($this->effects->resolve($response['effects'] ?? []) as [$effect, $config]) {
+            $missing = $effect->missing($config, $use);
+            if ($missing !== null) {
+                return $missing;
             }
         }
 
@@ -52,75 +96,58 @@ class UseActivity
     }
 
     /**
-     * Checks the activity's terms, asks the narrator about plain-language ones,
-     * and applies what it costs and gives.
+     * What happens when the response runs, for the narrator: the creator's
+     * outcome for its narrator conditions, then what each effect does.
      *
-     * @param  bool  $byPlayer  whether the player is the one using it; only the player learns the secret it may reveal
-     * @return array{allowed: bool, reason: ?string, narration: ?string, action: ?string}
+     * @param  array{condition: ?array, effects: array<int, array<string, mixed>>}  $response
      */
-    public function handle(WorldSession $session, Region $region, string $objectId, string $activityId, Inventory $actor, string $actorName, ?string $attempt, bool $byPlayer = false): array
+    private function describe(array $response, ActivityUse $use): string
     {
-        $terms = $this->terms($region, $objectId, $activityId);
-        if ($terms === null) {
-            return ['allowed' => true, 'reason' => null, 'narration' => null, 'action' => null];
-        }
+        $parts = collect($this->conditions->narratorLeaves($response['condition'] ?? null))->pluck('outcome')
+            ->merge(collect($this->effects->resolve($response['effects'] ?? []))->map(fn (array $pair) => $pair[0]->describe($pair[1], $use)))
+            ->filter(fn (?string $part) => filled($part));
 
-        $object = $this->resolveInventory->forObject($session, $region, $objectId);
-        $missing = $this->missing($terms, $actor, $object);
-        if ($missing !== null) {
-            return ['allowed' => false, 'reason' => $missing, 'narration' => null, 'action' => null];
-        }
-
-        $layoutObject = $region->layoutObject($objectId);
-        $activityName = $region->objectActivities($objectId)[$activityId]['name'] ?? $activityId;
-        $narration = null;
-        $action = null;
-        $revealed = $byPlayer ? $terms->revealsFact : null;
-        if ($terms->hasPlainLanguageTerms() || $revealed !== null) {
-            $verdict = $this->narrate->handle($session->worldUser->world, $region, array_filter([
-                'Who' => $actorName,
-                'Doing' => "{$activityName} at the {$layoutObject['name']} ({$layoutObject['description']})",
-                'Requirement' => $terms->requirement ?: 'none; it succeeds',
-                'Outcome when it succeeds' => $terms->outcome ?: 'the activity simply happens',
-                "{$actorName} carries" => $this->narrate->holdings($actor),
-                'What they do or say' => $attempt ?: 'nothing in particular',
-                'What they learn when it succeeds' => $revealed?->content,
-            ]));
-            if (! $verdict['succeeded']) {
-                return ['allowed' => false, 'reason' => null, 'narration' => $verdict['narration'], 'action' => $verdict['action']];
-            }
-            $narration = $verdict['narration'];
-            $action = $verdict['action'];
-        }
-
-        $reason = "{$layoutObject['name']}: {$activityName}";
-        $cost = $this->costFor($terms, $actor);
-        $payout = $this->payoutFor($terms, $actor);
-        DB::transaction(function () use ($terms, $actor, $object, $reason, $cost, $payout): void {
-            $consumed = $terms->consumes_required && $terms->required_item_id !== null ? [$terms->required_item_id => 1] : [];
-            $this->transferInventory->handle($actor, $object, $cost, $consumed, $reason);
-            $gives = collect($terms->gives_items ?? [])->mapWithKeys(fn (array $entry) => [(int) $entry['itemId'] => (int) $entry['quantity']])->all();
-            $this->transferInventory->handle($object, $actor, $payout, $gives, $reason);
-        });
-
-        return ['allowed' => true, 'reason' => null, 'narration' => $narration, 'action' => $action];
+        return $parts->isEmpty() ? 'the activity simply happens' : $parts->implode(' ');
     }
 
     /**
-     * What the actor pays for the activity. Residents only play at paying, so
-     * nothing is charged to them.
+     * The one narrator call of the use: it judges the requirement and writes
+     * what the player reads.
+     *
+     * @param  array<string, string>  $outcomes  the requirement and what happens either way
+     * @return bool whether the narrator judged the attempt a success
      */
-    private function costFor(ActivityTerms $terms, Inventory $actor): int
+    private function tellNarrator(ActivityUse $use, array $outcomes): bool
     {
-        return $actor->holder->countsCredits() ? $terms->cost : 0;
+        $verdict = $this->narrate->handle($use->session->worldUser->world, $use->region, array_filter([
+            'Who' => $use->playerName,
+            'Doing' => "{$use->activityName()} at the {$use->objectName()} ({$use->objectDescription()})",
+            ...$outcomes,
+            "{$use->playerName} carries" => $this->narrate->holdings($use->player),
+            'What they do or say' => $use->attempt ?: 'nothing in particular',
+        ]));
+        $use->narration = $verdict['narration'];
+        $use->action = $verdict['action'];
+
+        return $verdict['succeeded'];
     }
 
     /**
-     * The credits the activity pays the actor. A resident has no balance to
-     * pay into, so the object keeps its credits.
+     * Runs the effects of the response that happened; with none, the activity was refused.
+     *
+     * @param  ?array{condition: ?array, effects: array<int, array<string, mixed>>}  $response
+     * @return array{allowed: bool, narration: ?string, action: ?string, use: ActivityUse}
      */
-    private function payoutFor(ActivityTerms $terms, Inventory $actor): int
+    private function outcome(?array $response, ActivityUse $use): array
     {
-        return $actor->holder->countsCredits() ? $terms->gives_credits : 0;
+        if ($response !== null) {
+            DB::transaction(function () use ($response, $use): void {
+                foreach ($this->effects->resolve($response['effects'] ?? []) as [$effect, $config]) {
+                    $effect->apply($config, $use);
+                }
+            });
+        }
+
+        return ['allowed' => $response !== null, 'narration' => $use->narration, 'action' => $use->action, 'use' => $use];
     }
 }

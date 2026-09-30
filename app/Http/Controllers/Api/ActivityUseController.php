@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\LearnFact;
 use App\Actions\ResolveInventory;
 use App\Actions\UseActivity;
-use App\Enums\RevealSource;
 use App\Events\Quests\PlayerUsedActivity;
 use App\Exceptions\NarratorUnavailable;
 use App\Http\Controllers\Controller;
 use App\Models\Inventory;
+use App\Models\KnownFact;
 use App\Traits\ResolvesWorldSession;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +17,7 @@ class ActivityUseController extends Controller
 {
     use ResolvesWorldSession;
 
-    public function store(Request $request, int $world, int $session, ResolveInventory $resolveInventory, UseActivity $useActivity, LearnFact $learnFact): JsonResponse
+    public function store(Request $request, int $world, int $session, ResolveInventory $resolveInventory, UseActivity $useActivity): JsonResponse
     {
         $validated = $request->validate([
             'regionId' => ['required', 'integer'],
@@ -34,7 +33,7 @@ class ActivityUseController extends Controller
         $before = $player->summary();
 
         try {
-            $outcome = $useActivity->handle($worldSession, $region, $validated['objectId'], $validated['activityId'], $player, $player->displayName(), $validated['attempt'] ?? null, byPlayer: true);
+            $outcome = $useActivity->handle($worldSession, $region, $validated['objectId'], $validated['activityId'], $player, $player->displayName(), $validated['attempt'] ?? null);
         } catch (NarratorUnavailable $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         } catch (\RuntimeException $exception) {
@@ -45,11 +44,16 @@ class ActivityUseController extends Controller
         if ($outcome['allowed']) {
             PlayerUsedActivity::dispatch($worldSession->id, $region->id, $validated['objectId'], $validated['activityId']);
         }
-        $fact = $outcome['allowed'] ? $useActivity->terms($region, $validated['objectId'], $validated['activityId'])?->revealsFact : null;
-        $learned = $fact !== null
-            ? $learnFact->fromTheWorld($worldSession, $fact, RevealSource::Activity, $region->layoutObject($validated['objectId'])['name'] ?? $validated['objectId'], $outcome['narration'] ?? $fact->content)
-            : null;
+        $use = $outcome['use'];
 
-        return response()->json([...$outcome, 'inventory' => $after, 'changes' => Inventory::changesBetween($before, $after), 'learnedFacts' => $learned !== null ? [$learned->toPayload()] : []]);
+        return response()->json([
+            'allowed' => $outcome['allowed'],
+            'narration' => $outcome['narration'],
+            'action' => $outcome['action'],
+            'inventory' => $after,
+            'changes' => Inventory::changesBetween($before, $after),
+            'learnedFacts' => collect($use?->learnedFacts ?? [])->map(fn (KnownFact $known) => $known->toPayload())->values()->all(),
+            'objectState' => $use?->objectStateChanged ? ['regionId' => $region->id, 'objectId' => $validated['objectId'], 'state' => $use->objectState()->state] : null,
+        ]);
     }
 }

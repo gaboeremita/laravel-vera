@@ -13,12 +13,16 @@ class ApplyResidentZoneAccess
 
     public const PRIVATE = 'private';
 
+    public const OUTSIDE_AREA = 'outsideArea';
+
     /**
-     * The world as one resident knows it: secret zones she has no access to
+     * The world as one resident knows it: secret zones they have no access to
      * are gone along with everything inside them, and every other zone says
-     * whether she may enter it on her own. A resident who keeps to an area
-     * knows only the zones of that area. The returned world is an unsaved
-     * copy and must never be saved.
+     * whether they may enter it on their own. A resident who keeps to an area
+     * in their home region knows every zone there too, and the ones outside
+     * it are marked as places they go only when the user asks; in any other
+     * region the area does not apply. The returned world is an unsaved copy
+     * and must never be saved.
      */
     public function handle(Region $region, ?WorldResident $resident): Region
     {
@@ -28,17 +32,18 @@ class ApplyResidentZoneAccess
         }
 
         $zonesById = collect($layout['zones'])->keyBy('id')->all();
-        $area = $resident->areaZoneIds();
+        $area = $resident->region_id === $region->id ? $resident->areaZoneIds() : [];
         $zones = [];
         $hiddenZoneIds = [];
         foreach ($layout['zones'] as $zone) {
             $access = $this->evaluate($zonesById, $zone['id'], $resident);
-            if ($access['hidden'] || ($area !== [] && ! $this->withinArea($zonesById, $zone['id'], $area))) {
+            if ($access['hidden']) {
                 $hiddenZoneIds[] = $zone['id'];
 
                 continue;
             }
-            $zones[] = [...$zone, 'residentAccess' => $access['state']];
+            $outsideArea = $area !== [] && ! $this->withinArea($zonesById, $zone['id'], $area);
+            $zones[] = [...$zone, 'residentAccess' => $outsideArea && $access['state'] !== self::PRIVATE ? self::OUTSIDE_AREA : $access['state']];
         }
 
         $visible = clone $region;
@@ -64,6 +69,7 @@ class ApplyResidentZoneAccess
         return match ($zone['residentAccess'] ?? self::OPEN) {
             self::ALLOWED => 'private, and you may go in',
             self::PRIVATE => 'private: you go in only when the user asks you to',
+            self::OUTSIDE_AREA => 'outside the area you keep to: you go there only when the user asks you to',
             default => null,
         };
     }

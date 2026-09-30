@@ -85,6 +85,36 @@ it('never takes from the player through the resident\'s tools', function () {
         ->and(HandoverRequest::sole()->status)->toBe(HandoverRequestStatus::Pending);
 });
 
+it('lets a resident check without asking whether the player carries an item', function (int $quantity, bool $holds) {
+    $scenario = inventoryScenario();
+    [, , , $region, , , $player] = $scenario;
+    $chit = worldItem($region, ['name' => 'Fork toll chit']);
+    if ($quantity > 0) {
+        InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => $chit->id, 'quantity' => $quantity]);
+    }
+    fakeTurn(toolCallResponse('call_1', 'check_holds', ['item' => 'fork toll chit']), finalAnswerResponse('Go on through.'));
+
+    sendWorldMessage($this, $scenario, chatPositions($scenario))->assertOk();
+
+    expect(collect(Http::recorded()[1][0]['messages'])->firstWhere('role', 'tool')['content'])
+        ->toContain('"holds":'.($holds ? 'true' : 'false'))
+        ->toContain('"quantity":'.$quantity)
+        ->and($player->items()->where('item_id', $chit->id)->value('quantity'))->toBe($quantity > 0 ? $quantity : null)
+        ->and(HandoverRequest::count())->toBe(0);
+})->with([
+    'holding it' => [2, true],
+    'without it' => [0, false],
+]);
+
+it('tells a resident checking for an item the world does not have', function () {
+    $scenario = inventoryScenario();
+    fakeTurn(toolCallResponse('call_1', 'check_holds', ['item' => 'Golden ticket']), finalAnswerResponse('Never mind.'));
+
+    sendWorldMessage($this, $scenario, chatPositions($scenario))->assertOk();
+
+    expect(collect(Http::recorded()[1][0]['messages'])->firstWhere('role', 'tool')['content'])->toContain('There is no item called \"Golden ticket\" in this world.');
+});
+
 it('tells a resident what they carry and never what the player carries', function () {
     $scenario = inventoryScenario(playerCredits: 777);
     [, , , $region, , , $player, $resident] = $scenario;

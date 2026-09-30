@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { executeAction } from '../components/world/residentActions.js';
+import { areaIn } from '../components/world/zoneAccess.js';
 import { nextStopIndex, routeAction, routePause } from '../components/world/residentRoutes.js';
 
 const STAGGER_MS = 1500;
@@ -12,13 +13,13 @@ const FAILED_STOP_WAIT_MS = 8000;
  * while she is in a conversation, and picks her route up again afterwards;
  * nobody walks while the world is paused or the page is hidden.
  */
-export function useResidentRoutes({ enabled, residents, layout, chatResidentId, residentCommands, occupiedSpots, isBusy, isPaused }) {
+export function useResidentRoutes({ enabled, residents, regionId, layout, chatResidentId, residentCommands, occupiedSpots, isBusy, isPaused }) {
 	const chatResidentRef = useRef(chatResidentId);
 	const walkingRef = useRef(new Set());
 	const latestRef = useRef(null);
 
 	useEffect(() => {
-		latestRef.current = { residents, layout, isBusy, isPaused };
+		latestRef.current = { residents, regionId, layout, isBusy, isPaused };
 	});
 
 	useEffect(() => {
@@ -67,7 +68,7 @@ export function useResidentRoutes({ enabled, residents, layout, chatResidentId, 
 						layout: latest().layout,
 						fromUser: false,
 						zoneAccess: resident.zoneAccess,
-						area: resident.behaviorSettings?.area ?? [],
+						area: areaIn(resident, latest().regionId),
 						residentId: resident.id,
 						occupiedSpots: occupiedSpots.current,
 					});

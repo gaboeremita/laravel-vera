@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Actions\Activities\ValidateActivityResponses;
 use App\Models\Region;
 use App\Models\World;
-use App\Models\WorldResident;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -23,20 +23,10 @@ class UpdateActivityTermsRequest extends FormRequest
     {
         /** @var World $world */
         $world = $this->route('world');
-        $itemOfWorld = Rule::exists('items', 'id')->where('world_id', $world->id);
 
         return [
-            'requiredItemId' => ['nullable', 'integer', $itemOfWorld],
-            'consumesRequired' => ['boolean'],
-            'cost' => ['integer', 'min:0'],
-            'givesCredits' => ['integer', 'min:0'],
-            'givesItems' => ['array'],
-            'givesItems.*.itemId' => ['required', 'integer', 'distinct', $itemOfWorld],
-            'givesItems.*.quantity' => ['required', 'integer', 'min:1'],
-            'requirement' => ['nullable', 'string'],
-            'outcome' => ['nullable', 'string'],
+            'responses' => ['present', 'array', 'list', 'max:20'],
             'vendorResidentId' => ['nullable', 'integer', Rule::exists('world_residents', 'id')->where('world_id', $world->id)],
-            'revealsFactId' => ['nullable', 'integer', Rule::exists('facts', 'id')->where(fn ($query) => $query->whereIn('world_resident_id', WorldResident::where('world_id', $world->id)->select('id')))],
         ];
     }
 
@@ -52,6 +42,14 @@ class UpdateActivityTermsRequest extends FormRequest
                 if (! array_key_exists((string) $this->route('activity'), $region->objectActivities((string) $this->route('object')))) {
                     $validator->errors()->add('activity', 'That object offers no activity with this id.');
                 }
+                if (! is_array($this->input('responses'))) {
+                    return;
+                }
+                foreach (app(ValidateActivityResponses::class)->errors($this->input('responses'), $this->route('world')) as $path => $messages) {
+                    foreach ($messages as $message) {
+                        $validator->errors()->add($path, $message);
+                    }
+                }
             },
         ];
     }
@@ -61,18 +59,9 @@ class UpdateActivityTermsRequest extends FormRequest
      */
     public function attributesForTerms(): array
     {
-        $validated = $this->validated();
-
         return [
-            'required_item_id' => $validated['requiredItemId'] ?? null,
-            'consumes_required' => $validated['consumesRequired'] ?? false,
-            'cost' => $validated['cost'] ?? 0,
-            'gives_credits' => $validated['givesCredits'] ?? 0,
-            'gives_items' => collect($validated['givesItems'] ?? [])->map(fn (array $entry) => ['itemId' => (int) $entry['itemId'], 'quantity' => (int) $entry['quantity']])->values()->all(),
-            'requirement' => filled($validated['requirement'] ?? null) ? $validated['requirement'] : null,
-            'outcome' => filled($validated['outcome'] ?? null) ? $validated['outcome'] : null,
-            'vendor_resident_id' => $validated['vendorResidentId'] ?? null,
-            'reveals_fact_id' => $validated['revealsFactId'] ?? null,
+            'responses' => app(ValidateActivityResponses::class)->normalize($this->input('responses')),
+            'vendor_resident_id' => $this->validated('vendorResidentId'),
         ];
     }
 }

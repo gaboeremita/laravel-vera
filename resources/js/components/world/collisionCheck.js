@@ -20,12 +20,24 @@ const MAX_SPAWN_RINGS = 40;
 const INSIDE_PROBES = [new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 0, -1)];
 const COLLISION_NAME = /collision/i;
 const WATER_SEARCH_HEIGHT = 4;
+const SEAL_DIRECTIONS = 16;
+const SEAL_REACH = 3;
+const SEAL_DEPTH = 0.3;
+const SEAL_HEIGHT = CHARACTER_HEIGHT + 0.4;
+const SEAL_PROBE = 0.15;
 
 export class WorldCollision {
-	constructor(scene) {
+	/** `blockingObjectIds` are the objects whose meshes block the player only, until they turn passable. */
+	constructor(scene, { blockingObjectIds = [] } = {}) {
 		this.octree = new Octree();
 		this.waterOctree = new Octree();
 		this.hasWater = false;
+		// Residents keep to zone access, so blocking objects stop only the player.
+		const blocking = new Set(blockingObjectIds);
+		const blockerOrigins = new Map();
+		this.blockers = new Map();
+		this.passableObjectIds = new Set();
+		this.blockedBy = null;
 		this.bounds = new Box3();
 		this.bodyBounds = new Box3();
 		this.candidates = [];
@@ -35,10 +47,14 @@ export class WorldCollision {
 
 		const instanceMatrix = new Matrix4();
 		const worldMatrix = new Matrix4();
-		const collect = (node, parentVisible, parentCollider, parentPassable) => {
+		const collect = (node, parentVisible, parentCollider, parentPassable, parentBlocker) => {
 			const collider = parentCollider || COLLISION_NAME.test(node.name);
 			const visible = parentVisible && node.visible;
 			const passable = parentPassable || node.userData.passable === true;
+			const marker = node.userData.vera;
+			const blocksHere = marker?.type === 'object' && blocking.has(marker.id);
+			if (blocksHere) blockerOrigins.set(marker.id, node.getWorldPosition(new Vector3()));
+			const blocker = blocksHere ? this.blockerFor(marker.id) : parentBlocker;
 			if (node.isMesh && passable && visible) {
 				this.addGeometry(node.geometry, node.matrixWorld, this.waterOctree);
 				this.hasWater = true;
@@ -47,19 +63,86 @@ export class WorldCollision {
 					for (let instance = 0; instance < node.count; instance++) {
 						node.getMatrixAt(instance, instanceMatrix);
 						worldMatrix.multiplyMatrices(node.matrixWorld, instanceMatrix);
-						this.addGeometry(node.geometry, worldMatrix);
+						this.addGeometry(node.geometry, worldMatrix, blocker ?? this.octree);
 					}
 				} else {
-					this.addGeometry(node.geometry, node.matrixWorld);
+					this.addGeometry(node.geometry, node.matrixWorld, blocker ?? this.octree);
 				}
 			}
-			for (const child of node.children) collect(child, visible, collider, passable);
+			for (const child of node.children) collect(child, visible, collider, passable, blocker);
 			if (collider) node.visible = false;
 		};
-		collect(scene, true, false, false);
+		collect(scene, true, false, false, null);
 		if (this.triangleCount === 0) throw new Error('This environment has no geometry for collision.');
 		this.octree.build();
 		if (this.hasWater) this.waterOctree.build();
+		for (const [objectId, octree] of this.blockers) {
+			if (octree.triangles.length === 0) this.sealOpening(octree, blockerOrigins.get(objectId));
+			if (octree.triangles.length === 0) this.blockers.delete(objectId);
+			else octree.build();
+		}
+	}
+
+	/**
+	 * A blocking object with no meshes of its own seals the opening its marker
+	 * stands in: the narrowest span between walls on either side of it, at
+	 * chest height, gets a thin wall of its own, floor to above head height.
+	 */
+	sealOpening(octree, origin) {
+		if (!origin) return;
+		const chest = new Vector3(origin.x, origin.y + CHARACTER_HEIGHT / 2, origin.z);
+		let narrowest = null;
+		for (let step = 0; step < SEAL_DIRECTIONS; step++) {
+			const angle = (Math.PI * step) / SEAL_DIRECTIONS;
+			const across = new Vector3(Math.cos(angle), 0, Math.sin(angle));
+			const ahead = this.distanceToWall(chest, across);
+			const behind = this.distanceToWall(chest, across.clone().negate());
+			if (ahead === null || behind === null) continue;
+			if (!narrowest || ahead + behind < narrowest.ahead + narrowest.behind) narrowest = { across, ahead, behind };
+		}
+		if (!narrowest) return;
+
+		const through = new Vector3(-narrowest.across.z, 0, narrowest.across.x).multiplyScalar(SEAL_DEPTH / 2);
+		const corner = (side, depth, height) => new Vector3(origin.x, origin.y + height, origin.z)
+			.addScaledVector(narrowest.across, side)
+			.addScaledVector(through, depth);
+		const bottom = [corner(-narrowest.behind, -1, 0), corner(narrowest.ahead, -1, 0), corner(narrowest.ahead, 1, 0), corner(-narrowest.behind, 1, 0)];
+		const top = bottom.map((point) => point.clone().setY(origin.y + SEAL_HEIGHT));
+		const faces = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]];
+		const points = [...bottom, ...top];
+		for (const [a, b, c, d] of faces) {
+			octree.addTriangle(new Triangle(points[a], points[b], points[c]));
+			octree.addTriangle(new Triangle(points[a], points[c], points[d]));
+		}
+	}
+
+	blockerFor(objectId) {
+		if (!this.blockers.has(objectId)) this.blockers.set(objectId, new Octree());
+		return this.blockers.get(objectId);
+	}
+
+	/**
+	 * How far along a direction the first geometry is, probed with a small box
+	 * so walls running alongside the line and thin fences are found as well.
+	 * Null when there is none within reach.
+	 */
+	distanceToWall(origin, direction) {
+		const size = new Vector3(SEAL_PROBE * 2, SEAL_PROBE * 2, SEAL_PROBE * 2);
+		const box = new Box3();
+		const point = new Vector3();
+		const found = [];
+		for (let distance = SEAL_PROBE; distance <= SEAL_REACH; distance += SEAL_PROBE) {
+			box.setFromCenterAndSize(point.copy(origin).addScaledVector(direction, distance), size);
+			found.length = 0;
+			this.octree.getBoxTriangles(box, found);
+			if (found.some((triangle) => box.intersectsTriangle(triangle))) return distance;
+		}
+		return null;
+	}
+
+	/** The solid objects that no longer block the player. */
+	setPassableObjects(objectIds) {
+		this.passableObjectIds = new Set(objectIds);
 	}
 
 	addGeometry(geometry, matrix, octree = this.octree) {
@@ -81,7 +164,12 @@ export class WorldCollision {
 		}
 	}
 
-	isBodyBlocked(from, to = from, radius = CHARACTER_RADIUS) {
+	/**
+	 * Whether a body moving between two points touches geometry. With
+	 * `withBlockers`, the blocking objects that are not passable count too, and
+	 * the one touched is left in `blockedBy`.
+	 */
+	isBodyBlocked(from, to = from, radius = CHARACTER_RADIUS, withBlockers = false) {
 		this.bodyBounds.min.set(
 			Math.min(from.x, to.x) - radius,
 			Math.min(from.y, to.y) + MAX_STEP_HEIGHT + CONTACT_MARGIN,
@@ -92,16 +180,27 @@ export class WorldCollision {
 			Math.max(from.y, to.y) + CHARACTER_HEIGHT,
 			Math.max(from.z, to.z) + radius,
 		);
+		if (this.touches(this.octree)) return true;
+		if (!withBlockers) return false;
+		for (const [objectId, octree] of this.blockers) {
+			if (this.passableObjectIds.has(objectId) || !this.touches(octree)) continue;
+			this.blockedBy = objectId;
+			return true;
+		}
+		return false;
+	}
+
+	touches(octree) {
 		this.candidates.length = 0;
-		this.octree.getBoxTriangles(this.bodyBounds, this.candidates);
+		octree.getBoxTriangles(this.bodyBounds, this.candidates);
 		return this.candidates.some((triangle) => this.bodyBounds.intersectsTriangle(triangle));
 	}
 
-	tryStep(position, dx, dz, canFall = false) {
+	tryStep(position, dx, dz, canFall = false, withBlockers = false) {
 		const clamped = clampToBounds(position.x + dx, position.y, position.z + dz, this.bounds);
 		this.destination.set(clamped.x, position.y, clamped.z);
 		// Check at the current foot height before probing a higher surface.
-		if (this.isBodyBlocked(position, this.destination)) return false;
+		if (this.isBodyBlocked(position, this.destination, CHARACTER_RADIUS, withBlockers)) return false;
 		const groundY = getGroundHeight(
 			clamped.x, clamped.z, this.octree,
 			position.y - MAX_DROP_HEIGHT, position.y + MAX_STEP_HEIGHT,
@@ -114,7 +213,7 @@ export class WorldCollision {
 			return 'fall';
 		}
 		this.destination.y = groundY;
-		if (this.isBodyBlocked(position, this.destination)) return false;
+		if (this.isBodyBlocked(position, this.destination, CHARACTER_RADIUS, withBlockers)) return false;
 		position.copy(this.destination);
 		return true;
 	}
@@ -122,21 +221,23 @@ export class WorldCollision {
 	/**
 	 * Walks along the ground. With `canFall`, stepping off a ledge up to
 	 * MAX_FALL_HEIGHT high is allowed and reported as 'falling'; otherwise
-	 * ledges block like walls.
+	 * ledges block like walls. With `withBlockers`, blocking objects block too,
+	 * and the last one walked into is left in `blockedBy`.
 	 */
-	move(position, dx, dz, { canFall = false } = {}) {
+	move(position, dx, dz, { canFall = false, withBlockers = false } = {}) {
+		this.blockedBy = null;
 		const steps = Math.ceil(Math.hypot(dx, dz) / MOVEMENT_STEP);
 		if (steps === 0) return 'grounded';
 		const stepX = dx / steps;
 		const stepZ = dz / steps;
 		for (let step = 0; step < steps; step++) {
-			const moved = this.tryStep(position, stepX, stepZ, canFall);
+			const moved = this.tryStep(position, stepX, stepZ, canFall, withBlockers);
 			if (moved === 'fall') return 'falling';
 			if (moved) continue;
 			if (stepX === 0 || stepZ === 0) break;
-			const movedX = this.tryStep(position, stepX, 0, canFall);
+			const movedX = this.tryStep(position, stepX, 0, canFall, withBlockers);
 			if (movedX === 'fall') return 'falling';
-			const movedZ = this.tryStep(position, 0, stepZ, canFall);
+			const movedZ = this.tryStep(position, 0, stepZ, canFall, withBlockers);
 			if (movedZ === 'fall') return 'falling';
 			if (!movedX && !movedZ) break;
 		}
@@ -148,16 +249,16 @@ export class WorldCollision {
 	 * place: zeroed when the head bumps something. Horizontal movement stops
 	 * at walls and wherever there is no ground within reach below, so a jump
 	 * can never carry the body off the edge of the world. Returns whether it
-	 * landed.
+	 * landed. With `withBlockers`, blocking objects stop horizontal movement too.
 	 */
-	airStep(position, velocity, seconds) {
+	airStep(position, velocity, seconds, withBlockers = false) {
 		const dx = velocity.x * seconds;
 		const dz = velocity.z * seconds;
 		const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / MOVEMENT_STEP));
 		for (let step = 0; step < steps; step++) {
 			const clamped = clampToBounds(position.x + dx / steps, position.y, position.z + dz / steps, this.bounds);
 			this.destination.set(clamped.x, position.y, clamped.z);
-			if (this.isBodyBlocked(position, this.destination)) break;
+			if (this.isBodyBlocked(position, this.destination, CHARACTER_RADIUS, withBlockers)) break;
 			const groundBelow = getGroundHeight(clamped.x, clamped.z, this.octree, position.y - AIR_GROUND_SEARCH, position.y + MAX_STEP_HEIGHT);
 			if (groundBelow === null) break;
 			position.x = clamped.x;
@@ -283,6 +384,8 @@ export class WorldCollision {
 		this.disposed = true;
 		this.octree.clear();
 		this.waterOctree.clear();
+		for (const octree of this.blockers.values()) octree.clear();
+		this.blockers.clear();
 		this.candidates.length = 0;
 	}
 }

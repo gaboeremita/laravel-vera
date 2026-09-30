@@ -2,6 +2,13 @@
 
 namespace App\Providers;
 
+use App\Actions\Activities\Effects\GiveCredits;
+use App\Actions\Activities\Effects\GiveItems;
+use App\Actions\Activities\Effects\MakePassable;
+use App\Actions\Activities\Effects\RevealFact;
+use App\Actions\Activities\Effects\ShowText;
+use App\Actions\Activities\Effects\TakeCredits;
+use App\Actions\Activities\Effects\TakeItems;
 use App\Contracts\EmbeddingProvider;
 use App\Contracts\SttProvider;
 use App\Providers\Embeddings\OllamaEmbeddingProvider;
@@ -31,6 +38,15 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->tag([
+            GiveItems::class,
+            TakeItems::class,
+            GiveCredits::class,
+            TakeCredits::class,
+            ShowText::class,
+            RevealFact::class,
+            MakePassable::class,
+        ], 'activityEffects');
     }
 
     /**

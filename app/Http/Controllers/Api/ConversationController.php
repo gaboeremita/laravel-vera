@@ -54,6 +54,7 @@ use App\Services\AgentLoop\Tools\World\ActivityGate;
 use App\Services\AgentLoop\Tools\World\AdjustFeelingsTool;
 use App\Services\AgentLoop\Tools\World\AskForTool;
 use App\Services\AgentLoop\Tools\World\AssessQuestTool;
+use App\Services\AgentLoop\Tools\World\CheckHoldsTool;
 use App\Services\AgentLoop\Tools\World\CheckOfferConditionTool;
 use App\Services\AgentLoop\Tools\World\EditQuestTool;
 use App\Services\AgentLoop\Tools\World\EndQuestTool;
@@ -525,14 +526,14 @@ class ConversationController extends Controller
                 );
                 if ($residentInventory !== null && ! $creatorTurn) {
                     $residentIdsInRoom = $residentPoint !== null ? app(ResolveWorldState::class)->residentIdsInRoom($region->layout ?? [], $residentPoint, $validated['positions']['residents'] ?? []) : [];
-                    $worldToolbox->withActivityGate(new ActivityGate($worldSession, $region, $residentInventory, $assistantModel->name, $residentIdsInRoom));
+                    $worldToolbox->withActivityGate(new ActivityGate($region, $residentInventory, $residentIdsInRoom));
                 }
                 $tools = [...$tools, ...$worldToolbox->tools()];
             }
 
             if ($residentInventory !== null && $aiModel?->supports_tools) {
                 $askForTool = new AskForTool($residentInventory, $conversation);
-                $tools = [...$tools, new GiveTool($residentInventory, $playerInventory, 'the user'), $askForTool];
+                $tools = [...$tools, new GiveTool($residentInventory, $playerInventory, 'the user'), $askForTool, new CheckHoldsTool($playerInventory)];
             }
 
             if ($factsResident !== null) {
