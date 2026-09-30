@@ -68,3 +68,10 @@ export const api = {
             body: formData,
         }),
 };
+
+/** Every validation message from a Laravel error body, so each failing field or line is named. */
+export function validationMessages(errorBody) {
+    const messages = Object.values(errorBody?.errors ?? {}).flat();
+
+    return messages.length > 0 ? messages.join(' ') : errorBody?.message;
+}

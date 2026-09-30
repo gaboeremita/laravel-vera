@@ -6,6 +6,7 @@ import VoiceInstructionsBlock from "./VoiceInstructionsBlock";
 import AgentToolCallsTrace from "./AgentToolCallsTrace";
 import VoiceMessagePlayer from "./VoiceMessagePlayer";
 import veraAvatar from '../../images/vera-avatar.png';
+import { underlinedParts } from '../utils/termHighlights.js';
 
 function InlineText({ text }) {
     if (!text) return null;
@@ -201,7 +202,20 @@ function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
                     </ReactMarkdown>
                 ) : (
                     <p className="whitespace-pre-wrap">
-                        <InlineText text={msg.content} />
+                        {msg.underlines ? (
+                            underlinedParts(msg.content, msg.underlines).map((part, index) => (
+                                part.underlined
+                                    ? <u key={index} className="decoration-danger underline-offset-2">{part.text}</u>
+                                    : <InlineText key={index} text={part.text} />
+                            ))
+                        ) : (
+                            <InlineText text={msg.content} />
+                        )}
+                    </p>
+                )}
+                {isAssistant && msg.missingTerms && (
+                    <p className="text-danger text-[0.7rem] mt-1">
+                        Missing: {msg.missingTerms.map((term) => term.target).join(', ')}
                     </p>
                 )}
                 {msg.loading && (

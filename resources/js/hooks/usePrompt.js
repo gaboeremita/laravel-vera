@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { route } from 'ziggy-js';
-import { api } from '../utils/api.js';
+import { api, validationMessages } from '../utils/api.js';
 
 export default function usePrompt(assistantId, addToast) {
 	const [sections, setSections] = useState(null);
@@ -177,7 +177,7 @@ export default function usePrompt(assistantId, addToast) {
 
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
-				throw new Error(error.message || 'Save failed');
+				throw new Error(validationMessages(error) || 'Save failed');
 			}
 
 			addToast('Prompt saved', 'success');
@@ -209,7 +209,7 @@ export default function usePrompt(assistantId, addToast) {
 
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
-				throw new Error(error.message || 'Save failed');
+				throw new Error(validationMessages(error) || 'Save failed');
 			}
 
 			setSections(parsed);

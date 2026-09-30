@@ -29,4 +29,26 @@ class AssistantFactory extends Factory
             'kind' => AssistantKind::Assistant,
         ];
     }
+
+    /**
+     * Put term rule lines in a prompt section and pick that section for the term rule settings.
+     *
+     * @param  array{markTerms?: bool, swapInvariant?: bool, highlightMissing?: bool}  $settings
+     */
+    public function withTermRules(string $sectionText, array $settings = []): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'prompt' => [...($attributes['prompt'] ?? []), 'termRuleSection' => $sectionText],
+            'agent_config' => [
+                ...($attributes['agent_config'] ?? []),
+                'termRules' => [
+                    'section' => 'termRuleSection',
+                    'markTerms' => false,
+                    'swapInvariant' => false,
+                    'highlightMissing' => false,
+                    ...$settings,
+                ],
+            ],
+        ]);
+    }
 }

@@ -16,6 +16,7 @@ use App\Actions\ResolveSpotStacking;
 use App\Actions\ResolveUserActivity;
 use App\Actions\ResolveWorldState;
 use App\Actions\SummarizeLearnedFact;
+use App\Actions\TermRules\MarkTermRules;
 use App\Contracts\AgentTool;
 use App\Contracts\SttProvider;
 use App\Directors\PromptDirector;
@@ -475,6 +476,11 @@ class ConversationController extends Controller
 
         $systemPrompt = $director->build();
 
+        $markedMessage = $lastUserIndex !== null ? app(MarkTermRules::class)->forAssistant($assistantModel, $validated['messages'][$lastUserIndex]['content'] ?? '') : null;
+        if ($markedMessage !== null) {
+            $validated['messages'][$lastUserIndex]['content'] = $markedMessage->text;
+        }
+
         $tts = $voiceModel ? (new TtsManager)->fromModel($voiceModel) : null;
         $agentToolCalls = null;
 
@@ -571,7 +577,7 @@ class ConversationController extends Controller
             return response()->json(['message' => $e->getMessage()], 502);
         }
 
-        $content = $response->content;
+        $content = $markedMessage?->restore($response->content) ?? $response->content;
 
         $ttsInstructions = null;
         if ($tts) {
@@ -635,6 +641,7 @@ class ConversationController extends Controller
             'userContent' => $lastUserMessage['content'] ?? null,
             'creatorMode' => $creatorMode,
             ...($worldSession !== null ? ['learnedFacts' => $learnedFacts] : []),
+            ...($markedMessage !== null && $markedMessage->matches !== [] && $assistantModel->termRuleSettings()['highlightMissing'] ? ['missingTerms' => $markedMessage->missingTerms($content)] : []),
         ]);
     }
 
@@ -1094,8 +1101,10 @@ class ConversationController extends Controller
             ['title' => 'New conversation'],
         );
 
+        $authorPrefix = '';
         if (empty($validated['dm_username']) && ! empty($validated['author_username']) && trim($content) !== '') {
-            $content = "{$validated['author_username']}: {$content}";
+            $authorPrefix = "{$validated['author_username']}: ";
+            $content = $authorPrefix.$content;
         }
 
         $message = $conversation->messages()->create([
@@ -1218,6 +1227,12 @@ class ConversationController extends Controller
             $history[$lastIndex]['images'] = [$validated['images'][0]];
         }
 
+        $markedMessage = app(MarkTermRules::class)->forAssistant($assistantModel, substr($content, strlen($authorPrefix)));
+        $triggerIndex = array_key_last(array_filter($history, fn (array $entry) => $entry['role'] === 'user' && $entry['content'] === $content));
+        if ($markedMessage !== null && $triggerIndex !== null) {
+            $history[$triggerIndex]['content'] = $authorPrefix.$markedMessage->text;
+        }
+
         try {
             $llm = (new LlmManager)->forAssistantUser($assistantUser);
             $response = $llm->chat(messages: [
@@ -1228,7 +1243,7 @@ class ConversationController extends Controller
             return response()->json(['message' => $e->getMessage()], 502);
         }
 
-        $parsed = $this->extractExpressionTag($response->content, $assistantModel);
+        $parsed = $this->extractExpressionTag($markedMessage?->restore($response->content) ?? $response->content, $assistantModel);
 
         $assistantMessage = $conversation->messages()->create([
             'role' => 'assistant',
