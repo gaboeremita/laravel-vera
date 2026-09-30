@@ -86,16 +86,40 @@ class BuildResidentWorldPrompt
     }
 
     /**
-     * Every place she may know of, by name, id and floor, with a note on the
-     * private ones.
+     * Every place they may know of, by name and id, grouped by whether they
+     * may go there on their own and then by floor, so each access note is
+     * said once for its group.
      *
-     * @return array<int, string>
+     * @return array<string, array<int|string, mixed>> places by group label, then by floor name when the region has floors
      */
     public function availablePlaces(Region $region): array
     {
         $layout = $region->layout ?? [];
+        $floors = collect($layout['floors'] ?? [])->keyBy('id');
 
-        return collect($layout['zones'] ?? [])->map(fn (array $zone) => $this->zoneName($layout, $zone))->all();
+        $groups = [
+            ApplyResidentZoneAccess::OPEN => 'available places',
+            ApplyResidentZoneAccess::ALLOWED => 'private places you may go into',
+            ApplyResidentZoneAccess::OUTSIDE_AREA => 'outside the area you keep to, so you go there only when the user asks you to',
+            ApplyResidentZoneAccess::PRIVATE => 'private places you go into only when the user asks you to',
+        ];
+        $zonesByAccess = collect($layout['zones'] ?? [])->groupBy(fn (array $zone) => $zone['residentAccess'] ?? ApplyResidentZoneAccess::OPEN);
+
+        return collect($groups)
+            ->filter(fn (string $label, string $access) => $zonesByAccess->has($access))
+            ->mapWithKeys(fn (string $label, string $access) => [$label => $zonesByAccess[$access]])
+            ->map(function ($zones) use ($floors): array {
+                $names = fn ($zones) => $zones->map(fn (array $zone) => "{$zone['name']} [{$zone['id']}]")->values()->all();
+                if ($floors->isEmpty()) {
+                    return $names($zones);
+                }
+
+                return $zones
+                    ->groupBy(fn (array $zone) => $floors[$zone['floorId'] ?? '']['name'] ?? 'elsewhere')
+                    ->map(fn ($onFloor) => $names($onFloor))
+                    ->all();
+            })
+            ->all();
     }
 
     /**
@@ -459,15 +483,6 @@ class BuildResidentWorldPrompt
         }
 
         return $distance < 1 ? 'less than 1 m away from you' : sprintf('about %d m away from you', round($distance));
-    }
-
-    private function zoneName(array $layout, array $zone): string
-    {
-        $floor = collect($layout['floors'] ?? [])->firstWhere('id', $zone['floorId']);
-        $name = $floor !== null ? "{$zone['name']} [{$zone['id']}] ({$floor['name']})" : "{$zone['name']} [{$zone['id']}]";
-        $access = (new ApplyResidentZoneAccess)->note($zone);
-
-        return $access !== null ? "{$name}, {$access}" : $name;
     }
 
     private function objectPhrase(array $object): string

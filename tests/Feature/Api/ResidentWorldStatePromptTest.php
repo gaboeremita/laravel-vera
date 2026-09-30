@@ -49,7 +49,7 @@ it('describes her own zone in detail and other zones only by name and floor', fu
         ->toContain('Things to do here: Swim [swim]')
         ->toContain('Pool lounger [pool-lounger-1]: A white lounger by the pool. Spots: pool-lounger-1-seat (Recline [recline], reclining)')
         ->toContain('Here: An open terrace with an infinity pool.')
-        ->toContain('Available places: Music studio [studio] (Ground floor), Vocal booth [vocal-booth] (Ground floor), Pool terrace [pool-terrace] (Ground floor), Gallery [gallery] (Upper floor)')
+        ->toContain("Available places:\nGround floor: Music studio [studio], Vocal booth [vocal-booth], Pool terrace [pool-terrace]\nUpper floor: Gallery [gallery]")
         ->not->toContain('A studio full of keyboards.')
         ->not->toContain('An upper gallery overlooking the city.');
 });

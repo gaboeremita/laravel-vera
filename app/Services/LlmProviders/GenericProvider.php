@@ -103,6 +103,7 @@ class GenericProvider implements LlmProvider
             content: $choice['content'] ?? '',
             thinking: $this->thinkingKey ? ($choice[$this->thinkingKey] ?? null) : null,
             toolCalls: $toolCalls,
+            usage: $data['usage'] ?? null,
         );
     }
 

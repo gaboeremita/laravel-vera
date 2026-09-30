@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { formatMessage } from "../utils/formatMessage.jsx";
 
-export default function ThinkingBlock({ content, label = "Thinking Process" }) {
+export default function ThinkingBlock({ content, label = "Thinking Process", plain = false }) {
     const [isOpen, setIsOpen] = useState(false);
 
     if (!content) return null;
@@ -19,7 +19,7 @@ export default function ThinkingBlock({ content, label = "Thinking Process" }) {
             </button>
             {isOpen && (
                 <div className="mt-2 pl-4 border-l border-line-1 text-[0.75rem] leading-relaxed text-fg-3 whitespace-pre-wrap">
-                    {formatMessage(content)}
+                    {plain ? content : formatMessage(content)}
                 </div>
             )}
         </div>

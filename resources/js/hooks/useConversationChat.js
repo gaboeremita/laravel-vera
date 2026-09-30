@@ -212,7 +212,7 @@ export function useConversationChat({
 				if (data.audioError) addToast?.(data.audioError, 'error');
 
 				setHasError(false);
-				setMessages([...sent, ...generatedImageMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, ttsInstructions, toolCalls: data.tool_calls || null, audioBase64: data.audioBase64 || null, audioContentType: data.audioContentType || null }]);
+				setMessages([...sent, ...generatedImageMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, systemPrompt: data.system_prompt || null, usage: data.usage || null, ttsInstructions, toolCalls: data.tool_calls || null, audioBase64: data.audioBase64 || null, audioContentType: data.audioContentType || null }]);
 				setIsLoading(false);
 				if (voiceMode) onVoiceReply?.(cleanText, ttsInstructions);
 				if (data.action) onAction?.(data.action, cleanText);
