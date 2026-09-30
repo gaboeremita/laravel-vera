@@ -26,8 +26,9 @@ class MarkTermRules
     }
 
     /**
-     * Find every rule term in the message and build the copy the model receives: matched terms
-     * annotated as "[occurrence -> target]" when marking, invariant terms replaced by "⟦n⟧" when swapping.
+     * Find every rule term in the message, on either side of its rule, and build the copy the model
+     * receives: matched terms annotated with the other side's term as "[occurrence -> rendering]" when
+     * marking, invariant terms replaced by "⟦n⟧" when swapping.
      *
      * @param  list<TermRule>  $rules
      */
@@ -40,14 +41,15 @@ class MarkTermRules
 
         foreach ($matches as $match) {
             $occurrence = substr($text, $match['start'], $match['length']);
+            $rendering = $match['reverse'] ? $match['rule']->source : $match['rule']->target;
             $markedText .= substr($text, $position, $match['start'] - $position);
 
             if ($swapInvariant && $match['rule']->invariant) {
                 $placeholder = '⟦'.(count($placeholders) + 1).'⟧';
-                $placeholders[$placeholder] = $match['rule']->target;
+                $placeholders[$placeholder] = $rendering;
                 $markedText .= $placeholder;
             } elseif ($markTerms) {
-                $markedText .= "[{$occurrence} -> {$match['rule']->target}]";
+                $markedText .= "[{$occurrence} -> {$rendering}]";
             } else {
                 $markedText .= $occurrence;
             }
@@ -72,10 +74,11 @@ class MarkTermRules
     }
 
     /**
-     * Matches in the order they appear, keeping the longest where two overlap.
+     * Matches in the order they appear, keeping the longest where two overlap. A term that is on the
+     * source side of one rule and the target side of another reads as a source term.
      *
      * @param  list<TermRule>  $rules
-     * @return list<array{rule: TermRule, start: int, length: int}>
+     * @return list<array{rule: TermRule, reverse: bool, start: int, length: int}>
      */
     private function matches(string $text, array $rules): array
     {
@@ -83,10 +86,12 @@ class MarkTermRules
 
         foreach ([true, false] as $caseSensitive) {
             $rulesByTerm = [];
-            foreach ($rules as $rule) {
-                if ($rule->caseSensitive === $caseSensitive) {
-                    foreach ($rule->sourceTerms() as $term) {
-                        $rulesByTerm[$caseSensitive ? $term : mb_strtolower($term)] ??= $rule;
+            foreach ([false, true] as $reverse) {
+                foreach ($rules as $rule) {
+                    if ($rule->caseSensitive === $caseSensitive) {
+                        foreach ($reverse ? $rule->targetTerms() : $rule->sourceTerms() as $term) {
+                            $rulesByTerm[$caseSensitive ? $term : mb_strtolower($term)] ??= ['rule' => $rule, 'reverse' => $reverse];
+                        }
                     }
                 }
             }
@@ -98,9 +103,9 @@ class MarkTermRules
             preg_match_all(self::pattern(array_map('strval', array_keys($rulesByTerm)), $caseSensitive), $text, $found, PREG_OFFSET_CAPTURE);
 
             foreach ($found[0] as [$occurrence, $start]) {
-                $rule = $rulesByTerm[$caseSensitive ? $occurrence : mb_strtolower($occurrence)] ?? null;
-                if ($rule !== null) {
-                    $candidates[] = ['rule' => $rule, 'start' => $start, 'length' => strlen($occurrence)];
+                $termMatch = $rulesByTerm[$caseSensitive ? $occurrence : mb_strtolower($occurrence)] ?? null;
+                if ($termMatch !== null) {
+                    $candidates[] = [...$termMatch, 'start' => $start, 'length' => strlen($occurrence)];
                 }
             }
         }

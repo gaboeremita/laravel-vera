@@ -7,6 +7,7 @@ use App\Models\Conversation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
 
@@ -25,7 +26,7 @@ function termRulesChat(string $rules, array $settings, string $mode = 'assistant
 /**
  * @param  list<array{role: string, content: string}>  $messages
  */
-function sendTermRulesMessage(User $user, Assistant $assistant, Conversation $conversation, array $messages): Illuminate\Testing\TestResponse
+function sendTermRulesMessage(User $user, Assistant $assistant, Conversation $conversation, array $messages): TestResponse
 {
     return test()->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
@@ -172,6 +173,25 @@ describe('marking', function () {
         expect(collect($secondRequest)->last(fn (array $message) => $message['role'] === 'user')['content'])->toBe('[alpha -> eins]');
     });
 
+    it('annotates a target-side term with the source term', function () {
+        [$user, $assistant, $conversation] = termRulesChat('alpha, alphas -> uno, unos', ['markTerms' => true]);
+        fakeTermRulesReply('ok');
+
+        sendTermRulesMessage($user, $assistant, $conversation, [['role' => 'user', 'content' => 'tengo unos aquí']]);
+
+        expect(sentLastUserContent())->toBe('tengo [unos -> alpha] aquí');
+    });
+
+    it('reads a term on both sides of different rules as a source term', function () {
+        [$user, $assistant, $conversation] = termRulesChat('alpha -> beta
+beta -> gamma', ['markTerms' => true]);
+        fakeTermRulesReply('ok');
+
+        sendTermRulesMessage($user, $assistant, $conversation, [['role' => 'user', 'content' => 'beta']]);
+
+        expect(sentLastUserContent())->toBe('[beta -> gamma]');
+    });
+
     it('parses and marks a message against 500 rules in under 50 ms', function () {
         $sectionText = collect(range(1, 500))->map(fn (int $index) => "term{$index}, terms{$index} -> target{$index}")->implode("\n");
         $message = collect(range(1, 40))->map(fn (int $index) => "word term{$index} other terms{$index}")->implode(' ');
@@ -196,6 +216,16 @@ describe('exact swap', function () {
 
         expect(sentLastUserContent())->toBe('visit ⟦1⟧ and ⟦2⟧')
             ->and($conversation->messages()->where('role', 'assistant')->value('content'))->toBe('ACME Corp and Zeta Ltd');
+    });
+
+    it('swaps a target-side invariant term back to the exact source text', function () {
+        [$user, $assistant, $conversation] = termRulesChat('acme -> ACME Corp (invariant)', ['swapInvariant' => true]);
+        fakeTermRulesReply('visit ⟦1⟧');
+
+        sendTermRulesMessage($user, $assistant, $conversation, [['role' => 'user', 'content' => 'visite ACME Corp']])
+            ->assertJsonPath('content', 'visit acme');
+
+        expect(sentLastUserContent())->toBe('visite ⟦1⟧');
     });
 
     it('returns a reply without the placeholder as written', function () {
@@ -266,6 +296,14 @@ describe('missing-term highlight', function () {
         sendTermRulesMessage($user, $assistant, $conversation, [['role' => 'user', 'content' => 'alpha']])
             ->assertJsonPath('missingTerms', []);
     })->with(['target' => 'here is uno', 'variant' => 'here are unos']);
+
+    it('lists a missing source term for a target-side match', function () {
+        [$user, $assistant, $conversation] = termRulesChat('alpha, alphas -> uno, unos', ['highlightMissing' => true]);
+        fakeTermRulesReply('something else');
+
+        sendTermRulesMessage($user, $assistant, $conversation, [['role' => 'user', 'content' => 'dos unos']])
+            ->assertJsonPath('missingTerms', [['target' => 'alpha', 'ranges' => [[4, 4]]]]);
+    });
 
     it('checks the target\'s case exactly for case-sensitive rules', function () {
         [$user, $assistant, $conversation] = termRulesChat('alpha -> Uno (case)', ['highlightMissing' => true]);

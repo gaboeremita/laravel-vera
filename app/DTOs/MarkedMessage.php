@@ -7,8 +7,8 @@ use App\Actions\TermRules\MarkTermRules;
 class MarkedMessage
 {
     /**
-     * @param  array<string, string>  $placeholders  placeholder => the rule's exact target text
-     * @param  list<array{rule: TermRule, start: int, length: int}>  $matches  byte offsets into $originalText
+     * @param  array<string, string>  $placeholders  placeholder => the exact text of the rule's other side
+     * @param  list<array{rule: TermRule, reverse: bool, start: int, length: int}>  $matches  byte offsets into $originalText
      */
     public function __construct(
         public readonly string $originalText,
@@ -23,8 +23,8 @@ class MarkedMessage
     }
 
     /**
-     * The matched rules whose target term (or a target variant) is absent from the reply, with the
-     * ranges of their source terms in the message as typed.
+     * The matched rules whose rendering on the other side (or one of its variants) is absent from the
+     * reply, with the ranges of the matched terms in the message as typed.
      *
      * @return list<array{target: string, ranges: list<array{int, int}>}>
      */
@@ -34,13 +34,15 @@ class MarkedMessage
 
         foreach ($this->matchesByRule() as $ruleMatches) {
             $rule = $ruleMatches[0]['rule'];
+            $reverse = $ruleMatches[0]['reverse'];
+            $renderings = $reverse ? $rule->sourceTerms() : $rule->targetTerms();
 
-            if (preg_match(MarkTermRules::pattern($rule->targetTerms(), $rule->caseSensitive), $reply) === 1) {
+            if (preg_match(MarkTermRules::pattern($renderings, $rule->caseSensitive), $reply) === 1) {
                 continue;
             }
 
             $missing[] = [
-                'target' => $rule->target,
+                'target' => $renderings[0],
                 'ranges' => array_map(fn (array $match) => [
                     $this->utf16Length(substr($this->originalText, 0, $match['start'])),
                     $this->utf16Length(substr($this->originalText, $match['start'], $match['length'])),
@@ -52,14 +54,14 @@ class MarkedMessage
     }
 
     /**
-     * @return list<list<array{rule: TermRule, start: int, length: int}>>
+     * @return list<list<array{rule: TermRule, reverse: bool, start: int, length: int}>>
      */
     private function matchesByRule(): array
     {
         $grouped = [];
 
         foreach ($this->matches as $match) {
-            $grouped[spl_object_id($match['rule'])][] = $match;
+            $grouped[spl_object_id($match['rule']).($match['reverse'] ? 'r' : 'f')][] = $match;
         }
 
         return array_values($grouped);

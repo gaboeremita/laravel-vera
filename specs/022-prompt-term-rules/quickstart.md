@@ -10,7 +10,7 @@
 1. Open the assistant's edit page and add a top-level string prompt section holding rule lines, for example:
 
    ```
-   Translate each message. Terms written `source -> target` must use the target exactly.
+   Translate each message. Each line below gives a term, an arrow, then the target to use exactly.
    Copy every ⟦n⟧ marker into the reply exactly as written.
    hearing, hearings -> audiencia, audiencias
    ACME -> ACME (invariant)

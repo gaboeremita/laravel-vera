@@ -32,4 +32,3 @@
 ## Notes
 
 - Clarified 2026-09-30: rule line format, rule section dropdown, missing-term display.
-- The checkbox labels and the feature's name are pending approval; the spec describes them plainly.
