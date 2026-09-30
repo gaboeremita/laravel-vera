@@ -15,6 +15,9 @@
 - Q: What does a rule line look like? → A: `source, source variants -> target, target variants`, with optional trailing marks `(invariant)` and `(case)`, for example `hearing, hearings -> audiencia, audiencias`. The first term on each side is the rule's term; the rest are its variant forms.
 - Q: How does the code know which prompt section holds the rules? → A: A dropdown next to the checkboxes on the assistant form picks one of the assistant's existing prompt sections.
 - Q: How are missing target terms shown? → A: A warning line under the reply lists each missing target term, and in the user's message the source terms whose target is missing are underlined.
+- Q: When a conversation is reopened later, do the missing-term warning line and underlines still show on old replies? → A: No. They are shown only for replies received in the current view and disappear on reload; the check result is never stored.
+- Q: Do the model's copies of earlier user messages also carry the marking and placeholders? → A: No. Only the newest user message is marked and uses placeholders; earlier messages reach the model exactly as typed.
+- Q: What happens on save when a line in the picked rule section contains `->` but doesn't parse as a rule? → A: The save is refused until every `->` line in that section parses, and the error names each line that failed.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -32,6 +35,7 @@ The user writes term rules as plain text lines in one of the assistant's prompt 
 2. **Given** the same setup, **When** the message is shown in the chat or read back from history, **Then** it appears exactly as the user typed it.
 3. **Given** a message containing several rule terms, including a term that appears more than once, **When** it is sent, **Then** every occurrence of every matched term is annotated.
 4. **Given** a message containing no rule terms, **When** it is sent, **Then** the model-facing copy is identical to what the user typed.
+4a. **Given** an earlier message in the conversation contained a rule term, **When** the user sends a new message, **Then** the earlier message reaches the model exactly as typed, and only the new message is marked.
 5. **Given** a rule lists variant forms of its source term, **When** the message contains a variant, **Then** that occurrence is annotated with the rule's target term.
 6. **Given** a rule term appears inside a longer word, **When** the message is sent, **Then** that occurrence is left unmarked.
 7. **Given** inline marking is off, **When** the user sends any message, **Then** the model-facing copy is identical to what the user typed, and the rules still reach the model through the prompt.
@@ -72,6 +76,7 @@ With the highlight checkbox ticked, while the reply streams the system checks th
 3. **Given** a rule lists variant forms of its target term, **When** the reply contains one of them, **Then** the rule counts as satisfied.
 4. **Given** the highlight is on, **When** the reply streams, **Then** the reply appears at the same pace as with the highlight off.
 5. **Given** the highlight is off, **When** a reply misses a target term, **Then** nothing is shown.
+6. **Given** a reply showed a warning line, **When** the conversation is reloaded, **Then** that reply shows no warning line and the user's message shows no underlines.
 
 ---
 
@@ -79,7 +84,8 @@ With the highlight checkbox ticked, while the reply streams the system checks th
 
 - A source term of one rule is part of a longer source term of another rule (for example "court" and "supreme court"): the longest match wins, and the overlapping shorter term is left unmarked for that occurrence.
 - Two rules share the same source term: the first rule in the section wins.
-- Rule lines that don't follow the format are ignored by the code behaviors and still reach the model as prompt text.
+- Lines in the picked section without `->` are ordinary prompt text: the behaviors skip them and they reach the model unchanged.
+- A line in the picked section contains `->` but doesn't parse as a rule (for example, an empty side): saving is refused, and the error names that line.
 - No section is picked in the dropdown, or the picked section is empty or has since been deleted: the checkboxes have no effect, and messages and replies pass through unchanged.
 - A checkbox is ticked while no rules exist: the form still saves, and the behavior simply finds nothing to apply.
 - Case: matching follows each rule's case setting; the default is case-insensitive.
@@ -99,12 +105,13 @@ With the highlight checkbox ticked, while the reply streams the system checks th
 - **FR-006**: Matching MUST be plain text matching of each rule's source term and its variant forms at word boundaries, case-insensitive unless the rule is marked case-sensitive, preferring the longest match where terms overlap.
 - **FR-007**: The system MUST contain no languages, language pairs, inflection logic or glossary content of its own; everything that varies by language MUST come from the rule lines.
 - **FR-008**: With inline marking on, the model-facing copy of each user message MUST annotate every matched occurrence in place with the rule's target term.
+- **FR-008a**: Inline marking and exact swap MUST apply only to the newest user message of each turn; earlier user messages in the conversation MUST reach the model exactly as typed.
 - **FR-009**: The message shown in the chat and stored in the conversation MUST always be the text the user typed.
 - **FR-010**: With exact swap on, every matched occurrence of an invariant rule's term MUST be replaced in the model-facing copy by a placeholder, and every placeholder in the reply MUST be replaced by the rule's exact target text before the user sees it, including across streamed pieces.
 - **FR-011**: A stored reply MUST contain the swapped-in target text, with no placeholders.
-- **FR-012**: With the highlight on, after each reply the system MUST determine, for every rule matched in the user's message, whether the rule's target term or one of its variant forms appears in the reply, and the web chat MUST show a warning line under the reply listing each missing target term, and underline, in the user's displayed message, the source-term occurrences whose target term is missing. The message text itself MUST stay as typed (FR-009).
+- **FR-012**: With the highlight on, after each reply the system MUST determine, for every rule matched in the user's message, whether the rule's target term or one of its variant forms appears in the reply, and the web chat MUST show a warning line under the reply listing each missing target term, and underline, in the user's displayed message, the source-term occurrences whose target term is missing. The message text itself MUST stay as typed (FR-009). The warning line and underlines MUST be shown only for replies received in the current view; the check result MUST NOT be stored, so they disappear when the conversation is reloaded.
 - **FR-013**: Every behavior MUST work within the single model call already made per turn; none MAY add a model call, a retry or a wait before the reply starts streaming.
-- **FR-014**: Rule lines that don't follow the format MUST be ignored by the behaviors and MUST leave the prompt unchanged.
+- **FR-014**: Saving the prompt or the assistant's settings MUST be refused while any line containing `->` in the picked rule section fails to parse as a rule, with an error naming each failing line. Lines without `->` are ordinary prompt text and MUST be left out of the rules.
 
 ### Key Entities
 
