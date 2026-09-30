@@ -32,9 +32,9 @@
 
 ## R6. Placeholders for invariant rules
 
-- **Decision**: Each matched occurrence of an invariant rule becomes `⟦n⟧` (n counting from 1 per message). After the model call, every `⟦n⟧` in the reply is replaced with that rule's exact target text. When exact swap is on and the message contained at least one placeholder, a short fixed section is appended to the system prompt, stating that each `⟦n⟧` in the user's message stands for a fixed term that must be copied into the reply unchanged. That instruction is language-neutral about the rules themselves and carries no glossary content.
-- **Rationale**: A placeholder the model has never been told about tends to be translated or dropped. Appending the instruction only on turns that contain a placeholder keeps every other turn's prompt identical.
-- **Alternatives considered**: Leaving the explanation to the user's own prompt (every user of the checkbox would have to write the same instruction, and forgetting it breaks the feature silently).
+- **Decision**: Each matched occurrence of an invariant rule becomes `⟦n⟧` (n counting from 1 per message). After the model call, every `⟦n⟧` in the reply is replaced with that rule's exact target text. The code adds no model-facing text of its own; the user's prompt explains that `⟦n⟧` markers are copied into the reply unchanged (quickstart shows an example line).
+- **Rationale**: FR-007 keeps every piece of model-facing wording in the user's configuration. The mathematical brackets rarely appear in ordinary text and survive translation as symbols.
+- **Alternatives considered**: A fixed instruction section appended by code on turns with placeholders (hardcoded wording in one language, which FR-007 rules out).
 
 ## R7. Replies are returned whole
 
@@ -45,7 +45,7 @@
 
 - **Decision**:
   - Web chat: `ConversationController::sendMessage`, after the user message is stored and creator-mode tags are stripped, transform only `$validated['messages'][$lastUserIndex]['content']` (FR-008a). Retrieval keeps using the unmarked text. After the model call (both the agent-loop and plain `chat` branches), restore placeholders in `$content` before TTS parsing and storage. When `highlightMissing` is on, add `missingTerms` to the JSON response.
-  - Discord: `ConversationController::sendDiscordMessage`, marking and swap on the incoming content.
+  - Discord: `ConversationController::sendDiscordMessage`, marking and swap on the incoming content, whichever Discord user wrote it.
   - Telegram: `TelegramPollCommand`, marking and swap on the incoming text.
 - **Rationale**: These are the three places a user's own message reaches the assistant's model. Resident-to-resident turns and image/scene prompts carry no user message and stay untouched.
 

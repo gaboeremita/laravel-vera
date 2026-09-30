@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { route } from 'ziggy-js';
-import { api } from '../utils/api.js';
+import { api, validationMessages } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
 import PosturePoseSections from '../components/PosturePoseSections.jsx';
 import ModelVoiceFields from '../components/ModelVoiceFields.jsx';
+import TermRuleSettings from '../components/TermRuleSettings.jsx';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
 export default function CreateAssistantPage({ kind = 'assistant' }) {
@@ -57,9 +58,11 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 	const [promptMode, setPromptMode] = useState('manual');
 	const [promptJson, setPromptJson] = useState('');
 	const [promptJsonError, setPromptJsonError] = useState(null);
+	const [termRules, setTermRules] = useState({ section: null, markTerms: false, swapInvariant: false, highlightMissing: false });
 
 	// Prompt tree — local state, no API
 	const prompt = useLocalPrompt();
+	const promptSectionsForTermRules = promptMode === 'json' ? parsedPromptJson(promptJson) : prompt.sections;
 
 	const handleDefaultImage = (e) => {
 		const file = e.target.files?.[0];
@@ -243,6 +246,10 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 				formData.append('archive_id', selectedArchiveId);
 			}
 
+			if (!isNpc) {
+				formData.append('agent_config', JSON.stringify({ termRules }));
+			}
+
 			if (portraitType === 'image') {
 				formData.append('emotions[0][name]', 'default');
 				formData.append('emotions[0][image]', defaultImage);
@@ -277,7 +284,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
-				throw new Error(error.message || 'Failed to create assistant');
+				throw new Error(validationMessages(error) || 'Failed to create assistant');
 			}
 
 			const created = await res.json();
@@ -418,6 +425,8 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 							<option value="agent">Agent</option>
 						</select>
 					</div>}
+
+					{!isNpc && <TermRuleSettings sections={promptSectionsForTermRules} value={termRules} onChange={setTermRules} />}
 
 					{!isNpc && <div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
@@ -591,4 +600,12 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 			</div>
 		</>
 	);
+}
+
+function parsedPromptJson(promptJson) {
+	try {
+		return JSON.parse(promptJson);
+	} catch {
+		return null;
+	}
 }

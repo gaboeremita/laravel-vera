@@ -80,6 +80,23 @@ class Assistant extends Model
     }
 
     /**
+     * The term rule settings, with every value defaulted when unset.
+     *
+     * @return array{section: ?string, markTerms: bool, swapInvariant: bool, highlightMissing: bool}
+     */
+    public function termRuleSettings(): array
+    {
+        $settings = data_get($this->agent_config, 'termRules', []);
+
+        return [
+            'section' => $settings['section'] ?? null,
+            'markTerms' => (bool) ($settings['markTerms'] ?? false),
+            'swapInvariant' => (bool) ($settings['swapInvariant'] ?? false),
+            'highlightMissing' => (bool) ($settings['highlightMissing'] ?? false),
+        ];
+    }
+
+    /**
      * @return array{regular: array<string>, intimate: array<string>}
      */
     public function promptEmotionNames(): array

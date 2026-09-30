@@ -34,7 +34,7 @@ Term rules stay plain text in one of the assistant's top-level string prompt sec
 |---|---|
 | I. Lint-enforced style | Pint and ESLint run once at push/PR time per CLAUDE.md |
 | II. Append-only migrations | No migration needed |
-| III. Comments justify only non-obvious decisions | Only the placeholder instruction and the UTF-16 offset conversion warrant a comment |
+| III. Comments justify only non-obvious decisions | Only the UTF-16 offset conversion warrants a comment |
 | IV. Data isolation by ownership | Settings and rules are read from the assistant resolved through the requesting user's own assistants; no cross-assistant reads |
 | V. Errors fail loudly | Broken rule lines refuse the save with named lines (FR-014); no swallowed exceptions |
 | VI. Feature-test-first, factory-backed | Feature tests through the prompt, assistant and send-message endpoints, with `Assistant` factory states |
@@ -89,8 +89,8 @@ tests/Feature/Api/
 
 ## Design Notes
 
-- **Turn flow (web)**: resolve `termRules`; if every flag is off or `section` is null, skip entirely (FR-005). Otherwise parse the section, build `MarkedMessage` from the newest user message after creator-mode stripping, and replace only that message's content in `$validated['messages']`. The stored user message and `userContent` stay as typed; retrieval uses the unmarked text. When placeholders exist, append the fixed placeholder instruction section to the director before `build()` (research R6). After the model call, `$content = $marked->restore($content)` before TTS parsing and storage. If `highlightMissing`, add `missingTerms` to the response.
-- **Discord/Telegram**: same steps without the highlight.
+- **Turn flow (web)**: resolve `termRules`; if every flag is off or `section` is null, skip entirely (FR-005). Otherwise parse the section, build `MarkedMessage` from the newest user message after creator-mode stripping, and replace only that message's content in `$validated['messages']`. The stored user message and `userContent` stay as typed; retrieval uses the unmarked text. After the model call, `$content = $marked->restore($content)` before TTS parsing and storage. If `highlightMissing`, add `missingTerms` to the response.
+- **Discord/Telegram**: same steps without the highlight; on Discord the triggering message is marked whoever wrote it.
 - **Offsets**: matching runs on UTF-8 byte offsets (`PREG_OFFSET_CAPTURE`); ranges returned to the browser are converted to UTF-16 code-unit offsets.
 - **Frontend**: the dropdown lists top-level prompt keys whose value is a string. On the edit page it reads the loaded prompt; on the create page, the prompt being built. `ChatMessage` splits the user text by the ranges into plain and underlined spans; the warning line lists `missingTerms[].target` under the reply.
 

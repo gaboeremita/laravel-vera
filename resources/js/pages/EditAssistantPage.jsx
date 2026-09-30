@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { route } from 'ziggy-js';
-import { api } from '../utils/api.js';
+import { api, validationMessages } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import PromptEditor from '../components/PromptEditor.jsx';
 import EmotionGrid from '../components/EmotionGrid.jsx';
 import PosturePoseSections from '../components/PosturePoseSections.jsx';
 import ModelVoiceFields from '../components/ModelVoiceFields.jsx';
+import TermRuleSettings from '../components/TermRuleSettings.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
@@ -47,6 +48,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 	const [promptMode, setPromptMode] = useState('manual');
 	const [promptJson, setPromptJson] = useState('');
 	const [promptJsonError, setPromptJsonError] = useState(null);
+	const [termRules, setTermRules] = useState({ section: null, markTerms: false, swapInvariant: false, highlightMissing: false });
 
 	const prompt = usePrompt(Number(id), addToast);
 
@@ -107,6 +109,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				setOpeningMessage(data.opening_message || '');
 				setSelectedArchiveId(data.archive_id ? String(data.archive_id) : '');
 				setMode(data.mode || 'assistant');
+				if (data.agent_config?.termRules) setTermRules(data.agent_config.termRules);
 				setPortraitType(data.portrait_type || 'image');
 				setVrmFilename(data.vrm_url ? (data.vrm_original_name || 'avatar.vrm') : null);
 				setHasLod(Boolean(data.vrm_lod_url));
@@ -143,11 +146,12 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				archive_id: selectedArchiveId ? Number(selectedArchiveId) : null,
 				mode,
 				portrait_type: portraitType,
+				...(isNpc ? {} : { agent_config: { termRules } }),
 			});
 
 			if (!res.ok) {
 				const error = await res.json().catch(() => ({}));
-				throw new Error(error.message || 'Save failed');
+				throw new Error(validationMessages(error) || 'Save failed');
 			}
 
 			addToast(`${isNpc ? 'NPC' : 'Assistant'} saved`, 'success');
@@ -611,6 +615,8 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 							<option value="agent">Agent</option>
 						</select>
 					</div>
+
+					{!isNpc && <TermRuleSettings sections={prompt.sections} value={termRules} onChange={setTermRules} />}
 
 					<div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">

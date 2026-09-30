@@ -11,6 +11,7 @@
 
    ```
    Translate each message. Terms written `source -> target` must use the target exactly.
+   Copy every ⟦n⟧ marker into the reply exactly as written.
    hearing, hearings -> audiencia, audiencias
    ACME -> ACME (invariant)
    ```
@@ -27,7 +28,8 @@
 | 4 | Highlight on, get a reply without "audiencia" | Warning line under the reply lists `audiencia`; "hearing" is underlined in your message; after reload both are gone (FR-012) |
 | 5 | Send a second message | Only the new message is marked; the first reaches the model as typed (FR-008a) |
 | 6 | Add the line `hearing ->` to the picked section and save | Save refused with an error naming that line (FR-014) |
-| 7 | Word inside a longer word, e.g. "hearings" without that variant listed, or "rehearing" | Left unmarked |
+| 7 | Send a message containing "rehearing" | "hearing" inside it is left unmarked |
+| 8 | Edit the rule section, then send another message | The new message uses the edited rules |
 
 ## Automated checks
 

@@ -14,13 +14,17 @@ use App\Models\Emotion;
 use App\Models\Image;
 use App\Models\Pose;
 use App\Models\User;
+use App\Rules\ValidTermRuleSection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Enum;
 
 class AssistantController extends Controller
 {
+    private const array TERM_RULE_KEYS = ['section', 'markTerms', 'swapInvariant', 'highlightMissing'];
+
     public function index(Request $request): JsonResponse
     {
         $assistants = $request->user()
@@ -116,6 +120,7 @@ class AssistantController extends Controller
             'description' => $assistant->description,
             'opening_message' => $assistant->opening_message,
             'prompt' => $assistant->prompt,
+            'agent_config' => [...($assistant->agent_config ?? []), 'termRules' => $assistant->termRuleSettings()],
             'archive_id' => $assistant->archive_id,
             'mode' => $assistant->mode,
             'portrait_type' => $assistant->portrait_type->value,
@@ -133,6 +138,9 @@ class AssistantController extends Controller
     {
         if (is_string($request->input('prompt'))) {
             $request->merge(['prompt' => json_decode($request->input('prompt'), true)]);
+        }
+        if (is_string($request->input('agent_config'))) {
+            $request->merge(['agent_config' => json_decode($request->input('agent_config'), true)]);
         }
 
         $isAvatarMode = $request->input('portrait_type') === AssistantPortraitType::Avatar3D->value;
@@ -164,6 +172,7 @@ class AssistantController extends Controller
             'poses.*.vrm_blendshapes.*.expression' => ['required', 'string', 'max:100'],
             'poses.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
             'poses.*.animation' => ['sometimes', 'file', 'extensions:vrma,fbx', 'max:10240'],
+            ...$this->termRuleValidation($request, $request->input('prompt') ?? []),
         ]);
 
         $duplicatePose = collect($validated['poses'] ?? [])
@@ -209,6 +218,7 @@ class AssistantController extends Controller
                 'description' => $validated['description'] ?? null,
                 'opening_message' => $validated['opening_message'] ?? null,
                 'prompt' => $validated['prompt'] ?? [],
+                'agent_config' => isset($validated['agent_config']['termRules']) ? ['termRules' => Arr::only($validated['agent_config']['termRules'], self::TERM_RULE_KEYS)] : null,
                 'archive_id' => $validated['archive_id'] ?? null,
                 'mode' => $validated['mode'] ?? AssistantMode::Assistant->value,
                 'portrait_type' => $validated['portrait_type'] ?? AssistantPortraitType::Image->value,
@@ -292,11 +302,44 @@ class AssistantController extends Controller
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
             'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
+            ...$this->termRuleValidation($request, $request->input('prompt') ?? $assistant->prompt ?? []),
         ]);
+
+        $termRules = $validated['agent_config']['termRules'] ?? null;
+        unset($validated['agent_config']);
+        if ($termRules !== null) {
+            $validated['agent_config'] = [
+                ...($assistant->agent_config ?? []),
+                'termRules' => [...($assistant->agent_config['termRules'] ?? []), ...Arr::only($termRules, self::TERM_RULE_KEYS)],
+            ];
+        }
 
         $assistant->update($validated);
 
         return response()->json($assistant);
+    }
+
+    /**
+     * Rules for the term rule settings, checking the picked section against the prompt being saved.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function termRuleValidation(Request $request, mixed $prompt): array
+    {
+        $section = $request->input('agent_config.termRules.section');
+
+        return [
+            'agent_config' => ['sometimes', 'array'],
+            'agent_config.termRules' => ['sometimes', 'array'],
+            'agent_config.termRules.section' => [
+                'nullable',
+                'string',
+                new ValidTermRuleSection(is_array($prompt) ? $prompt : [], is_string($section) ? $section : null),
+            ],
+            'agent_config.termRules.markTerms' => ['sometimes', 'boolean'],
+            'agent_config.termRules.swapInvariant' => ['sometimes', 'boolean'],
+            'agent_config.termRules.highlightMissing' => ['sometimes', 'boolean'],
+        ];
     }
 
     public function destroy(Request $request, int $id, DeleteAssistantAssets $deleteAssistantAssets): JsonResponse

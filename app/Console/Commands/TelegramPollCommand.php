@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\TermRules\MarkTermRules;
 use App\Directors\PromptDirector;
 use App\Exceptions\TelegramApiException;
 use App\Models\Assistant;
@@ -247,6 +248,11 @@ class TelegramPollCommand extends Command
             $history[$lastIndex]['images'] = [$image];
         }
 
+        $markedMessage = app(MarkTermRules::class)->forAssistant($this->assistant, $text);
+        if ($markedMessage !== null && count($history) > 0) {
+            $history[array_key_last($history)]['content'] = $markedMessage->text;
+        }
+
         // Load prompt from assistant
         $director = new PromptDirector($this->assistant->prompt);
         $archive = $this->assistant->archive;
@@ -278,7 +284,7 @@ class TelegramPollCommand extends Command
             return;
         }
 
-        $parsed = app(LlmResponseTagParser::class)->parse($response->content, $this->assistant);
+        $parsed = app(LlmResponseTagParser::class)->parse($markedMessage?->restore($response->content) ?? $response->content, $this->assistant);
         $content = $parsed['content'];
         $emotion = $parsed['emotion'] ?? 'neutral';
 

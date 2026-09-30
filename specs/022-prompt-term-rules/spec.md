@@ -89,7 +89,8 @@ With the highlight checkbox ticked, when the reply arrives the system checks tha
 - A checkbox is ticked while no rules exist: the form still saves, and the behavior simply finds nothing to apply.
 - Case: matching follows each rule's case setting; the default is case-insensitive.
 - Scripts written without spaces between words: word-boundary matching can't separate words there, so rules in those scripts may match inside longer words. This feature accepts that limitation.
-- The assistant replies through another channel (Telegram, Discord): inline marking and exact swap apply there too; the highlight appears only in the web chat.
+- The assistant replies through another channel (Telegram, Discord): inline marking and exact swap apply there too, to the message that triggers the reply whoever wrote it; the highlight appears only in the web chat.
+- Exact swap is on but the user's prompt doesn't explain the placeholders: the model may alter or drop them; any placeholder returned intact is still swapped, and anything else is shown as written.
 - The user edits the rules mid-conversation: the next message uses the rules as saved.
 
 ## Requirements *(mandatory)*
@@ -97,16 +98,16 @@ With the highlight checkbox ticked, when the reply arrives the system checks tha
 ### Functional Requirements
 
 - **FR-001**: Term rules MUST be written as plain text lines in the assistant's existing prompt; the feature MUST add no separate storage or editor for the rules.
-- **FR-002**: The assistant create and edit forms MUST offer a dropdown, next to the checkboxes, listing the assistant's existing prompt sections; the code behaviors MUST read the rules only from the section picked there.
+- **FR-002**: The assistant create and edit forms MUST offer a dropdown, next to the checkboxes, listing the assistant's existing top-level prompt sections whose value is text (list and nested sections are left out, because they reach the model joined by commas or as labelled pairs); the code behaviors MUST read the rules only from the section picked there.
 - **FR-003**: A rule line MUST express a source term, a target term, and optionally variant forms of the source term, variant forms of the target term, an invariant mark and a case-sensitive mark, in the form `source, source variants -> target, target variants`, followed optionally by the marks `(invariant)` and `(case)`. The first term on each side is the rule's term and the rest are its variant forms, all separated by commas. The line MUST stay readable to the model as prompt text.
 - **FR-004**: The assistant create and edit forms MUST offer one checkbox for each behavior: inline marking, exact swap for invariant terms, and the missing-term highlight. All three MUST default to off.
 - **FR-005**: With every checkbox off, the assistant's behavior MUST be identical to its behavior before this feature.
 - **FR-006**: Matching MUST be plain text matching of each rule's source term and its variant forms at word boundaries, case-insensitive unless the rule is marked case-sensitive, preferring the longest match where terms overlap.
 - **FR-007**: The system MUST contain no languages, language pairs, inflection logic or glossary content of its own; everything that varies by language MUST come from the rule lines.
-- **FR-008**: With inline marking on, the model-facing copy of each user message MUST annotate every matched occurrence in place with the rule's target term.
-- **FR-008a**: Inline marking and exact swap MUST apply only to the newest user message of each turn; earlier user messages in the conversation MUST reach the model exactly as typed.
+- **FR-008**: With inline marking on, the model-facing copy of the newest user message MUST annotate every matched occurrence in place with the rule's target term.
+- **FR-008a**: Inline marking and exact swap MUST apply only to the message that triggers the reply (on Discord, whoever wrote it); earlier messages in the conversation MUST reach the model exactly as typed.
 - **FR-009**: The message shown in the chat and stored in the conversation MUST always be the text the user typed.
-- **FR-010**: With exact swap on, every matched occurrence of an invariant rule's term MUST be replaced in the model-facing copy by a placeholder, and every placeholder in the reply MUST be replaced by the rule's exact target text before the user sees it.
+- **FR-010**: With exact swap on, every matched occurrence of an invariant rule's term MUST be replaced in the model-facing copy by a placeholder, and every placeholder in the reply MUST be replaced by the rule's exact target text before the user sees it. The system adds no text of its own explaining the placeholders; the user's prompt explains them.
 - **FR-011**: A stored reply MUST contain the swapped-in target text, with no placeholders.
 - **FR-012**: With the highlight on, after each reply the system MUST determine, for every rule matched in the user's message, whether the rule's target term or one of its variant forms appears in the reply, and the web chat MUST show a warning line under the reply listing each missing target term, and underline, in the user's displayed message, the source-term occurrences whose target term is missing. The message text itself MUST stay as typed (FR-009). The warning line and underlines MUST be shown only for replies received in the current view; the check result MUST NOT be stored, so they disappear when the conversation is reloaded.
 - **FR-013**: Every behavior MUST work within the single model call already made per turn; none MAY add a model call or a retry.
@@ -132,7 +133,7 @@ With the highlight checkbox ticked, when the reply arrives the system checks tha
 
 - The rules share the prompt with the rest of the assistant's instructions, and the model follows them through the prompt alone when every checkbox is off.
 - The prompt section holding the rules keeps its place in the prompt from turn to turn, so providers that reuse an unchanged prompt prefix process the rules once.
-- Only the user's messages are scanned for rule terms; messages from other participants (residents, other Discord users) are outside this feature.
+- Only the message that triggers the reply is scanned for rule terms: the user's message in the web chat and on Telegram, and the triggering message on Discord, whoever wrote it. Resident-to-resident turns are outside this feature.
 - The highlight is shown only in the web chat; other channels have no place to show it.
 - Rules apply in one direction, source to target, as written; the languages involved are whatever the user writes in the rules and the prompt.
 - Temperature and model choice stay in the existing assistant settings; this feature adds none.

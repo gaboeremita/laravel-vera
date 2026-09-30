@@ -211,8 +211,11 @@ export function useConversationChat({
 
 				if (data.audioError) addToast?.(data.audioError, 'error');
 
+				const missingTerms = data.missingTerms?.length > 0 ? data.missingTerms : null;
+				const sentWithUnderlines = missingTerms ? sent.map((m) => (m.id === userMsg.id ? { ...m, underlines: missingTerms.flatMap((term) => term.ranges) } : m)) : sent;
+
 				setHasError(false);
-				setMessages([...sent, ...generatedImageMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, systemPrompt: data.system_prompt || null, usage: data.usage || null, ttsInstructions, toolCalls: data.tool_calls || null, audioBase64: data.audioBase64 || null, audioContentType: data.audioContentType || null }]);
+				setMessages([...sentWithUnderlines, ...generatedImageMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, systemPrompt: data.system_prompt || null, usage: data.usage || null, ttsInstructions, toolCalls: data.tool_calls || null, audioBase64: data.audioBase64 || null, audioContentType: data.audioContentType || null, missingTerms }]);
 				setIsLoading(false);
 				if (voiceMode) onVoiceReply?.(cleanText, ttsInstructions);
 				if (data.action) onAction?.(data.action, cleanText);
