@@ -18,6 +18,7 @@ import FocusTracker from './FocusTracker.jsx';
 import SpotBeacons from './SpotBeacons.jsx';
 import ResidentController from './ResidentController.jsx';
 import WorldEnvironment from './WorldEnvironment.jsx';
+import { blockingObjectIds } from '../../utils/activityResponses.js';
 import { homeState } from './residentHome.js';
 import PerformanceProbe from './PerformanceProbe.jsx';
 import EnvironmentDetail from './EnvironmentDetail.jsx';
@@ -180,7 +181,7 @@ function NavigationBuilder({ layout, environment, fileUrl, navigationRef }) {
 
 const NO_PASSAGES = [];
 
-export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, initialFacing = null, linkedPassageIds, onEnterPassage, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands, occupiedSpots, residentStates = {}, thoughts = {}, speech = {}, playerState, playerCommands, collisionWorldRef, onMovementChange, onGetUpIntent, onMoveIntent, onLocationChange, focusLabelRef, focusEnabled = true, focusedObjectId = null, nearbyObjectIds = [], onFocusChange, onNearbyChange, watchedObjectId = null, onWatchedOutOfReach, paused = false, onResidentVoice, statsRef = null, residentDetails = null }) {
+export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, initialFacing = null, linkedPassageIds, onEnterPassage, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands, occupiedSpots, residentStates = {}, thoughts = {}, speech = {}, playerState, playerCommands, collisionWorldRef, onMovementChange, onGetUpIntent, onMoveIntent, onLocationChange, focusLabelRef, focusEnabled = true, focusedObjectId = null, nearbyObjectIds = [], onFocusChange, onNearbyChange, watchedObjectId = null, onWatchedOutOfReach, paused = false, onResidentVoice, statsRef = null, residentDetails = null, onBlockedByObject }) {
 	const [environment, setEnvironment] = useState(null);
 	const audioListener = useRef(null);
 	const [playerPosition, setPlayerPosition] = useState([0, 1.6, 4]);
@@ -190,6 +191,7 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 		setPlayerPosition(position);
 		onPlayerPositionChange?.(position);
 	}, [onPlayerPositionChange]);
+	const blockingIds = useMemo(() => [...blockingObjectIds(world.activityTerms)], [world.activityTerms]);
 	const handleReady = useCallback((loadedEnvironment) => {
 		setEnvironment(loadedEnvironment);
 		if (collisionWorldRef) collisionWorldRef.current = loadedEnvironment.collisionWorld;
@@ -208,10 +210,10 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 			<directionalLight position={[4, 8, 4]} intensity={2} />
 			<CameraAudioListener listenerRef={audioListener} />
 			<PauseController paused={paused} audioListener={audioListener} />
-			<WorldEnvironment url={world.environmentUrl} onReady={handleReady} onError={onError} />
+			<WorldEnvironment url={world.environmentUrl} blockingObjectIds={blockingIds} onReady={handleReady} onError={onError} />
 			{environment && (
 				<>
-					<FirstPersonController collisionWorld={environment.collisionWorld} navigation={navigation} spawnPosition={spawnPosition} spawnYaw={initialFacing === null ? null : initialFacing + Math.PI} enabled={explorationEnabled} onPositionChange={handlePositionChange} playerState={playerState} playerCommands={playerCommands} onMovementChange={onMovementChange} onGetUpIntent={onGetUpIntent} onMoveIntent={onMoveIntent} />
+					<FirstPersonController collisionWorld={environment.collisionWorld} navigation={navigation} spawnPosition={spawnPosition} spawnYaw={initialFacing === null ? null : initialFacing + Math.PI} enabled={explorationEnabled} onPositionChange={handlePositionChange} playerState={playerState} playerCommands={playerCommands} onMovementChange={onMovementChange} onGetUpIntent={onGetUpIntent} onMoveIntent={onMoveIntent} onBlockedByObject={onBlockedByObject} />
 					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} layout={world.layout} onVoice={onResidentVoice} savedState={residentStates[resident.id] ?? homeStates.get(resident.id) ?? null} occupiedSpots={occupiedSpots} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} interaction={interaction} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} residentVoices={residentVoices} audioListener={audioListener} inConversation={resident.id === activeResidentId} navigation={navigation} residentCommands={residentCommands} residentDetails={residentDetails} />)}
 					<PlayerViewTracker viewRef={playerView} playerState={playerState} />
 					<EnvironmentDetail root={environment.root} layout={world.layout} playerState={playerState} />

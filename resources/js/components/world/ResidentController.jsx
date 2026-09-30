@@ -359,23 +359,37 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			const scene = bodyRef.current;
 			placementRef.current = { elapsed: 0, fromPosition: scene.position.clone(), toPosition: target, fromRotation: scene.rotation.y, toRotation: rotation, resolve };
 		});
+		// Standing where no route starts, such as on top of a seat, she steps down to ground that leads somewhere.
+		const stepOffIfStranded = async () => {
+			const grid = navigation.current;
+			if (!grid?.isStranded(bodyRef.current.position)) return;
+			const standing = grid.standingPointNear(bodyRef.current.position);
+			if (standing) await placeAt(standing, bodyRef.current.rotation.y);
+		};
 		const leaveSpot = async () => {
 			const spot = spotRef.current;
-			if (!spot) return;
-			spotRef.current = null;
-			postureRef.current = 'standing';
-			heldPoseRef.current = null;
-			spot.onLeave?.();
-			if (spot.approach) await placeAt(spot.approach, bodyRef.current.rotation.y);
-		};
-		const routeTo = (target, { near = false, towardUser = false } = {}) => new Promise((resolve) => {
-			const plan = planTo(target, near, towardUser);
-			if (!plan.path) {
-				resolve({ outcome: 'failed', reason: plan.reason });
-				return;
+			if (spot) {
+				spotRef.current = null;
+				postureRef.current = 'standing';
+				heldPoseRef.current = null;
+				spot.onLeave?.();
+				if (spot.approach) {
+					// The ground below a seat's approach can lie inside the seat's own base.
+					const standing = collisionWorld.isBodyStuck(new Vector3(spot.approach.x, spot.approach.y, spot.approach.z))
+						? navigation.current?.standingPointNear(spot.approach) ?? spot.approach
+						: spot.approach;
+					await placeAt(standing, bodyRef.current.rotation.y);
+				}
 			}
-			routeRef.current = { mode: 'goto', target, near, towardUser, waypoints: plan.path, index: Math.min(1, plan.path.length - 1), moving: true, heading: null, replans: 0, progressAt: null, bestDistance: Infinity, resolve };
-		});
+			await stepOffIfStranded();
+		};
+		const routeTo = async (target, { near = false, towardUser = false } = {}) => {
+			const plan = planTo(target, near, towardUser);
+			if (!plan.path) return { outcome: 'failed', reason: plan.reason };
+			return new Promise((resolve) => {
+				routeRef.current = { mode: 'goto', target, near, towardUser, waypoints: plan.path, index: Math.min(1, plan.path.length - 1), moving: true, heading: null, replans: 0, progressAt: null, bestDistance: Infinity, resolve };
+			});
+		};
 		const commands = {
 			goTo: async (target, { near = false, towardUser = false } = {}) => {
 				settle('interrupted', 'a new action replaced it');
@@ -409,7 +423,8 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				await leaveSpot();
 				const grid = navigation.current;
 				if (!grid) return { outcome: 'failed', reason: 'still mapping this place' };
-				const path = grid.findPathWhere(bodyRef.current.position, (point) => inTalkingReach(point, target, (from, to) => collisionWorld.hasLineOfSight(from, to)));
+				const inReach = (point) => inTalkingReach(point, target, (from, to) => collisionWorld.hasLineOfSight(from, to));
+				const path = grid.findPathWhere(bodyRef.current.position, inReach);
 				if (!path) return { outcome: 'failed', reason: 'there is no way to get close to them' };
 				return new Promise((resolve) => {
 					routeRef.current = { mode: 'goto', target, near: true, towardUser: false, waypoints: path, index: Math.min(1, path.length - 1), moving: true, heading: null, replans: 0, progressAt: null, bestDistance: Infinity, resolve };

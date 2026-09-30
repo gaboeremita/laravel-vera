@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { OUTSIDE_AREA, RESIDENT_BUSY, USER_BUSY, describeStep, executeAction } from '../components/world/residentActions.js';
+import { areaIn } from '../components/world/zoneAccess.js';
 import { finishActivity, startActivity } from '../components/world/activityLog.js';
 import { fullSpotIds, stackedSpots } from '../components/world/spotOccupancy.js';
 import { idleWait } from '../components/world/residentMotion.js';
@@ -23,13 +24,13 @@ const USER_INPUT_EVENTS = ['keydown', 'mousedown', 'mousemove', 'wheel', 'touchs
  * on another floor from the user, while the world is paused or the page is
  * hidden, and after five minutes with no input from the user.
  */
-export function useResidentAgency({ enabled, worldId, sessionId, residents, layout, chatResidentId, residentCommands, occupiedSpots, getPositions, getFollowTarget, getResidentPosition, getUserState, getUserBusyWith, getBusyResidents, claimTarget, releaseTarget, isBusy, isPaused, onSpeak, onThought, addToast }) {
+export function useResidentAgency({ enabled, worldId, sessionId, residents, regionId, layout, chatResidentId, residentCommands, occupiedSpots, getPositions, getFollowTarget, getResidentPosition, getUserState, getUserBusyWith, getBusyResidents, claimTarget, releaseTarget, isBusy, isPaused, onSpeak, onThought, addToast }) {
 	const chatResidentRef = useRef(chatResidentId);
 	const runningRef = useRef(new Map());
 	const latestRef = useRef(null);
 
 	useEffect(() => {
-		latestRef.current = { residents, layout, getPositions, getFollowTarget, getResidentPosition, getUserState, getUserBusyWith, getBusyResidents, claimTarget, releaseTarget, isBusy, isPaused, onSpeak, onThought, addToast };
+		latestRef.current = { residents, regionId, layout, getPositions, getFollowTarget, getResidentPosition, getUserState, getUserBusyWith, getBusyResidents, claimTarget, releaseTarget, isBusy, isPaused, onSpeak, onThought, addToast };
 	});
 
 	useEffect(() => {
@@ -154,7 +155,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, layo
 						releaseTarget: (target) => latest().releaseTarget?.(resident.id, target),
 						fromUser: false,
 						zoneAccess: resident.zoneAccess,
-						area: resident.behaviorSettings?.area ?? [],
+						area: areaIn(resident, latest().regionId),
 						residentId: resident.id,
 						occupiedSpots: occupiedSpots.current,
 						onStepStart: (step, index, total) => {

@@ -45,15 +45,8 @@ class ActivityTermsController extends Controller
         return [
             'objectId' => $terms->object_id,
             'activityId' => $terms->activity_id,
-            'requiredItemId' => $terms->required_item_id,
-            'consumesRequired' => $terms->consumes_required,
-            'cost' => $terms->cost,
-            'givesCredits' => $terms->gives_credits,
-            'givesItems' => $terms->gives_items ?? [],
-            'requirement' => $terms->requirement,
-            'outcome' => $terms->outcome,
+            'responses' => $terms->responseList(),
             'vendorResidentId' => $terms->vendor_resident_id,
-            'revealsFactId' => $terms->reveals_fact_id,
         ];
     }
 }

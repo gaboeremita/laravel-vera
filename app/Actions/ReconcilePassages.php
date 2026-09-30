@@ -6,6 +6,7 @@ use App\Models\ActivityTerms;
 use App\Models\Inventory;
 use App\Models\Region;
 use App\Models\StartingInventory;
+use App\Models\WorldSessionObject;
 
 class ReconcilePassages
 {
@@ -37,8 +38,9 @@ class ReconcilePassages
     }
 
     /**
-     * Drops the starting inventories, session inventories and activity terms of
-     * objects, or activities of an object, the layout no longer has.
+     * Drops the starting inventories, session inventories, session states and
+     * activity terms of objects, or activities of an object, the layout no
+     * longer has.
      */
     private function dropVanishedObjects(Region $region): void
     {
@@ -46,6 +48,7 @@ class ReconcilePassages
 
         StartingInventory::where('region_id', $region->id)->whereNotIn('object_id', $objectIds)->delete();
         Inventory::where('region_id', $region->id)->whereNotIn('object_id', $objectIds)->delete();
+        WorldSessionObject::where('region_id', $region->id)->whereNotIn('object_id', $objectIds)->delete();
         $region->activityTerms()->get()
             ->reject(fn (ActivityTerms $terms) => array_key_exists($terms->activity_id, $region->objectActivities($terms->object_id)))
             ->each->delete();

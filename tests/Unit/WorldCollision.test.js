@@ -5,11 +5,15 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { WorldCollision } from '../../resources/js/components/world/collisionCheck.js';
 
 function createWorld(context, ...objects) {
+	return createWorldWith(context, {}, ...objects);
+}
+
+function createWorldWith(context, options, ...objects) {
 	const scene = new Group();
 	const floor = new Mesh(new BoxGeometry(20, 0.1, 20), new MeshBasicMaterial());
 	floor.position.y = -0.05;
 	scene.add(floor, ...objects);
-	const world = new WorldCollision(scene);
+	const world = new WorldCollision(scene, options);
 	context.after(() => {
 		world.dispose();
 		scene.traverse((node) => {
@@ -371,4 +375,113 @@ test('a point with no ground within reach below stays where it is', (context) =>
 	const world = createWorld(context);
 	const point = { x: 50, y: 1, z: 50 };
 	assert.equal(world.groundBelow(point), point);
+});
+
+const BLOCKING = { blockingObjectIds: ['orphanage-door'] };
+
+function door({ invisible = false } = {}) {
+	const marker = new Group();
+	marker.userData.vera = { type: 'object', id: 'orphanage-door' };
+	const panel = wall();
+	if (invisible) {
+		const proxy = new Group();
+		proxy.name = 'Collision';
+		proxy.add(panel);
+		marker.add(proxy);
+	} else {
+		marker.add(panel);
+	}
+	return marker;
+}
+
+test('a blocking object blocks the player and names itself, until it is passable', (context) => {
+	const world = createWorldWith(context, BLOCKING, door({ invisible: true }));
+	const player = new Vector3(0, 0, 2);
+	world.move(player, 0, -4, { withBlockers: true });
+	assert.ok(player.z >= 0.25);
+	assert.equal(world.blockedBy, 'orphanage-door');
+
+	world.setPassableObjects(['orphanage-door']);
+	world.move(player, 0, -4, { withBlockers: true });
+	assert.ok(player.z < -1.5);
+	assert.equal(world.blockedBy, null);
+});
+
+test('residents walk through a blocking object, which stays out of the shared geometry', (context) => {
+	const world = createWorldWith(context, BLOCKING, door());
+	const resident = new Vector3(0, 0, 2);
+	world.move(resident, 0, -4);
+	assert.ok(resident.z < -1.5);
+	assert.equal(world.isBodyBlocked(new Vector3(0, 0, 0)), false);
+	assert.equal(world.isBodyBlocked(new Vector3(0, 0, 0), undefined, undefined, true), true);
+});
+
+test('a jump does not carry the player through a blocking object', (context) => {
+	const world = createWorldWith(context, BLOCKING, door());
+	const player = new Vector3(0, 0, 1);
+	const velocity = { x: 0, y: 3, z: -6 };
+	for (let frame = 0; frame < 30; frame++) {
+		if (world.airStep(player, velocity, 1 / 30, true).landed) break;
+		velocity.y -= 9.8 / 30;
+	}
+	assert.ok(player.z >= 0.25);
+});
+
+test('an object nobody set to block collides like any other geometry', (context) => {
+	const world = createWorld(context, door());
+	const resident = new Vector3(0, 0, 2);
+	world.move(resident, 0, -4);
+	assert.ok(resident.z >= 0.25);
+	assert.equal(world.blockers.size, 0);
+});
+
+function doorway() {
+	const left = new Mesh(new BoxGeometry(4, 3, 0.3), new MeshBasicMaterial());
+	left.position.set(-2.45, 1.5, 0);
+	const right = new Mesh(new BoxGeometry(4, 3, 0.3), new MeshBasicMaterial());
+	right.position.set(2.45, 1.5, 0);
+	return [left, right];
+}
+
+function emptyMarker(x = 0, z = 0) {
+	const marker = new Group();
+	marker.userData.vera = { type: 'object', id: 'orphanage-door' };
+	marker.position.set(x, 0, z);
+	return marker;
+}
+
+test('a blocking object with no meshes seals the doorway its marker stands in', (context) => {
+	const world = createWorldWith(context, BLOCKING, ...doorway(), emptyMarker());
+	const player = new Vector3(0, 0, 2);
+	world.move(player, 0, -4, { withBlockers: true });
+	assert.ok(player.z >= 0.25);
+	assert.equal(world.blockedBy, 'orphanage-door');
+
+	const resident = new Vector3(0, 0, 2);
+	world.move(resident, 0, -4);
+	assert.ok(resident.z < -1.5);
+
+	world.setPassableObjects(['orphanage-door']);
+	world.move(player, 0, -4, { withBlockers: true });
+	assert.ok(player.z < -1.5);
+});
+
+test('a blocking object with no meshes and no walls around it blocks nothing', (context) => {
+	const world = createWorldWith(context, BLOCKING, emptyMarker());
+	assert.equal(world.blockers.size, 0);
+	const player = new Vector3(0, 0, 2);
+	world.move(player, 0, -4, { withBlockers: true });
+	assert.ok(player.z < -1.5);
+});
+
+test('a blocking object with no meshes seals a gap in a thin fence it stands just off', (context) => {
+	const left = wall();
+	left.position.x = -5.9;
+	const right = wall();
+	right.position.x = 5.9;
+	const world = createWorldWith(context, BLOCKING, left, right, emptyMarker(0, 0.1));
+	const player = new Vector3(0, 0, 2);
+	world.move(player, 0, -4, { withBlockers: true });
+	assert.ok(player.z >= 0.25);
+	assert.equal(world.blockedBy, 'orphanage-door');
 });

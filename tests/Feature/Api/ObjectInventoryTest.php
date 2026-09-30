@@ -7,6 +7,7 @@ use App\Models\InventoryItem;
 use App\Models\StartingInventory;
 use App\Models\StartingInventoryItem;
 use App\Models\WorldSession;
+use App\Models\WorldSessionObject;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -86,6 +87,7 @@ it('removes what was configured on an object that leaves the layout', function (
     stockObject($scenario, [[worldItem($region), 1, true]]);
     app(ResolveInventory::class)->forObject($session, $region, 'pool-lounger-1');
     ActivityTerms::factory()->create(['region_id' => $region->id, 'object_id' => 'pool-lounger-1', 'activity_id' => 'recline']);
+    WorldSessionObject::factory()->passable()->create(['world_session_id' => $session->id, 'region_id' => $region->id]);
 
     $layout = $region->layout;
     $layout['objects'] = [];
@@ -95,5 +97,6 @@ it('removes what was configured on an object that leaves the layout', function (
     expect(StartingInventory::where('region_id', $region->id)->count())->toBe(0)
         ->and($session->inventories()->where('region_id', $region->id)->count())->toBe(0)
         ->and(ActivityTerms::count())->toBe(0)
+        ->and(WorldSessionObject::count())->toBe(0)
         ->and(InventoryItem::count())->toBe(0);
 });

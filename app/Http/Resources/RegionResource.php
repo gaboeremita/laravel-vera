@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Actions\Activities\ResponseItems;
 use App\Http\Controllers\Api\ActivityTermsController;
 use App\Models\ActivityTerms;
 use App\Models\Item;
@@ -35,18 +36,14 @@ class RegionResource extends JsonResource
             'trackUrl' => $this->whenLoaded('track', fn () => $this->track?->url),
             'trackOriginalName' => $this->whenLoaded('track', fn () => $this->track?->original_name),
             'activityTerms' => $this->whenLoaded('activityTerms', function () {
-                $items = Item::with('cardImage')->whereKey($this->activityTerms->flatMap(fn (ActivityTerms $terms) => collect($terms->gives_items ?? [])->pluck('itemId')))->get()->keyBy('id');
+                $responseItems = app(ResponseItems::class);
+                $items = Item::with('cardImage')->whereKey($this->activityTerms->flatMap(fn (ActivityTerms $terms) => $responseItems->ids($terms->responseList())))->get()->keyBy('id');
 
                 return $this->activityTerms->map(fn (ActivityTerms $terms) => [
                     ...ActivityTermsController::present($terms),
-                    'requiredItemName' => $terms->requiredItem?->name,
-                    'requiredItemImageUrl' => $terms->requiredItem?->cardImage?->url,
-                    'gives' => collect($terms->gives_items ?? [])->filter(fn (array $entry) => $items->has($entry['itemId']))->map(fn (array $entry) => [
-                        'itemId' => $entry['itemId'],
-                        'name' => $items[$entry['itemId']]->name,
-                        'quantity' => $entry['quantity'],
-                        'cardImageUrl' => $items[$entry['itemId']]->cardImage?->url,
-                    ])->values(),
+                    'items' => collect($responseItems->ids($terms->responseList()))
+                        ->filter(fn (int $itemId) => $items->has($itemId))
+                        ->mapWithKeys(fn (int $itemId) => [$itemId => ['name' => $items[$itemId]->name, 'cardImageUrl' => $items[$itemId]->cardImage?->url]]),
                 ])->values();
             }),
             'links' => $this->whenLoaded('passageLinks', fn () => $this->passageLinks->map(fn (PassageLink $link) => [

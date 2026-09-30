@@ -132,7 +132,7 @@ class ResidentDecisionController extends Controller
 
         $toolbox = new WorldToolbox($residentRegion, $location['zoneChain'], $occupiedSpots, $assistant->posturesByPoseName(), $companions, userAvailable: $busyWith === null, userInSight: $userInSight, residentPoint: $residentPoint, recall: fn () => app(RecallResidentMemory::class)->handle($assistant, $request->user()));
         $residentIdsInRoom = $residentPoint !== null ? $resolveWorldState->residentIdsInRoom($region->layout ?? [], $residentPoint, $positions['residents'] ?? []) : [];
-        $toolbox->withActivityGate(new ActivityGate($worldSession, $region, app(ResolveInventory::class)->forResident($worldSession, $worldResident), $assistant->name, $residentIdsInRoom));
+        $toolbox->withActivityGate(new ActivityGate($region, app(ResolveInventory::class)->forResident($worldSession, $worldResident), $residentIdsInRoom));
 
         try {
             $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();

@@ -145,3 +145,34 @@ test('a route through a wide doorway keeps to its middle', (context) => {
 	const crossingX = previous.x + (crossing.x - previous.x) * t;
 	assert.ok(crossingX >= -0.8, `crossed the doorway at x=${crossingX}, next to its frame at x=-1.2`);
 });
+
+test('someone stranded on a platform with no way down steps off onto the floor beside it', (context) => {
+	const platform = box(1, 0.5, 1, 0, 0.25, 0);
+	const grid = navigate(context, [platform]);
+	const stranded = { x: 0, y: 0.5, z: 0 };
+	assert.equal(grid.findPath(stranded, { x: 0, y: 0, z: 6 }), null);
+	assert.equal(grid.isStranded(stranded), true);
+	assert.equal(grid.isStranded({ x: 0, y: 0, z: 4 }), false);
+
+	const standing = grid.standingPointNear(stranded);
+	assert.ok(standing);
+	assert.ok(Math.abs(standing.y) < 0.05, `stood at height ${standing.y}`);
+	assert.ok(Math.hypot(standing.x, standing.z) <= 1.5);
+	assert.ok(grid.findPath(standing, { x: 0, y: 0, z: 6 }));
+});
+
+test('standing up where a seat\'s base fills the ground moves to open floor beside it', (context) => {
+	const base = box(1, 0.6, 1, 0, 0.3, 0);
+	const grid = navigate(context, [base]);
+	const belowSeat = { x: 0, y: 0, z: 0.2 };
+
+	const standing = grid.standingPointNear(belowSeat);
+	assert.ok(standing);
+	assert.ok(Math.abs(standing.y) < 0.05);
+	assert.ok(Math.abs(standing.x) >= 0.7 || Math.abs(standing.z) >= 0.7, `stood at ${standing.x}, ${standing.z}`);
+});
+
+test('no standing point is found where nothing within reach leads anywhere', (context) => {
+	const grid = navigate(context, [box(1, 0.5, 1, 0, 0.25, 0)], { withFloor: false });
+	assert.equal(grid.standingPointNear({ x: 0, y: 0.5, z: 0 }), null);
+});

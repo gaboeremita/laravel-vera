@@ -66,7 +66,10 @@ it('counts where an item is used and removes it everywhere on delete', function 
     $lockbox = worldItem($region, ['name' => 'Lockbox', 'releases_items' => [['itemId' => $key->id, 'quantity' => 1]]]);
     InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => $key->id]);
     StartingInventoryItem::factory()->create(['starting_inventory_id' => StartingInventory::factory()->create(['world_id' => $region->world_id])->id, 'item_id' => $key->id]);
-    $terms = ActivityTerms::factory()->create(['region_id' => $region->id, 'required_item_id' => $key->id, 'gives_items' => [['itemId' => $key->id, 'quantity' => 1]]]);
+    $terms = ActivityTerms::factory()->withEffects(
+        [['type' => 'giveItems', 'items' => [['itemId' => $key->id, 'quantity' => 1]]], ['type' => 'showText', 'text' => 'It clicks.']],
+        ['all' => [['has' => ['item' => $key->id, 'atLeast' => 1]], ['credits' => ['atLeast' => 1]]]],
+    )->create(['region_id' => $region->id]);
 
     $this->actingAs($user)->getJson(route('worlds.items.index', $region->world_id))
         ->assertJsonPath('0.name', 'Iron key')
@@ -76,7 +79,7 @@ it('counts where an item is used and removes it everywhere on delete', function 
 
     expect($player->items()->count())->toBe(0)
         ->and(StartingInventoryItem::count())->toBe(0)
-        ->and($terms->fresh())->required_item_id->toBeNull()->gives_items->toBe([])
+        ->and($terms->fresh()->responses)->toBe([['condition' => ['credits' => ['atLeast' => 1]], 'effects' => [['type' => 'showText', 'text' => 'It clicks.']]]])
         ->and($lockbox->fresh()->releases_items)->toBe([]);
 });
 

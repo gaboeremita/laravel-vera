@@ -20,9 +20,17 @@ class ActivityTermsFactory extends Factory
             'region_id' => Region::factory()->withLayout(),
             'object_id' => 'pool-lounger-1',
             'activity_id' => 'recline',
-            'cost' => 0,
-            'gives_credits' => 0,
-            'gives_items' => [],
+            'responses' => [],
         ];
+    }
+
+    /**
+     * One response that always runs, with these effects.
+     *
+     * @param  array<int, array<string, mixed>>  $effects
+     */
+    public function withEffects(array $effects, ?array $condition = null): static
+    {
+        return $this->state(fn (array $attributes) => ['responses' => [['condition' => $condition, 'effects' => $effects]]]);
     }
 }

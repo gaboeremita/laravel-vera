@@ -9,6 +9,7 @@ import { activityKind, nearestFreeSpot } from '../components/world/playerActivit
 import { claimSpot, holderUnder, releaseAllSpots, releaseSpot as releaseHeldSpot, stackTier } from '../components/world/spotOccupancy.js';
 import { floorAt, zoneChain } from '../components/world/worldLocation.js';
 import { formatAmount } from '../components/world/inventoryChanges.js';
+import { givesItem, likelyResponse, openingActivityId, needsAttempt, requiredItemIds, responseGives, responsePrice, responseTakes } from '../utils/activityResponses.js';
 
 const ACTIVITY_MS = 3000;
 const OCCUPANCY_REFRESH_MS = 500;
@@ -32,25 +33,24 @@ function availabilityText({ free, total, takenBy }) {
 	return takenBy.includes('YOU') ? 'IN USE · YOU' : `ALL ${total} TAKEN`;
 }
 
-function holds(inventory, itemId) {
+function holds(inventory, itemId, quantity = 1) {
 	const held = (inventory?.items ?? []).find((item) => item.itemId === itemId);
-	return !!held && (held.quantity === null || held.quantity >= 1);
+	return !!held && (held.quantity === null || held.quantity >= quantity);
 }
 
-/** What an activity with terms asks of the player, shaped like a character's request. */
+/** What the response the player is likely to get asks of them, shaped like a character's request. */
 function purchaseOf(object, row, inventory) {
-	const { terms } = row;
-	const held = new Map((inventory?.items ?? []).map((item) => [item.itemId, item.quantity]));
-	const hasRequired = !terms.requiredItemId || (held.has(terms.requiredItemId) && (held.get(terms.requiredItemId) === null || held.get(terms.requiredItemId) >= 1));
-	const hasCredits = inventory?.credits === null || (inventory?.credits ?? 0) >= terms.cost;
+	const { terms, response } = row;
+	const credits = responsePrice(response);
+	const takes = responseTakes(terms, response);
 	return {
 		id: `${object.id}:${row.id}`,
 		askedBy: object.name,
-		credits: terms.cost,
-		items: terms.requiredItemId && terms.consumesRequired ? [{ itemId: terms.requiredItemId, name: terms.requiredItemName, quantity: 1, cardImageUrl: terms.requiredItemImageUrl }] : [],
-		gives: terms.gives ?? [],
+		credits,
+		items: takes,
+		gives: responseGives(terms, response),
 		reason: row.name,
-		affordable: hasRequired && hasCredits,
+		affordable: response !== null && (inventory?.credits === null || (inventory?.credits ?? 0) >= credits) && takes.every((entry) => holds(inventory, entry.itemId, entry.quantity)),
 	};
 }
 
@@ -68,7 +68,7 @@ export function contextLineFor(layout, zone, { withFloor, includeZone = false })
  * The user's side of the world's activities: object and zone cards, starting
  * and leaving activities, and telling the residents who saw it.
  */
-export function usePlayerActivities({ world, worldId, sessionId, location, focusedObject, occupiedSpots: occupiedSpotsRef, playerState: playerStateRef, playerCommands: playerCommandsRef, residentPositions: residentPositionsRef, residentCommands: residentCommandsRef, collisionWorldRef, chatResident, actionSender: actionSenderRef, addToast, onInventory, onLearnedFacts, onNarration, inventory, onTalkToVendor }) {
+export function usePlayerActivities({ world, worldId, sessionId, location, focusedObject, occupiedSpots: occupiedSpotsRef, playerState: playerStateRef, playerCommands: playerCommandsRef, residentPositions: residentPositionsRef, residentCommands: residentCommandsRef, collisionWorldRef, chatResident, actionSender: actionSenderRef, addToast, onInventory, onLearnedFacts, onNarration, inventory, onTalkToVendor, objectStates, onObjectState }) {
 	const layout = world?.layout;
 	const withFloor = (layout?.floors?.length ?? 0) > 1;
 	const [card, setCard] = useState(null);
@@ -109,6 +109,9 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 				...uniqueActivities(cardObject).map((candidate) => {
 					const availability = spotAvailability(cardObject, candidate.id, occupancy, residentNames);
 					const terms = termsFor(cardObject.id, candidate.id);
+					const response = terms ? likelyResponse(terms, { inventory, objectState: objectStates?.[cardObject.id] }) : null;
+					const price = responsePrice(response);
+					const requiredItemId = terms ? requiredItemIds(terms)[0] : undefined;
 					return {
 						id: candidate.id,
 						kind: 'activity',
@@ -117,9 +120,10 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 						availability: availabilityText(availability),
 						taken: availability.free === 0 && !availability.takenBy.includes('YOU'),
 						terms,
-						price: terms?.cost > 0 ? `${terms.cost} CR` : null,
-						requires: terms?.requiredItemName ?? null,
-						needsAttempt: !!terms?.requirement,
+						response,
+						price: price > 0 ? `${price} CR` : null,
+						requires: requiredItemId !== undefined ? terms.items?.[requiredItemId]?.name ?? null : null,
+						needsAttempt: needsAttempt(terms),
 					};
 				}),
 				...(objectStock?.objectId === cardObject.id ? objectStock.takeable : []).map((item) => ({
@@ -180,14 +184,14 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 			onInventory?.(body.inventory);
 			onLearnedFacts?.(body.learnedFacts);
 			if (body.narration) onNarration?.(`${activityItem.name.toUpperCase()}`, { narration: body.narration, succeeded: body.allowed, changes: body.changes });
-			if (!body.allowed && body.reason) addToast(body.reason, 'info');
 			if (body.allowed) setStockVersion((version) => version + 1);
+			if (body.objectState) onObjectState?.(body.objectState);
 			return { allowed: body.allowed, action: body.action ?? null };
 		} catch (error) {
 			addToast(error.message || `Unable to ${activityItem.name.toLowerCase()}`, 'error');
 			return { allowed: false, action: null };
 		}
-	}, [worldId, sessionId, cardObjectId, regionId, onInventory, onLearnedFacts, onNarration, addToast]);
+	}, [worldId, sessionId, cardObjectId, regionId, onInventory, onLearnedFacts, onNarration, onObjectState, addToast]);
 
 	useEffect(() => {
 		if (!card) return undefined;
@@ -296,8 +300,9 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 				onTalkToVendor?.(vendor, actionLine({ activity: chosen, object: cardObject }));
 				return;
 			}
-			const supplierIndex = row.terms.requiredItemId && !holds(inventory, row.terms.requiredItemId)
-				? cardView.rows.findIndex((candidate) => candidate.kind === 'activity' && candidate.terms?.gives?.some((given) => given.itemId === row.terms.requiredItemId))
+			const missingItemId = requiredItemIds(row.terms).find((itemId) => !holds(inventory, itemId));
+			const supplierIndex = missingItemId !== undefined
+				? cardView.rows.findIndex((candidate) => candidate.kind === 'activity' && candidate.terms && givesItem(candidate.terms, missingItemId))
 				: -1;
 			if (supplierIndex >= 0) {
 				const supplierRow = cardView.rows[supplierIndex];
@@ -320,7 +325,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 				return;
 			}
 			setAttemptIndex(null);
-			if (row.terms.cost > 0 && !confirmed) {
+			if (responsePrice(row.response) > 0 && !confirmed) {
 				setPendingPurchase({ index, attempt: attempt ?? null });
 				return;
 			}
@@ -396,6 +401,23 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 	}, [occupiedSpotsRef]);
 	const closeCard = useCallback(() => setCard(null), []);
 
+	const bumpChoice = useRef(null);
+	/** Walking into a blocking object chooses its opening activity, as if the player had opened its card and picked it. */
+	const bumpInto = useCallback((objectId) => {
+		const activityId = openingActivityId(world?.activityTerms, objectId);
+		if (!activityId) return;
+		bumpChoice.current = { objectId, activityId };
+		openObjectCard(objectId);
+	}, [world, openObjectCard]);
+
+	useEffect(() => {
+		const choice = bumpChoice.current;
+		if (!choice || choice.objectId !== cardObjectId || !cardView) return;
+		bumpChoice.current = null;
+		const index = cardView.rows.findIndex((row) => row.kind === 'activity' && row.id === choice.activityId);
+		if (index >= 0) void start(index);
+	}, [cardObjectId, cardView, start]);
+
 	useEffect(() => {
 		const rowCount = cardView?.rows.length ?? 0;
 		const keyDown = (event) => {
@@ -458,6 +480,7 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 		submitAttempt: (text) => { if (attemptIndex !== null) void start(attemptIndex, text); },
 		cancelAttempt: () => setAttemptIndex(null),
 		closeCard,
+		bumpInto,
 		activity,
 		getUp,
 		cancel,

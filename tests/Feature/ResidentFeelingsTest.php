@@ -29,7 +29,9 @@ it('tells the resident how they feel about the user, starting neutral, and lets 
 
     sendWorldMessage($this, $scenario, feelingsPositions($resident))->assertOk();
 
-    expect(feelingsPromptSent())->toContain('How you feel about the user right now, each from -10 to 10 with 0 as neutral: romance 0, trust 0, liking 0.')
+    expect(feelingsPromptSent())->toContain('Everyone starts at 0, a neutral feeling either way.')
+        ->toContain('- Trust: -10 is expecting betrayal from them at every turn; 10 is trusting them with your life and your secrets.')
+        ->toContain('Right now: romance 0, trust 0, liking 0. Read each value against its scale')
         ->toContain('Keep the numbers to yourself')
         ->toContain('call adjust_feelings in that same reply')
         ->and(collect(Http::recorded()[0][0]['tools'])->pluck('function.name'))->toContain('adjust_feelings')

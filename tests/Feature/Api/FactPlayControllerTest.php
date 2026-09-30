@@ -73,7 +73,8 @@ it('learns a fact linked to an item when the player examines it, with the narrat
 
 it('learns nothing from an activity whose requirement is not met', function () {
     [$user, , , $region, , $session, , , $fact] = playScenario();
-    ActivityTerms::factory()->create(['region_id' => $region->id, 'object_id' => 'pool-lounger-1', 'activity_id' => 'recline', 'requirement' => 'only for guild members', 'reveals_fact_id' => $fact->id]);
+    ActivityTerms::factory()->withEffects([['type' => 'revealFact', 'fact' => $fact->id]], ['narrator' => ['requirement' => 'only for guild members', 'outcome' => '']])
+        ->create(['region_id' => $region->id, 'object_id' => 'pool-lounger-1', 'activity_id' => 'recline']);
     fakeTurn(toolCallResponse('call_1', 'narrate', ['succeeded' => false, 'narration' => 'The attendant shoos you away.', 'action' => 'is turned away']));
 
     $this->actingAs($user)->postJson(route('worlds.sessions.activity-uses.store', [$region->world_id, $session->id]), [

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import Accordion from './common/Accordion.jsx';
 import ActivityTermsEditor from './ActivityTermsEditor.jsx';
 import StartingInventoryEditor from './StartingInventoryEditor.jsx';
+import useQuestOptions from '../hooks/useQuestOptions.js';
+import { blockingObjectIds } from '../utils/activityResponses.js';
 
 function uniqueActivities(object) {
 	const seen = new Map();
@@ -11,13 +13,14 @@ function uniqueActivities(object) {
 	return [...seen.values()];
 }
 
-function ObjectRow({ worldId, region, object, residents, inventoryConfig, onTermsChange, addToast }) {
+function ObjectRow({ worldId, region, object, residents, inventoryConfig, conditionOptions, onTermsChange, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const stock = inventoryConfig.starting.objects[region.id]?.[object.id];
 	const activities = uniqueActivities(object);
 	const termsFor = (activityId) => (region.activityTerms ?? []).find((terms) => terms.objectId === object.id && terms.activityId === activityId) ?? null;
 	const stockedCount = stock?.items?.length ?? 0;
 	const termsCount = activities.filter((activity) => termsFor(activity.id)).length;
+	const blocks = blockingObjectIds(region.activityTerms).has(object.id);
 
 	return (
 		<Accordion
@@ -27,11 +30,13 @@ function ObjectRow({ worldId, region, object, residents, inventoryConfig, onTerm
 			badge={
 				<span className="flex gap-1">
 					{stockedCount > 0 && <span className="border border-line-1 px-1.5 py-0.5 text-[0.6rem] tracking-[0.1em] text-fg-3">{stockedCount} ITEM{stockedCount === 1 ? '' : 'S'}</span>}
+					{blocks && <span className="border border-accent/40 px-1.5 py-0.5 text-[0.6rem] tracking-[0.1em] text-accent">BLOCKS</span>}
 					{termsCount > 0 && <span className="border border-accent/40 px-1.5 py-0.5 text-[0.6rem] tracking-[0.1em] text-accent">{termsCount} WITH TERMS</span>}
 				</span>
 			}
 		>
 			{object.description && <p className="text-fg-3 text-xs">{object.description}</p>}
+			{blocks && <p className="text-fg-3 text-xs">A response makes it passable, so its meshes block the player until that response runs. Residents walk through.</p>}
 			<div>
 				<p className="text-fg-3 text-[0.65rem] tracking-[0.15em] mb-3">STOCK <span className="normal-case tracking-normal">— what it holds at the start of every session; mark items the player can take</span></p>
 				<StartingInventoryEditor
@@ -48,21 +53,22 @@ function ObjectRow({ worldId, region, object, residents, inventoryConfig, onTerm
 				/>
 			</div>
 			<div className="border-t border-line-1 pt-4 space-y-2">
-				<p className="text-fg-3 text-[0.65rem] tracking-[0.15em]">ACTIVITIES <span className="normal-case tracking-normal">— what each one requires, costs and gives</span></p>
+				<p className="text-fg-3 text-[0.65rem] tracking-[0.15em]">ACTIVITIES <span className="normal-case tracking-normal">— what happens when the player uses each one</span></p>
 				{activities.length === 0 ? (
 					<p className="text-fg-3 text-xs">This object offers no activities.</p>
 				) : activities.map((activity) => (
-					<ActivityTermsEditor key={activity.id} worldId={worldId} regionId={region.id} objectId={object.id} activity={activity} terms={termsFor(activity.id)} items={inventoryConfig.items} facts={inventoryConfig.facts} residents={residents} onSaved={onTermsChange} addToast={addToast} />
+					<ActivityTermsEditor key={activity.id} worldId={worldId} regionId={region.id} objectId={object.id} activity={activity} terms={termsFor(activity.id)} items={inventoryConfig.items} facts={inventoryConfig.facts} residents={residents} options={conditionOptions} onSaved={onTermsChange} addToast={addToast} />
 				))}
 			</div>
 		</Accordion>
 	);
 }
 
-/** Every object of the region's environment: its stock and its activities' terms. */
+/** Every object of the region's environment: its stock and what its activities do. */
 export default function RegionObjectsEditor({ worldId, region, residents = [], inventoryConfig, onTermsChange, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const objects = region.layout?.objects ?? [];
+	const { options: conditionOptions } = useQuestOptions(worldId, addToast);
 
 	return (
 		<Accordion label="OBJECTS" collapsed={collapsed} onToggle={() => setCollapsed((current) => !current)} actions={<span className="text-fg-3 text-xs">{objects.length}</span>}>
@@ -71,7 +77,7 @@ export default function RegionObjectsEditor({ worldId, region, residents = [], i
 			) : (
 				<div className="space-y-2">
 					{objects.map((object) => (
-						<ObjectRow key={object.id} worldId={worldId} region={region} object={object} residents={residents} inventoryConfig={inventoryConfig} onTermsChange={onTermsChange} addToast={addToast} />
+						<ObjectRow key={object.id} worldId={worldId} region={region} object={object} residents={residents} inventoryConfig={inventoryConfig} conditionOptions={conditionOptions} onTermsChange={onTermsChange} addToast={addToast} />
 					))}
 				</div>
 			)}

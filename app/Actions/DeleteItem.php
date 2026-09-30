@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Actions\Activities\ResponseItems;
 use App\Models\ActivityTerms;
 use App\Models\Item;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +12,7 @@ class DeleteItem
 {
     /**
      * Removes the item from every list that names it by id, then deletes it;
-     * inventories, starting inventories and requirements follow through their foreign keys.
+     * inventories and starting inventories follow through their foreign keys.
      */
     public function handle(Item $item): void
     {
@@ -19,7 +20,7 @@ class DeleteItem
             $withoutItem = fn (?array $entries) => collect($entries ?? [])->reject(fn (array $entry) => (int) $entry['itemId'] === $item->id)->values()->all();
 
             ActivityTerms::whereIn('region_id', $item->world->regions()->select('id'))->get()
-                ->each(fn (ActivityTerms $terms) => $terms->update(['gives_items' => $withoutItem($terms->gives_items)]));
+                ->each(fn (ActivityTerms $terms) => $terms->update(['responses' => app(ResponseItems::class)->without($terms->responseList(), $item->id)]));
             Item::where('world_id', $item->world_id)->whereKeyNot($item->id)->get()
                 ->each(fn (Item $other) => $other->update(['releases_items' => $withoutItem($other->releases_items)]));
 
@@ -45,7 +46,7 @@ class DeleteItem
         return DB::table('inventory_items')->where('item_id', $item->id)->count()
             + DB::table('starting_inventory_items')->where('item_id', $item->id)->count()
             + ActivityTerms::whereIn('region_id', $item->world->regions()->select('id'))->get()
-                ->filter(fn (ActivityTerms $terms) => $terms->required_item_id === $item->id || $named($terms->gives_items))->count()
+                ->filter(fn (ActivityTerms $terms) => in_array($item->id, app(ResponseItems::class)->ids($terms->responseList()), true))->count()
             + Item::where('world_id', $item->world_id)->whereKeyNot($item->id)->get()->filter(fn (Item $other) => $named($other->releases_items))->count();
     }
 }
