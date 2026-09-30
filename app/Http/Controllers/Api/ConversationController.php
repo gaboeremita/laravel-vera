@@ -556,6 +556,7 @@ class ConversationController extends Controller
 
                 $agentToolCalls = $agentResult->toolCalls;
                 $response = new LlmResponse(content: $agentResult->content, thinking: $agentResult->thinking);
+                $usage = $agentResult->usage;
             } else {
                 $response = $llm->chat(
                     messages: [
@@ -564,6 +565,7 @@ class ConversationController extends Controller
                     ],
                     options: $tts?->llmOptions() ?? [],
                 );
+                $usage = $response->usage !== null ? [$response->usage] : [];
             }
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 502);
@@ -619,6 +621,8 @@ class ConversationController extends Controller
             'conversation_id' => $conversation->id,
             'content' => $content,
             'thinking' => $response->thinking,
+            'system_prompt' => $systemPrompt,
+            'usage' => $usage,
             'tts_instructions' => $ttsInstructions,
             'tool_calls' => $agentToolCalls,
             'action' => $action,

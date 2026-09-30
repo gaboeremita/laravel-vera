@@ -111,6 +111,59 @@ const markdownComponents = {
     ),
 };
 
+function addUsage(totals, usage) {
+    for (const [key, value] of Object.entries(usage)) {
+        if (typeof value === 'number') {
+            totals[key] = (totals[key] ?? 0) + value;
+        } else if (value !== null && typeof value === 'object') {
+            totals[key] = addUsage(totals[key] ?? {}, value);
+        }
+    }
+
+    return totals;
+}
+
+function sumUsage(usageCalls) {
+    return usageCalls.reduce((totals, usage) => addUsage(totals, usage), {});
+}
+
+function orderUsageEntries(usage) {
+    const detailsKeyOf = (key) => `${key}_details`;
+    const isAttachedDetails = (key) => key.endsWith('_details') && key.slice(0, -'_details'.length) in usage;
+
+    return Object.entries(usage).flatMap(([key, value]) => {
+        if (isAttachedDetails(key)) {
+            return [];
+        }
+
+        return detailsKeyOf(key) in usage ? [[key, value], [detailsKeyOf(key), usage[detailsKeyOf(key)]]] : [[key, value]];
+    });
+}
+
+function formatUsageValue(value) {
+    return typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 10 }) : String(value);
+}
+
+function formatUsageLines(usage, depth) {
+    const indent = '  '.repeat(depth);
+
+    return orderUsageEntries(usage)
+        .map(([key, value]) => (value !== null && typeof value === 'object'
+            ? `${indent}${key}\n${formatUsageLines(value, depth + 1)}`
+            : `${indent}${key}: ${formatUsageValue(value)}`))
+        .join('\n');
+}
+
+function formatUsage(usageCalls) {
+    if (usageCalls.length === 1) {
+        return formatUsageLines(usageCalls[0], 0);
+    }
+
+    const calls = usageCalls.map((usage, index) => `Call ${index + 1}\n${formatUsageLines(usage, 1)}`);
+
+    return [...calls, `Total\n${formatUsageLines(sumUsage(usageCalls), 1)}`].join('\n\n');
+}
+
 function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
     const isAssistant = msg.role === 'assistant';
 
@@ -122,6 +175,12 @@ function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
 
             {isAssistant && msg.thinking && (
                 <ThinkingBlock content={msg.thinking} label={msg.image ? 'Image Prompt' : 'Thinking Process'} />
+            )}
+            {isAssistant && msg.systemPrompt && (
+                <ThinkingBlock content={msg.systemPrompt} label={`Prompt sent · ${msg.systemPrompt.length.toLocaleString()} characters · ~${Math.round(msg.systemPrompt.length / 4).toLocaleString()} tokens`} plain />
+            )}
+            {isAssistant && msg.usage?.length > 0 && (
+                <ThinkingBlock content={formatUsage(msg.usage)} label="Usage" plain />
             )}
             {isAssistant && msg.ttsInstructions && <VoiceInstructionsBlock content={msg.ttsInstructions} />}
             {isAssistant && msg.toolCalls && <AgentToolCallsTrace toolCalls={msg.toolCalls} />}

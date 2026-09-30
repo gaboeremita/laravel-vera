@@ -5,6 +5,7 @@ namespace App\Services\AgentLoop;
 use App\Contracts\AgentTool;
 use App\Contracts\LlmProvider;
 use App\DTOs\AgentRunResult;
+use App\DTOs\LlmResponse;
 use App\DTOs\ToolCallRequest;
 use App\Models\Assistant;
 use App\Models\Conversation;
@@ -35,17 +36,22 @@ class AgentLoopRunner
         $step = 0;
         $toolCallsSummary = [];
         $thinkingSteps = [];
+        $usage = [];
 
         try {
             while ($step < $stepLimit) {
                 $response = $this->provider->chat($messages, tools: $toolDefinitions);
+
+                if ($response->usage !== null) {
+                    $usage[] = $response->usage;
+                }
 
                 if (filled($response->thinking)) {
                     $thinkingSteps[] = $response->thinking;
                 }
 
                 if ($response->isFinal()) {
-                    return new AgentRunResult($response->content, $toolCallsSummary, $this->joinThinking($thinkingSteps));
+                    return new AgentRunResult($response->content, $toolCallsSummary, $this->joinThinking($thinkingSteps), $usage);
                 }
 
                 $messages[] = [
@@ -94,6 +100,7 @@ class AgentLoopRunner
                                 "I wasn't able to complete this task after a few different attempts — {$e->getMessage()}",
                                 $toolCallsSummary,
                                 $this->joinThinking($thinkingSteps),
+                                $usage,
                             );
                         }
                     }
@@ -104,7 +111,13 @@ class AgentLoopRunner
                 }
             }
 
-            return new AgentRunResult($this->requestFinalSummary($messages), $toolCallsSummary, $this->joinThinking($thinkingSteps));
+            $summary = $this->requestFinalSummary($messages);
+
+            if ($summary->usage !== null) {
+                $usage[] = $summary->usage;
+            }
+
+            return new AgentRunResult($summary->content, $toolCallsSummary, $this->joinThinking($thinkingSteps), $usage);
         } finally {
             $this->clearProgress($conversation->id);
         }
@@ -213,14 +226,14 @@ class AgentLoopRunner
     /**
      * @param  array<int, array<string, mixed>>  $messages
      */
-    private function requestFinalSummary(array $messages): string
+    private function requestFinalSummary(array $messages): LlmResponse
     {
         $messages[] = [
             'role' => 'user',
             'content' => "You've reached the maximum number of steps allowed for this task. Summarize what you've found or accomplished so far, and explain what's left undone.",
         ];
 
-        return $this->provider->chat($messages)->content;
+        return $this->provider->chat($messages);
     }
 
     /**

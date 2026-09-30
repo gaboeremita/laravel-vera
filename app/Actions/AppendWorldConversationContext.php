@@ -54,7 +54,7 @@ class AppendWorldConversationContext
                 ? $this->buildResidentWorldPrompt->postAwareness()
                 : $this->buildResidentWorldPrompt->worldAwareness();
             if (! $atPost) {
-                $prompt['world_places'] = ['title' => 'Places in this world', 'available places' => $this->buildResidentWorldPrompt->availablePlaces($region)];
+                $prompt['world_places'] = ['title' => 'Places in this world', ...$this->buildResidentWorldPrompt->availablePlaces($region)];
             }
         }
 

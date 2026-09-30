@@ -44,7 +44,9 @@ it('offers a resident who keeps to an area every place, telling them which lie o
 
     $tools = collect(Http::recorded()[0][0]['tools'])->keyBy('function.name');
     expect($tools['go_to']['function']['parameters']['properties']['target']['enum'])->toContain('studio')->toContain('pool-terrace')
-        ->and(sentSystemPrompt())->toContain('Pool terrace [pool-terrace] (Ground floor), outside the area you keep to: you go there only when the user asks you to');
+        ->and(sentSystemPrompt())
+        ->toContain("Available places:\nGround floor: Music studio [studio], Vocal booth [vocal-booth]")
+        ->toContain("Outside the area you keep to, so you go there only when the user asks you to:\nGround floor: Pool terrace [pool-terrace]\nUpper floor: Gallery [gallery]");
 });
 
 it('gives an NPC who stays put only the tools that tell her about the place and the trading tools, and tells her she keeps to her post', function (string $behavior) {
