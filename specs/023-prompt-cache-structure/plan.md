@@ -72,7 +72,6 @@ specs/023-prompt-cache-structure/
 
 ```text
 app/
-├── Enums/PromptGroup.php                         # new
 ├── Enums/TurnSection.php                         # new: cases + heading()
 ├── DTOs/PromptLayout.php                         # new
 ├── Directors/PromptDirector.php                  # groups, addOccasional/addToTurn, build(): PromptLayout, memory parts, rule sections
@@ -113,6 +112,7 @@ tests/
 ├── Feature/ProviderCacheMarksTest.php            # new: wire format per provider and setting, identifier field, Anthropic usage
 ├── Feature/AiModelCachingSettingsTest.php        # new: validation and persistence
 ├── Feature/SummarizeConversationOrderTest.php    # new: appended at the end, existing text untouched
+├── Feature/PromptCachingTurnsTest.php            # new: two-turn byte identity, identifier, per-path history limits, tool order
 └── Unit/PromptDirectorVoiceModeTest.php          # updated for the new voice placement
 ```
 
@@ -148,7 +148,6 @@ Approved by the owner.
 
 | Proposed name | Refers to |
 |---|---|
-| `PromptGroup` (`Unchanging`, `Occasional`, `PerTurn`) | The three prompt groups |
 | `TurnSection` (`CurrentState`, `RecentActivity`, `RetrievedKnowledge`, `RelationshipState`) | The per-turn headings already approved |
 | `PromptLayout` | The built prompt, split by group |
 | `ComposeChatRequest` | The action that assembles the request with cache points |

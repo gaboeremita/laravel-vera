@@ -81,7 +81,7 @@ The rule that retrieved knowledge and memory are reference material only, never 
 - **A conversation's memory was written before this change**: it keeps its newest-first order. New summaries are added after it from then on.
 - **Summarization finishes in the background between two turns**: this is handled like any other summarization.
 - **The owner edits the memory by hand**: the memory is re-read once from the first edited point onward.
-- **The conversation has no memory yet, or memory is empty**: there is no memory heading, and the request marks only the first cache point.
+- **The conversation has no memory yet, or memory is empty**: there is no memory heading and no memory cache point.
 - **Lists whose order could vary between turns** (available places, poses, Discord participants, tool definitions): they must come out in the same order every time for the same underlying data.
 - **The provider or model does not support caching or ignores the conversation identifier**: replies behave exactly as before, with no errors and no change in content.
 - **The model reads the tool definitions before the system prompt**: the tool definitions must be sent in a stable order. When the set of tools differs between turns (for example, turn mode adds or removes a tool), the cache restarts from that point. That is acceptable and needs no workaround.
@@ -110,7 +110,7 @@ The rule that retrieved knowledge and memory are reference material only, never 
 - **FR-010**: Each request to the model provider MUST carry an identifier unique to the conversation. All turns of that conversation, and every step of a multi-step tool loop within a turn, MUST send the same identifier, so the provider can route them to the same cache.
 - **FR-011**: Tool definitions MUST be sent in a stable order for the same set of tools.
 - **FR-012**: Every place where an assistant replies as itself MUST follow this ordering: web chat, voice, Telegram, Discord, resident-to-resident conversation turns, quest rewards, and resident decisions.
-- **FR-013**: The change MUST NOT alter what the assistant is told, only where and how often it is told. Every instruction present today must still be present after the change, apart from the repeated wording that FR-008 and FR-009 merge into one.
+- **FR-013**: The change MUST NOT alter what the assistant is told, only where and how often it is told. Every instruction present today must still be present after the change, apart from the repeated wording that FR-008 and FR-009 merge into one. Previous messages are sent the same way on every path, as web chat sends them today: assistant messages without their expression control tags.
 - **FR-014**: For providers that only cache when told where the reusable part ends (for example, Anthropic and Gemini models, including when reached through OpenRouter), each request MUST mark up to three cache points: at the end of the unchanging group, at the end of the changes-occasionally group, and at the end of the previous messages. A point whose group is empty is not marked. Providers that cache automatically MUST receive requests that work unchanged, whether they use the marks or ignore them.
 - **FR-015**: The long-term memory block MUST contain only the conversation's memory text, under its own heading, with the rule from FR-008 covering it. This applies everywhere memory is included, including when a resident's conversation turn with another resident brings in the memory of the resident's chat with the user.
 - **FR-016**: Between two summarizations or manual memory edits, the memory text in the prompt MUST be character-for-character identical from turn to turn, so the second cache point keeps being reused.
@@ -143,6 +143,7 @@ The rule that retrieved knowledge and memory are reference material only, never 
 - The author's own sections are kept in the order the author stored them. The headings proposed in the input (Identity, Personality, Appearance, and so on) come from the author's section names, and the system does not impose a fixed category order on them.
 - Rewriting or compressing the character's own text is out of scope. Duplicate pose-tag explanations the author wrote into their own sections (such as a "Critical Rule - Pose Tags" section) are theirs to remove by editing the assistant.
 - The conversation identifier only enables reuse on providers that support it. Other providers ignore it.
+- Whether a model needs cache marks, and the name of its conversation identifier field, are set per model in its settings. Marks and the identifier are sent only for models configured that way.
 - Memory keeps its current summarization schedule and its current editor. Memories that already exist are not reordered.
 - Providers that need cache marks only reuse a cached part when the request still has a mark at exactly the point where that part ended before. Meeting FR-018 on those providers therefore depends on where the earlier memory ends in the request. The plan settles how.
 - The summarization request itself is out of scope. It is a separate, short request.

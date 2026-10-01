@@ -27,7 +27,7 @@ The names introduced below (classes, enums, columns, request keys, UI labels) ar
 
 ## R4. Prompt groups and headings
 
-- **Decision**: `PromptDirector` keeps one ordered list of sections per group, using a `PromptGroup` enum with the cases `Unchanging`, `Occasional`, and `PerTurn`.
+- **Decision**: `PromptDirector` keeps one ordered list of sections per group: unchanging, occasional, and per turn.
   - The existing `append()`, `insertAfter()`, `only()`, and `except()` methods keep working on the unchanging group, which is where the author's sections live.
   - New methods add to the other two groups: `addOccasional(key, value)` and `addToTurn(TurnSection, key, value)`.
   - `TurnSection` is an enum with the cases `CurrentState`, `RecentActivity`, `RetrievedKnowledge`, and `RelationshipState`. Its case order is the render order, and each case has a heading.

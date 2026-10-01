@@ -25,10 +25,6 @@ A new `AiModelFactory` (none exists yet) has two states, one with `cache_marks` 
 
 ## Values built per request (not stored)
 
-### `PromptGroup` (enum)
-
-`Unchanging`, `Occasional`, `PerTurn`. The case order is the render order.
-
 ### `TurnSection` (enum)
 
 | Case | Heading |
@@ -75,5 +71,7 @@ Provider translation:
 The start index is `max(0, floor((N - J) / J) * J)` over the `N` previous messages ordered by id.
 
 ### Conversation identifier
+
+The spec's "conversation identifier" is the value of `providerSessionKey()`, passed to providers as `$conversationKey`.
 
 `Conversation::providerSessionKey()` is an HMAC-SHA256 of `conversation:{id}` using the app key, as 64 hex characters.

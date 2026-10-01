@@ -3,7 +3,7 @@
 ## Automated checks
 
 ```bash
-php artisan test --compact --filter='PromptLayout|PromptDirector|ComposeChatRequest|ConversationHistory|ProviderCacheMarks|SummarizeConversation|AiModelCachingSettings'
+php artisan test --compact --filter='PromptLayout|PromptDirector|ComposeChatRequest|ConversationHistory|ProviderCacheMarks|SummarizeConversation|AiModelCachingSettings|PromptCachingTurns'
 ```
 
 Expected:
