@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\BuildConversationHistory;
+use App\Actions\ComposeChatRequest;
 use App\Actions\TermRules\MarkTermRules;
 use App\Directors\PromptDirector;
 use App\Exceptions\TelegramApiException;
@@ -232,28 +234,18 @@ class TelegramPollCommand extends Command
 
         $this->telegram->sendTypingAction($chatId);
 
-        $conversation->messages()->create([
+        $message = $conversation->messages()->create([
             'role' => 'user',
             'content' => $text,
         ]);
 
-        $history = $conversation->messages()
-            ->orderBy('created_at')
-            ->get(['role', 'content'])
-            ->map(fn ($m) => ['role' => $m->role, 'content' => $m->content])
-            ->toArray();
-
-        if ($image && count($history) > 0) {
-            $lastIndex = array_key_last($history);
-            $history[$lastIndex]['images'] = [$image];
-        }
-
         $markedMessage = app(MarkTermRules::class)->forAssistant($this->assistant, $text);
-        if ($markedMessage !== null && count($history) > 0) {
-            $history[array_key_last($history)]['content'] = $markedMessage->text;
-        }
+        $currentMessage = [
+            'role' => 'user',
+            'content' => $markedMessage?->text ?? $text,
+            ...($image ? ['images' => [$image]] : []),
+        ];
 
-        // Load prompt from assistant
         $director = new PromptDirector($this->assistant->prompt);
         $archive = $this->assistant->archive;
 
@@ -261,16 +253,16 @@ class TelegramPollCommand extends Command
             $director->withRetrieval($text, $archive->id);
         }
 
-        $systemPrompt = $director
+        $layout = $director
             ->except(['emotion tags', 'opening_message'])
             ->build();
 
         try {
             $llm = (new LlmManager)->forAssistantUser($this->assistantUser);
-            $response = $llm->chat([
-                ['role' => 'system', 'content' => $systemPrompt],
-                ...$history,
-            ]);
+            $response = $llm->chat(
+                messages: app(ComposeChatRequest::class)->handle($layout, app(BuildConversationHistory::class)->handle($conversation, $this->assistant, $message->id), $currentMessage),
+                conversationKey: $conversation->providerSessionKey(),
+            );
         } catch (\Throwable $e) {
             $this->error("LLM error: {$e->getMessage()}");
             Log::error('Telegram LLM request failed', [

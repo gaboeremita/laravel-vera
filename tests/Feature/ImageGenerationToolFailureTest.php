@@ -18,7 +18,7 @@ test('a failing image generation surfaces a clear failure instead of hanging', f
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'show me a cat']]],
+        ['message' => ['content' => 'show me a cat']],
     );
 
     $response->assertSuccessful();

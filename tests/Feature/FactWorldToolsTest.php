@@ -40,7 +40,7 @@ function factChatPositions(array $scenario): array
 
 function systemPromptOfRequest(int $index = 0): string
 {
-    return collect(Http::recorded()[$index][0]['messages'])->firstWhere('role', 'system')['content'] ?? '';
+    return promptOfRequest($index);
 }
 
 /**
@@ -200,7 +200,7 @@ it('gives holders the secret on out-of-character turns, keeps the OOC text, and 
         finalAnswerResponse('You heard he rowed out.'),
     );
 
-    sendWorldMessage($this, $scenario, factChatPositions($scenario), ['messages' => [['role' => 'user', 'content' => '[OOC: what is your secret about the keeper?]']]])->assertOk();
+    sendWorldMessage($this, $scenario, factChatPositions($scenario), ['message' => ['content' => '[OOC: what is your secret about the keeper?]']])->assertOk();
 
     expect(systemPromptOfRequest())->toContain(KEEPER_SECRET)
         ->and(collect(Http::recorded()[0][0]['messages'])->last()['content'])->toContain('[OOC: what is your secret')

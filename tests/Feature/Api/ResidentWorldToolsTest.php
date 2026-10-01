@@ -195,7 +195,7 @@ it('gives NPCs the world tools on the default model', function () {
     fakeTurn(toolCallResponse('call_1', 'go_to', ['target' => 'studio']), finalAnswerResponse('This way.'));
 
     $this->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $npc->id, 'id' => $conversation->id]), [
-        'messages' => [['role' => 'user', 'content' => 'Show me the studio.']],
+        'message' => ['content' => 'Show me the studio.'],
         'worldId' => $world->world_id, 'regionId' => $world->id,
     ])->assertSuccessful()->assertJsonPath('action.target', 'studio');
 
@@ -309,7 +309,7 @@ it('runs an NPC on the model chosen for it instead of the default', function () 
     ]);
 
     $this->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $npc->id, 'id' => $conversation->id]), [
-        'messages' => [['role' => 'user', 'content' => 'Hello.']],
+        'message' => ['content' => 'Hello.'],
         'worldId' => $world->world_id, 'regionId' => $world->id,
     ])->assertSuccessful()->assertJsonPath('content', 'Hi.');
 });

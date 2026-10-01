@@ -28,9 +28,9 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
 
 **Purpose**: Per-model caching settings and test data
 
-- [ ] T001 Create a migration with `php artisan make:migration add_caching_settings_to_ai_models_table --table=ai_models --no-interaction` that adds `cache_marks` (boolean, default false, after `supports_tools`) and `conversation_key_field` (string, nullable, after `cache_marks`), with a `down()` that drops both, in `database/migrations/`
-- [ ] T002 [P] Add `'cache_marks' => 'boolean'` to the casts in `app/Models/AiModel.php`, and make both new columns mass-assignable the same way `supports_tools` and `thinking_key` are
-- [ ] T003 [P] Create `database/factories/AiModelFactory.php` (`php artisan make:factory AiModelFactory --model=AiModel --no-interaction`) with a default that belongs to an `AiProvider` and sets `endpoint`, `supports_tools` false, `cache_marks` false and `conversation_key_field` null. Add the states `cacheMarks()` and `conversationKeyField(string $field = 'session_id')`. If no `AiProviderFactory` exists, create it with `format` `generic` plus an `anthropic()` state. Add `HasFactory` to the models if missing.
+- [X] T001 Create `database/migrations/2026_10_01_120000_add_caching_settings_to_ai_models_table.php` that adds `cache_marks` (boolean, default false) and `conversation_key_field` (string, nullable) to `ai_models`, with a `down()` that drops both
+- [X] T002 [P] Add `'cache_marks' => 'boolean'` to the casts in `app/Models/AiModel.php`, and make both new columns mass-assignable the same way `supports_tools` and `thinking_key` are
+- [X] T003 [P] Create `database/factories/AiModelFactory.php` with a default that belongs to an `AiProvider` and sets `endpoint`, `supports_tools` false, `cache_marks` false and `conversation_key_field` null, plus the states `cacheMarks()` and `conversationKeyField(string $field = 'session_id')`. Create `database/factories/AiProviderFactory.php` with `format` `generic` and an `anthropic()` state. Add `HasFactory` to `AiModel` and `AiProvider`.
 
 ---
 
@@ -42,7 +42,7 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
 
 ### Tests for the foundation
 
-- [ ] T004 [P] Write `tests/Feature/ProviderCacheMarksTest.php` with `Http::fake` capturing request bodies. Cover:
+- [X] T004 [P] Write `tests/Feature/ProviderCacheMarksTest.php` with `Http::fake` capturing request bodies. Cover:
   - `GenericProvider` with `cache_marks` off joins text parts with `\n\n` into plain strings, byte-identical to sending the joined string.
   - `GenericProvider` with `cache_marks` on sends content arrays with `cache_control: {type: 'ephemeral'}` on exactly the parts flagged `cachePoint`.
   - `AnthropicProvider` sends `system` as text blocks and message content as blocks, with `cache_control` only when `cache_marks` is on.
@@ -54,26 +54,26 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
 
 ### Implementation for the foundation
 
-- [ ] T005 [P] Create `app/Enums/TurnSection.php`, a string-backed enum with the cases `CurrentState`, `RecentActivity`, `RetrievedKnowledge`, and `RelationshipState` in render order. Add `heading(): string` returning `CURRENT STATE`, `RECENT ACTIVITY`, `RETRIEVED KNOWLEDGE`, and `RELATIONSHIP STATE`.
-- [ ] T006 [P] Create `app/DTOs/PromptLayout.php`, a readonly constructor-promoted value object holding `string $unchanging`, `list<string> $occasionalParts`, and `string $turn`. Methods:
+- [X] T005 [P] Create `app/Enums/TurnSection.php`, a string-backed enum with the cases `CurrentState`, `RecentActivity`, `RetrievedKnowledge`, and `RelationshipState` in render order. Add `heading(): string` returning `CURRENT STATE`, `RECENT ACTIVITY`, `RETRIEVED KNOWLEDGE`, and `RELATIONSHIP STATE`.
+- [X] T006 [P] Create `app/DTOs/PromptLayout.php`, a readonly constructor-promoted value object holding `string $unchanging`, `list<string> $occasionalParts`, and `string $turn`. Methods:
   - `unchanging()`, `occasionalParts()`, `turn()`
   - `fullText()`: every non-empty piece joined with `\n\n`
-- [ ] T007 [P] Add `providerSessionKey(): string` to `app/Models/Conversation.php`, returning `hash_hmac('sha256', "conversation:{$this->id}", config('app.key'))`
-- [ ] T008 Update the docblock of `app/Contracts/LlmProvider.php`:
+- [X] T007 [P] Add `providerSessionKey(): string` to `app/Models/Conversation.php`, returning `hash_hmac('sha256', "conversation:{$this->id}", config('app.key'))`
+- [X] T008 Update the docblock of `app/Contracts/LlmProvider.php`:
   - `content` may be `string|null|list<array{type: 'text', text: string, cachePoint?: bool}>`.
   - `chat()` gains a trailing `?string $conversationKey = null`.
 
   Update `chat()` in both providers to accept it.
-- [ ] T009 Update `app/Services/LlmProviders/GenericProvider.php`:
+- [X] T009 Update `app/Services/LlmProviders/GenericProvider.php`:
   - Take `bool $cacheMarks` and `?string $conversationKeyField` in the constructor, filled in `fromModel()` from `$aiModel->cache_marks` and `$aiModel->conversation_key_field`.
-  - In `formatMessage()`, map parts content to `[{type:'text', text, cache_control?}]` when `cacheMarks` is on, or join the text with `\n\n` when it is off. Keep the existing image and tool branches working with parts content: images are appended after the text parts, and a tool-call message's content is joined.
+  - Format parts content through a new shared `app/Services/LlmProviders/PromptParts.php`: `join()` gives the parts' text joined with `\n\n`, `blocks()` gives text blocks with `cache_control` on cache points when marks are on, and `format()` picks between the two by the setting. Images are appended after the text blocks, and a tool-call message's content is joined.
   - Add `[$conversationKeyField => $conversationKey]` to the payload when both are set (depends on T008).
-- [ ] T010 Update `app/Services/LlmProviders/AnthropicProvider.php` the same way:
+- [X] T010 Update `app/Services/LlmProviders/AnthropicProvider.php` the same way:
   - Collect the single leading system message into `system` text blocks.
   - Map message parts to text blocks with `cache_control` when `cacheMarks` is on, or join the text when it is off.
   - Add the identifier field when configured.
   - Return `usage: $data['usage'] ?? null` (depends on T008).
-- [ ] T011 Update `app/Services/AgentLoop/AgentLoopRunner.php`:
+- [X] T011 Update `app/Services/AgentLoop/AgentLoopRunner.php`:
   - `run()` takes `?string $conversationKey = null` and passes it to every `chat()` call, including `requestFinalSummary()`.
   - `withToolUsageInstructions()` appends the instruction to the end of the first text part when the system content is a parts list (keeping that part's `cachePoint`), and to the string when it is a string.
 
@@ -91,7 +91,7 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] Write `tests/Feature/PromptLayoutTest.php`. Cover:
+- [X] T012 [P] [US1] Write `tests/Feature/PromptLayoutTest.php`. Cover:
   - Author sections land in `unchanging()` in author order.
   - World context, awareness, places, neighbours, and the emotion or static pose-tag format follow them.
   - `world_state`, `current_activity`, posture with the poses that fit it, `inventory`, `recent_activity`, `conversations_with_others`, `facts`, `quests`, `feelings`, and retrieval land in `turn()` under their `TurnSection` headings, in order, and only when they have content.
@@ -99,12 +99,12 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
   - Two builds with the same inputs but different positions, posture, activity, inventory, and retrieval produce identical `unchanging()` and `occasionalParts()`.
   - `except(['pose tags'])` removes `pose tags` from both the unchanging group and `CURRENT STATE`.
   - The posture and pose text under `CURRENT STATE` is no longer than the posture sentence and pose list the old `pose tags` section carried for the same posture (SC-004).
-- [ ] T013 [P] [US1] Write `tests/Feature/ComposeChatRequestTest.php`. Cover:
+- [X] T013 [P] [US1] Write `tests/Feature/ComposeChatRequestTest.php`. Cover:
   - The output is one system message: `unchanging` (cachePoint), then the occasional parts with a cachePoint on the last one, or none when empty.
   - The history follows, with a cachePoint on its last message, or none when empty.
   - The current user message has content parts `[turn text, user text]` and keeps its images. When the turn text is empty, its content is the user text only.
   - Never more than 3 cache points.
-- [ ] T014 [P] [US1] Write `tests/Feature/ConversationHistoryLimitTest.php` for `BuildConversationHistory`. Cover:
+- [X] T014 [P] [US1] Write `tests/Feature/ConversationHistoryLimitTest.php` for `BuildConversationHistory`. Cover:
   - With limit 100/jump 50: N = 0, 49, 99, 100, 149, 150, 230 give start indexes 0, 0, 0, 50, 50, 100, 150.
   - With 60/30: N = 59, 60, 95 give 0, 30, 60.
   - Two consecutive calls before a jump share the same first message.
@@ -112,21 +112,21 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
   - Discord sibling messages are merged, sorted by `created_at`, deduped by `discord_message_id`, then limited.
 
   Use `ConversationFactory` and message factories.
-- [ ] T015 [P] [US1] Write `tests/Feature/SummarizeConversationOrderTest.php`, with `Http::fake` for the summary call:
+- [X] T015 [P] [US1] Write `tests/Feature/SummarizeConversationOrderTest.php`, with `Http::fake` for the summary call:
   - With existing memory `A`, a run stores `A\n\n---\n\nB`, and `A` is byte-unchanged.
   - With empty memory, it stores `B`.
-- [ ] T016 [P] [US1] Write `tests/Feature/PromptCachingTurnsTest.php`, posting twice to `conversations.sendMessage` with `Http::fake` capturing bodies. Cover:
-  - The request bodies are byte-identical up to the end of the first turn's history.
-  - The first turn's current message, sent as history on the second turn, contains only the user's text.
-  - The `conversation_key_field` value equals `providerSessionKey()`.
+- [X] T016 [P] [US1] Write `tests/Feature/PromptCachingTurnsTest.php` with `Http::fake` capturing bodies. Cover:
+  - Two web turns: the system message is identical, the first turn's message is sent as history with only the user's text, and the reply follows it.
+  - The `conversation_key_field` value equals `providerSessionKey()` on both turns.
   - The tool definitions are identical across the two captured turns (FR-011).
-  - Telegram (`TelegramPollCommand` with a faked update) and Discord (`conversations.sendDiscordMessage`) with 150 stored messages send 100.
-  - A resident-to-resident turn with 70 stored messages sends 40.
-  - The image and scene-change replies send no trailing `system` message, and their note appears under `# CURRENT STATE`.
+  - Discord with 149 stored messages sends 99 previous messages, starting at the 51st.
+  - The scene-change reply sends one system message, and its note appears under `# CURRENT STATE` in the final user message.
+
+  The Telegram and resident-to-resident limits are covered through `BuildConversationHistory` in T014.
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Rework `app/Directors/PromptDirector.php`:
+- [X] T017 [US1] Rework `app/Directors/PromptDirector.php`:
   - Keep the constructor array as the unchanging group, and keep `append()`, `insertAfter()`, `only()`, and `except()` acting on it.
   - Add `addOccasional(string $key, mixed $value): static` and `addToTurn(TurnSection $section, string $key, mixed $value): static`. Turn entries keep insertion order within a section.
   - `build(): PromptLayout` renders the unchanging group through `PromptBuilder`. Each turn section renders as `# {heading}` followed by its entries rendered through `PromptBuilder` at entry level.
@@ -136,31 +136,33 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
   - `except()` and `only()` apply to the keys of every group, so an excluded key such as `pose tags` is dropped from the unchanging group and from every turn section alike.
 
   (depends on T005–T006)
-- [ ] T018 [US1] Change `app/Actions/AppendWorldConversationContext.php` to `handle(PromptDirector $director, Assistant $assistant, ?Region $region, …same params): void`:
-  - `world_context`, `world_awareness`, `world_places`, and `neighbours` go into the unchanging group via `append()`.
+- [X] T018 [US1] Change `app/Actions/AppendWorldConversationContext.php` to `handle(PromptDirector $director, Assistant $assistant, ?Region $region, …same params): void`:
+  - `world_context`, `world_awareness`, `world_places`, `neighbours`, and `poses and movement` go into the unchanging group via `append()`.
   - `world_state` and `current_activity` go into `addToTurn(CurrentState, …)`.
   - `recent_activity` and `conversations_with_others` go into `addToTurn(RecentActivity, …)`.
 
-  Update its callers: `ConversationController::sendMessage`, `GenerateResidentConversationTurn`, `GiveQuestRewardAction`, and `ResidentDecisionController`. Each now creates `new PromptDirector($assistant->prompt)` first (depends on T017).
-- [ ] T019 [US1] Split `app/Actions/AppendExpressionTags.php` for 3D avatars:
+  Update its callers: `ConversationController::sendMessage`, `GenerateResidentConversationTurn`, `GiveQuestRewardAction`, and `ResidentDecisionController`. Each now creates `new PromptDirector($assistant->prompt)` first (depends on T017). Update `tests/Feature/Api/WorldConversationContextTest.php` to read the built unchanging text.
+- [X] T019 [US1] Split `app/Actions/AppendExpressionTags.php` for 3D avatars:
   - `pose tags` in the unchanging group keeps the format rule without the posture: "Use [pose: <exact pose name>] to select a pose. Use only a name from the available poses list. Control tags may appear in any order and are removed before the reply is shown."
-  - `addToTurn(CurrentState, 'pose tags', ['posture' => "You are {$posture->value}; these poses fit how you are right now", 'available poses' => $poses])` carries the posture part.
+  - `addToTurn(CurrentState, 'pose tags', ['posture' => "You are {$posture}. The available poses are the ones that fit how you are right now, and a pose keeps you {$posture}. Anything else you do goes in your narration.", 'available poses' => $poses])` carries the posture part.
 
   Emotion tags stay wholly in the unchanging group (depends on T017).
-- [ ] T020 [US1] Move every remaining per-turn `append()` call to `addToTurn()`:
-  - `CurrentState`: `inventory`, `talking with`, `available activities`, `for sale nearby`, `next step`, and the image or scene-change notes.
+- [X] T020 [US1] Move every per-turn `append()` call to `addToTurn()`:
+  - `CurrentState`: `inventory`, `available activities`, `for sale nearby`, and the image or scene-change notes (`what just happened`).
   - `RecentActivity`: `recent conversation`, `facts`, `quests`.
   - `RelationshipState`: `feelings`.
 
-  The calls are in `app/Http/Controllers/Api/ConversationController.php`, `app/Actions/GenerateResidentConversationTurn.php`, `app/Http/Controllers/Api/ResidentDecisionController.php`, and `app/Actions/Quests/GiveQuestRewardAction.php`. Voice sections use `append()` after the author sections instead of `insertAfter('identity', …)` (depends on T017).
-- [ ] T021 [P] [US1] Create `app/Actions/BuildConversationHistory.php` with `handle(Conversation $conversation, int $limit, int $jump, ?int $excludeMessageId = null): array` returning normalized `['role', 'content']` messages:
-  - Read the stored messages ordered by id, without tool-call rows (the same filter the enhancers use today).
-  - Apply the start index `max(0, intdiv(max(0, $n - $jump), $jump) * $jump)` with a one-line comment on why the start only jumps.
-  - Strip expression tags from assistant content with `LlmResponseTagParser`.
-  - Add a `discordSiblings(Conversation, string $channelId, User $owner, …)` path, or a parameter, that merges sibling conversations as `sendDiscordMessage` does today.
-- [ ] T022 [P] [US1] Create `app/Actions/ComposeChatRequest.php` with `handle(PromptLayout $layout, array $history, array $currentMessage): array`, which returns the normalized messages described in T013, with a one-line comment on why the per-turn text travels inside the current user message (depends on T006)
-- [ ] T023 [P] [US1] Update `app/Actions/SummarizeConversation.php` to store `"{$existing}\n\n---\n\n{$summary}"` when existing memory is present
-- [ ] T024 [US1] Wire `ConversationController::sendMessage` in `app/Http/Controllers/Api/ConversationController.php`:
+  The calls are in `app/Http/Controllers/Api/ConversationController.php`, `app/Actions/GenerateResidentConversationTurn.php`, and `app/Http/Controllers/Api/ResidentDecisionController.php`. `talking with`, `next step`, and `the reward` stay in the unchanging group, because their text is the same for the whole conversation. Voice sections use `append()` before the world context instead of `insertAfter('identity', …)` (depends on T017).
+- [X] T021 [P] [US1] Create `app/Actions/BuildConversationHistory.php`:
+  - `handle(Conversation $conversation, Assistant $assistant, ?int $excludeMessageId = null)` returns the chat history with the 100/50 limit.
+  - `forDiscordChannel(Conversation $conversation, Assistant $assistant, User $owner, Message $trigger)` merges sibling conversations as `sendDiscordMessage` did, dedupes by `discord_message_id`, and leaves the trigger out.
+  - `residentMessages(Conversation $conversation)` returns the stored messages with the 60/30 limit.
+  - `window(array $items, int $jump)` applies the start index `intdiv(max(0, $n - $jump), $jump) * $jump`, with a comment on why the start only jumps.
+  - Stored messages are user and assistant rows with non-empty content, ordered by id. Assistant content has expression tags stripped with `LlmResponseTagParser`.
+  - The parser caches each assistant's emotion and pose names, so parsing a whole history reads them once.
+- [X] T022 [P] [US1] Create `app/Actions/ComposeChatRequest.php` with `handle(PromptLayout $layout, array $history, ?array $currentMessage): array`, which returns the normalized messages described in T013. When there is no current message, the turn text is sent as its own user message. There is a comment on why the per-turn text travels inside the current user message (depends on T006).
+- [X] T023 [P] [US1] Update `app/Actions/SummarizeConversation.php` to store `"{$existing}\n\n---\n\n{$summary}"` when existing memory is present
+- [X] T024 [US1] Wire `ConversationController::sendMessage` in `app/Http/Controllers/Api/ConversationController.php`:
   - Validate `message.content` (nullable string) and `message.images` (sometimes array), replacing `messages.*`.
   - Keep the voice-command, creator-mode and term-rule handling on the current message only.
   - Store the user message as today.
@@ -169,39 +171,39 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
   - Pass `conversationKey: $conversation->providerSessionKey()` to `AgentLoopRunner::run()` and to `$llm->chat()`.
 
   (depends on T018–T022)
-- [ ] T025 [US1] Wire `sendDiscordMessage` and the image and scene-change reply helpers in `app/Http/Controllers/Api/ConversationController.php`:
+- [X] T025 [US1] Wire `sendDiscordMessage` and the image and scene-change reply helpers in `app/Http/Controllers/Api/ConversationController.php`:
   - Build the history through `BuildConversationHistory` (100/50, Discord siblings for `sendDiscordMessage`).
   - Treat the triggering message as the current message, with the author prefix and term marking applied to it only.
   - Compose and pass the identifier.
   - Replace the trailing `'role' => 'system'` notes with `addToTurn(TurnSection::CurrentState, …)` (depends on T024).
-- [ ] T026 [P] [US1] Wire `app/Console/Commands/TelegramPollCommand.php`:
+- [X] T026 [P] [US1] Wire `app/Console/Commands/TelegramPollCommand.php`:
   - Build the history with `BuildConversationHistory` (100/50), excluding the just-stored message.
   - The current message carries the image and the term marking.
   - Compose and pass the identifier.
 
   (depends on T021, T022)
-- [ ] T027 [P] [US1] Wire `app/Actions/GenerateResidentConversationTurn.php`:
-  - Build the history with `BuildConversationHistory` (60/30), keeping the existing speaker-name mapping for the other resident's lines.
+- [X] T027 [P] [US1] Wire `app/Actions/GenerateResidentConversationTurn.php`:
+  - Build the history from `BuildConversationHistory::residentMessages()` (60/30), keeping the existing speaker-name mapping for the other resident's lines.
   - The last history entry is the current message.
   - Compose and pass the conversation's identifier.
 
   (depends on T021, T022)
-- [ ] T028 [P] [US1] Wire `app/Http/Controllers/Api/ResidentDecisionController.php` and `app/Actions/Quests/GiveQuestRewardAction.php`: compose with an empty history and their existing user message, and pass the identifier of the conversation they use (depends on T022)
-- [ ] T029 [P] [US1] Update the one-shot enhancers `app/Services/ImageGenProviders/ImageGenPromptEnhancer.php` and `app/Services/AvatarBackground/AvatarBackgroundPromptEnhancer.php` to use `$director->build()->fullText()` where they used the string (depends on T017)
-- [ ] T030 [US1] Update `app/Http/Controllers/Api/AiModelController.php` store and update to validate `cache_marks` (`sometimes`, `boolean`) and `conversation_key_field` (`nullable`, `string`, `max:64`, `regex:/^[A-Za-z_][A-Za-z0-9_]*$/`)
-- [ ] T031 [P] [US1] Write `tests/Feature/AiModelCachingSettingsTest.php`. Cover:
+- [X] T028 [P] [US1] Wire `app/Http/Controllers/Api/ResidentDecisionController.php` to compose with an empty history and its existing user message, passing the conversation's identifier. `app/Actions/Quests/GiveQuestRewardAction.php` has no per-turn sections, so it sends `$director->build()->fullText()` as its system message and also excludes `poses and movement` along with `world_awareness` (depends on T022).
+- [X] T029 [P] [US1] Update the one-shot enhancers `app/Services/ImageGenProviders/ImageGenPromptEnhancer.php` and `app/Services/AvatarBackground/AvatarBackgroundPromptEnhancer.php` to use `$director->build()->fullText()` where they used the string (depends on T017)
+- [X] T030 [US1] Update `app/Http/Controllers/Api/AiModelController.php` store and update to validate `cache_marks` (`sometimes`, `boolean`) and `conversation_key_field` (`nullable`, `string`, `max:64`, `regex:/^[A-Za-z_][A-Za-z0-9_]*$/`)
+- [X] T031 [P] [US1] Write `tests/Feature/AiModelCachingSettingsTest.php`. Cover:
   - Store and update persist both fields.
   - `conversation_key_field` values `session id` and `a-b` are refused with a 422 on that key.
   - Another user's provider returns 404.
 
   (depends on T030)
-- [ ] T032 [P] [US1] Add to `resources/js/components/ModelAccordion.jsx`, following the existing `thinking_key` input and `supports_tools` checkbox markup:
+- [X] T032 [P] [US1] Add to `resources/js/components/ModelAccordion.jsx`, following the existing `thinking_key` input and `supports_tools` checkbox markup:
   - a checkbox labelled "Send cache marks", bound to `cache_marks`;
   - a text input labelled "Conversation ID field", bound to `conversation_key_field`.
 
   Check that `resources/js/hooks/useProviders.js` sends both on save.
-- [ ] T033 [US1] Update `resources/js/hooks/useConversationChat.js` `sendMessage` to post `message: { content, images? }` with the new message only, plus `voice_mode` and `extraParams`. Remove the `apiMessages` mapping of the full list (depends on T024).
-- [ ] T034 [US1] Update every existing test that posts `messages` to `conversations.sendMessage` (24 files under `tests/`, found with `grep -rln "conversations.sendMessage" tests`):
+- [X] T033 [US1] Update `resources/js/hooks/useConversationChat.js` `sendMessage` to post `message: { content, images? }` with the new message only, plus `voice_mode` and `extraParams`. Remove the `apiMessages` mapping of the full list (depends on T024).
+- [X] T034 [US1] Update every existing test that posts `messages` to `conversations.sendMessage` (24 files under `tests/`, found with `grep -rln "conversations.sendMessage" tests`):
   - Post `message` instead.
   - Store earlier turns as messages with factories wherever the test relied on sending history.
   - Update assertions on the captured request, where the per-turn text now sits in the current user message.
@@ -220,7 +222,7 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
 
 ### Tests for User Story 2
 
-- [ ] T035 [P] [US2] Add to `tests/Feature/PromptLayoutTest.php`:
+- [X] T035 [P] [US2] Add to `tests/Feature/PromptLayoutTest.php`:
   - A string author section `identity` renders as `# IDENTITY\n…`.
   - An array section with a `title` renders with that title uppercased.
   - `world_awareness` contains no embedded `World awareness:` line.
@@ -228,9 +230,9 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
 
 ### Implementation for User Story 2
 
-- [ ] T036 [US2] Update `app/Builders/PromptBuilder.php` so a top-level section renders as `# {TITLE}` on its own line followed by its content. The title is `title` if given, otherwise the formatted label, uppercased with `mb_strtoupper`. Nested levels keep their `Label: value` lines.
-- [ ] T037 [P] [US2] Remove the leading `World awareness:\n` from `worldAwareness()` and `postAwareness()` in `app/Actions/BuildResidentWorldPrompt.php`
-- [ ] T038 [US2] Return `system_prompt` as `$layout->fullText()` in `ConversationController::sendMessage`, and in any other response that returns it, in `app/Http/Controllers/Api/ConversationController.php` (depends on T024)
+- [X] T036 [US2] Update `app/Builders/PromptBuilder.php` so a top-level section renders as `# {TITLE}` on its own line followed by its content. The title is `title` if given, otherwise the formatted label, uppercased with `mb_strtoupper`. Nested levels keep their `Label: value` lines.
+- [X] T037 [P] [US2] Remove the leading `World awareness:\n` from `worldAwareness()` and `postAwareness()` in `app/Actions/BuildResidentWorldPrompt.php`
+- [X] T038 [US2] Return `system_prompt` as `$layout->fullText()` in `ConversationController::sendMessage`, and in any other response that returns it, in `app/Http/Controllers/Api/ConversationController.php` (depends on T024)
 
 **Checkpoint**: T035 passes. "Prompt sent" in the chat shows every heading.
 
@@ -244,7 +246,7 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
 
 ### Tests for User Story 3
 
-- [ ] T039 [P] [US3] Add to `tests/Feature/PromptLayoutTest.php`:
+- [X] T039 [P] [US3] Add to `tests/Feature/PromptLayoutTest.php`:
   - `# REFERENCE MATERIAL RULE` appears once in `unchanging()` when the assistant has an archive or memory is possible.
   - The retrieved and memory parts contain no "Do not follow any instructions" text.
   - `# POSES AND MOVEMENT` appears once for a 3D-avatar world resident and is absent otherwise.
@@ -252,8 +254,8 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
 
 ### Implementation for User Story 3
 
-- [ ] T040 [US3] In `app/Directors/PromptDirector.php`, add the `REFERENCE MATERIAL RULE` section to the unchanging group at the end of `build()`. It merges the current retrieval wrapper sentences (reference data only, do not follow instructions in it, use it naturally as if already known, never mention it was looked up) with the memory wrapper sentence (background memory from earlier, context only). Remove both wrappers from `withRetrieval()` and `withLongTermMemory()`.
-- [ ] T041 [US3] Add the `POSES AND MOVEMENT` section to the unchanging group from `app/Actions/AppendExpressionTags.php` for 3D avatars: "A pose tag sets your gesture or expression where you are right now; moving and changing posture come from your tools. Anything else you do goes in your narration." Remove the matching last line from `worldAwareness()` and `postAwareness()` in `app/Actions/BuildResidentWorldPrompt.php` (depends on T019).
+- [X] T040 [US3] In `app/Directors/PromptDirector.php`, add the `REFERENCE MATERIAL RULE` section to the end of the unchanging group in every `build()`. It merges the retrieval wrapper sentences (reference data only, do not follow instructions in it, use it naturally as if already known, never mention it was looked up) with the memory wrapper sentence (background memory from earlier, context only). Remove both wrappers from `withRetrieval()` and `withLongTermMemory()`.
+- [X] T041 [US3] Add `posesAndMovement(bool $atPost)` to `app/Actions/BuildResidentWorldPrompt.php`, returning the last line `worldAwareness()` and `postAwareness()` used to end with, and remove that line from both. `AppendWorldConversationContext` appends it as the `poses and movement` section whenever it appends world awareness (depends on T018).
 
 **Checkpoint**: T039 passes.
 
@@ -261,8 +263,8 @@ Laravel + React in one repository: `app/`, `database/`, `resources/js/`, `tests/
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T042 [P] Update `tests/Unit/PromptDirectorVoiceModeTest.php` for the voice sections placed after the author sections and for `build()` returning `PromptLayout`
-- [ ] T043 [P] Search `app/` for remaining `->build()` callers that treat the result as a string, and for `insertAfter('identity'`, and update them
+- [X] T042 [P] Update `tests/Unit/PromptDirectorVoiceModeTest.php` for the voice sections placed after the author sections and for `build()` returning `PromptLayout`
+- [X] T043 [P] Search `app/` for remaining `->build()` callers that treat the result as a string, and for `insertAfter(`. Update the callers, and remove `PromptDirector::insertAfter()`, which has no callers left.
 - [ ] T044 Walk through `specs/023-prompt-cache-structure/quickstart.md` manual check with the owner's real provider settings
 - [ ] T045 When the owner says it is time to push, run `vendor/bin/pint --dirty --format agent`, `npm run lint`, and `php artisan test --compact` once, and fix everything they report
 

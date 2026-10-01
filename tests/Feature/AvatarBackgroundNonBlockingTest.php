@@ -24,7 +24,7 @@ test('a background change request completes the HTTP response without the job ha
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => '/change-background a futuristic park']]],
+        ['message' => ['content' => '/change-background a futuristic park']],
     );
 
     $response->assertSuccessful();

@@ -44,7 +44,7 @@ it('offers a resident who keeps to an area every place, telling them which lie o
 
     $tools = collect(Http::recorded()[0][0]['tools'])->keyBy('function.name');
     expect($tools['go_to']['function']['parameters']['properties']['target']['enum'])->toContain('studio')->toContain('pool-terrace')
-        ->and(sentSystemPrompt())
+        ->and(sentPrompt())
         ->toContain("Available places:\nGround floor: Music studio [studio], Vocal booth [vocal-booth]")
         ->toContain("Outside the area you keep to, so you go there only when the user asks you to:\nGround floor: Pool terrace [pool-terrace]\nUpper floor: Gallery [gallery]");
 });
@@ -60,7 +60,7 @@ it('gives an NPC who stays put only the tools that tell her about the place and 
     ])->assertSuccessful();
 
     expect(collect(Http::recorded()[0][0]['tools'])->pluck('function.name')->sort()->values()->all())->toBe(['adjust_feelings', 'ask_for', 'check_holds', 'describe', 'give', 'what_is_in', 'where_can_i'])
-        ->and(sentSystemPrompt())->toContain('You keep to your post here, and people come to you.')->not->toContain('Your body in this world moves only through your tools');
+        ->and(sentPrompt())->toContain('You keep to your post here, and people come to you.')->not->toContain('Your body in this world moves only through your tools');
 })->with(['stationary', 'route']);
 
 it('keeps the movement tools of an assistant who stays put and of a roaming NPC', function (AssistantKind $kind, string $behavior) {
@@ -84,15 +84,15 @@ it('puts the unchanging world sections before the world state, and leaves places
     $positions = ['user' => ['x' => 5, 'y' => 0, 'z' => -3], 'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -4]]];
 
     sendWorldMessage($this, $scenario, $positions)->assertSuccessful();
-    $prompt = sentSystemPrompt();
-    expect(strpos($prompt, 'World awareness:'))->toBeLessThan(strpos($prompt, 'Places in this world:'))
-        ->and(strpos($prompt, 'Places in this world:'))->toBeLessThan(strpos($prompt, 'World state:'))
+    $prompt = sentPrompt();
+    expect(strpos($prompt, '# WORLD AWARENESS'))->toBeLessThan(strpos($prompt, '# PLACES IN THIS WORLD'))
+        ->and(strpos($prompt, '# PLACES IN THIS WORLD'))->toBeLessThan(strpos($prompt, 'World state:'))
         ->and($prompt)->toContain('Things here:');
 
     Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Right here.'))]);
     $scenario[1]->update(['kind' => AssistantKind::WorldNpc]);
     sendWorldMessage($this, $scenario, $positions)->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain('World state:')->toContain('You are in: Pool terrace')
-        ->not->toContain('Places in this world')->not->toContain('Things here:')->not->toContain('Things to do here:');
+    expect(sentPrompt())->toContain('World state:')->toContain('You are in: Pool terrace')
+        ->not->toContain('# PLACES IN THIS WORLD')->not->toContain('Things here:')->not->toContain('Things to do here:');
 });

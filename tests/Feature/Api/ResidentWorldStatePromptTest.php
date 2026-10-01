@@ -15,7 +15,7 @@ it('tells the resident her zone, and the user\'s zone and distance when they sha
         'residents' => [$residentId => ['x' => 9, 'y' => 0, 'z' => -9]],
     ])->assertSuccessful();
 
-    $prompt = sentSystemPrompt();
+    $prompt = sentPrompt();
     expect($prompt)
         ->toContain('World state:')
         ->toContain('You are in: Pool terrace, on the Ground floor')
@@ -27,7 +27,7 @@ it('only knows the user is out of sight when they are in another room', function
 
     sendWorldMessage($this, $scenario, ['user' => $user, 'residents' => [$scenario[4]->id => $resident]], ['userState' => ['posture' => 'swimming']])->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain('The user is: somewhere out of sight')->not->toContain('away from you')->not->toContain(', swimming');
+    expect(sentPrompt())->toContain('The user is: somewhere out of sight')->not->toContain('away from you')->not->toContain(', swimming');
 })->with([
     'another room' => [['x' => 5, 'y' => 0, 'z' => -3], ['x' => -2, 'y' => 0, 'z' => 9]],
     'a room inside hers' => [['x' => -2, 'y' => 0, 'z' => 8], ['x' => -8, 'y' => 0, 'z' => 2]],
@@ -43,7 +43,7 @@ it('describes her own zone in detail and other zones only by name and floor', fu
         'residents' => [$residentId => ['x' => 5, 'y' => 0, 'z' => -3]],
     ])->assertSuccessful();
 
-    $prompt = sentSystemPrompt();
+    $prompt = sentPrompt();
     expect($prompt)
         ->toContain('An open terrace with an infinity pool.')
         ->toContain('Things to do here: Swim [swim]')
@@ -59,7 +59,7 @@ it('sees the user outside every room only on the same floor and within 10 m', fu
 
     sendWorldMessage($this, $scenario, ['user' => $user, 'residents' => [$scenario[4]->id => ['x' => 20, 'y' => 0, 'z' => 20]]])->assertSuccessful();
 
-    expect(str_contains(sentSystemPrompt(), 'The user is: somewhere out of sight'))->toBe(! $inSight);
+    expect(str_contains(sentPrompt(), 'The user is: somewhere out of sight'))->toBe(! $inSight);
 })->with([
     'close by' => [['x' => 26, 'y' => 0, 'z' => 26], true],
     'far away' => [['x' => 40, 'y' => 0, 'z' => 20], false],
@@ -75,7 +75,7 @@ it('keeps today\'s prompt for a world without markers', function () {
         'residents' => [$residentId => ['x' => 1, 'y' => 0, 'z' => 1]],
     ])->assertSuccessful();
 
-    expect(sentSystemPrompt())->not->toContain('World state:');
+    expect(sentPrompt())->not->toContain('World state:');
 });
 
 it('keeps the world state under 2,000 characters for a world with 40 zones', function () {
@@ -93,8 +93,8 @@ it('keeps the world state under 2,000 characters for a world with 40 zones', fun
         'residents' => [$residentId => ['x' => 25, 'y' => 0, 'z' => 5]],
     ])->assertSuccessful();
 
-    $prompt = sentSystemPrompt();
-    $places = substr($prompt, strpos($prompt, 'Places in this world:'));
+    $prompt = sentPrompt();
+    $places = substr($prompt, strpos($prompt, '# PLACES IN THIS WORLD'));
     $places = explode("\n\n", $places)[0];
     $state = substr($prompt, strpos($prompt, 'World state:'));
     $state = explode("\n\n", $state)[0];
@@ -135,7 +135,7 @@ it('includes her recent activity, newest first, limited to the last eight', func
         'residents' => [$resident->id => ['x' => -5, 'y' => 0, 'z' => 2]],
     ])->assertSuccessful();
 
-    $prompt = sentSystemPrompt();
+    $prompt = sentPrompt();
     expect($prompt)
         ->toContain('Your recent activity, newest first:')
         ->toContain('- walked toward pool-terrace, from Music studio: failed (there is no way to get there), just now')
@@ -151,8 +151,8 @@ it('tells the resident her body moves only through her world tools', function ()
 
     sendWorldMessage($this, $scenario, [])->assertSuccessful();
 
-    expect(sentSystemPrompt())
-        ->toContain('World awareness:')
+    expect(sentPrompt())
+        ->toContain('# WORLD AWARENESS')
         ->toContain('Your body in this world moves only through your tools. Whenever your reply has you go somewhere')
         ->toContain('A pose tag sets your gesture or expression where you are right now; moving and changing posture come from your tools.')
         ->toContain('People name things loosely; a couch can mean a sofa or the armchairs. Match what they mean to the closest fitting thing, and prefer what is near you.');
@@ -166,7 +166,7 @@ it('tells the resident what the user is doing', function (array $userState, stri
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
     ], ['userState' => $userState])->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain("away from you{$phrase}");
+    expect(sentPrompt())->toContain("away from you{$phrase}");
 })->with([
     'reclining on a spot' => [['posture' => 'reclining', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'recline'], ', reclining on the Pool lounger, doing "Recline"'],
     'doing a zone activity' => [['posture' => 'standing', 'activityId' => 'swim'], ', doing "Swim"'],
@@ -182,7 +182,7 @@ it('tells the resident her own posture and what she is on', function () {
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
     ], ['residentState' => ['posture' => 'reclining', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'recline']])->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain('Pool terrace, on the Ground floor, reclining on the Pool lounger');
+    expect(sentPrompt())->toContain('Pool terrace, on the Ground floor, reclining on the Pool lounger');
 });
 
 it('tells the resident the pose she holds, why she is doing what she is doing and how she put it', function () {
@@ -210,7 +210,7 @@ it('tells the resident the pose she holds, why she is doing what she is doing an
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
     ], ['residentState' => ['posture' => 'reclining', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'recline', 'pose' => 'content']])->assertSuccessful();
 
-    expect(sentSystemPrompt())
+    expect(sentPrompt())
         ->toContain('reclining on the Pool lounger, doing "Recline", holding the pose "content"')
         ->toContain("What you are doing now:\nYou have been in Pool terrace for less than a minute.\nYou have been at it for less than a minute.\nWhy: step 2 of 2 of get a drink\nIn your words when you started: *mixes a gin tonic, then takes it out to the lounger*");
 });
@@ -231,7 +231,7 @@ it('adds nothing for a user who is simply standing', function () {
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
     ], ['userState' => ['posture' => 'standing']])->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain('away from you')->not->toContain('away from you, ');
+    expect(sentPrompt())->toContain('away from you')->not->toContain('away from you, ');
 });
 
 it('rejects a user state naming a spot or activity the world does not have', function (array $userState, string $field) {
@@ -265,7 +265,7 @@ it('tells the resident who is lying on top of her and whom she lies on top of', 
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
     ], ['stackedSpots' => [['spotId' => 'pool-lounger-1-seat', 'holders' => $holders]]])->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain("Sharing your spot: {$phrase}");
+    expect(sentPrompt())->toContain("Sharing your spot: {$phrase}");
 })->with([
     'the user on top of her' => [['resident', 'user'], 'the user is lying on top of you on the Pool lounger'],
     'her on top of the user' => [['user', 'resident'], 'you are lying on top of the user on the Pool lounger'],
@@ -279,7 +279,7 @@ it('says nothing about a shared spot the resident is not in', function () {
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
     ], ['stackedSpots' => [['spotId' => 'pool-lounger-1-seat', 'holders' => ['user', '999']]]])->assertSuccessful();
 
-    expect(sentSystemPrompt())->not->toContain('Sharing your spot');
+    expect(sentPrompt())->not->toContain('Sharing your spot');
 });
 
 it('rejects a shared spot the world does not have', function () {

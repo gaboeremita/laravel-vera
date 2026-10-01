@@ -79,7 +79,7 @@ app/
 ├── Actions/ComposeChatRequest.php                # new: layout + history + current message -> normalized messages with cache points
 ├── Actions/BuildConversationHistory.php          # new: stored history, jump-ahead limit, tag stripping
 ├── Actions/AppendWorldConversationContext.php    # writes into the director's groups instead of returning an array
-├── Actions/AppendExpressionTags.php              # static tag format + POSES AND MOVEMENT; posture + poses into CURRENT STATE
+├── Actions/AppendExpressionTags.php              # static tag format; posture + poses into CURRENT STATE
 ├── Actions/BuildResidentWorldPrompt.php          # drop embedded "World awareness:" prefix and the duplicate pose line
 ├── Actions/SummarizeConversation.php             # append new summary at the end
 ├── Actions/GenerateResidentConversationTurn.php  # history + compose + identifier
@@ -87,6 +87,8 @@ app/
 ├── Contracts/LlmProvider.php                     # content parts with cachePoint; ?string $conversationKey
 ├── Services/LlmProviders/GenericProvider.php     # parts -> arrays with cache_control or joined strings; identifier field
 ├── Services/LlmProviders/AnthropicProvider.php   # parts -> blocks with cache_control; identifier field; return usage
+├── Services/LlmProviders/PromptParts.php         # new: shared join/blocks formatting of text parts
+├── Services/LlmResponseTagParser.php             # caches an assistant's emotion and pose names per parser
 ├── Services/AgentLoop/AgentLoopRunner.php        # pass the identifier every step; instruction into the first system part
 ├── Models/Conversation.php                       # providerSessionKey()
 ├── Models/AiModel.php                            # casts for the two columns
@@ -99,7 +101,8 @@ app/
 
 database/
 ├── migrations/xxxx_add_caching_settings_to_ai_models_table.php  # new
-└── factories/AiModelFactory.php                  # new: with cacheMarks() and conversationKeyField() states
+├── factories/AiModelFactory.php                  # new: with cacheMarks() and conversationKeyField() states
+└── factories/AiProviderFactory.php               # new: with an anthropic() state
 
 resources/js/
 ├── hooks/useConversationChat.js                  # send only the new message
@@ -127,7 +130,7 @@ tests/
   - `withRetrieval()` adds to `RetrievedKnowledge`, with entries only.
   - `withLongTermMemory()` adds the memory parts to the occasional group.
   - `withDiscordEnvironment()` adds to the occasional group.
-  - The `REFERENCE MATERIAL RULE` and `POSES AND MOVEMENT` sections are added by `build()` when their subjects are present: retrieval or memory possible, and a 3D avatar.
+  - `build()` always ends the unchanging group with the `REFERENCE MATERIAL RULE` section. `AppendWorldConversationContext` adds `POSES AND MOVEMENT` wherever it adds world awareness.
 - **Turn flow (web)**:
   1. Validate `message`.
   2. Store it.

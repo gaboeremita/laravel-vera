@@ -33,7 +33,7 @@ use RuntimeException;
  */
 class GiveQuestRewardAction
 {
-    private const EXCLUDED_PROMPT_SECTIONS = ['world_awareness', 'world_places', 'opening_message', 'voice mode', 'image handling', 'OOC mode', 'emotion tags', 'pose tags', 'secret trigger', 'creator mode'];
+    private const EXCLUDED_PROMPT_SECTIONS = ['world_awareness', 'poses and movement', 'world_places', 'opening_message', 'voice mode', 'image handling', 'OOC mode', 'emotion tags', 'pose tags', 'secret trigger', 'creator mode'];
 
     public function __construct(
         private readonly ResolveInventory $resolveInventory,
@@ -107,10 +107,12 @@ class GiveQuestRewardAction
         $session = $run->worldSession;
         $assistantUser = AssistantUser::where('assistant_id', $resident->assistant_id)->where('user_id', $session->worldUser->user_id)->firstOrFail();
         $region = app(ResolveResidentRegion::class)->handle($session, $resident);
-        $director = (new PromptDirector(app(AppendWorldConversationContext::class)->handle($resident->assistant, $region)))->except(self::EXCLUDED_PROMPT_SECTIONS);
+        $director = new PromptDirector($resident->assistant->prompt);
+        app(AppendWorldConversationContext::class)->handle($director, $resident->assistant, $region);
+        $director->except(self::EXCLUDED_PROMPT_SECTIONS);
         $director->append('the reward', 'The user just completed a quest you are part of, and you are the one who rewards them. Read what the story asks of you, how the user did, how you feel about them and what you hold, then decide in character what to give and call the give_reward tool once, with what you say to the user as you hand it over. Let the quest move your feelings about the user too, usually 1 to 3 points each: someone rude who still got the job done might earn your trust and lose some of your liking.');
 
-        return [(new LlmManager)->forAssistantUser($assistantUser), $director->build()];
+        return [(new LlmManager)->forAssistantUser($assistantUser), $director->build()->fullText()];
     }
 
     /**

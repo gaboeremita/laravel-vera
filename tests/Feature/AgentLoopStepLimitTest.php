@@ -18,7 +18,7 @@ test('a task exceeding the step limit stops and returns a clear partial result',
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'Do something that takes a while.']]],
+        ['message' => ['content' => 'Do something that takes a while.']],
     );
 
     $response->assertSuccessful();
@@ -40,7 +40,7 @@ test('the step limit does not trigger an error response', function () {
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'Do something.']]],
+        ['message' => ['content' => 'Do something.']],
     );
 
     $response->assertSuccessful();

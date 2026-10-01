@@ -21,7 +21,7 @@ test('a conversation with no opening message never dispatches a background from 
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $newConversationId]),
-        ['messages' => [['role' => 'user', 'content' => 'hey, where are we?']]],
+        ['message' => ['content' => 'hey, where are we?']],
     );
 
     Queue::assertNotPushed(GenerateAvatarBackground::class);
@@ -39,7 +39,7 @@ test('a non-empty opening message never dispatches a background on its own', fun
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $newConversationId]),
-        ['messages' => [['role' => 'user', 'content' => 'hi there']]],
+        ['message' => ['content' => 'hi there']],
     );
 
     Queue::assertNotPushed(GenerateAvatarBackground::class);

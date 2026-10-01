@@ -20,6 +20,8 @@ class AnthropicProvider implements LlmProvider
         private readonly string $version,
         private readonly array $params = [],
         private readonly int $timeout = 120,
+        private readonly bool $cacheMarks = false,
+        private readonly ?string $conversationKeyField = null,
     ) {}
 
     public static function fromModel(AiModel $aiModel): static
@@ -46,10 +48,12 @@ class AnthropicProvider implements LlmProvider
             version: $config['version'] ?? self::DEFAULT_VERSION,
             params: $params,
             timeout: (int) $timeout,
+            cacheMarks: (bool) $aiModel->cache_marks,
+            conversationKeyField: $aiModel->conversation_key_field,
         );
     }
 
-    public function chat(array $messages, array $options = [], array $tools = []): LlmResponse
+    public function chat(array $messages, array $options = [], array $tools = [], ?string $conversationKey = null): LlmResponse
     {
         $systemPrompt = null;
         $chatMessages = [];
@@ -70,7 +74,11 @@ class AnthropicProvider implements LlmProvider
         ];
 
         if ($systemPrompt) {
-            $body['system'] = $systemPrompt;
+            $body['system'] = is_array($systemPrompt) ? PromptParts::format($this->cacheMarks, $systemPrompt) : $systemPrompt;
+        }
+
+        if ($this->conversationKeyField && $conversationKey !== null) {
+            $body[$this->conversationKeyField] = $conversationKey;
         }
 
         if (! empty($tools)) {
@@ -116,6 +124,7 @@ class AnthropicProvider implements LlmProvider
             content: $content,
             thinking: $thinking,
             toolCalls: $toolCalls,
+            usage: $data['usage'] ?? null,
         );
     }
 
@@ -139,9 +148,10 @@ class AnthropicProvider implements LlmProvider
 
         if (! empty($message['tool_calls'])) {
             $parts = [];
+            $text = is_array($message['content'] ?? null) ? PromptParts::join($message['content']) : ($message['content'] ?? '');
 
-            if (! empty($message['content'])) {
-                $parts[] = ['type' => 'text', 'text' => $message['content']];
+            if ($text !== '') {
+                $parts[] = ['type' => 'text', 'text' => $text];
             }
 
             foreach ($message['tool_calls'] as $toolCall) {
@@ -159,18 +169,16 @@ class AnthropicProvider implements LlmProvider
             ];
         }
 
+        $content = $message['content'] ?? '';
+
         if (empty($message['images'])) {
             return [
                 'role' => $message['role'],
-                'content' => $message['content'] ?? '',
+                'content' => is_array($content) ? PromptParts::format($this->cacheMarks, $content) : $content,
             ];
         }
 
-        $parts = [];
-
-        if (! empty($message['content'])) {
-            $parts[] = ['type' => 'text', 'text' => $message['content']];
-        }
+        $parts = is_array($content) ? PromptParts::blocks($this->cacheMarks, $content) : ($content !== '' ? [['type' => 'text', 'text' => $content]] : []);
 
         foreach ($message['images'] as $image) {
             $parts[] = [

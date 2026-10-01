@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Actions\AppendExpressionTags;
 use App\Actions\AppendWorldConversationContext;
 use App\Actions\ApplyResidentZoneAccess;
+use App\Actions\BuildConversationHistory;
 use App\Actions\BuildFactsPrompt;
 use App\Actions\BuildFeelingsPrompt;
 use App\Actions\BuildInventoryPrompt;
 use App\Actions\BuildQuestsPrompt;
+use App\Actions\ComposeChatRequest;
 use App\Actions\CreatorModeTags;
 use App\Actions\Quests\OfferMoment;
 use App\Actions\ResolveInventory;
@@ -26,6 +28,7 @@ use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
 use App\Enums\Posture;
 use App\Enums\TurnMode;
+use App\Enums\TurnSection;
 use App\Events\Quests\PlayerTalkedTo;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAvatarBackground;
@@ -221,10 +224,9 @@ class ConversationController extends Controller
     public function sendMessage(Request $request, int $assistant, int $id): JsonResponse
     {
         $validated = $request->validate([
-            'messages' => ['required', 'array'],
-            'messages.*.role' => ['required', 'string', 'in:user,assistant'],
-            'messages.*.content' => ['nullable', 'string'],
-            'messages.*.images' => ['sometimes', 'array'],
+            'message' => ['required', 'array'],
+            'message.content' => ['nullable', 'string'],
+            'message.images' => ['sometimes', 'array'],
             'voice_mode' => ['sometimes', 'boolean'],
             'worldId' => ['nullable', 'integer', 'exists:worlds,id'],
             'regionId' => ['nullable', 'integer', 'required_with:worldId'],
@@ -253,7 +255,7 @@ class ConversationController extends Controller
             ->conversations()
             ->findOrFail($id);
 
-        $lastUserMessage = collect($validated['messages'])->last(fn ($m) => $m['role'] === 'user');
+        $lastUserMessage = ['role' => 'user', 'content' => $validated['message']['content'] ?? null, ...(isset($validated['message']['images']) ? ['images' => $validated['message']['images']] : [])];
 
         $unknownCommand = $this->unknownCommand($lastUserMessage['content'] ?? null);
         if ($unknownCommand !== null) {
@@ -265,15 +267,6 @@ class ConversationController extends Controller
         if ($voiceCommandContent !== null) {
             $lastUserMessage['content'] = $voiceCommandContent;
             $forceVoice = true;
-
-            $messages = $validated['messages'];
-            for ($i = count($messages) - 1; $i >= 0; $i--) {
-                if ($messages[$i]['role'] === 'user') {
-                    $messages[$i]['content'] = $voiceCommandContent;
-                    break;
-                }
-            }
-            $validated['messages'] = $messages;
         }
 
         $creatorModeTags = app(CreatorModeTags::class);
@@ -283,31 +276,21 @@ class ConversationController extends Controller
             $creatorNotice = $this->activateCreatorMode($request, $conversation, $password);
         }
         $creatorTurn = $conversation->creator_mode_at !== null && $creatorModeTags->hasCommand($lastUserMessage['content'] ?? '');
-        $lastUserIndex = array_key_last(array_filter($validated['messages'], fn (array $message) => $message['role'] === 'user'));
-        foreach ($validated['messages'] as $index => $message) {
-            if ($message['role'] === 'user') {
-                $validated['messages'][$index]['content'] = $creatorModeTags->withoutActivations($message['content'] ?? '', $index === $lastUserIndex && $creatorNotice === self::CREATOR_MODE_ON);
-            }
-        }
-        if ($lastUserMessage) {
-            $lastUserMessage['content'] = $validated['messages'][$lastUserIndex]['content'];
-        }
+        $lastUserMessage['content'] = $creatorModeTags->withoutActivations($lastUserMessage['content'] ?? '', $creatorNotice === self::CREATOR_MODE_ON);
         $creatorMode = ['active' => $conversation->creator_mode_at !== null, 'notice' => $creatorNotice];
 
         if ($password !== null && $creatorNotice !== self::CREATOR_MODE_ON && trim($lastUserMessage['content'] ?? '') === '' && empty($lastUserMessage['images'][0])) {
             return response()->json(['conversation_id' => $conversation->id, 'content' => null, 'userContent' => '', 'creatorMode' => $creatorMode]);
         }
 
-        if ($lastUserMessage) {
-            $message = $conversation->messages()->create([
-                'role' => 'user',
-                'content' => $lastUserMessage['content'] ?? '',
-            ]);
+        $message = $conversation->messages()->create([
+            'role' => 'user',
+            'content' => $lastUserMessage['content'] ?? '',
+        ]);
 
-            if (! empty($lastUserMessage['images'][0])) {
-                $storagePath = "messages/{$request->user()->id}/{$conversation->id}";
-                Image::storeFromBase64($lastUserMessage['images'][0], $message, $storagePath);
-            }
+        if (! empty($lastUserMessage['images'][0])) {
+            $storagePath = "messages/{$request->user()->id}/{$conversation->id}";
+            Image::storeFromBase64($lastUserMessage['images'][0], $message, $storagePath);
         }
 
         $imageGenPrompt = $this->extractImageGenPrompt($lastUserMessage['content'] ?? null);
@@ -406,29 +389,25 @@ class ConversationController extends Controller
 
         $userActivity = $region !== null ? app(ResolveUserActivity::class)->handle($region, $validated['userState'] ?? null) : null;
         $residentActivity = $region !== null ? app(ResolveUserActivity::class)->handle($region, $validated['residentState'] ?? null, 'residentState') : null;
-        $prompt = app(AppendWorldConversationContext::class)->handle($assistantModel, $region, $validated['positions'] ?? null, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], residentActivity: $residentActivity);
-        $director = new PromptDirector($prompt);
-        app(AppendExpressionTags::class)->handle($director, $assistantModel, $excludedSections, Posture::from($validated['residentPosture'] ?? Posture::Standing->value));
-
-        $director->except($excludedSections);
+        $director = new PromptDirector($assistantModel->prompt);
 
         $voiceModel = null;
 
         if (! empty($validated['voice_mode'])) {
             $voiceModel = (new TtsManager)->resolveVoiceModel($assistantUser);
 
-            $voiceSections = [];
             if ($voiceModel?->provider->prompt) {
-                $voiceSections['voice provider prompt'] = $voiceModel->provider->prompt;
+                $director->append('voice provider prompt', $voiceModel->provider->prompt);
             }
             if ($voiceModel?->prompt) {
-                $voiceSections['voice model prompt'] = $voiceModel->prompt;
-            }
-
-            if ($voiceSections) {
-                $director->insertAfter('identity', $voiceSections);
+                $director->append('voice model prompt', $voiceModel->prompt);
             }
         }
+
+        app(AppendWorldConversationContext::class)->handle($director, $assistantModel, $region, $validated['positions'] ?? null, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], residentActivity: $residentActivity);
+        app(AppendExpressionTags::class)->handle($director, $assistantModel, $excludedSections, Posture::from($validated['residentPosture'] ?? Posture::Standing->value));
+
+        $director->except($excludedSections);
 
         if ($archive && ! empty($lastUserMessage['content'])) {
             $director->withRetrieval($lastUserMessage['content'], $archive->id);
@@ -443,7 +422,7 @@ class ConversationController extends Controller
             if ($inventoryResident !== null) {
                 $playerInventory = app(ResolveInventory::class)->forPlayer($worldSession);
                 $residentInventory = app(ResolveInventory::class)->forResident($worldSession, $inventoryResident);
-                $director->append('inventory', app(BuildInventoryPrompt::class)->handle($residentInventory));
+                $director->addToTurn(TurnSection::CurrentState, 'inventory', app(BuildInventoryPrompt::class)->handle($residentInventory));
             }
         }
         $playerBefore = $playerInventory?->summary();
@@ -456,7 +435,7 @@ class ConversationController extends Controller
         if ($factsResident !== null) {
             $factsPrompt = app(BuildFactsPrompt::class)->handle($worldSession, $factsResident, $turnMode);
             if ($factsPrompt !== null) {
-                $director->append('facts', $factsPrompt);
+                $director->addToTurn(TurnSection::RecentActivity, 'facts', $factsPrompt);
             }
         }
         $factTools = [];
@@ -464,22 +443,26 @@ class ConversationController extends Controller
         if ($questsResident !== null) {
             $questsPrompt = app(BuildQuestsPrompt::class)->handle($worldSession, $questsResident, $turnMode, (bool) $aiModel?->supports_tools);
             if ($questsPrompt !== null) {
-                $director->append('quests', $questsPrompt);
+                $director->addToTurn(TurnSection::RecentActivity, 'quests', $questsPrompt);
             }
             $residentFeeling = ResidentFeeling::of($worldSession, $questsResident);
             $feelingsPrompt = app(BuildFeelingsPrompt::class)->handle($residentFeeling, $turnMode, (bool) $aiModel?->supports_tools);
             if ($feelingsPrompt !== null) {
-                $director->append('feelings', $feelingsPrompt);
+                $director->addToTurn(TurnSection::RelationshipState, 'feelings', $feelingsPrompt);
             }
         }
         $questTools = [];
 
-        $systemPrompt = $director->build();
+        $layout = $director->build();
+        $systemPrompt = $layout->fullText();
 
-        $markedMessage = $lastUserIndex !== null ? app(MarkTermRules::class)->forAssistant($assistantModel, $validated['messages'][$lastUserIndex]['content'] ?? '') : null;
-        if ($markedMessage !== null) {
-            $validated['messages'][$lastUserIndex]['content'] = $markedMessage->text;
-        }
+        $markedMessage = app(MarkTermRules::class)->forAssistant($assistantModel, $lastUserMessage['content'] ?? '');
+        $requestMessages = app(ComposeChatRequest::class)->handle(
+            $layout,
+            app(BuildConversationHistory::class)->handle($conversation, $assistantModel, $message->id),
+            [...$lastUserMessage, 'content' => $markedMessage?->text ?? $lastUserMessage['content']],
+        );
+        $conversationKey = $conversation->providerSessionKey();
 
         $tts = $voiceModel ? (new TtsManager)->fromModel($voiceModel) : null;
         $agentToolCalls = null;
@@ -553,11 +536,9 @@ class ConversationController extends Controller
 
                 $agentResult = $runner->run(
                     assistant: $assistantModel,
-                    messages: [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ...$validated['messages'],
-                    ],
+                    messages: $requestMessages,
                     conversation: $conversation,
+                    conversationKey: $conversationKey,
                 );
 
                 $agentToolCalls = $agentResult->toolCalls;
@@ -565,11 +546,9 @@ class ConversationController extends Controller
                 $usage = $agentResult->usage;
             } else {
                 $response = $llm->chat(
-                    messages: [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ...$validated['messages'],
-                    ],
+                    messages: $requestMessages,
                     options: $tts?->llmOptions() ?? [],
+                    conversationKey: $conversationKey,
                 );
                 $usage = $response->usage !== null ? [$response->usage] : [];
             }
@@ -966,27 +945,17 @@ class ConversationController extends Controller
         }
 
         $director->withLongTermMemory($conversation);
+        $director->addToTurn(TurnSection::CurrentState, 'what just happened', "[You just generated and are sending an image. What it depicts: \"{$enhancedPrompt}\"]");
 
-        $history = $conversation->messages()
-            ->orderByDesc('created_at')
-            ->take(self::MESSAGES_PER_PAGE)
-            ->get(['role', 'content'])
-            ->reverse()
-            ->values()
-            ->map(fn ($m) => ['role' => $m->role, 'content' => $m->content ?? ''])
-            ->toArray();
-
-        $history[] = [
-            'role' => 'system',
-            'content' => "[You just generated and are sending an image. What it depicts: \"{$enhancedPrompt}\"]",
-        ];
+        $history = app(BuildConversationHistory::class)->handle($conversation, $assistantModel);
+        $currentMessage = array_pop($history);
 
         $llm = (new LlmManager)->forAssistantUser($assistantUser);
 
-        return $llm->chat(messages: [
-            ['role' => 'system', 'content' => $director->build()],
-            ...$history,
-        ]);
+        return $llm->chat(
+            messages: app(ComposeChatRequest::class)->handle($director->build(), $history, $currentMessage),
+            conversationKey: $conversation->providerSessionKey(),
+        );
     }
 
     /**
@@ -1015,27 +984,17 @@ class ConversationController extends Controller
         }
 
         $director->withLongTermMemory($conversation);
+        $director->addToTurn(TurnSection::CurrentState, 'what just happened', "[The scene has just moved to a new location: \"{$description}\"]");
 
-        $history = $conversation->messages()
-            ->orderByDesc('created_at')
-            ->take(self::MESSAGES_PER_PAGE)
-            ->get(['role', 'content'])
-            ->reverse()
-            ->values()
-            ->map(fn ($m) => ['role' => $m->role, 'content' => $m->content ?? ''])
-            ->toArray();
-
-        $history[] = [
-            'role' => 'system',
-            'content' => "[The scene has just moved to a new location: \"{$description}\"]",
-        ];
+        $history = app(BuildConversationHistory::class)->handle($conversation, $assistantModel);
+        $currentMessage = array_pop($history);
 
         $llm = (new LlmManager)->forAssistantUser($assistantUser);
 
-        return $llm->chat(messages: [
-            ['role' => 'system', 'content' => $director->build()],
-            ...$history,
-        ]);
+        return $llm->chat(
+            messages: app(ComposeChatRequest::class)->handle($director->build(), $history, $currentMessage),
+            conversationKey: $conversation->providerSessionKey(),
+        );
     }
 
     public function sendDiscordMessage(Request $request, int $assistant): JsonResponse
@@ -1168,77 +1127,21 @@ class ConversationController extends Controller
         $director->withLongTermMemory($conversation);
         $director->withDiscordEnvironment($conversation, $assistantUser);
 
-        $systemPrompt = $director->build();
-
-        $ownMessages = $conversation->messages()
-            ->orderBy('created_at')
-            ->get(['role', 'content', 'discord_message_id', 'created_at'])
-            ->map(fn ($m) => [
-                'role' => $m->role,
-                'content' => $m->content,
-                'discord_message_id' => $m->discord_message_id,
-                'created_at' => $m->created_at,
-            ]);
-
-        $siblingMessages = Conversation::query()
-            ->whereMorphedTo('owner', $request->user())
-            ->where('discord_channel_id', $validated['channel_id'])
-            ->where('id', '!=', $conversation->id)
-            ->with('counterpart')
-            ->get()
-            ->flatMap(function (Conversation $sibling) {
-                $assistantName = $sibling->counterpart->name;
-
-                return $sibling->messages()
-                    ->get(['role', 'content', 'discord_message_id', 'created_at'])
-                    ->map(fn ($m) => [
-                        'role' => 'user',
-                        'content' => $m->role === 'assistant' ? "{$assistantName}: {$m->content}" : $m->content,
-                        'discord_message_id' => $m->discord_message_id,
-                        'created_at' => $m->created_at,
-                    ]);
-            });
-
-        $seenDiscordMessageIds = [];
-
-        $history = $ownMessages
-            ->concat($siblingMessages)
-            ->sortBy('created_at')
-            ->values()
-            ->filter(function ($m) use (&$seenDiscordMessageIds) {
-                if (! $m['discord_message_id']) {
-                    return true;
-                }
-
-                if (in_array($m['discord_message_id'], $seenDiscordMessageIds, true)) {
-                    return false;
-                }
-
-                $seenDiscordMessageIds[] = $m['discord_message_id'];
-
-                return true;
-            })
-            ->map(fn ($m) => ['role' => $m['role'], 'content' => $m['content']])
-            ->values()
-            ->toArray();
-
-        if (! empty($validated['images'][0]) && count($history) > 0) {
-            $lastIndex = array_key_last($history);
-            $history[$lastIndex]['images'] = [$validated['images'][0]];
-        }
-
         $markedMessage = app(MarkTermRules::class)->forAssistant($assistantModel, substr($content, strlen($authorPrefix)));
-        $triggerIndex = array_key_last(array_filter($history, fn (array $entry) => $entry['role'] === 'user' && $entry['content'] === $content));
-        if ($markedMessage !== null && $triggerIndex !== null) {
-            $history[$triggerIndex]['content'] = $authorPrefix.$markedMessage->text;
-        }
+        $currentMessage = [
+            'role' => 'user',
+            'content' => $markedMessage !== null ? $authorPrefix.$markedMessage->text : $content,
+            ...(! empty($validated['images'][0]) ? ['images' => [$validated['images'][0]]] : []),
+        ];
+        $requestMessages = app(ComposeChatRequest::class)->handle(
+            $director->build(),
+            app(BuildConversationHistory::class)->forDiscordChannel($conversation, $assistantModel, $request->user(), $message),
+            $currentMessage,
+        );
 
         try {
             $llm = (new LlmManager)->forAssistantUser($assistantUser);
-            $response = $llm->chat(messages: [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ...$history,
-            ]);
+            $response = $llm->chat(messages: $requestMessages, conversationKey: $conversation->providerSessionKey());
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 502);
         }

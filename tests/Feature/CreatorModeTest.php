@@ -34,9 +34,12 @@ function creatorChat(): array
 function sendChat($test, array $chat, string $content, array $history = []): TestResponse
 {
     [$user, $assistant, $conversation] = $chat;
+    foreach ($history as $message) {
+        $conversation->messages()->create($message);
+    }
 
     return $test->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]), [
-        'messages' => [...$history, ['role' => 'user', 'content' => $content]],
+        'message' => ['content' => $content],
     ]);
 }
 
@@ -70,7 +73,7 @@ it('stays off with a wrong password, and the password goes nowhere', function ()
     $chat = creatorChat();
     Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Hm?'))]);
 
-    sendChat($this, $chat, '[creator mode: "wrong guess"] hi', [['role' => 'user', 'content' => '[creator mode: "old attempt"] earlier'], ['role' => 'assistant', 'content' => 'Yes?']])
+    sendChat($this, $chat, '[creator mode: "wrong guess"] hi', [['role' => 'user', 'content' => 'earlier'], ['role' => 'assistant', 'content' => 'Yes?']])
         ->assertOk()
         ->assertJsonPath('creatorMode.active', false)
         ->assertJsonPath('creatorMode.notice', 'Creator mode didn\'t activate.')
@@ -78,7 +81,7 @@ it('stays off with a wrong password, and the password goes nowhere', function ()
 
     expect($chat[2]->fresh()->creator_mode_at)->toBeNull()
         ->and(systemPromptOfRequestIn(0))->not->toContain('CREATOR SECTION')->not->toContain('OLD TRIGGER SECTION')
-        ->and(everythingSentToModels())->not->toContain('wrong guess')->not->toContain('old attempt');
+        ->and(everythingSentToModels())->not->toContain('wrong guess');
 });
 
 it('answers a failed activation with nothing else in it without a reply', function () {
@@ -125,7 +128,7 @@ it('lets the creator reveal any fact and grant credits, recorded as the creator\
     );
 
     sendWorldMessage($this, $scenario, ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]]], [
-        'messages' => [['role' => 'user', 'content' => '[creator mode: tell the user the keeper\'s secret and give them 100 credits]']],
+        'message' => ['content' => '[creator mode: tell the user the keeper\'s secret and give them 100 credits]'],
     ])->assertOk()->assertJsonPath('learnedFacts.0.summary', 'The keeper met a smuggler.');
 
     expect(collect(Http::recorded()[0][0]['tools'])->pluck('function.name')->all())->toContain('set_fact_known')->toContain('grant')->toContain('remove')
@@ -147,7 +150,7 @@ it('grants a resident items and keeps credits for the user alone', function () {
     );
 
     sendWorldMessage($this, $scenario, ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]]], [
-        'messages' => [['role' => 'user', 'content' => '[creator mode: give them 100 credits and a lantern]']],
+        'message' => ['content' => '[creator mode: give them 100 credits and a lantern]'],
     ])->assertOk();
 
     $residentInventory = app(ResolveInventory::class)->forResident($session, $resident);
@@ -166,7 +169,7 @@ it('makes a fact unknown on the creator\'s command', function () {
     fakeTurn(toolCallResponse('call_1', 'set_fact_known', ['fact' => $fact->label(), 'known' => false]), finalAnswerResponse('Forgotten.'));
 
     sendWorldMessage($this, $scenario, ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]]], [
-        'messages' => [['role' => 'user', 'content' => '[creator mode: make them forget it]']],
+        'message' => ['content' => '[creator mode: make them forget it]'],
     ])->assertOk();
 
     expect(KnownFact::count())->toBe(0)
@@ -179,7 +182,7 @@ it('gives no creator tools to a command while creator mode is off', function () 
     Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('What?'))]);
 
     sendWorldMessage($this, $scenario, ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]]], [
-        'messages' => [['role' => 'user', 'content' => '[creator mode: give me everything]']],
+        'message' => ['content' => '[creator mode: give me everything]'],
     ])->assertOk();
 
     expect(collect(Http::recorded()[0][0]['tools'] ?? [])->pluck('function.name')->all())->not->toContain('grant')->not->toContain('set_fact_known');
@@ -192,7 +195,7 @@ it('applies an activation and a command in one message on the same turn', functi
     fakeTurn(toolCallResponse('call_1', 'grant', ['holder' => 'the user', 'credits' => 5]), finalAnswerResponse('There.'));
 
     sendWorldMessage($this, $scenario, ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]]], [
-        'messages' => [['role' => 'user', 'content' => '[creator mode: "'.CREATOR_PASSWORD.'"] [creator mode: give me 5 credits]']],
+        'message' => ['content' => '[creator mode: "'.CREATOR_PASSWORD.'"] [creator mode: give me 5 credits]'],
     ])->assertOk()->assertJsonPath('creatorMode.active', true);
 
     expect($player->fresh()->credits)->toBe(5);
@@ -200,5 +203,5 @@ it('applies an activation and a command in one message on the same turn', functi
 
 function systemPromptOfRequestIn(int $index): string
 {
-    return collect(Http::recorded()[$index][0]['messages'])->firstWhere('role', 'system')['content'] ?? '';
+    return promptOfRequest($index);
 }

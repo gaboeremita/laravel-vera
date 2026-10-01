@@ -73,7 +73,7 @@ it('tells her who is in the room with her before she decides', function () {
 
     decide($this, $scenario)->assertCreated();
 
-    expect(sentSystemPrompt())->toContain('Here with you: Vera: about 1 m away from you');
+    expect(sentPrompt())->toContain('Here with you: Vera: about 1 m away from you');
 });
 
 it('keeps residents and the user in other rooms out of what she knows and whom she can talk to', function () {
@@ -87,7 +87,7 @@ it('keeps residents and the user in other rooms out of what she knows and whom s
     ]])->assertCreated();
 
     expect(collect(Http::recorded()[0][0]['tools'])->firstWhere('function.name', 'talk_to'))->toBeNull()
-        ->and(sentSystemPrompt())->toContain('The user is: somewhere out of sight')
+        ->and(sentPrompt())->toContain('The user is: somewhere out of sight')
         ->not->toContain('Here with you')
         ->not->toContain('Music studio, on the Ground floor, about');
 });
@@ -100,7 +100,7 @@ it('tells both residents who is in the room on a conversation turn', function ()
 
     takeTurn($this, $scenario, $conversation)->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain('Here with you: Yinlin: about 1 m away from you')->toContain('The user is: in Pool terrace');
+    expect(sentPrompt())->toContain('Here with you: Yinlin: about 1 m away from you')->toContain('The user is: in Pool terrace');
 });
 
 it('decides to talk to the user without saving the line before she gets there', function () {
@@ -183,7 +183,7 @@ it('keeps her from talking to the user while the user is busy with someone else'
 
     $talkTo = collect(Http::recorded()[0][0]['tools'])->firstWhere('function.name', 'talk_to');
     expect($talkTo['function']['parameters']['properties']['target']['enum'])->not->toContain('user')
-        ->and(sentSystemPrompt())->toContain(', busy talking with Vera');
+        ->and(sentPrompt())->toContain(', busy talking with Vera');
 });
 
 it('refuses to start a conversation with a resident who is talking with someone else', function () {
@@ -209,7 +209,7 @@ it('leaves residents the world reports busy out of talk_to and says who they are
 
     $talkTo = collect(Http::recorded()[0][0]['tools'])->firstWhere('function.name', 'talk_to');
     expect($talkTo['function']['parameters']['properties']['target']['enum'])->not->toContain('Vera')
-        ->and(sentSystemPrompt())->toContain('Vera: about 1 m away from you, busy with you');
+        ->and(sentPrompt())->toContain('Vera: about 1 m away from you, busy with you');
 });
 
 it('answers with the resident who did not speak last', function () {
@@ -225,7 +225,7 @@ it('answers with the resident who did not speak last', function () {
         ->assertJsonPath('message.residentId', $vera->id)
         ->assertJsonPath('message.content', 'I did, it was lovely.');
 
-    expect(sentSystemPrompt())->toContain('You are talking with Yinlin in person');
+    expect(sentPrompt())->toContain('You are talking with Yinlin in person');
 });
 
 it('plays the pose she picks with her line and drops tags she made up', function () {
@@ -242,7 +242,7 @@ it('plays the pose she picks with her line and drops tags she made up', function
         ->assertJsonPath('message.content', 'I did, it was lovely.')
         ->assertJsonPath('message.pose', 'laugh');
 
-    expect(sentSystemPrompt())->toContain('Use [pose: <exact pose name>] to select a pose')
+    expect(sentPrompt())->toContain('Use [pose: <exact pose name>] to select a pose')
         ->and(Message::latest('id')->first()->expression)->toBe(['pose' => 'laugh', 'tags' => ['pose' => ['laugh'], 'stray' => ['amused']]]);
 });
 
@@ -347,7 +347,7 @@ it('reminds her of her conversations with others when she talks to the user', fu
 
     sendWorldMessage($this, $scenario, residentPositions($scenario))->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain("With Vera:\nVera: The keytars are his.");
+    expect(sentPrompt())->toContain("With Vera:\nVera: The keytars are his.");
 });
 
 it('stops a conversation with an NPC after four lines each', function () {

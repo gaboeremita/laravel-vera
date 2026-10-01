@@ -11,6 +11,9 @@ class LlmResponseTagParser
 
     private const OUT_OF_CHARACTER = '/\[\s*ooc\s*(?::[^\]\r\n]*)?\]/iu';
 
+    /** @var array<int, array{emotions: array<int, string>, poses: array<int, string>}> */
+    private array $namesByAssistant = [];
+
     /**
      * @return array{
      *     content: string,
@@ -29,10 +32,7 @@ class LlmResponseTagParser
         $intimate = false;
         $tags = [];
 
-        $regularEmotions = $assistant->promptEmotionNames()['regular'];
-        $intimateEmotions = $assistant->promptEmotionNames()['intimate'];
-        $emotionNames = [...$regularEmotions, ...$intimateEmotions];
-        $poseNames = $assistant->poseNames();
+        ['emotions' => $emotionNames, 'poses' => $poseNames] = $this->names($assistant);
 
         $content = preg_replace_callback(
             '/\[(?<identifier>[a-z][a-z0-9 _-]*):\s*(?<value>[^\]\r\n]*)\]/iu',
@@ -110,6 +110,25 @@ class LlmResponseTagParser
             'intimate' => $intimate,
             'tags' => $tags,
         ];
+    }
+
+    /**
+     * The assistant's emotion and pose names, read once per parser, since a
+     * whole conversation history can be parsed for the same assistant.
+     *
+     * @return array{emotions: array<int, string>, poses: array<int, string>}
+     */
+    private function names(Assistant $assistant): array
+    {
+        if (! isset($this->namesByAssistant[$assistant->id])) {
+            $emotionNames = $assistant->promptEmotionNames();
+            $this->namesByAssistant[$assistant->id] = [
+                'emotions' => [...$emotionNames['regular'], ...$emotionNames['intimate']],
+                'poses' => $assistant->poseNames(),
+            ];
+        }
+
+        return $this->namesByAssistant[$assistant->id];
     }
 
     /**

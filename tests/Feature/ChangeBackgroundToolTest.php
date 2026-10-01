@@ -22,7 +22,7 @@ test('the background tool is offered to 3D avatar assistants in agent mode', fun
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+        ['message' => ['content' => 'hello']],
     )->assertSuccessful();
 
     expect(offeredToolNames())->toContain('change_background');
@@ -35,7 +35,7 @@ test('the background tool is left out for assistants without a 3D avatar', funct
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+        ['message' => ['content' => 'hello']],
     )->assertSuccessful();
 
     expect(offeredToolNames())->not->toContain('change_background');
@@ -53,7 +53,7 @@ test('calling the background tool queues a background for the described setting'
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'change the background to the library']]],
+        ['message' => ['content' => 'change the background to the library']],
     )->assertSuccessful();
 
     Queue::assertPushed(GenerateAvatarBackground::class, fn (GenerateAvatarBackground $job) => $job->description === 'the library' && $job->conversation->is($conversation));

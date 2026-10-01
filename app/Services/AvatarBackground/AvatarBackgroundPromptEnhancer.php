@@ -83,7 +83,7 @@ class AvatarBackgroundPromptEnhancer
 
         $director->withLongTermMemory($conversation);
 
-        return $director->build();
+        return $director->build()->fullText();
     }
 
     /**

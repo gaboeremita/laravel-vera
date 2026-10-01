@@ -350,7 +350,7 @@ it('tells a resident who sells what in their region, and nothing that is not for
 
     requestTermsDecision($this, $scenario, [$vendor->id => ['x' => 6, 'y' => 0, 'z' => -3]])->assertCreated();
 
-    expect(sentSystemPrompt())
+    expect(sentPrompt())
         ->toContain('Rosa (serves at the Pool lounger, now in Pool terrace): Tacos')
         ->toContain('It costs you nothing')
         ->not->toContain('Secret salsa');

@@ -17,17 +17,14 @@ test('pose names are added to the system prompt under a pose tags section when p
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+        ['message' => ['content' => 'hello']],
     );
 
-    Http::assertSent(function ($request) {
-        $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
-
-        return str_contains($systemContent, 'Pose tags')
-            && str_contains($systemContent, 'spin')
-            && str_contains($systemContent, 'dance')
-            && str_contains($systemContent, '[pose: <exact pose name>]');
-    });
+    expect(promptOfRequest())->toContain('# POSE TAGS')
+        ->toContain('[pose: <exact pose name>]')
+        ->toContain("# CURRENT STATE\nPose tags:")
+        ->toContain('spin')
+        ->toContain('dance');
 });
 
 test('the pose-tags section is omitted for an assistant with no poses configured', function () {
@@ -39,14 +36,10 @@ test('the pose-tags section is omitted for an assistant with no poses configured
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+        ['message' => ['content' => 'hello']],
     );
 
-    Http::assertSent(function ($request) {
-        $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
-
-        return ! str_contains($systemContent, 'Pose tags');
-    });
+    expect(promptOfRequest())->not->toContain('# POSE TAGS')->not->toContain('Pose tags:');
 });
 
 test('the pose-tags section is omitted for an image-portrait assistant even with poses configured', function () {
@@ -59,14 +52,10 @@ test('the pose-tags section is omitted for an image-portrait assistant even with
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+        ['message' => ['content' => 'hello']],
     );
 
-    Http::assertSent(function ($request) {
-        $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
-
-        return ! str_contains($systemContent, 'Pose tags');
-    });
+    expect(promptOfRequest())->not->toContain('# POSE TAGS')->not->toContain('Pose tags:');
 });
 
 test('the emotion-tags section documents identified emotion tags', function () {
@@ -78,12 +67,8 @@ test('the emotion-tags section documents identified emotion tags', function () {
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+        ['message' => ['content' => 'hello']],
     );
 
-    Http::assertSent(function ($request) {
-        $systemContent = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
-
-        return str_contains($systemContent, '[emotion: <exact emotion name>]');
-    });
+    expect(promptOfRequest())->toContain('# EMOTION TAGS')->toContain('[emotion: <exact emotion name>]');
 });

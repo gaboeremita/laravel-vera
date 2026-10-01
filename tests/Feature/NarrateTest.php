@@ -19,7 +19,7 @@ it('returns the narrator\'s verdict and describes the attempt to it', function (
     $request = Http::recorded()[0][0];
     expect(collect($request['tools'])->pluck('function.name')->all())->toBe(['narrate'])
         ->and(collect($request['messages'])->firstWhere('role', 'user')['content'])->toContain('Requirement: the iron key')
-        ->and(sentSystemPrompt())->toContain("narrator of {$region->world->name}");
+        ->and(sentPrompt())->toContain("narrator of {$region->world->name}");
 });
 
 it('fails loudly when the narrator gives no verdict', function () {

@@ -152,4 +152,13 @@ class Conversation extends Model
                 ->orWhere(fn (Builder $query) => $query->whereMorphedTo('owner', $second)->whereMorphedTo('counterpart', $first));
         });
     }
+
+    /**
+     * The value sent to model providers so every request of this conversation
+     * shares one provider-side cache, without exposing the database id.
+     */
+    public function providerSessionKey(): string
+    {
+        return hash_hmac('sha256', "conversation:{$this->id}", (string) config('app.key'));
+    }
 }

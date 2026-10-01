@@ -93,7 +93,7 @@ it('keeps secret places out of her tools and tells her which places are private'
         ->not->toContain('the-orphanage')
         ->not->toContain('war-room')
         ->not->toContain('war-table');
-    expect(sentSystemPrompt())
+    expect(sentPrompt())
         ->toContain("Private places you go into only when the user asks you to:\nGround floor: Row house [mona-house]")
         ->not->toContain('Orphanage');
 });

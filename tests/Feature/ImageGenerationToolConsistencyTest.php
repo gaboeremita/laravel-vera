@@ -21,12 +21,12 @@ test('the tool and the manual command use the same per-assistant image-gen confi
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'show me a fox']]],
+        ['message' => ['content' => 'show me a fox']],
     )->assertSuccessful();
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => '/create-image a fox']]],
+        ['message' => ['content' => '/create-image a fox']],
     )->assertSuccessful();
 
     Http::assertSentCount(7);

@@ -228,7 +228,7 @@ it('asks her own model with her persona, the world, her history and what she can
 
     requestDecision($this, $scenario, ['residentPosture' => 'sitting', 'occupiedSpots' => ['pool-lounger-1-seat']])->assertCreated();
 
-    $prompt = sentSystemPrompt();
+    $prompt = sentPrompt();
     expect($prompt)
         ->toContain('World state:')
         ->toContain('You are in: Pool terrace')
@@ -252,7 +252,7 @@ it('tells her what the user is doing when she decides', function () {
 
     requestDecision($this, $scenario, ['userState' => ['posture' => 'reclining', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'recline']])->assertCreated();
 
-    expect(sentSystemPrompt())->toContain(', reclining on the Pool lounger');
+    expect(sentPrompt())->toContain(', reclining on the Pool lounger');
 });
 
 it('rejects a decision request whose user state names an unknown spot', function () {
@@ -285,7 +285,7 @@ it('shows her the last messages of her session conversation when she decides', f
 
     requestDecision($this, $scenario)->assertCreated();
 
-    expect(sentSystemPrompt())
+    expect(sentPrompt())
         ->toContain('Recent conversation, oldest first:')
         ->toContain("the user: hello there\nyou: hi yourself\nthe user: ".str_repeat('a', 300)."\nyou: that is a lot of a\nthe user: see you\nyou: *I see the user sit down at the bar counter*")
         ->not->toContain('the oldest words')
@@ -299,5 +299,5 @@ it('leaves out the recent conversation when there is none', function () {
 
     requestDecision($this, $scenario)->assertCreated();
 
-    expect(sentSystemPrompt())->not->toContain('Recent conversation, oldest first:');
+    expect(sentPrompt())->not->toContain('Recent conversation, oldest first:');
 });

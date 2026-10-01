@@ -18,7 +18,7 @@ test('a reply with no [scene: ...] tag never dispatches background regeneration'
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'how are you?']]],
+        ['message' => ['content' => 'how are you?']],
     );
 
     $response->assertSuccessful();
@@ -38,7 +38,7 @@ test('a non-3D-avatar assistant never has its reply parsed for a scene tag', fun
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hi']]],
+        ['message' => ['content' => 'hi']],
     );
 
     $response->assertSuccessful();

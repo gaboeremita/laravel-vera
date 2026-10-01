@@ -21,7 +21,7 @@ function questChatPositions(WorldResident $resident): array
 
 function questPromptOfRequest(int $index = 0): string
 {
-    return collect(Http::recorded()[$index][0]['messages'])->firstWhere('role', 'system')['content'] ?? '';
+    return promptOfRequest($index);
 }
 
 /**

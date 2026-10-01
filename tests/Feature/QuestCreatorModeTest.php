@@ -36,9 +36,9 @@ it('gives the character the quest tools only on creator turns', function () {
     $positions = ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]]];
     fakeTurn(finalAnswerResponse('No.'), finalAnswerResponse('Done.'));
 
-    sendWorldMessage($this, $scenario, $positions, ['messages' => [['role' => 'user', 'content' => '[creator mode: finish the first beat]']]])->assertOk();
+    sendWorldMessage($this, $scenario, $positions, ['message' => ['content' => '[creator mode: finish the first beat]']])->assertOk();
     $conversation->update(['creator_mode_at' => now()]);
-    sendWorldMessage($this, $scenario, $positions, ['messages' => [['role' => 'user', 'content' => '[creator mode: finish the first beat]']]])->assertOk();
+    sendWorldMessage($this, $scenario, $positions, ['message' => ['content' => '[creator mode: finish the first beat]']])->assertOk();
 
     $tools = fn (int $index) => collect(Http::recorded()[$index][0]['tools'] ?? [])->pluck('function.name')->all();
     expect($tools(0))->not->toContain('set_beat')

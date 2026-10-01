@@ -18,7 +18,7 @@ function feelingsPositions(WorldResident $resident): array
 
 function feelingsPromptSent(int $index = 0): string
 {
-    return collect(Http::recorded()[$index][0]['messages'])->firstWhere('role', 'system')['content'] ?? '';
+    return promptOfRequest($index);
 }
 
 it('tells the resident how they feel about the user, starting neutral, and lets them change it in character', function () {
@@ -44,7 +44,7 @@ it('lets the user read and set the numbers out of character', function () {
     $conversation->update(['world_session_id' => $session->id]);
     fakeTurn(toolCallResponse('feel_1', 'adjust_feelings', ['romance' => 8, 'reason' => 'The user asked for romance 8.']), finalAnswerResponse('Done.'));
 
-    sendWorldMessage($this, $scenario, feelingsPositions($resident), ['messages' => [['role' => 'user', 'content' => '[OOC: set your romance to 8]']]])->assertOk();
+    sendWorldMessage($this, $scenario, feelingsPositions($resident), ['message' => ['content' => '[OOC: set your romance to 8]']])->assertOk();
 
     expect(feelingsPromptSent())->toContain('tell them the numbers plainly')->not->toContain('Keep the numbers to yourself')
         ->and(ResidentFeeling::of($session, $resident)->romance)->toBe(8.0);

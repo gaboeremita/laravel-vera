@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\AppendWorldConversationContext;
+use App\Directors\PromptDirector;
 use App\Enums\AssistantKind;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
@@ -12,6 +13,14 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
+
+function worldContextPrompt(Assistant $assistant, ?Region $region): string
+{
+    $director = new PromptDirector($assistant->prompt);
+    (new AppendWorldConversationContext)->handle($director, $assistant, $region);
+
+    return $director->build()->unchanging();
+}
 
 it('layers the world prompt, the region prompt and the region name without mutating the base prompt', function () {
     $world = Region::factory()->for(World::factory()->state([
@@ -29,11 +38,9 @@ it('layers the world prompt, the region prompt and the region name without mutat
         ['assistant_id' => $npc->id, 'position' => ['x' => 1, 'y' => 0, 'z' => 0], 'behavior' => 'stationary'],
     ]);
 
-    $action = new AppendWorldConversationContext;
-
-    expect($action->handle($assistant, $world)['world_context'])->toBe(['Assistant world prompt', 'Assistant world context', 'You are in Lua Building.']);
-    expect($action->handle($npc, $world)['world_context'])->toBe(['NPC world prompt', 'NPC world context', 'You are in Lua Building.']);
-    expect($action->handle($assistant, null))->toBe(['identity' => ['Base identity']]);
+    expect(worldContextPrompt($assistant, $world))->toContain("# WORLD CONTEXT\nAssistant world prompt, Assistant world context, You are in Lua Building.");
+    expect(worldContextPrompt($npc, $world))->toContain("# WORLD CONTEXT\nNPC world prompt, NPC world context, You are in Lua Building.");
+    expect(worldContextPrompt($assistant, null))->toStartWith("# IDENTITY\nBase identity")->not->toContain('# WORLD CONTEXT');
     expect($assistant->fresh()->prompt)->toBe(['identity' => ['Base identity']]);
 });
 
@@ -47,14 +54,7 @@ it('adds a resident-specific custom prompt on top of the world context', functio
         'custom_prompt' => 'Only this placement knows about the hidden door.',
     ]);
 
-    $action = new AppendWorldConversationContext;
-
-    expect($action->handle($assistant, $world)['world_context'])->toBe([
-        'Assistant world prompt',
-        'Assistant world context',
-        'You are in Lua Building.',
-        'Only this placement knows about the hidden door.',
-    ]);
+    expect(worldContextPrompt($assistant, $world))->toContain("# WORLD CONTEXT\nAssistant world prompt, Assistant world context, You are in Lua Building., Only this placement knows about the hidden door.");
 });
 
 it('tells a resident the short line known about each other resident of their region, and nothing about the rest', function () {
@@ -72,9 +72,7 @@ it('tells a resident the short line known about each other resident of their reg
     $place($region, 'Secret', null);
     $place($elsewhere, 'Faraway', 'Lives in another region.');
 
-    $prompt = (new AppendWorldConversationContext)->handle($listener->assistant, $region);
-
-    expect($prompt['neighbours'])->toBe("People around here, as far as you know them:\n- Oxygen: The diver of the Sump.\n- Stranger: A strange man who roams Pipe Street at night.");
+    expect(worldContextPrompt($listener->assistant, $region))->toContain("# NEIGHBOURS\nPeople around here, as far as you know them:\n- Oxygen: The diver of the Sump.\n- Stranger: A strange man who roams Pipe Street at night.\n\n");
 });
 
 it('leaves out who is around when nobody else in the region has a known line', function () {
@@ -82,7 +80,7 @@ it('leaves out who is around when nobody else in the region has a known line', f
     $assistant = Assistant::factory()->create(['kind' => AssistantKind::WorldNpc]);
     $region->residents()->create(['assistant_id' => $assistant->id, 'position' => ['x' => 0, 'y' => 0, 'z' => 0], 'behavior' => 'stationary', 'public_description' => 'Known to others.']);
 
-    expect((new AppendWorldConversationContext)->handle($assistant, $region))->not->toHaveKey('neighbours');
+    expect(worldContextPrompt($assistant, $region))->not->toContain('# NEIGHBOURS');
 });
 
 it('uses a resident-specific opening message when starting a fresh world conversation', function () {
@@ -122,6 +120,6 @@ it('rejects a character that is not a resident of the requested world', function
     $world = Region::factory()->create();
     $assistant = Assistant::factory()->create();
 
-    expect(fn () => (new AppendWorldConversationContext)->handle($assistant, $world))
+    expect(fn () => worldContextPrompt($assistant, $world))
         ->toThrow(AuthorizationException::class);
 });

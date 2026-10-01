@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Builders\PromptBuilder;
+use App\Directors\PromptDirector;
 use App\Models\Conversation;
 use App\Services\LlmProviders\LlmManager;
 
@@ -114,7 +115,7 @@ class SummarizeConversation
             $existing = $conversation->long_term_memory;
 
             $conversation->update([
-                'long_term_memory' => $existing ? "{$summary}\n\n---\n\n{$existing}" : $summary,
+                'long_term_memory' => $existing ? $existing.PromptDirector::MEMORY_SEPARATOR.$summary : $summary,
                 'memory_checkpoint_message_id' => $batchEnd,
             ]);
 

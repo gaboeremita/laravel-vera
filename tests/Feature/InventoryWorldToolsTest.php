@@ -124,7 +124,7 @@ it('tells a resident what they carry and never what the player carries', functio
 
     sendWorldMessage($this, $scenario, chatPositions($scenario))->assertOk();
 
-    expect(sentSystemPrompt())
+    expect(sentPrompt())
         ->toContain('You can pay or give the user any amount of credits the moment calls for.')
         ->toContain('4 Bread (for sale, usually 2 credits for one Bread)')
         ->not->toContain('Secret map')
@@ -150,7 +150,7 @@ it('lets residents hand each other items for free while they talk', function () 
     $giveTool = collect(Http::recorded()[0][0]['tools'])->firstWhere('function.name', 'give');
     $yinlinInventory = app(ResolveInventory::class)->forResident($session, $first);
     expect($giveTool['function']['parameters']['properties'])->not->toHaveKey('credits')
-        ->and(sentSystemPrompt())->toContain('nothing really costs credits')->not->toContain('any amount of credits')
+        ->and(sentPrompt())->toContain('nothing really costs credits')->not->toContain('any amount of credits')
         ->and($veraInventory->fresh()->credits)->toBeNull()
         ->and($veraInventory->items()->first()->quantity)->toBe(1)
         ->and($yinlinInventory->items()->first()->quantity)->toBe(2);

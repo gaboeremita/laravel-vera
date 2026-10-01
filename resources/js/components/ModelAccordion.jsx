@@ -84,6 +84,34 @@ export default function ModelAccordion({ model, configSchema, onUpdate, onSave, 
 					</label>
 				</div>
 
+				{/* Send Cache Marks */}
+				<div>
+					<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase flex items-center gap-2 cursor-pointer w-fit">
+						<input
+							type="checkbox"
+							checked={!!model.cache_marks}
+							onChange={(e) => onUpdate('cache_marks', e.target.checked)}
+							className="accent-accent"
+						/>
+						Send cache marks
+					</label>
+				</div>
+
+				{/* Conversation ID Field */}
+				<div>
+					<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+						Conversation ID field
+						<span className="text-fg-3 ml-2 normal-case">optional</span>
+					</label>
+					<input
+						type="text"
+						value={model.conversation_key_field ?? ''}
+						onChange={(e) => onUpdate('conversation_key_field', e.target.value)}
+						className="w-full bg-bg-1 border border-line-1 text-accent text-sm px-3 py-2 outline-none focus:border-accent/50 transition-colors"
+						placeholder="e.g. session_id, prompt_cache_key"
+					/>
+				</div>
+
 				{/* Prompt */}
 			<div>
 				<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
