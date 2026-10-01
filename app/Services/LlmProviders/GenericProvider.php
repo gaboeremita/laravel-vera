@@ -107,9 +107,21 @@ class GenericProvider implements LlmProvider
             arguments: json_decode($toolCall['function']['arguments'], associative: true) ?? [],
         ), $choice['tool_calls'] ?? []);
 
+        $content = $choice['content'] ?? '';
+        $thinking = $this->thinkingKey ? ($choice[$this->thinkingKey] ?? null) : null;
+
+        /**
+         * Some reasoning models (e.g. DeepSeek) occasionally skip reasoning and deliver
+         * the whole reply in the reasoning field with empty content.
+         */
+        if ($toolCalls === [] && blank($content) && filled($thinking)) {
+            $content = $thinking;
+            $thinking = null;
+        }
+
         return new LlmResponse(
-            content: $choice['content'] ?? '',
-            thinking: $this->thinkingKey ? ($choice[$this->thinkingKey] ?? null) : null,
+            content: $content,
+            thinking: $thinking,
             toolCalls: $toolCalls,
             usage: $data['usage'] ?? null,
         );

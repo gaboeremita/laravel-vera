@@ -42,7 +42,7 @@ it('sends two web turns that match from the start through the first turn\'s mess
         ->and($second[2])->toBe(['role' => 'assistant', 'content' => 'Hello!'])
         ->and(Http::recorded()[0][0]['session_id'])->toBe($conversation->providerSessionKey())
         ->and(Http::recorded()[1][0]['session_id'])->toBe($conversation->providerSessionKey())
-        ->and(Http::recorded()[1][0]['tools'])->toBe(Http::recorded()[0][0]['tools']);
+        ->and(Http::recorded()[1][0]['tools'])->toEqual(Http::recorded()[0][0]['tools']);
 });
 
 it('sends at most 100 previous messages on Discord, however long the channel history is', function () {
