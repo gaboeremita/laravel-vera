@@ -142,9 +142,9 @@ tests/
   - `useConversationChat.sendMessage` posts `{message: {content, images?}, …extraParams}`.
   - `ModelAccordion.jsx` adds a checkbox and a text input, using the existing field components and the labels approved below.
 
-## Names pending approval
+## Names
 
-Per CLAUDE.md, none of these are used until the owner approves them.
+Approved by the owner.
 
 | Proposed name | Refers to |
 |---|---|

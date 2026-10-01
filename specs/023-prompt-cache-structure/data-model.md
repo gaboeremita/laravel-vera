@@ -1,6 +1,6 @@
 # Data Model: Cache-Friendly Prompt Structure
 
-All names are pending the owner's approval (see plan.md).
+Names are listed in plan.md under "Names".
 
 ## Stored data
 

@@ -1,6 +1,6 @@
 # Research: Cache-Friendly Prompt Structure
 
-All names introduced below (classes, enums, columns, request keys, UI labels) are proposals pending the owner's approval. They are listed in plan.md under "Names pending approval".
+The names introduced below (classes, enums, columns, request keys, UI labels) are listed in plan.md under "Names".
 
 ## R1. One provider-neutral request shape, translated by each provider
 
