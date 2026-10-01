@@ -7,6 +7,7 @@ use App\Enums\AssistantKind;
 use App\Enums\ConversationStatus;
 use App\Enums\Posture;
 use App\Enums\TurnMode;
+use App\Enums\TurnSection;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
@@ -38,14 +39,14 @@ class GenerateResidentConversationTurn
      */
     public const NPC_LINES_PER_SITTING = 4;
 
-    private const HISTORY_LIMIT = 30;
-
     public function __construct(
         private readonly AppendExpressionTags $appendExpressionTags,
         private readonly AppendWorldConversationContext $appendWorldConversationContext,
         private readonly BuildResidentWorldPrompt $buildResidentWorldPrompt,
         private readonly LlmResponseTagParser $tagParser,
         private readonly ResolveResidentRegion $resolveResidentRegion,
+        private readonly BuildConversationHistory $buildConversationHistory,
+        private readonly ComposeChatRequest $composeChatRequest,
     ) {}
 
     /**
@@ -89,33 +90,32 @@ class GenerateResidentConversationTurn
         $region = $this->resolveResidentRegion->handle($session, $speakerResident);
         $assistantUser = AssistantUser::where('user_id', $session->worldUser->user_id)->where('assistant_id', $speaker->id)->firstOrFail();
 
-        $director = new PromptDirector($this->appendWorldConversationContext->handle($speaker, $region, $positions, $session));
+        $director = new PromptDirector($speaker->prompt);
+        $this->appendWorldConversationContext->handle($director, $speaker, $region, $positions, $session);
         $director->append('talking with', $this->buildResidentWorldPrompt->conversationTurnInstruction($other->name));
         $excluded = ['opening_message', 'voice mode', 'image handling', 'OOC mode', 'conversations_with_others', 'secret trigger', 'creator mode'];
         $this->appendExpressionTags->handle($director, $speaker, $excluded, $posturesByAssistantId[$speaker->id] ?? Posture::Standing);
         $director->except($excluded);
         $otherResident = $session->worldUser->world->residents()->where('assistant_id', $other->id)->first();
         $speakerInventory = app(ResolveInventory::class)->forResident($session, $speakerResident);
-        $director->append('inventory', app(BuildInventoryPrompt::class)->handle($speakerInventory, talkingWithUser: false));
+        $director->addToTurn(TurnSection::CurrentState, 'inventory', app(BuildInventoryPrompt::class)->handle($speakerInventory, talkingWithUser: false));
         $factsPrompt = app(BuildFactsPrompt::class)->handle($session, $speakerResident, TurnMode::BetweenResidents);
         if ($factsPrompt !== null) {
-            $director->append('facts', $factsPrompt);
+            $director->addToTurn(TurnSection::RecentActivity, 'facts', $factsPrompt);
         }
         $questsPrompt = app(BuildQuestsPrompt::class)->handle($session, $speakerResident, TurnMode::BetweenResidents);
         if ($questsPrompt !== null) {
-            $director->append('quests', $questsPrompt);
+            $director->addToTurn(TurnSection::RecentActivity, 'quests', $questsPrompt);
         }
         $userChat = $assistantUser->conversations()->where('world_session_id', $session->id)->first();
         if ($userChat !== null) {
             $director->withLongTermMemory($userChat);
         }
 
-        $history = $conversation->messages()->latest('id')->limit(self::HISTORY_LIMIT)->get()->reverse()
-            ->map(fn (Message $message) => $message->speaker_id === $speaker->id
-                ? ['role' => 'assistant', 'content' => (string) $message->content]
-                : ['role' => 'user', 'content' => "{$other->name}: {$message->content}"])
-            ->values()
-            ->all();
+        $history = array_map(fn (Message $message) => $message->speaker_id === $speaker->id
+            ? ['role' => 'assistant', 'content' => (string) $message->content]
+            : ['role' => 'user', 'content' => "{$other->name}: {$message->content}"], $this->buildConversationHistory->residentMessages($conversation));
+        $currentMessage = array_pop($history);
 
         $llmManager = new LlmManager;
         $aiModel = $llmManager->resolveModelForAssistantUser($assistantUser);
@@ -127,8 +127,9 @@ class GenerateResidentConversationTurn
         }
         $result = (new AgentLoopRunner($llm, $aiModel?->supports_tools ? $tools : []))->run(
             assistant: $speaker,
-            messages: [['role' => 'system', 'content' => $director->build()], ...$history],
+            messages: $this->composeChatRequest->handle($director->build(), $history, $currentMessage),
             conversation: $conversation,
+            conversationKey: $conversation->providerSessionKey(),
         );
 
         $parsed = $this->tagParser->parse($result->content, $speaker);

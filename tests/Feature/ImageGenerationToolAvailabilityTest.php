@@ -15,7 +15,7 @@ test('the image tool is not offered when image generation is not configured', fu
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+        ['message' => ['content' => 'hello']],
     );
 
     $response->assertSuccessful();
@@ -38,7 +38,7 @@ test('the image tool is offered when a global default image-gen configuration ex
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+        ['message' => ['content' => 'hello']],
     );
 
     $response->assertSuccessful();

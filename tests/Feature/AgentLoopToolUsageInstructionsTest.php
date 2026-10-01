@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\AiModel;
+use App\Models\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -16,7 +18,7 @@ test('every request in the loop tells the model how to treat an already-returned
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'what is 1 + 1?']]],
+        ['message' => ['content' => 'what is 1 + 1?']],
     )->assertSuccessful();
 
     Http::assertSentCount(2);
@@ -39,12 +41,34 @@ test('the tool-usage instruction is appended to the existing system prompt, not 
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+        ['message' => ['content' => 'hello']],
     )->assertSuccessful();
 
     Http::assertSent(function ($request) {
         $systemMessages = collect($request['messages'])->where('role', 'system');
 
         return $systemMessages->count() === 1;
+    });
+});
+
+test('with cache marks on, the tool-usage instruction sits inside the cached unchanging part', function () {
+    [$user, $assistant, $conversation] = setUpAgentAssistant();
+    $aiModel = AiModel::find(Settings::where('user_id', $user->id)->first()->data['ai_model_id']);
+    $aiModel->update(['cache_marks' => true]);
+
+    Http::fake([
+        'fake-llm.test/*' => Http::response(finalAnswerResponse('Just a normal reply.')),
+    ]);
+
+    $this->actingAs($user)->postJson(
+        route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
+        ['message' => ['content' => 'hello']],
+    )->assertSuccessful();
+
+    Http::assertSent(function ($request) {
+        $firstBlock = collect($request['messages'])->firstWhere('role', 'system')['content'][0];
+
+        return str_contains($firstBlock['text'], 'never describe a tool call as text or JSON')
+            && $firstBlock['cache_control'] === ['type' => 'ephemeral'];
     });
 });

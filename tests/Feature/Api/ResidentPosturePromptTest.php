@@ -31,7 +31,7 @@ it('lists only the poses that fit her posture, since a pose keeps her posture', 
 
     sendWorldMessage($this, $scenario, [], ['residentPosture' => 'sitting'])->assertSuccessful();
 
-    expect(sentSystemPrompt())
+    expect(sentPrompt())
         ->toContain('You are sitting.')
         ->toContain('a pose keeps you sitting. Anything else you do goes in your narration.')
         ->toContain("Available poses:\nRegular: laugh\nRestricted: \n")
@@ -43,7 +43,7 @@ it('assumes she is standing when no posture is sent', function () {
 
     sendWorldMessage($this, $scenario, [])->assertSuccessful();
 
-    expect(sentSystemPrompt())
+    expect(sentPrompt())
         ->toContain('You are standing.')
         ->toContain("Available poses:\nRegular: laugh, dance");
 });
@@ -60,7 +60,7 @@ it('lists only the poses that fit while she swims', function () {
 
     sendWorldMessage($this, $scenario, [], ['residentPosture' => 'swimming'])->assertSuccessful();
 
-    expect(sentSystemPrompt())
+    expect(sentPrompt())
         ->toContain('You are swimming.')
         ->toContain("Available poses:\nRegular: splash\nRestricted: \n");
 });
@@ -72,7 +72,7 @@ it('lists restricted poses apart from the regular ones', function () {
 
     sendWorldMessage($this, $scenario, [], ['residentPosture' => 'sitting'])->assertSuccessful();
 
-    expect(sentSystemPrompt())
+    expect(sentPrompt())
         ->toContain("Available poses:\nRegular: laugh\nRestricted: lean-in")
         ->not->toContain('tease');
 });
@@ -85,5 +85,5 @@ it('leaves her idle default and the world\'s own motions out of the poses she pi
 
     sendWorldMessage($this, $scenario, [])->assertSuccessful();
 
-    expect(sentSystemPrompt())->toContain("Available poses:\nRegular: laugh, dance\n");
+    expect(sentPrompt())->toContain("Available poses:\nRegular: laugh, dance\n");
 });

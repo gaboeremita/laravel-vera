@@ -17,7 +17,7 @@ test('a single get_current_datetime call is incorporated into the final answer',
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'What is today\'s date?']]],
+        ['message' => ['content' => 'What is today\'s date?']],
     );
 
     $response->assertSuccessful();
@@ -44,7 +44,7 @@ test('a single basic_calculator call is incorporated into the final answer', fun
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'What is 78 times 3?']]],
+        ['message' => ['content' => 'What is 78 times 3?']],
     );
 
     $response->assertSuccessful();
@@ -60,7 +60,7 @@ test('a task needing no tool is answered directly', function () {
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'What do you think about pineapple on pizza?']]],
+        ['message' => ['content' => 'What do you think about pineapple on pizza?']],
     );
 
     $response->assertSuccessful();
@@ -78,7 +78,7 @@ test('a non-agent-mode assistant is entirely unaffected', function () {
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'Hello']]],
+        ['message' => ['content' => 'Hello']],
     );
 
     $response->assertSuccessful();
@@ -104,7 +104,7 @@ test('thinking from every agent loop step is saved on the reply and returned', f
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'What is today\'s date?']]],
+        ['message' => ['content' => 'What is today\'s date?']],
     );
 
     $expectedThinking = "Check the date before answering.\n\nNow answer with the date.";
@@ -125,7 +125,7 @@ test('the tool calls of a reply are saved on it and come back when the conversat
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'What is today\'s date?']]],
+        ['message' => ['content' => 'What is today\'s date?']],
     )->assertSuccessful();
 
     $reply = collect($this->actingAs($user)->getJson(

@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Directors\PromptDirector;
 use App\Enums\AssistantPortraitType;
 use App\Enums\Posture;
+use App\Enums\TurnSection;
 use App\Models\Assistant;
 
 class AppendExpressionTags
@@ -17,6 +18,8 @@ class AppendExpressionTags
      * $excludedSections, so a stale section baked into the assistant's
      * stored prompt (e.g. from before it was in this mode) never renders
      * alongside it and confuses the model with two competing tag formats.
+     * For 3D avatars the tag format stays with the unchanging sections, while
+     * the current posture and the poses that fit it go with this turn's state.
      *
      * @param  array<int, string>  $excludedSections
      */
@@ -29,7 +32,10 @@ class AppendExpressionTags
 
             if ($poses['regular'] !== [] || $poses['restricted'] !== []) {
                 $director->append('pose tags', [
-                    'format' => "You are {$posture->value}. Use [pose: <exact pose name>] to select a pose. Use only a name from the available poses list: these are the poses that fit how you are right now, and a pose keeps you {$posture->value}. Anything else you do goes in your narration. Control tags may appear in any order and are removed before the reply is shown.",
+                    'format' => 'Use [pose: <exact pose name>] to select a pose. Use only a name from the available poses list. Control tags may appear in any order and are removed before the reply is shown.',
+                ]);
+                $director->addToTurn(TurnSection::CurrentState, 'pose tags', [
+                    'posture' => "You are {$posture->value}. The available poses are the ones that fit how you are right now, and a pose keeps you {$posture->value}. Anything else you do goes in your narration.",
                     'available poses' => $poses,
                 ]);
             }

@@ -7,6 +7,7 @@ use App\Actions\ApplyResidentZoneAccess;
 use App\Actions\BuildQuestsPrompt;
 use App\Actions\BuildResidentWorldPrompt;
 use App\Actions\BuildVendorsPrompt;
+use App\Actions\ComposeChatRequest;
 use App\Actions\RecallResidentMemory;
 use App\Actions\RecordResidentActivity;
 use App\Actions\ResolveInventory;
@@ -18,6 +19,7 @@ use App\DTOs\AgentRunResult;
 use App\Enums\AssistantKind;
 use App\Enums\Posture;
 use App\Enums\TurnMode;
+use App\Enums\TurnSection;
 use App\Enums\WorldResidentBehavior;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreResidentDecisionRequest;
@@ -110,21 +112,22 @@ class ResidentDecisionController extends Controller
             ? $worldUser->world->residents()->with('assistant')->find($validated['userBusyWith'])?->assistant->name
             : null;
         $busyWithOthers = collect($validated['busyResidents'] ?? [])->mapWithKeys(fn (array $busy) => [(int) $busy['id'] => $busy['talkingWith'] ?? null])->all();
-        $director = new PromptDirector(app(AppendWorldConversationContext::class)->handle($assistant, $residentRegion, $positions, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], $busyWith, $residentActivity, $busyWithOthers));
-        $director->append('available activities', $buildResidentWorldPrompt->availableActivities($residentRegion, $assistant, $location, $occupiedSpots, $posture));
+        $director = new PromptDirector($assistant->prompt);
+        app(AppendWorldConversationContext::class)->handle($director, $assistant, $residentRegion, $positions, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], $busyWith, $residentActivity, $busyWithOthers);
+        $director->addToTurn(TurnSection::CurrentState, 'available activities', $buildResidentWorldPrompt->availableActivities($residentRegion, $assistant, $location, $occupiedSpots, $posture));
         $vendors = app(BuildVendorsPrompt::class)->handle($worldSession, $region, $worldResident, $positions);
         if ($vendors !== null) {
-            $director->append('for sale nearby', $vendors);
+            $director->addToTurn(TurnSection::CurrentState, 'for sale nearby', $vendors);
         }
         $companions = $this->companions($residentRegion, $worldResident, $worldSession, $positions, array_keys($busyWithOthers));
         $userInSight = $residentPoint !== null && isset($positions['user']) && $resolveWorldState->sharesRoom($residentRegion->layout ?? [], $residentPoint, $positions['user']);
         $questsPrompt = app(BuildQuestsPrompt::class)->handle($worldSession, $worldResident, TurnMode::BetweenResidents);
         if ($questsPrompt !== null) {
-            $director->append('quests', $questsPrompt);
+            $director->addToTurn(TurnSection::RecentActivity, 'quests', $questsPrompt);
         }
         $recentConversation = $buildResidentWorldPrompt->recentConversation($conversation);
         if ($recentConversation !== null) {
-            $director->append('recent conversation', $recentConversation);
+            $director->addToTurn(TurnSection::RecentActivity, 'recent conversation', $recentConversation);
         }
         $director->append('next step', $buildResidentWorldPrompt->idleInstruction());
         $director->except(['opening_message', 'voice mode', 'image handling', 'OOC mode', 'emotion tags', 'pose tags', 'secret trigger', 'creator mode']);
@@ -138,11 +141,9 @@ class ResidentDecisionController extends Controller
             $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
             $result = (new AgentLoopRunner($llm, $toolbox->idleTools()))->run(
                 assistant: $assistant,
-                messages: [
-                    ['role' => 'system', 'content' => $director->build()],
-                    ['role' => 'user', 'content' => '[A moment passes in the world.]'],
-                ],
+                messages: app(ComposeChatRequest::class)->handle($director->build(), [], ['role' => 'user', 'content' => '[A moment passes in the world.]']),
                 conversation: $conversation,
+                conversationKey: $conversation->providerSessionKey(),
             );
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 502);

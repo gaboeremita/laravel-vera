@@ -20,6 +20,8 @@ class GenericProvider implements LlmProvider
         private readonly array $params = [],
         private readonly ?string $thinkingKey = null,
         private readonly int $timeout = 600,
+        private readonly bool $cacheMarks = false,
+        private readonly ?string $conversationKeyField = null,
     ) {}
 
     public static function fromModel(AiModel $aiModel): static
@@ -46,10 +48,12 @@ class GenericProvider implements LlmProvider
             params: $params,
             thinkingKey: $aiModel->thinking_key,
             timeout: (int) $timeout,
+            cacheMarks: (bool) $aiModel->cache_marks,
+            conversationKeyField: $aiModel->conversation_key_field,
         );
     }
 
-    public function chat(array $messages, array $options = [], array $tools = []): LlmResponse
+    public function chat(array $messages, array $options = [], array $tools = [], ?string $conversationKey = null): LlmResponse
     {
         $payload = [
             'model' => $this->model,
@@ -58,6 +62,10 @@ class GenericProvider implements LlmProvider
             ...$this->params,
             ...$options,
         ];
+
+        if ($this->conversationKeyField && $conversationKey !== null) {
+            $payload[$this->conversationKeyField] = $conversationKey;
+        }
 
         if (! empty($tools)) {
             $payload['tools'] = array_map(fn (array $tool) => [
@@ -120,7 +128,7 @@ class GenericProvider implements LlmProvider
         if (! empty($message['tool_calls'])) {
             return [
                 'role' => 'assistant',
-                'content' => $message['content'] ?? null,
+                'content' => is_array($message['content'] ?? null) ? PromptParts::join($message['content']) : ($message['content'] ?? null),
                 'tool_calls' => array_map(fn (array $toolCall) => [
                     'id' => $toolCall['id'],
                     'type' => 'function',
@@ -132,18 +140,16 @@ class GenericProvider implements LlmProvider
             ];
         }
 
+        $content = $message['content'] ?? '';
+
         if (empty($message['images'])) {
             return [
                 'role' => $message['role'],
-                'content' => $message['content'] ?? '',
+                'content' => is_array($content) ? PromptParts::format($this->cacheMarks, $content) : $content,
             ];
         }
 
-        $parts = [];
-
-        if (! empty($message['content'])) {
-            $parts[] = ['type' => 'text', 'text' => $message['content']];
-        }
+        $parts = is_array($content) ? PromptParts::blocks($this->cacheMarks, $content) : ($content !== '' ? [['type' => 'text', 'text' => $content]] : []);
 
         foreach ($message['images'] as $image) {
             $parts[] = [

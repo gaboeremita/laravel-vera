@@ -18,7 +18,7 @@ test('starting a conversation with a non-3D-avatar assistant never dispatches an
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $newConversationId]),
-        ['messages' => [['role' => 'user', 'content' => 'hi there']]],
+        ['message' => ['content' => 'hi there']],
     );
 
     Queue::assertNotPushed(GenerateAvatarBackground::class);

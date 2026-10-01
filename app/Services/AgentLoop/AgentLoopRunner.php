@@ -25,7 +25,7 @@ class AgentLoopRunner
     /**
      * @param  array<int, array<string, mixed>>  $messages
      */
-    public function run(Assistant $assistant, array $messages, Conversation $conversation): AgentRunResult
+    public function run(Assistant $assistant, array $messages, Conversation $conversation, ?string $conversationKey = null): AgentRunResult
     {
         $messages = $this->withToolUsageInstructions($messages);
         $stepLimit = data_get($assistant->agent_config, 'step_limit', config('agent.step_limit'));
@@ -40,7 +40,7 @@ class AgentLoopRunner
 
         try {
             while ($step < $stepLimit) {
-                $response = $this->provider->chat($messages, tools: $toolDefinitions);
+                $response = $this->provider->chat($messages, tools: $toolDefinitions, conversationKey: $conversationKey);
 
                 if ($response->usage !== null) {
                     $usage[] = $response->usage;
@@ -111,7 +111,7 @@ class AgentLoopRunner
                 }
             }
 
-            $summary = $this->requestFinalSummary($messages);
+            $summary = $this->requestFinalSummary($messages, $conversationKey);
 
             if ($summary->usage !== null) {
                 $usage[] = $summary->usage;
@@ -226,14 +226,14 @@ class AgentLoopRunner
     /**
      * @param  array<int, array<string, mixed>>  $messages
      */
-    private function requestFinalSummary(array $messages): LlmResponse
+    private function requestFinalSummary(array $messages, ?string $conversationKey): LlmResponse
     {
         $messages[] = [
             'role' => 'user',
             'content' => "You've reached the maximum number of steps allowed for this task. Summarize what you've found or accomplished so far, and explain what's left undone.",
         ];
 
-        return $this->provider->chat($messages);
+        return $this->provider->chat($messages, conversationKey: $conversationKey);
     }
 
     /**
@@ -251,7 +251,9 @@ class AgentLoopRunner
     {
         $instruction = 'You have tools available for this task. Use the tool-calling mechanism provided by the API to call one — never describe a tool call as text or JSON in your reply. Once a tool result has been given back to you, treat that tool as already done: respond to the user in natural language, and only call a tool again if the task genuinely still needs it.';
 
-        if (($messages[0]['role'] ?? null) === 'system') {
+        if (($messages[0]['role'] ?? null) === 'system' && is_array($messages[0]['content'])) {
+            $messages[0]['content'][0]['text'] = trim("{$messages[0]['content'][0]['text']}\n\n{$instruction}");
+        } elseif (($messages[0]['role'] ?? null) === 'system') {
             $messages[0]['content'] = trim(($messages[0]['content'] ?? '')."\n\n{$instruction}");
         } else {
             array_unshift($messages, ['role' => 'system', 'content' => $instruction]);

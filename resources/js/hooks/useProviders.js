@@ -184,6 +184,7 @@ export default function useProviders(addToast, assistantId) {
 								name: '',
 								endpoint: '',
 								thinking_key: '',
+								conversation_key_field: '',
 								prompt: '',
 								config: '',
 								additional_config: '',
@@ -209,6 +210,8 @@ export default function useProviders(addToast, assistantId) {
 				thinking_key: model.thinking_key || null,
 				prompt: model.prompt || null,
 				supports_tools: !!model.supports_tools,
+				cache_marks: !!model.cache_marks,
+				conversation_key_field: model.conversation_key_field || null,
 			};
 
 			if (typeof model.config === 'string' && model.config.trim()) {

@@ -120,13 +120,11 @@ export function useConversationChat({
 		setMessages([...updatedMessages, { id: `pending-${userMsg.id}`, role: 'assistant', content: '', loading: true, generatingImage: isImageGen }]);
 		setIsLoading(true);
 
-		const apiMessages = updatedMessages.map((m) => {
-			const msg = { role: m.role, content: m.content || '' };
-			if (m.image && m.image.startsWith('data:')) {
-				msg.images = [m.image.replace(/^data:image\/\w+;base64,/, '')];
-			}
-			return msg;
-		});
+		// The server reads the earlier messages from storage, so only the new one is sent.
+		const apiMessage = { content: trimmed };
+		if (image && image.startsWith('data:')) {
+			apiMessage.images = [image.replace(/^data:image\/\w+;base64,/, '')];
+		}
 
 		const maxRetries = 3;
 		let lastError = null;
@@ -134,7 +132,7 @@ export function useConversationChat({
 		for (let attempt = 1; attempt <= maxRetries; attempt++) {
 			try {
 				const response = await api.post(route('conversations.sendMessage', { assistant: assistantId, id: conversationId }), {
-					messages: apiMessages,
+					message: apiMessage,
 					...(voiceMode ? { voice_mode: true } : {}),
 					...extraParams,
 				});

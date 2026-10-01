@@ -24,13 +24,20 @@ function termRulesChat(string $rules, array $settings, string $mode = 'assistant
 }
 
 /**
+ * Stores every message but the last as the conversation so far, then sends the last one.
+ *
  * @param  list<array{role: string, content: string}>  $messages
  */
 function sendTermRulesMessage(User $user, Assistant $assistant, Conversation $conversation, array $messages): TestResponse
 {
+    $current = array_pop($messages);
+    foreach ($messages as $message) {
+        $conversation->messages()->create($message);
+    }
+
     return test()->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => $messages],
+        ['message' => ['content' => $current['content']]],
     );
 }
 

@@ -20,7 +20,7 @@ test('the /change-background command dispatches generation and replies in charac
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => '/change-background a futuristic park']]],
+        ['message' => ['content' => '/change-background a futuristic park']],
     );
 
     $response->assertSuccessful();
@@ -48,7 +48,7 @@ test('the first user message being a background command dispatches only the comm
 
     $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => '/change-background a futuristic park']]],
+        ['message' => ['content' => '/change-background a futuristic park']],
     )->assertSuccessful();
 
     Queue::assertPushed(GenerateAvatarBackground::class, 1);
@@ -68,7 +68,7 @@ test('an identified pose tag in the /change-background reaction is stripped from
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => '/change-background a futuristic park']]],
+        ['message' => ['content' => '/change-background a futuristic park']],
     );
 
     $response->assertSuccessful();
@@ -86,7 +86,7 @@ test('the /change-background command requires a description', function () {
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => '/change-background']]],
+        ['message' => ['content' => '/change-background']],
     );
 
     $response->assertStatus(422);

@@ -54,7 +54,7 @@ class ImageGenPromptEnhancer
             $director->append('image generation instructions', $additionalPrompt);
         }
 
-        return $director->build()."\n\n".self::TASK_INSTRUCTION;
+        return $director->build()->fullText()."\n\n".self::TASK_INSTRUCTION;
     }
 
     /**

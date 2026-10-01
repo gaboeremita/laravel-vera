@@ -18,7 +18,7 @@ test('a single generate_image call produces an image message and completes the t
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'show me a cyberpunk cat']]],
+        ['message' => ['content' => 'show me a cyberpunk cat']],
     );
 
     $response->assertSuccessful();

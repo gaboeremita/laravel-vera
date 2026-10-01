@@ -15,7 +15,7 @@ test('the /change-background command has no effect for a non-3D-avatar assistant
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => '/change-background a futuristic park']]],
+        ['message' => ['content' => '/change-background a futuristic park']],
     );
 
     $response->assertStatus(422);
@@ -32,7 +32,7 @@ test('the background tool is not offered to a non-3D-avatar agent-mode assistant
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'hello']]],
+        ['message' => ['content' => 'hello']],
     );
 
     $response->assertSuccessful();

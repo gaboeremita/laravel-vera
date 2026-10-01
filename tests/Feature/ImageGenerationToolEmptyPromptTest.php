@@ -17,7 +17,7 @@ test('a generate_image call with an empty prompt is rejected without generating 
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'generate an image']]],
+        ['message' => ['content' => 'generate an image']],
     );
 
     $response->assertSuccessful();

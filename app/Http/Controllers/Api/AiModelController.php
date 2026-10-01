@@ -23,6 +23,8 @@ class AiModelController extends Controller
             'additional_config' => ['nullable', 'array'],
             'prompt' => ['nullable', 'string'],
             'supports_tools' => ['sometimes', 'boolean'],
+            'cache_marks' => ['sometimes', 'boolean'],
+            'conversation_key_field' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z_][A-Za-z0-9_]*$/'],
         ]);
 
         $model = $provider->models()->create($validated);
@@ -46,6 +48,8 @@ class AiModelController extends Controller
             'additional_config' => ['nullable', 'array'],
             'prompt' => ['nullable', 'string'],
             'supports_tools' => ['sometimes', 'boolean'],
+            'cache_marks' => ['sometimes', 'boolean'],
+            'conversation_key_field' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z_][A-Za-z0-9_]*$/'],
         ]);
 
         $model->update($validated);

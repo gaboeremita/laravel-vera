@@ -17,7 +17,7 @@ test('two dependent tool calls are resolved in one exchange', function () {
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => "What's today's day of the month, tripled?"]]],
+        ['message' => ['content' => "What's today's day of the month, tripled?"]],
     );
 
     $response->assertSuccessful();
@@ -44,7 +44,7 @@ test('more than two dependent tool calls are chained until a final answer', func
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'Chain a few calculations for me.']]],
+        ['message' => ['content' => 'Chain a few calculations for me.']],
     );
 
     $response->assertSuccessful();

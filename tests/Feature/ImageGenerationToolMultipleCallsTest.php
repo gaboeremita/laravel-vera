@@ -22,7 +22,7 @@ test('two generate_image calls in one task each produce their own independent im
 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
-        ['messages' => [['role' => 'user', 'content' => 'show me a cat, then a dog']]],
+        ['message' => ['content' => 'show me a cat, then a dog']],
     );
 
     $response->assertSuccessful();

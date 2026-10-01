@@ -2,6 +2,8 @@
 
 namespace App\Actions;
 
+use App\Directors\PromptDirector;
+use App\Enums\TurnSection;
 use App\Models\Assistant;
 use App\Models\Region;
 use App\Models\WorldSession;
@@ -24,10 +26,10 @@ class AppendWorldConversationContext
      * @param  ?array{posture: string, object: ?array, activity: ?array}  $residentActivity
      * @param  array<int, ?int>  $busyResidents  for each resident who is busy, the resident they are talking with or on their way to
      */
-    public function handle(Assistant $assistant, ?Region $region, ?array $positions = null, ?WorldSession $session = null, ?array $userActivity = null, array $stackedSpots = [], ?string $userTalkingWith = null, ?array $residentActivity = null, array $busyResidents = []): array
+    public function handle(PromptDirector $director, Assistant $assistant, ?Region $region, ?array $positions = null, ?WorldSession $session = null, ?array $userActivity = null, array $stackedSpots = [], ?string $userTalkingWith = null, ?array $residentActivity = null, array $busyResidents = []): void
     {
         if ($region === null) {
-            return $assistant->prompt;
+            return;
         }
 
         $resident = $region->world->residents()->where('assistant_id', $assistant->id)->first();
@@ -38,29 +40,30 @@ class AppendWorldConversationContext
 
         $region = $this->applyResidentZoneAccess->handle($region, $resident);
 
-        $prompt = $assistant->prompt;
-        $prompt['world_context'] = array_filter([
+        $director->append('world_context', array_values(array_filter([
             $region->world->contextPromptFor($assistant->kind),
             $region->contextPromptFor($assistant->kind),
             "You are in {$region->name}.",
             $resident->custom_prompt,
-        ]);
+        ])));
 
-        // The parts that stay the same from one call to the next come first, so
-        // the model provider can reuse them as a cached prefix.
         $atPost = $resident->staysAtPost();
         if (! empty($region->layout['zones'])) {
-            $prompt['world_awareness'] = $atPost
+            $director->append('world_awareness', $atPost
                 ? $this->buildResidentWorldPrompt->postAwareness()
-                : $this->buildResidentWorldPrompt->worldAwareness();
+                : $this->buildResidentWorldPrompt->worldAwareness());
             if (! $atPost) {
-                $prompt['world_places'] = ['title' => 'Places in this world', ...$this->buildResidentWorldPrompt->availablePlaces($region)];
+                $director->append('world_places', ['title' => 'Places in this world', ...$this->buildResidentWorldPrompt->availablePlaces($region)]);
             }
         }
 
         $neighbours = $this->buildResidentWorldPrompt->neighbours($resident);
         if ($neighbours !== null) {
-            $prompt['neighbours'] = $neighbours;
+            $director->append('neighbours', $neighbours);
+        }
+
+        if (! empty($region->layout['zones'])) {
+            $director->append('poses and movement', $this->buildResidentWorldPrompt->posesAndMovement($atPost));
         }
 
         $residentPosition = $positions['residents'][$resident->id] ?? null;
@@ -71,26 +74,24 @@ class AppendWorldConversationContext
             $stacking = $this->resolveSpotStacking->handle($region, $resident, $stackedSpots);
             $userInSight = isset($positions['user']) && $this->resolveWorldState->sharesRoom($region->layout, $residentPosition, $positions['user']);
             $withYou = $this->buildResidentWorldPrompt->companions($region, $resident, $positions, $busyResidents);
-            $prompt['world_state'] = $this->buildResidentWorldPrompt->worldState($region, $state['residents'][$resident->id], $state['user'], $userActivity, $stacking, $userTalkingWith, $residentActivity, $userInSight, $withYou, lean: $atPost);
+            $director->addToTurn(TurnSection::CurrentState, 'world_state', $this->buildResidentWorldPrompt->worldState($region, $state['residents'][$resident->id], $state['user'], $userActivity, $stacking, $userTalkingWith, $residentActivity, $userInSight, $withYou, lean: $atPost));
         }
 
         if ($session !== null) {
             $currentActivity = $this->buildResidentWorldPrompt->currentActivity($session, $resident, $residentZone, $residentActivity);
             if ($currentActivity !== null) {
-                $prompt['current_activity'] = $currentActivity;
+                $director->addToTurn(TurnSection::CurrentState, 'current_activity', $currentActivity);
             }
 
             $recentActivity = $this->buildResidentWorldPrompt->recentActivity($region, $session, $resident, $atPost ? BuildResidentWorldPrompt::POST_ACTIVITY_LIMIT : null);
             if ($recentActivity !== null) {
-                $prompt['recent_activity'] = $recentActivity;
+                $director->addToTurn(TurnSection::RecentActivity, 'recent_activity', $recentActivity);
             }
 
             $otherConversations = $this->buildResidentWorldPrompt->conversationsWithOthers($assistant, $session);
             if ($otherConversations !== null) {
-                $prompt['conversations_with_others'] = $otherConversations;
+                $director->addToTurn(TurnSection::RecentActivity, 'conversations_with_others', $otherConversations);
             }
         }
-
-        return $prompt;
     }
 }

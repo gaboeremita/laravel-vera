@@ -229,7 +229,7 @@ function sendWorldMessage($test, array $scenario, array $positions, array $extra
     [$user, $assistant, $conversation, $world, , $session] = $scenario;
 
     return $test->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]), [
-        'messages' => [['role' => 'user', 'content' => 'Where are you, and where am I?']],
+        'message' => ['content' => 'Where are you, and where am I?'],
         'worldId' => $world->world_id,
         'regionId' => $world->id,
         'worldSessionId' => $session->id,
@@ -238,16 +238,24 @@ function sendWorldMessage($test, array $scenario, array $positions, array $extra
     ]);
 }
 
-function sentSystemPrompt(): string
+/**
+ * What a request told the model around the user's own words: the system
+ * message, then the current user message, which carries this turn's sections.
+ */
+function promptOfRequest(int $index = 0): string
 {
-    $prompt = '';
-    Http::assertSent(function ($request) use (&$prompt) {
-        $prompt = collect($request['messages'] ?? [])->firstWhere('role', 'system')['content'] ?? '';
+    $messages = collect(Http::recorded()[$index][0]['messages'] ?? []);
 
-        return true;
-    });
+    return collect([$messages->firstWhere('role', 'system')['content'] ?? '', $messages->last(fn (array $message) => $message['role'] === 'user')['content'] ?? ''])
+        ->map(fn (mixed $content) => is_array($content) ? collect($content)->pluck('text')->implode("\n\n") : (string) $content)
+        ->implode("\n\n");
+}
 
-    return $prompt;
+function sentPrompt(): string
+{
+    Http::assertSent(fn () => true);
+
+    return promptOfRequest(Http::recorded()->count() - 1);
 }
 
 /**

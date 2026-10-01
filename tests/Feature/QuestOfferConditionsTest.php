@@ -61,7 +61,7 @@ function giverPositions(WorldResident $resident, array $others = []): array
 
 function offerPrompt(int $index = 0): string
 {
-    return collect(Http::recorded()[$index][0]['messages'])->firstWhere('role', 'system')['content'] ?? '';
+    return promptOfRequest($index);
 }
 
 /**

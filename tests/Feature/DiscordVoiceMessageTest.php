@@ -431,9 +431,7 @@ test('[US4] /send-voice-message works from web chat endpoint, strips prefix and 
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', [$assistant, $conversation]),
         [
-            'messages' => [
-                ['role' => 'user', 'content' => '/send-voice-message how are you today?'],
-            ],
+            'message' => ['content' => '/send-voice-message how are you today?'],
         ],
     );
 
@@ -458,9 +456,7 @@ test('[US4] /send-voice-message from web returns audioError when TTS fails', fun
     $response = $this->actingAs($user)->postJson(
         route('conversations.sendMessage', [$assistant, $conversation]),
         [
-            'messages' => [
-                ['role' => 'user', 'content' => '/send-voice-message hello'],
-            ],
+            'message' => ['content' => '/send-voice-message hello'],
         ],
     );
 

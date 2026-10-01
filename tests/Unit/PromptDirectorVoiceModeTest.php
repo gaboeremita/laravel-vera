@@ -17,7 +17,7 @@ function voicePrompt(): array
 test('voice mode excludes style rules, OOC mode, and image handling but keeps voice mode', function () {
     $built = (new PromptDirector(voicePrompt()))
         ->except(['opening_message', 'style rules', 'OOC mode', 'image handling'])
-        ->build();
+        ->build()->fullText();
 
     expect($built)
         ->toContain('Speak in plain sentences only.')
@@ -31,7 +31,7 @@ test('voice mode excludes style rules, OOC mode, and image handling but keeps vo
 test('text mode excludes voice mode but keeps style rules, OOC mode, and image handling', function () {
     $built = (new PromptDirector(voicePrompt()))
         ->except(['opening_message', 'voice mode'])
-        ->build();
+        ->build()->fullText();
 
     expect($built)
         ->toContain('Everything between asterisks are actions.')
@@ -47,7 +47,7 @@ test('excluding voice mode when the assistant has not authored one does not erro
 
     $built = (new PromptDirector($prompt))
         ->except(['opening_message', 'style rules', 'OOC mode', 'image handling'])
-        ->build();
+        ->build()->fullText();
 
     expect($built)->toContain('You are helpful.');
 });
