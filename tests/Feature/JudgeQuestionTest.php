@@ -65,7 +65,7 @@ it('runs no check until a named resident signals', function () {
 
     expect(QuestEvent::where('type', QuestEventType::QuestionJudged)->exists())->toBeFalse()
         ->and(Http::recorded())->toHaveCount(1)
-        ->and(collect(Http::recorded()[0][0]['messages'])->firstWhere('role', 'system')['content'])
+        ->and(promptOfRequest())
         ->toContain("As soon as you believe the user has done one of them, call the signal_question tool in that same reply, alongside your words, with your reason:\n- Has the player apologised to them?");
 });
 
