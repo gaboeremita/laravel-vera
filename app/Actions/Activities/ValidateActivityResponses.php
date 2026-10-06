@@ -13,8 +13,6 @@ use App\Models\WorldResident;
  */
 class ValidateActivityResponses
 {
-    private const FEELINGS = ['romance', 'trust', 'liking'];
-
     private const QUEST_STATES = ['offered', 'active', 'declined', 'abandoned'];
 
     private const MAX_DEPTH = 4;
@@ -31,6 +29,9 @@ class ValidateActivityResponses
     /** @var array<int, int> */
     private array $factIds = [];
 
+    /** @var array<int, string> */
+    private array $sentimentNames = [];
+
     public function __construct(private readonly ActivityEffects $effects) {}
 
     /**
@@ -42,6 +43,7 @@ class ValidateActivityResponses
         $this->errors = [];
         $this->itemIds = $world->items()->pluck('id')->all();
         $this->residentIds = $world->residents()->pluck('id')->all();
+        $this->sentimentNames = $world->sentimentNames();
         $this->factIds = Fact::whereIn('world_resident_id', WorldResident::where('world_id', $world->id)->select('id'))->pluck('id')->all();
 
         foreach (array_values($responses) as $index => $response) {
@@ -157,7 +159,7 @@ class ValidateActivityResponses
             'knows' => $this->known($this->factIds, $value) ? null : 'Choose one of the world\'s facts.',
             'acknowledged' => $isArray && $this->known($this->factIds, $value['fact'] ?? null) && $this->known($this->residentIds, $value['resident'] ?? null) ? null : 'Choose one of the world\'s facts and residents.',
             'flag' => $isArray && filled($value['quest'] ?? null) && filled($value['name'] ?? null) ? null : 'Choose a quest and the flag it ended with.',
-            'feeling' => $isArray && $this->known($this->residentIds, $value['resident'] ?? null) && in_array($value['kind'] ?? null, self::FEELINGS, true) && (isset($value['atLeast']) || isset($value['atMost'])) ? null : 'Choose a resident, a feeling and a bound.',
+            'sentiment' => $isArray && $this->known($this->residentIds, $value['resident'] ?? null) && in_array($value['kind'] ?? null, $this->sentimentNames, true) && (isset($value['atLeast']) || isset($value['atMost'])) ? null : 'Choose a resident, one of the world\'s sentiments and a bound.',
             'questState' => $isArray && filled($value['quest'] ?? null) && in_array($value['state'] ?? null, self::QUEST_STATES, true) ? null : 'Choose a quest and a state.',
             'declinedTimes' => $isArray && filled($value['quest'] ?? null) && $this->atLeast($value, 1) ? null : 'Choose a quest and a count of at least 1.',
             'gaveTo' => $isArray && $this->known($this->residentIds, $value['resident'] ?? null) && $this->known($this->itemIds, $value['item'] ?? null) && $this->atLeast($value, 1) ? null : 'Choose a resident, an item and a quantity of at least 1.',

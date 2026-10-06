@@ -17,7 +17,7 @@ use App\Models\Conversation;
 use App\Models\Quest;
 use App\Models\QuestEvent;
 use App\Models\QuestOffer;
-use App\Models\ResidentFeeling;
+use App\Models\ResidentSentiment;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Models\WorldSessionQuest;
@@ -74,7 +74,7 @@ function offerTools(int $index = 0): array
 
 function trustAtLeast(int $value): Closure
 {
-    return fn (WorldResident $resident) => ['feeling' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => $value]];
+    return fn (WorldResident $resident) => ['sentiment' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => $value]];
 }
 
 function ledgerRun(WorldSession $session): WorldSessionQuest
@@ -120,7 +120,8 @@ it('leaves a quest that asks nothing before being offered as it was', function (
 it('answers a check with the value now and what the quest asks, and refuses a part the quest does not have', function () {
     $scenario = offerConditionScenario(trustAtLeast(3));
     [, , , , $resident, $session] = $scenario;
-    ResidentFeeling::of($session, $resident)->adjust(['trust' => 2]);
+    worldSentiments($resident->world);
+    ResidentSentiment::of($session, $resident)->adjust(['trust' => 2]);
     fakeTurn(
         toolCallResponse('check_1', 'check_offer_condition', ['quest' => 'The Ledger', 'part' => 'your trust toward the user is at least 3']),
         toolCallResponse('check_2', 'check_offer_condition', ['quest' => 'The Ledger', 'part' => 'the moon is full']),
@@ -136,7 +137,8 @@ it('answers a check with the value now and what the quest asks, and refuses a pa
 it('lets the giver offer while the quest\'s condition doesn\'t hold, recording what they checked', function () {
     $scenario = offerConditionScenario(trustAtLeast(3));
     [, , , , $resident, $session] = $scenario;
-    ResidentFeeling::of($session, $resident)->adjust(['trust' => 1]);
+    worldSentiments($resident->world);
+    ResidentSentiment::of($session, $resident)->adjust(['trust' => 1]);
     fakeTurn(
         toolCallResponse('check_1', 'check_offer_condition', ['quest' => 'The Ledger', 'part' => 'your trust toward the user is at least 3']),
         toolCallResponse('offer_1', 'offer_quest', ['quest' => 'The Ledger']),
@@ -179,7 +181,7 @@ it('leaves a pending offer alone: no condition line and no check for it', functi
         ))->checkable())->toBeEmpty();
 });
 
-it('gives the checks the feeling, a quest\'s state and the sums', function () {
+it('gives the checks the sentiment, a quest\'s state and the sums', function () {
     [, , , $region, $resident, $session, $player, $residentInventory] = inventoryScenario();
     $bread = worldItem($region, ['name' => 'bread']);
     $player->items()->create(['item_id' => $bread->id, 'quantity' => 3]);

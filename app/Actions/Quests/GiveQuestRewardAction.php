@@ -3,7 +3,7 @@
 namespace App\Actions\Quests;
 
 use App\Actions\AppendWorldConversationContext;
-use App\Actions\BuildFeelingsPrompt;
+use App\Actions\BuildSentimentsPrompt;
 use App\Actions\Narrate;
 use App\Actions\ResolveInventory;
 use App\Actions\ResolveNarratorModel;
@@ -18,7 +18,7 @@ use App\Models\Inventory;
 use App\Models\InventoryItem;
 use App\Models\Item;
 use App\Models\Region;
-use App\Models\ResidentFeeling;
+use App\Models\ResidentSentiment;
 use App\Models\WorldResident;
 use App\Models\WorldSessionQuest;
 use App\Services\AgentLoop\Tools\World\GiveRewardTool;
@@ -59,14 +59,14 @@ class GiveQuestRewardAction
             : $this->resolveInventory->forObject($session, $region, $reward['from']['object']['object']);
         $giverName = $resident?->assistant->name ?? ($region->layoutObject($reward['from']['object']['object'])['name'] ?? $reward['from']['object']['object']);
 
-        $feeling = $resident !== null ? ResidentFeeling::of($session, $resident) : null;
-        $tool = new GiveRewardTool($this->held($giver), $giver->holder->countsCredits() ? $giver->credits : null, withFeelings: $feeling !== null);
+        $sentiment = $resident !== null && $world->sentimentNames() !== [] ? ResidentSentiment::of($session, $resident) : null;
+        $tool = new GiveRewardTool($this->held($giver), $giver->holder->countsCredits() ? $giver->credits : null, sentiments: $sentiment?->names() ?? []);
         [$provider, $system] = $resident !== null
             ? $this->asResident($run, $resident)
             : $this->asObject($run, $region, $giverName);
 
         $response = $provider->chat(
-            messages: [['role' => 'system', 'content' => $system], ['role' => 'user', 'content' => $this->situation($run, $reward['prose'], $giver, $feeling)]],
+            messages: [['role' => 'system', 'content' => $system], ['role' => 'user', 'content' => $this->situation($run, $reward['prose'], $giver, $sentiment)]],
             tools: [['name' => $tool->name(), 'description' => $tool->description(), 'parameters' => $tool->parameters()]],
         );
         $call = collect($response->toolCalls)->firstWhere('name', $tool->name())
@@ -76,15 +76,15 @@ class GiveQuestRewardAction
         $player = $this->resolveInventory->forPlayer($session);
         $this->transferInventory->handle($giver, $player, $given['credits'], $given['items'], "Reward for {$run->quest->title}");
 
-        if ($feeling !== null && $given['feelings'] !== []) {
-            $feeling->adjust($given['feelings']);
+        if ($sentiment !== null && $given['sentiments'] !== []) {
+            $sentiment->adjust($given['sentiments']);
         }
 
         $received = collect($given['items'])->map(fn (int $quantity, int $itemId) => ['name' => Item::find($itemId)->name, 'quantity' => $quantity])->values()->all();
         $record = ['giverName' => $giverName, 'line' => $given['line'], 'credits' => $given['credits'], 'items' => $received];
         $run->mergeState(['reward' => $record]);
         $run->save();
-        $this->recordQuestEvent->handle($run, QuestEventType::RewardGiven, payload: [...$record, 'prose' => $reward['prose'], 'feelings' => $given['feelings']]);
+        $this->recordQuestEvent->handle($run, QuestEventType::RewardGiven, payload: [...$record, 'prose' => $reward['prose'], 'sentiments' => $given['sentiments']]);
 
         if ($resident !== null && $given['line'] !== '') {
             $this->tellInConversation($run, $resident, $given['line']);
@@ -110,7 +110,10 @@ class GiveQuestRewardAction
         $director = new PromptDirector($resident->assistant->prompt);
         app(AppendWorldConversationContext::class)->handle($director, $resident->assistant, $region);
         $director->except(self::EXCLUDED_PROMPT_SECTIONS);
-        $director->append('the reward', 'The user just completed a quest you are part of, and you are the one who rewards them. Read what the story asks of you, how the user did, how you feel about them and what you hold, then decide in character what to give and call the give_reward tool once, with what you say to the user as you hand it over. Let the quest move your feelings about the user too, usually 1 to 3 points each: someone rude who still got the job done might earn your trust and lose some of your liking.');
+        $director->append('the reward', implode(' ', array_filter([
+            'The user just completed a quest you are part of, and you are the one who rewards them. Read what the story asks of you, how the user did, how you feel about them and what you hold, then decide in character what to give and call the give_reward tool once, with what you say to the user as you hand it over.',
+            $session->worldUser->world->sentimentNames() !== [] ? 'Let the quest move your feelings about the user too, usually 1 to 3 points each: someone rude who still got the job done might rise in one and fall in another.' : null,
+        ])));
 
         return [(new LlmManager)->forAssistantUser($assistantUser), $director->build()->fullText()];
     }
@@ -130,7 +133,7 @@ class GiveQuestRewardAction
         return [app(ResolveNarratorModel::class)->handle($world), $system];
     }
 
-    private function situation(WorldSessionQuest $run, string $prose, Inventory $giver, ?ResidentFeeling $feeling): string
+    private function situation(WorldSessionQuest $run, string $prose, Inventory $giver, ?ResidentSentiment $sentiment): string
     {
         $ending = $run->ending ?? [];
         $scores = collect($ending['scores'] ?? []);
@@ -141,7 +144,7 @@ class GiveQuestRewardAction
             'Ending' => trim(($ending['title'] ?? '').(($ending['tier'] ?? null) ? " ({$ending['tier']})" : '').': '.($ending['epilogue'] ?? ''), ' :'),
             'Total score' => $total !== null ? "{$total}/10" : null,
             'Scores' => $scores->isEmpty() ? null : $scores->map(fn (array $score) => "{$score['dimension']} {$score['score']}/10 ({$score['reason']})")->implode('; '),
-            'How you feel about the user (-10 to 10)' => $feeling === null ? null : collect($feeling->values())->map(fn (float $value, string $name) => "{$name} ".BuildFeelingsPrompt::format($value))->implode(', '),
+            'How you feel about the user (-10 to 10)' => $sentiment === null ? null : collect($sentiment->scores())->map(fn (float $value, string $name) => "{$name} ".BuildSentimentsPrompt::format($value))->implode(', '),
             'Holding' => app(Narrate::class)->holdings($giver),
             'What the story asks of the reward' => $prose,
         ])->filter()->map(fn (string $value, string $label) => "{$label}: {$value}")->implode("\n");

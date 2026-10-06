@@ -28,6 +28,7 @@ class StoreWorldRequest extends FormRequest
             'description' => ['required', 'string'],
             'assistantContextPrompt' => ['required', 'string'],
             'npcContextPrompt' => ['required', 'string'],
+            ...UpdateWorldRequest::sentimentRules(),
         ];
     }
 }

@@ -25,8 +25,6 @@ class ValidateQuestDefinition
 
     private const OUTCOMES = ['ended', 'completed', 'failed', 'abandoned'];
 
-    private const FEELINGS = ['romance', 'trust', 'liking'];
-
     private const QUEST_STATES = ['offered', 'active', 'declined', 'abandoned'];
 
     /** Leaves about the turn with the giver, which only mean something in offerWhen. */
@@ -50,6 +48,9 @@ class ValidateQuestDefinition
 
     /** @var array<int, int> */
     private array $itemIds;
+
+    /** @var array<int, string> */
+    private array $sentimentNames;
 
     /** @var array<int, int> */
     private array $factIds;
@@ -130,6 +131,7 @@ class ValidateQuestDefinition
         $this->regions = $world->regions()->get(['id', 'name', 'layout'])->keyBy('id');
         $this->residents = $world->residents()->with('assistant')->get()->keyBy('id');
         $this->itemIds = $world->items()->pluck('id')->all();
+        $this->sentimentNames = $world->sentimentNames();
         $this->factIds = Fact::whereHas('holder', fn ($query) => $query->where('world_id', $world->id))->pluck('id')->all();
         $this->otherQuests = $world->quests()->when($quest !== null, fn ($query) => $query->whereKeyNot($quest->id))->get()->keyBy('key');
         $this->campaignQuests = $world->campaigns()->with('quests:id,campaign_id,key')->get()
@@ -364,7 +366,7 @@ class ValidateQuestDefinition
             'flag' => $this->flag($value, "{$path}.flag"),
             'question' => $this->known($value, $this->questionIds, "{$path}.question", 'question'),
             'beat' => $this->known($value, $this->beatIds, "{$path}.beat", 'beat'),
-            'feeling' => $this->feeling($value, "{$path}.feeling"),
+            'sentiment' => $this->sentiment($value, "{$path}.sentiment"),
             'questState' => $this->questState($value, "{$path}.questState"),
             'declinedTimes' => [$this->anyQuest($value['quest'] ?? null, "{$path}.declinedTimes.quest"), $this->atLeast($value, "{$path}.declinedTimes", 1)],
             'gaveTo' => $this->gaveTo($value, "{$path}.gaveTo"),
@@ -443,11 +445,11 @@ class ValidateQuestDefinition
         }
     }
 
-    private function feeling(mixed $value, string $path): void
+    private function sentiment(mixed $value, string $path): void
     {
         $this->resident($value['resident'] ?? null, "{$path}.resident");
-        if (! in_array($value['kind'] ?? null, self::FEELINGS, true)) {
-            $this->error("{$path}.kind", 'Choose romance, trust or liking.');
+        if (! in_array($value['kind'] ?? null, $this->sentimentNames, true)) {
+            $this->error("{$path}.kind", 'Choose one of the world\'s sentiments.');
         }
 
         $bounds = array_intersect_key(is_array($value) ? $value : [], ['atLeast' => true, 'atMost' => true]);

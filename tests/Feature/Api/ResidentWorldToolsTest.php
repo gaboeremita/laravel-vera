@@ -33,7 +33,7 @@ it('offers the world tools, with go_to limited to the world\'s real ids', functi
     /** @var Request $request */
     $request = Http::recorded()[0][0];
     $tools = collect($request['tools'])->keyBy('function.name');
-    expect($tools->keys()->sort()->values()->all())->toBe(['adjust_feelings', 'ask_for', 'check_holds', 'describe', 'follow', 'give', 'go_to', 'plan', 'stop', 'swim_to_edge', 'use', 'wander', 'what_is_in', 'where_can_i', 'zone']);
+    expect($tools->keys()->sort()->values()->all())->toBe(['ask_for', 'check_holds', 'describe', 'follow', 'give', 'go_to', 'plan', 'stop', 'swim_to_edge', 'use', 'wander', 'what_is_in', 'where_can_i', 'zone']);
     expect($tools['go_to']['function']['parameters']['properties']['target']['enum'])
         ->toContain('pool-terrace')
         ->toContain('studio')

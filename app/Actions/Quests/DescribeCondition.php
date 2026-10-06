@@ -75,7 +75,7 @@ class DescribeCondition
             'flag' => $this->fact(is_string($value) ? "the flag {$value} is set" : "\"{$this->quest($value['quest'] ?? null)}\" ended with the flag ".($value['name'] ?? '')),
             'question' => $this->fact("the question {$value} is met"),
             'beat' => $this->fact("the beat {$value} is finished"),
-            'feeling' => $this->feeling($value, $who($value['resident'] ?? null)),
+            'sentiment' => $this->sentiment($value, $who($value['resident'] ?? null)),
             'questState' => ["where \"{$this->quest($value['quest'] ?? null)}\" stands", (string) ($value['state'] ?? ''), "\"{$this->quest($value['quest'] ?? null)}\" is ".($value['state'] ?? '')],
             'declinedTimes' => $this->atLeast("how many times the user has turned down \"{$this->quest($value['quest'] ?? null)}\"", $value, fn (int $count) => "the user has turned down \"{$this->quest($value['quest'] ?? null)}\" at least {$count} times"),
             'gaveTo' => $this->atLeast("how many {$this->item($value['item'] ?? null)} the user has given {$who($value['resident'] ?? null)}", $value, fn (int $count) => "the user has given {$who($value['resident'] ?? null)} at least {$count} {$this->item($value['item'] ?? null)}"),
@@ -158,9 +158,9 @@ class DescribeCondition
     /**
      * @return array{0: string, 1: string, 2: string}
      */
-    private function feeling(mixed $value, string $who): array
+    private function sentiment(mixed $value, string $who): array
     {
-        $subject = ($who === 'you' ? 'your' : "{$who}'s").' '.($value['kind'] ?? 'feeling').' toward the user';
+        $subject = ($who === 'you' ? 'your' : "{$who}'s").' '.($value['kind'] ?? 'sentiment').' toward the user';
         $asks = collect(['atLeast' => 'at least', 'atMost' => 'at most'])
             ->filter(fn (string $words, string $bound) => isset($value[$bound]))
             ->map(fn (string $words, string $bound) => "{$words} {$value[$bound]}")

@@ -129,12 +129,13 @@ it('warns, without refusing, when a resident who grants flags cannot call tools'
 it('accepts offer conditions with every new part, naming this quest or another', function () {
     $scenario = worldStateScenario();
     [, , , $region, $resident] = $scenario;
+    worldSentiments($region->world);
     $item = worldItem($region);
     worldQuest($region->world, [], ['key' => 'the-ledger']);
 
     $result = checkQuest($scenario, [
         'start' => ['mode' => 'offer', 'giver' => $resident->id, 'offerQuestion' => 'Has the user shown they can keep a secret?', 'offerWhen' => ['all' => [
-            ['feeling' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => 3, 'atMost' => 8.5]],
+            ['sentiment' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => 3, 'atMost' => 8.5]],
             ['questState' => ['quest' => 'the-quest', 'state' => 'declined']],
             ['declinedTimes' => ['quest' => 'the-ledger', 'atLeast' => 2]],
             ['gaveTo' => ['resident' => $resident->id, 'item' => $item->id, 'atLeast' => 1]],
@@ -144,7 +145,7 @@ it('accepts offer conditions with every new part, naming this quest or another',
             ['any' => [['othersInTheZone' => ['nobody' => true]], ['othersInTheZone' => ['resident' => $resident->id]]]],
             ['enterRegion' => $region->id],
         ]]],
-        'beats' => [QuestFactory::beat('go', ['when' => ['feeling' => ['resident' => $resident->id, 'kind' => 'liking', 'atMost' => -2]]])],
+        'beats' => [QuestFactory::beat('go', ['when' => ['sentiment' => ['resident' => $resident->id, 'kind' => 'liking', 'atMost' => -2]]])],
     ]);
 
     expect($result['errors'])->toBe([]);
@@ -153,11 +154,12 @@ it('accepts offer conditions with every new part, naming this quest or another',
 it('refuses the new parts with unknown references, out of range or without a bound', function () {
     $scenario = worldStateScenario();
     [, , , $region, $resident] = $scenario;
+    worldSentiments($region->world);
 
     $result = checkQuest($scenario, ['beats' => [QuestFactory::beat('go', ['when' => ['all' => [
-        ['feeling' => ['resident' => 999, 'kind' => 'awe', 'atLeast' => 12]],
-        ['feeling' => ['resident' => $resident->id, 'kind' => 'trust']],
-        ['feeling' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => 5, 'atMost' => 2]],
+        ['sentiment' => ['resident' => 999, 'kind' => 'awe', 'atLeast' => 12]],
+        ['sentiment' => ['resident' => $resident->id, 'kind' => 'trust']],
+        ['sentiment' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => 5, 'atMost' => 2]],
         ['questState' => ['quest' => 'nowhere', 'state' => 'lost']],
         ['declinedTimes' => ['quest' => 'the-quest', 'atLeast' => 0]],
         ['gaveTo' => ['resident' => $resident->id, 'item' => 999, 'atLeast' => 1]],
@@ -165,11 +167,11 @@ it('refuses the new parts with unknown references, out of range or without a bou
     ]]])]]);
 
     expect(array_keys($result['errors']))->toEqual([
-        'beats.0.when.all.0.feeling.resident',
-        'beats.0.when.all.0.feeling.kind',
-        'beats.0.when.all.0.feeling.atLeast',
-        'beats.0.when.all.1.feeling',
-        'beats.0.when.all.2.feeling.atMost',
+        'beats.0.when.all.0.sentiment.resident',
+        'beats.0.when.all.0.sentiment.kind',
+        'beats.0.when.all.0.sentiment.atLeast',
+        'beats.0.when.all.1.sentiment',
+        'beats.0.when.all.2.sentiment.atMost',
         'beats.0.when.all.3.questState.quest',
         'beats.0.when.all.3.questState.state',
         'beats.0.when.all.4.declinedTimes.atLeast',

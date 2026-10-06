@@ -112,7 +112,7 @@ class LookUpOfferCondition
             'enterRegion', 'enterZone', 'talkTo', 'use', 'residentDid' => $holds() ? 'has happened' : 'hasn\'t happened',
             'has' => (string) ($state->quantityOf((int) ($value['item'] ?? 0)) ?? 'unlimited'),
             'credits' => (string) ($state->credits() ?? 'unlimited'),
-            'feeling' => number_format($state->feeling((int) ($value['resident'] ?? 0), (string) ($value['kind'] ?? '')), 1),
+            'sentiment' => number_format($state->sentiment((int) ($value['resident'] ?? 0), (string) ($value['kind'] ?? '')), 1),
             'questState' => $state->questState((string) ($value['quest'] ?? '')) ?? 'not available',
             'declinedTimes' => (string) $state->declinedTimes((string) ($value['quest'] ?? '')),
             'gaveTo' => (string) $state->gaveTo((int) ($value['resident'] ?? 0), (int) ($value['item'] ?? 0)),

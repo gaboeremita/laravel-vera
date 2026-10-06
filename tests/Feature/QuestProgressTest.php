@@ -17,7 +17,7 @@ use App\Models\FactAcknowledgement;
 use App\Models\Inventory;
 use App\Models\QuestEvent;
 use App\Models\QuestOffer;
-use App\Models\ResidentFeeling;
+use App\Models\ResidentSentiment;
 use App\Models\WorldSession;
 use App\Models\WorldSessionQuest;
 use Database\Factories\QuestFactory;
@@ -208,26 +208,27 @@ it('leaves other sessions untouched', function () {
 it('finishes a beat the moment a resident\'s trust reaches what it asks, with the change as its cause', function () {
     [, , , $region, $resident, $session] = worldStateScenario();
     worldQuest($region->world, ['beats' => [
-        QuestFactory::beat('trusted', ['when' => ['feeling' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => 3]]]),
+        QuestFactory::beat('trusted', ['when' => ['sentiment' => ['resident' => $resident->id, 'kind' => 'trust', 'atLeast' => 3]]]),
         QuestFactory::beat('later', ['requires' => ['trusted']]),
     ]]);
     syncQuests($session);
-    $feeling = ResidentFeeling::of($session, $resident);
+    worldSentiments($region->world);
+    $sentiment = ResidentSentiment::of($session, $resident);
 
-    $feeling->adjust(['trust' => 2]);
+    $sentiment->adjust(['trust' => 2]);
     expect(runOf($session)->finishedBeats())->toBe([]);
 
-    $feeling->adjust(['trust' => 1]);
+    $sentiment->adjust(['trust' => 1]);
     $finished = QuestEvent::where('type', QuestEventType::BeatFinished)->firstOrFail();
     expect(runOf($session)->finishedBeats())->toBe(['trusted'])
         ->and($finished->payload['because'])->toBe("{$resident->assistant->name}'s trust is now 3.0");
 });
 
-it('reads a feeling bound from above, and a resident with no feelings yet as 0', function () {
+it('reads a sentiment bound from above, and a sentiment that never moved as 0', function () {
     [, , , $region, $resident, $session] = worldStateScenario();
     worldQuest($region->world, ['beats' => [
-        QuestFactory::beat('cold', ['when' => ['feeling' => ['resident' => $resident->id, 'kind' => 'romance', 'atMost' => -2]]]),
-        QuestFactory::beat('neutral', ['when' => ['all' => [['feeling' => ['resident' => $resident->id, 'kind' => 'liking', 'atLeast' => 0, 'atMost' => 0]], ['flag' => 'go']]]]),
+        QuestFactory::beat('cold', ['when' => ['sentiment' => ['resident' => $resident->id, 'kind' => 'romance', 'atMost' => -2]]]),
+        QuestFactory::beat('neutral', ['when' => ['all' => [['sentiment' => ['resident' => $resident->id, 'kind' => 'liking', 'atLeast' => 0, 'atMost' => 0]], ['flag' => 'go']]]]),
         QuestFactory::beat('later', ['requires' => ['cold', 'neutral']]),
     ]]);
     syncQuests($session);
@@ -235,7 +236,8 @@ it('reads a feeling bound from above, and a resident with no feelings yet as 0',
     $run->mergeState(['flags' => ['go' => ['by' => null, 'reason' => null]]]);
     $run->save();
 
-    ResidentFeeling::of($session, $resident)->adjust(['romance' => -2]);
+    worldSentiments($region->world);
+    ResidentSentiment::of($session, $resident)->adjust(['romance' => -2]);
 
     expect(runOf($session)->finishedBeats())->toEqualCanonicalizing(['cold', 'neutral']);
 });
@@ -287,13 +289,14 @@ it('reads another quest\'s state and how often its offer was turned down, walkin
         ->and(QuestSessionState::for($session->fresh())->questState('the-ledger'))->toBe('declined');
 });
 
-it('reads a quest as active once its offer is accepted, and starts a quest on a feeling', function () {
+it('reads a quest as active once its offer is accepted, and starts a quest on a sentiment', function () {
     [, , , $region, $resident, $session] = worldStateScenario();
-    worldQuest($region->world, ['start' => ['mode' => 'condition', 'when' => ['feeling' => ['resident' => $resident->id, 'kind' => 'liking', 'atLeast' => 4]]]], ['key' => 'fond']);
+    worldQuest($region->world, ['start' => ['mode' => 'condition', 'when' => ['sentiment' => ['resident' => $resident->id, 'kind' => 'liking', 'atLeast' => 4]]]], ['key' => 'fond']);
     syncQuests($session);
     $run = runOf($session);
 
-    ResidentFeeling::of($session, $resident)->adjust(['liking' => 4]);
+    worldSentiments($region->world);
+    ResidentSentiment::of($session, $resident)->adjust(['liking' => 4]);
 
     expect($run->fresh()->status)->toBe(QuestStatus::Active)
         ->and(QuestSessionState::for($session->fresh())->questState('fond'))->toBe('active');

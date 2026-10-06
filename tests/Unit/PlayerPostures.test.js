@@ -33,8 +33,8 @@ test('from the upper tier the user can look all the way around and down', () => 
 	close(Math.cos(behind.yaw - upper.yaw), -1);
 	close(behind.pitch, -MAX_PITCH);
 	const lower = postureView({ spot, posture: 'lying' });
-	close(lower.yawRange, 45 * DEGREE);
-	close(lower.pitchMin, -10 * DEGREE);
+	close(lower.yawRange, 90 * DEGREE);
+	close(lower.pitchMin, -30 * DEGREE);
 	close(lower.pitchMax, 80 * DEGREE);
 });
 
@@ -55,7 +55,7 @@ test('each posture has its base pitch and look limits', () => {
 	close(reclining.yawRange, 55 * DEGREE);
 	const lying = postureView({ spot, posture: 'lying' });
 	close(lying.pitch, 55 * DEGREE);
-	close(lying.yawRange, 45 * DEGREE);
+	close(lying.yawRange, 90 * DEGREE);
 	close(lying.pitchMax, 80 * DEGREE);
 });
 

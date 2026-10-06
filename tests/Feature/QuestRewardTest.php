@@ -12,7 +12,7 @@ use App\Models\AiModel;
 use App\Models\Inventory;
 use App\Models\InventoryItem;
 use App\Models\QuestEvent;
-use App\Models\ResidentFeeling;
+use App\Models\ResidentSentiment;
 use App\Models\WorldSessionQuest;
 use Database\Factories\QuestFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -97,10 +97,22 @@ it('queues the reward once the ending of a completed quest is written', function
     Queue::assertPushed(GiveQuestReward::class, fn (GiveQuestReward $job) => $job->runId === $run->id);
 });
 
+it('leaves sentiments out of the reward when the world has none', function () {
+    [, , , , , , , , $run] = rewardScenario();
+    fakeTurn(toolCallResponse('reward_1', 'give_reward', ['credits' => 0, 'items' => [], 'line' => 'Thanks.']));
+
+    GiveQuestReward::dispatchSync($run->id);
+
+    $request = Http::recorded()[0][0];
+    expect($request['tools'][0]['function']['parameters']['properties'])->not->toHaveKey('sentiments')
+        ->and(collect($request['messages'])->pluck('content')->implode("\n"))->not->toContain('How you feel about the user')->not->toContain('Let the quest move your feelings');
+});
+
 it('lets the resident decide the reward in their own voice from the score and what they hold, and hands it over', function () {
     [, , $conversation, , $resident, $session, $player, $residentInventory, $run, , $plating] = rewardScenario();
+    worldSentiments($resident->world);
     Event::fake([QuestsUpdated::class]);
-    fakeTurn(toolCallResponse('reward_1', 'give_reward', ['credits' => 15, 'items' => [['item' => 'Compliance Unit plating', 'quantity' => 1]], 'line' => 'Thanks for the broth. Take this.', 'feelings' => ['liking' => -1, 'trust' => 5]]));
+    fakeTurn(toolCallResponse('reward_1', 'give_reward', ['credits' => 15, 'items' => [['item' => 'Compliance Unit plating', 'quantity' => 1]], 'line' => 'Thanks for the broth. Take this.', 'sentiments' => ['liking' => -1, 'trust' => 5]]));
 
     GiveQuestReward::dispatchSync($run->id);
 
@@ -111,7 +123,8 @@ it('lets the resident decide the reward in their own voice from the score and wh
         ->and(heldQuantity($player, $plating))->toBe(1)
         ->and(heldQuantity($residentInventory, $plating))->toBeNull()
         ->and($player->fresh()->credits)->toBe(25)
-        ->and(ResidentFeeling::of($session, $resident)->values())->toBe(['romance' => 0.0, 'trust' => 3.0, 'liking' => -1.0])
+        ->and(array_keys($request['tools'][0]['function']['parameters']['properties']['sentiments']['properties']))->toBe(['romance', 'trust', 'liking'])
+        ->and(ResidentSentiment::of($session, $resident)->scores())->toBe(['romance' => 0.0, 'trust' => 3.0, 'liking' => -1.0])
         ->and($run->fresh()->state['reward'])->toMatchArray(['line' => 'Thanks for the broth. Take this.', 'credits' => 15, 'items' => [['name' => 'Compliance Unit plating', 'quantity' => 1]]])
         ->and(QuestEvent::where('type', QuestEventType::RewardGiven)->first()->payload)->toMatchArray(['prose' => REWARD_PROSE, 'credits' => 15])
         ->and($conversation->messages()->latest('id')->first())->role->toBe('assistant')->content->toBe('Thanks for the broth. Take this.');

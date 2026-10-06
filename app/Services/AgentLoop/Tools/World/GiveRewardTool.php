@@ -3,29 +3,28 @@
 namespace App\Services\AgentLoop\Tools\World;
 
 use App\Contracts\AgentTool;
-use App\Models\ResidentFeeling;
 
 /**
  * What a quest's reward giver hands the user once the quest is complete, and
- * for a resident giver how their feelings about the user change. Its call is
- * read directly from the reply; items can only be ones the giver holds, never
- * more than they hold, credits never more than a counted balance, and each
- * feeling moves at most 3 points.
+ * for a resident giver how their sentiments about the user change. Its call
+ * is read directly from the reply; items can only be ones the giver holds,
+ * never more than they hold, credits never more than a counted balance, and
+ * each sentiment moves at most 3 points.
  */
 class GiveRewardTool implements AgentTool
 {
     /**
      * @param  array<string, array{id: int, quantity: ?int}>  $held  what the giver holds, by item name; a null quantity is plenty
      * @param  ?int  $credits  the giver's balance, or null when theirs isn't counted
-     * @param  bool  $withFeelings  whether the giver is a resident, whose feelings can change
+     * @param  array<int, string>  $sentiments  the names of the giver's sentiments that can change; empty for an object
      */
     public function __construct(
         private readonly array $held,
         private readonly ?int $credits,
-        private readonly bool $withFeelings = false,
+        private readonly array $sentiments = [],
     ) {}
 
-    private const FEELING_STEP = 3;
+    private const SENTIMENT_STEP = 3;
 
     public function name(): string
     {
@@ -55,10 +54,10 @@ class GiveRewardTool implements AgentTool
                     ],
                 ],
                 'line' => ['type' => 'string', 'description' => 'One to three sentences said or shown to the user as the reward is handed over.'],
-                ...($this->withFeelings ? ['feelings' => [
+                ...($this->sentiments !== [] ? ['sentiments' => [
                     'type' => 'object',
                     'description' => 'How your feelings about the user change after this quest, as the amount to add to each (negative to lower); only the ones that change.',
-                    'properties' => collect(ResidentFeeling::FEELINGS)->mapWithKeys(fn (string $feeling) => [$feeling => ['type' => 'number', 'minimum' => -self::FEELING_STEP, 'maximum' => self::FEELING_STEP]])->all(),
+                    'properties' => collect($this->sentiments)->mapWithKeys(fn (string $name) => [$name => ['type' => 'number', 'minimum' => -self::SENTIMENT_STEP, 'maximum' => self::SENTIMENT_STEP]])->all(),
                 ]] : []),
             ],
             'required' => ['credits', 'items', 'line'],
@@ -66,7 +65,7 @@ class GiveRewardTool implements AgentTool
     }
 
     /**
-     * @return array{credits: int, items: array<int, int>, line: string, feelings: array<string, float>}
+     * @return array{credits: int, items: array<int, int>, line: string, sentiments: array<string, float>}
      */
     public function handle(array $arguments): array
     {
@@ -89,12 +88,10 @@ class GiveRewardTool implements AgentTool
             'credits' => $credits,
             'items' => array_filter($items),
             'line' => trim((string) ($arguments['line'] ?? '')),
-            'feelings' => $this->withFeelings
-                ? collect(ResidentFeeling::FEELINGS)
-                    ->filter(fn (string $feeling) => is_numeric($arguments['feelings'][$feeling] ?? null))
-                    ->mapWithKeys(fn (string $feeling) => [$feeling => max(-self::FEELING_STEP, min(self::FEELING_STEP, (float) $arguments['feelings'][$feeling]))])
-                    ->all()
-                : [],
+            'sentiments' => collect($this->sentiments)
+                ->filter(fn (string $name) => is_numeric($arguments['sentiments'][$name] ?? null))
+                ->mapWithKeys(fn (string $name) => [$name => max(-self::SENTIMENT_STEP, min(self::SENTIMENT_STEP, (float) $arguments['sentiments'][$name]))])
+                ->all(),
         ];
     }
 

@@ -7,7 +7,7 @@ const UPPER_TIER_TOWARD_FEET = 0.25;
 const POSTURE_VIEWS = {
 	sitting: { height: 0.72, back: 0.1, pitch: 0, yawRange: 75 * DEGREE, pitchMin: -60 * DEGREE, pitchMax: 50 * DEGREE },
 	reclining: { height: 0.55, back: 0.45, pitch: 20 * DEGREE, yawRange: 55 * DEGREE, pitchMin: -35 * DEGREE, pitchMax: 55 * DEGREE },
-	lying: { height: 0.28, back: 0.7, pitch: 55 * DEGREE, yawRange: 45 * DEGREE, pitchMin: -10 * DEGREE, pitchMax: 80 * DEGREE },
+	lying: { height: 0.28, back: 0.7, pitch: 55 * DEGREE, yawRange: 90 * DEGREE, pitchMin: -30 * DEGREE, pitchMax: 80 * DEGREE },
 };
 
 export const RESTING_POSTURES = Object.keys(POSTURE_VIEWS);

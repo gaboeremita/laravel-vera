@@ -5,8 +5,7 @@ const SELECT = 'bg-bg-1 border border-line-1 text-accent text-sm px-2 py-1.5 out
 const SMALL_BUTTON = 'text-[0.65rem] tracking-[0.1em] px-2 py-1 border border-dashed border-line-1 text-fg-3 hover:text-accent hover:border-accent/50 transition-colors cursor-pointer';
 
 const GROUP_LABELS = { all: 'All of', any: 'Any of', none: 'None of' };
-const FEELINGS = [['romance', 'Romance'], ['trust', 'Trust'], ['liking', 'Liking']];
-const FEELING_BOUNDS = [['atLeast', 'at least'], ['atMost', 'at most'], ['between', 'between']];
+const SENTIMENT_BOUNDS = [['atLeast', 'at least'], ['atMost', 'at most'], ['between', 'between']];
 const QUEST_STATES = [['offered', 'Offered'], ['active', 'Active'], ['declined', 'Declined'], ['abandoned', 'Abandoned']];
 const OBJECT_STATES = [['passable', 'Passable']];
 const NO_ERRORS = () => [];
@@ -45,7 +44,7 @@ function wholeNumber(value, minimum) {
 	return Math.max(minimum, Math.floor(Number(value) || 0));
 }
 
-function feelingNumber(value) {
+function sentimentNumber(value) {
 	return Math.min(10, Math.max(-10, Math.round((Number(value) || 0) * 10) / 10));
 }
 
@@ -71,7 +70,7 @@ function defaultCondition(type, options, context) {
 		case 'acknowledged': return { acknowledged: { fact: factId, resident: residentId } };
 		case 'flag': return context.outsideQuest ? { flag: { quest: options.quests[0]?.key ?? '', name: options.quests[0]?.flags[0] ?? '' } } : { flag: context.flags[0] ?? '' };
 		case 'question': return { question: context.questions[0]?.id ?? '' };
-		case 'feeling': return { feeling: { resident: residentId, kind: 'trust', atLeast: 1 } };
+		case 'sentiment': return { sentiment: { resident: residentId, kind: options.sentiments[0] ?? '', atLeast: 1 } };
 		case 'questState': return { questState: { quest: context.questKey || options.quests[0]?.key || '', state: 'declined' } };
 		case 'declinedTimes': return { declinedTimes: { quest: context.questKey || options.quests[0]?.key || '', atLeast: 1 } };
 		case 'gaveTo': return { gaveTo: { resident: residentId, item: options.items[0]?.id ?? null, atLeast: 1 } };
@@ -153,7 +152,7 @@ function ZoneFields({ options, value, onChange }) {
 	);
 }
 
-function FeelingFields({ options, value, onChange }) {
+function SentimentFields({ options, value, onChange }) {
 	const bound = 'atLeast' in value && 'atMost' in value ? 'between' : 'atMost' in value ? 'atMost' : 'atLeast';
 	const setBound = (next) => {
 		const low = value.atLeast ?? value.atMost ?? 0;
@@ -163,17 +162,17 @@ function FeelingFields({ options, value, onChange }) {
 		return onChange({ ...base, [next]: next === 'atLeast' ? low : high });
 	};
 	const number = (key, label) => (
-		<input type="number" min={-10} max={10} step={0.5} value={value[key]} onWheel={(event) => event.target.blur()} onChange={(event) => onChange({ ...value, [key]: feelingNumber(event.target.value) })} className={`${SELECT} w-20`} aria-label={label} />
+		<input type="number" min={-10} max={10} step={0.5} value={value[key]} onWheel={(event) => event.target.blur()} onChange={(event) => onChange({ ...value, [key]: sentimentNumber(event.target.value) })} className={`${SELECT} w-20`} aria-label={label} />
 	);
 
 	return (
 		<>
 			<ResidentSelect options={options} value={value.resident} onChange={(resident) => onChange({ ...value, resident })} />
-			<select value={value.kind} onChange={(event) => onChange({ ...value, kind: event.target.value })} className={SELECT} aria-label="Feeling">
-				{FEELINGS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+			<select value={value.kind} onChange={(event) => onChange({ ...value, kind: event.target.value })} className={SELECT} aria-label="Sentiment">
+				{options.sentiments.map((name) => <option key={name} value={name}>{name}</option>)}
 			</select>
 			<select value={bound} onChange={(event) => setBound(event.target.value)} className={SELECT} aria-label="Bound">
-				{FEELING_BOUNDS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+				{SENTIMENT_BOUNDS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
 			</select>
 			{bound !== 'atMost' && number('atLeast', 'At least')}
 			{bound === 'between' && <span className="text-fg-3 text-xs">and</span>}
@@ -259,8 +258,8 @@ function ConditionFields({ type, value, onChange, options, context }) {
 					<AtLeast value={value} onChange={onChange} />
 				</>
 			);
-		case 'feeling':
-			return <FeelingFields options={options} value={value} onChange={onChange} />;
+		case 'sentiment':
+			return <SentimentFields options={options} value={value} onChange={onChange} />;
 		case 'questState':
 			return (
 				<>

@@ -2,10 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 
-const EMPTY_OPTIONS = { regions: [], residents: [], items: [], facts: [], quests: [], campaigns: [] };
+const EMPTY_OPTIONS = { regions: [], residents: [], sentiments: [], items: [], facts: [], quests: [], campaigns: [] };
 
-/** Everything the quest editor's pickers choose from: the world's regions, residents, items, facts, quests and campaigns. */
-export default function useQuestOptions(worldId, addToast) {
+/**
+ * Everything the quest editor's pickers choose from: the world's regions, residents, sentiments, items, facts, quests and campaigns.
+ * A new worldVersion loads them again, for changes saved on the world itself.
+ */
+export default function useQuestOptions(worldId, addToast, worldVersion = 0) {
 	const [options, setOptions] = useState(EMPTY_OPTIONS);
 
 	const fetchOptions = useCallback(async () => {
@@ -27,7 +30,7 @@ export default function useQuestOptions(worldId, addToast) {
 		};
 		void load();
 		return () => { active = false; };
-	}, [worldId, fetchOptions, addToast]);
+	}, [worldId, fetchOptions, addToast, worldVersion]);
 
 	const reload = useCallback(async () => {
 		try {

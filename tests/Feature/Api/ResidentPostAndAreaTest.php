@@ -59,7 +59,7 @@ it('gives an NPC who stays put only the tools that tell her about the place and 
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -4]],
     ])->assertSuccessful();
 
-    expect(collect(Http::recorded()[0][0]['tools'])->pluck('function.name')->sort()->values()->all())->toBe(['adjust_feelings', 'ask_for', 'check_holds', 'describe', 'give', 'what_is_in', 'where_can_i'])
+    expect(collect(Http::recorded()[0][0]['tools'])->pluck('function.name')->sort()->values()->all())->toBe(['ask_for', 'check_holds', 'describe', 'give', 'what_is_in', 'where_can_i'])
         ->and(sentPrompt())->toContain('You keep to your post here, and people come to you.')->not->toContain('Your body in this world moves only through your tools');
 })->with(['stationary', 'route']);
 
