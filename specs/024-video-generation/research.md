@@ -48,7 +48,7 @@ A first frame is sent as `frame_images: [{ "type": "image_url", "image_url": { "
 
 ## R5. Closest supported value
 
-**Decision**: `VideoGenerationService` reads the model's supported durations and aspect ratios from the provider (`VideoGenProvider::supportedSettings()`), cached for a day per provider URL and model. A requested duration is replaced by the nearest supported number. A requested aspect ratio is replaced by the supported ratio whose width/height quotient is nearest. Sound is passed through unchanged, because OpenRouter ignores it for models without audio. If the listing can't be read, the request is sent unchanged and a warning is logged; the provider's rejection then becomes the failure reason.
+**Decision**: `VideoGenerationService` reads the model's supported durations and aspect ratios from the provider (`VideoGenProvider::supportedSettings()`), cached for a day per provider URL and model. A requested duration is replaced by the nearest supported number. A requested aspect ratio is replaced by the supported ratio whose width/height quotient is nearest. Sound is passed through unchanged, because OpenRouter ignores it for models without audio. If the listing can't be read, the request is sent unchanged and a warning is logged; the provider's rejection then becomes the failure reason (spec edge case).
 
 **Rationale**: the provider already publishes these lists, so the user never types them, and the model record stays shaped like `image_gen_models`.
 

@@ -43,7 +43,7 @@ Laravel + React in one repository: `app/`, `config/`, `database/`, `routes/`, `r
   - Relations: `message()`, `model()` (BelongsTo `VideoGenModel`, `video_gen_model_id`), `firstFrame()` (BelongsTo `Image`, `first_frame_image_id`).
   - A `url` accessor that returns null without `path`, otherwise copies `Image::getUrlAttribute`.
   - `toChatPayload(): array` returning `id`, `status`, `url`, `prompt`, `duration`, `aspect_ratio`, `failure_reason`, in the shape in contracts/api.md.
-  - `historyNote(): string` returning `[Video: "<prompt>" — generating]`, `— ready]` or `— failed: <failure_reason>]`. `queued` counts as generating.
+  - `historyNote(): string` returning `[Video: "<prompt>" — generating]`, `— ready]` or `— failed: <failure_reason>]`. `queued` counts as generating. The assistant sees "ready" for the `Completed` status, matching FR-012a's wording.
   - `storeDownloaded(string $tempPath, string $storagePath): void`: puts the file on the `public` disk as `{storagePath}/{uuid}.mp4` and fills `path`, `disk`, `mime_type` (`video/mp4`) and `size`.
 
   Add `HasFactory`.
@@ -149,6 +149,8 @@ Laravel + React in one repository: `app/`, `config/`, `database/`, `routes/`, `r
   - A valid command returns the contracts/api.md response with `video.status` `queued`, creates an assistant message with the reply text and a `Video` holding the improved description and the model's defaults, and dispatches `PollVideoGeneration`.
   - Length, aspect ratio and sound from the improver's JSON override the defaults, adjusted to the closest supported value (see T026).
   - A non-JSON improver reply falls back to the whole reply and the defaults.
+  - A failing improver or reply LLM call returns a 502 with its message and creates no video.
+  - The same command in a world conversation (`worldStateScenario()`) creates the video the same way.
   - `conversations.show` returns `video` on that message.
 - [ ] T024 [P] [US1] Write `tests/Feature/PollVideoGenerationTest.php` with `Http::fake` sequences, `Event::fake([VideoGenerationStatusUpdated::class, VideoGenerationFinished::class])` and `Storage::fake('public')`. Cover:
   - The first run submits, stores `job_id`, and releases.
@@ -159,6 +161,7 @@ Laravel + React in one repository: `app/`, `config/`, `database/`, `routes/`, `r
   - A failed download sets `failed`.
   - `failed()` after the deadline sets `failed` with `timed out after N seconds`.
   - A deleted conversation makes the job end without error and without broadcasts.
+  - Two videos in the same conversation each get their own `job_id`, status changes and broadcasts.
 
 ### Implementation for User Story 1
 
@@ -188,6 +191,7 @@ Laravel + React in one repository: `app/`, `config/`, `database/`, `routes/`, `r
 - [ ] T028 [US1] In `app/Http/Controllers/Api/ConversationController.php`:
   - Add `/create-video` to `COMMANDS`, and `extractVideoGenPrompt()` next to `extractImageGenPrompt()`.
   - In `sendMessage`, right after the `/create-image` block, handle `/create-video` with the 422s from data-model.md, then call a new private `startVideoMessage()`, styled like `generateImageMessage()`. It improves the description and gets the in-character reply from a new `reactToStartedVideo()`, a copy of `reactToGeneratedImage()` whose current-state line reads `[You just started making a video. What it will show: "<description>"]`. It creates the assistant message with the parsed reply, and calls `VideoGenerationService::start()`.
+  - Wrap the improver, reply and `start()` calls the way `/create-image` wraps `generateImageMessage()`: a `RuntimeException` returns a 502 with its message, and nothing is created.
   - Return the contracts/api.md payload.
   - In `show()`, eager-load `video` and add `$message->video = $message->video?->toChatPayload()` next to `image_url`.
 
@@ -258,19 +262,21 @@ Laravel + React in one repository: `app/`, `config/`, `database/`, `routes/`, `r
   - A `generate_video` call creates a carrier message with a `queued` video, dispatches the job, and returns `{status, video_id, enhanced_prompt}`.
   - `duration`, `aspect_ratio` and `generate_audio` arguments override the defaults.
   - An image attached to the triggering user message becomes the first frame.
+  - With an attached image and no `ai.video_gen.public_url`, the tool call fails with the 422 wording, and no message or video is created.
+  - Tool arguments win over the improver's values, which win over the model defaults.
   - The chat reply returns without waiting for the job (`Bus::fake`).
 
 ### Implementation for User Story 4
 
 - [ ] T039 [US4] Create `app/Services/AgentLoop/Tools/VideoGenerationTool.php`, copying `ImageGenerationTool`. It has the name `generate_video`, and the description and parameters from contracts/api.md. `handle()`:
   - validates `prompt`;
-  - creates the empty carrier message, as the image tool does;
-  - reads the conversation's latest user message image;
+  - reads the conversation's latest user message image. With an image and an empty `ai.video_gen.public_url`, it throws a `RuntimeException` with the 422 wording from data-model.md before creating anything, so the agent loop reports it to the model;
   - improves the description;
-  - calls `start()` with the tool's arguments as `$requested`;
+  - creates the empty carrier message, as the image tool does;
+  - calls `start()` with `$requested` built from the improver's values, overridden by any `duration`, `aspect_ratio` or `generate_audio` tool argument;
   - returns the contracts/api.md result.
 
-  `timeoutSeconds()` is the improver's LLM timeout plus 30. Register it in `ConversationController::sendMessage` next to `ImageGenerationTool`, when `VideoGenerationService::isAvailableFor()` is true. Make T038 pass.
+  `timeoutSeconds()` is `config('ai.default.config.timeout') + 30`, covering the improver's LLM call. Register it in `ConversationController::sendMessage` next to `ImageGenerationTool`, when `VideoGenerationService::isAvailableFor()` is true. Make T038 pass.
 - [ ] T040 [US4] In `resources/js/hooks/useConversationChat.js`, next to the `call.result?.image_url` mapping, add a placeholder message `{ role: 'assistant', content: '', video: { id: call.result.video_id, status: 'queued', url: null, … } }` for each tool call whose `result.video_id` is set.
 
 **Checkpoint**: All five stories work.
@@ -293,7 +299,7 @@ Laravel + React in one repository: `app/`, `config/`, `database/`, `routes/`, `r
 
 - [ ] T043 [P] Add the video generation feature and the `PUBLIC_TUNNEL_URL` / `VIDEO_GEN_*` keys to `README.md`, in the same place and style as image generation.
 - [ ] T044 [P] Check `ARCHITECTURE.md`. If it describes image generation, add the matching video generation paragraph: the job, broadcasts, and the tunnel address.
-- [ ] T045 Walk through quickstart.md scenarios 1–7 by hand with the owner. The owner runs them; no browser automation.
+- [ ] T045 Walk through quickstart.md scenarios 1–7 by hand with the owner. The owner runs them; no browser automation. The second half of scenario 6 is the check for US4 scenario 4, which depends on the model's judgment and has no automated test.
 - [ ] T046 When the owner says it is time to push: run `vendor/bin/pint --format agent`, `npm run lint` and `php artisan test --compact` once, and fix everything they report.
 
 ---

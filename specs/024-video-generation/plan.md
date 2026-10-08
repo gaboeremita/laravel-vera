@@ -35,7 +35,7 @@ Video generation is image generation's twin, with one structural difference: the
 
 **Project Type**: Web application (Laravel API + React SPA)
 
-**Performance Goals**: The `/create-video` reply returns as fast as a `/create-image` reply minus the image generation itself (SC-002). The notice arrives within a few seconds of completion; the delay is set by the 30 s check interval plus broadcast latency.
+**Performance Goals**: The `/create-video` reply returns as fast as a `/create-image` reply minus the image generation itself (SC-002). The notice arrives within 30 s of the provider finishing (SC-004): the check interval plus broadcast latency.
 
 **Constraints**:
 - The job sets `retryUntil()`, which overrides the worker's `--tries=1` (`composer run dev`) for released jobs.

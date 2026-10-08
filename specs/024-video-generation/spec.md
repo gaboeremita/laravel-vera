@@ -113,6 +113,9 @@ From an assistant's menu, the user opens a Video Gen page laid out like the Imag
 - The user is in a world conversation: `/create-video` and the assistant's video ability work the same as in a regular conversation.
 - The user asks for a setting the selected model cannot produce (for example, a 40 second clip from a model that tops out at 30): the video is generated with the closest value the model supports.
 - An attached image is too large or in a format the provider rejects: the provider's rejection is shown as the failure reason.
+- The provider's list of supported values cannot be read: the request is sent as asked, and a rejection by the provider is shown as the failure reason.
+- The assistant starts a video on its own while the user's message has an attached image and no public address is configured: no video is started, and the assistant is told why so it can tell the user.
+- Writing the video description or the in-character reply fails: the app shows the error and no video is started.
 
 ## Requirements *(mandatory)*
 
@@ -165,7 +168,7 @@ From an assistant's menu, the user opens a Video Gen page laid out like the Imag
 
 - **Video Gen Provider**: A service the user's videos are generated with. Belongs to one user. Has a name, an address, an API key and a format that says how to talk to it.
 - **Video Gen Model**: A model offered by a provider, with default settings for length, resolution, aspect ratio, sound and maximum wait, and the lengths and aspect ratios it supports, as the provider lists them. An assistant can have one selected.
-- **Video**: A generated video. Belongs to one assistant message. Records the provider's job reference, the status (queued, generating, completed, failed), the failure reason when it failed, the description it was generated from, and, once finished, the stored file, its length and its size.
+- **Video**: A generated video. Belongs to one assistant message. Records the provider's job reference, the status (queued, generating, completed, failed), the failure reason when it failed, the description it was generated from, the requested length, aspect ratio and sound, and, once finished, the stored file and its size.
 
 ## Success Criteria *(mandatory)*
 
@@ -174,7 +177,7 @@ From an assistant's menu, the user opens a Video Gen page laid out like the Imag
 - **SC-001**: A user can go from typing `/create-video` with a description to watching the finished video without leaving or reloading the conversation.
 - **SC-002**: The assistant's in-character reply to a video request appears as quickly as its reply to an image request, regardless of how long the video takes.
 - **SC-003**: Every requested video ends in exactly one of two visible outcomes in its message, a playable video or a failure with a reason; none stays in "generating" past the model's maximum wait.
-- **SC-004**: When a video finishes while the user is anywhere else in the app, a notice appears within a few seconds of completion, and one click opens the conversation with the video.
+- **SC-004**: When a video finishes while the user is anywhere else in the app, a notice appears within 30 seconds of the provider finishing it, and one click opens the conversation with the video.
 - **SC-005**: A video started from an attached image opens on that image as its first frame.
 - **SC-006**: A user can set up a provider and model and generate their first video from the Video Gen page alone, with no manual configuration outside the app beyond setting the public address.
 
