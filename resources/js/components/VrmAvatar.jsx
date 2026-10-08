@@ -20,6 +20,7 @@ const POSE_BLEND_SECONDS = 0.25;
 // margin. The hold reuses EXPRESSION_HOLD_SECONDS so a static pose's body
 // and (if it has one) facial expression revert together.
 const POSE_STATIC_CLIP_SECONDS = 0.5;
+const EYE_LINE_FROM_TOP = 0.28;
 
 // vrm.humanoid.humanBones returns the *raw* bones — a different node than
 // the *normalized* ones AnimationMixer clips actually target (built via
@@ -253,20 +254,21 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 					void startDefaultLoop(vrm, defaultPoseAnimationUrlRef.current);
 				}
 
-				// Frame from the thighs up: fit the vertical range from the hips
-				// bone (top of the thighs, standard humanoid skeleton) to the
-				// top of the head into the vertical fov, so the crop line lands
-				// in the same place regardless of the model's own proportions.
-				vrm.scene.updateWorldMatrix(true, true);
+				// Crop at the tops of the legs with the eyes EYE_LINE_FROM_TOP down
+				// the frame, so every model gets the same composition. The hips
+				// bone sits at the waist on some rigs and at the legs on others,
+				// and the model's bounding box top varies with hair and ornaments.
+				// updateMatrixWorld also refreshes each skinned mesh's bind matrix
+				// after rotateVRM0; without it the box of a model built away from
+				// the origin comes out mirrored and the camera frames empty space.
+				vrm.scene.updateMatrixWorld(true);
 				const box = new Box3().setFromObject(vrm.scene);
 				const center = box.getCenter(new Vector3());
-				const hips = vrm.humanoid.getNormalizedBoneNode('hips');
-				const hipsPosition = new Vector3();
-				if (hips) hips.getWorldPosition(hipsPosition);
-				const frameBottom = hips ? hipsPosition.y : box.min.y;
-				const frameTop = box.max.y;
-				const frameHeight = frameTop - frameBottom;
-				const frameCenterY = (frameTop + frameBottom) / 2;
+				const boneY = (boneName) => vrm.humanoid.getNormalizedBoneNode(boneName)?.getWorldPosition(new Vector3()).y;
+				const eyeY = boneY('leftEye') ?? boneY('head');
+				const frameBottom = (boneY('leftUpperLeg') + boneY('rightUpperLeg')) / 2;
+				const frameHeight = (eyeY - frameBottom) / (1 - EYE_LINE_FROM_TOP);
+				const frameCenterY = frameBottom + frameHeight / 2;
 				const fovRad = (camera.fov * Math.PI) / 180;
 				const distance = (frameHeight / 2) / Math.tan(fovRad / 2) * 1.1;
 				camera.position.set(center.x, frameCenterY, center.z + distance);
