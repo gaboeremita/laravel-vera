@@ -139,6 +139,10 @@ export function retargetBaseClip(base, vrm) {
 	}
 
 	const hipsPositionScale = Math.abs(vrmHipsY - vrmRootY) / base.motionHipsHeight;
+	// Mixamo records the hips around its own origin; a VRM built away from the
+	// origin would otherwise snap there and leave the camera framing empty space.
+	const [restHipsX = 0, , restHipsZ = 0] = vrm.humanoid?.normalizedRestPose?.hips?.position ?? [];
+	const restHipsOffset = [restHipsX, 0, restHipsZ];
 	const isVrm0 = vrm.meta?.metaVersion === '0';
 	const tracks = [];
 
@@ -154,7 +158,7 @@ export function retargetBaseClip(base, vrm) {
 		if (track.kind === 'quaternion') {
 			tracks.push(new QuaternionKeyframeTrack(name, track.times, track.values.map((v, i) => (isVrm0 && i % 2 === 0 ? -v : v))));
 		} else {
-			tracks.push(new VectorKeyframeTrack(name, track.times, track.values.map((v, i) => (isVrm0 && i % 3 !== 1 ? -v : v) * hipsPositionScale)));
+			tracks.push(new VectorKeyframeTrack(name, track.times, track.values.map((v, i) => (isVrm0 && i % 3 !== 1 ? -v : v) * hipsPositionScale + restHipsOffset[i % 3])));
 		}
 	}
 
