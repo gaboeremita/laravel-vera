@@ -8,6 +8,14 @@
 
 **Input**: User description: "Let users request videos from Discord with `/create-video`, as they can in the web chat. The assistant replies in character right away, and the finished video is posted later by the assistant's bot as a reply to the original message. An image attached to the request is used as the video's first frame. Laravel tells the Discord bridge (node-discord-api) when a video finishes or fails, retrying if the bridge does not answer. The bridge posts the video as an attachment, shrinking it with ffmpeg when it is over the destination's upload limit (first at a bitrate fitted to the limit, then at 480p), and posts a failure notice when it still does not fit or the video failed. Telegram and the assistant's own video ability on Discord are out of scope."
 
+## Clarifications
+
+### Session 2026-10-07
+
+- Q: In a server channel, who should be allowed to start a video with `/create-video`? → A: Only people on the assistant's DM allowlist; anyone else gets a reply saying they can't request videos.
+- Q: When Laravel rejects a Discord message with a reason, should the bot show that reason for every kind of message, or only for `/create-video`? → A: Every rejected message shows Laravel's reason; "Connection failed. Try again." stays only for when Laravel can't be reached or gives no reason.
+- Q: When a Discord video fails or is too big to post, should the bot's notice be a plain system message or written in the assistant's voice? → A: A plain system message, for example "Video failed: <reason>" or "Video too large for Discord — watch it in the web app".
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Ask for a video in Discord and get it as a reply (Priority: P1)
@@ -26,6 +34,7 @@ In a Discord channel where the assistant's bot answers, or in a DM with it, the 
 4. **Given** an assistant with no video model selected, **When** the user sends `/create-video` with a description, **Then** the bot replies that no video model is configured for this assistant, and nothing is generated.
 5. **Given** the user sends `/create-video` with no description, **When** the message reaches the assistant, **Then** the bot asks the user to describe the video to generate.
 6. **Given** a video requested from Discord, **When** the user opens that conversation in the web app, **Then** the video is shown in its message as it is for web requests.
+7. **Given** a server channel where the bot answers, **When** someone who is not on the assistant's DM allowlist sends `/create-video`, **Then** the bot replies that they can't request videos, and nothing is generated.
 
 ---
 
@@ -84,6 +93,7 @@ When a video requested from Discord fails, the bot posts a short notice as a rep
 - The conversation is deleted while its video is generating: nothing is posted to Discord.
 - A video is requested in the web app: it is never posted to Discord, even if the same assistant has a Discord bot.
 - The assistant's bot is not running in the bridge when delivery is attempted: delivery is retried like an unreachable bridge, then logged and dropped.
+- The assistant's DM allowlist is empty: nobody can start a video from Discord, and every `/create-video` gets the "can't request videos" reply.
 - The user requests a second video while the first is still generating: each is posted separately as a reply to its own request.
 - Writing the video description or the in-character reply fails: the bot replies with the error, and no video is started.
 - The bot no longer has access to the channel when the video finishes (for example, it was removed from the server): the bridge reports the post failure, and it is logged without retrying.
@@ -96,17 +106,19 @@ When a video requested from Discord fails, the bot posts a short notice as a rep
 **Requesting a video from Discord**
 
 - **FR-001**: Users MUST be able to request a video by sending `/create-video` followed by a description in any Discord channel or DM where the assistant's bot answers.
+- **FR-001a**: Only people on the assistant's DM allowlist MUST be able to start a video. A `/create-video` from anyone else, including other bots, MUST get a reply saying they can't request videos, and MUST NOT start a video.
 - **FR-002**: A Discord video request MUST follow the same rules as a web request: the same description improvement, the same in-character reply, the same use of the requested length, aspect ratio and sound, and the same closest-supported-value fallback.
 - **FR-003**: When the Discord message carries an attached image, the system MUST use that image as the video's first frame, under the same public-address rule as the web app.
 - **FR-004**: The in-character reply MUST be posted in Discord without waiting for the video.
-- **FR-005**: When a Discord video request is rejected (no description, no video model, image with no public address, or a failure writing the description or reply), the bot MUST reply with the reason the app gives, the same wording the web app shows.
+- **FR-005**: When the app rejects any Discord message with a reason, the bot MUST reply with that reason, the same wording the web app shows. This covers `/create-video` rejections (no description, no video model, image with no public address, or a failure writing the description or reply) and every other message, including `/create-image`, voice messages and normal chat.
+- **FR-005a**: The bot MUST reply "Connection failed. Try again." only when the app cannot be reached or its rejection carries no reason.
 
 **Delivering the finished video**
 
 - **FR-006**: When a video belonging to a Discord conversation finishes or fails, the system MUST send it to the Discord bridge for posting, identifying the assistant, the channel, and the Discord message to reply to.
 - **FR-007**: The bridge MUST accept delivery only from the app, using the same shared secret that protects channel discovery.
 - **FR-008**: The bridge MUST post a finished video with the assistant's own bot, as a file attachment that plays inline, in reply to the `/create-video` message.
-- **FR-009**: The bridge MUST post a failed video as a short notice in reply to the `/create-video` message, stating the failure reason.
+- **FR-009**: The bridge MUST post a failed video as a plain system notice in reply to the `/create-video` message, in the form "Video failed: <reason>". Notices are fixed text, never written by the assistant.
 - **FR-010**: When the message to reply to no longer exists, the bridge MUST post in the same channel without a reply reference.
 - **FR-011**: Videos requested in the web app MUST NOT be posted to Discord.
 
@@ -115,7 +127,7 @@ When a video requested from Discord fails, the bot posts a short notice as a rep
 - **FR-012**: Before posting, the bridge MUST determine the upload limit for the destination: the DM limit for a DM, and the server's limit, based on its boost level, for a server channel.
 - **FR-013**: A video within the limit MUST be posted unchanged.
 - **FR-014**: A video over the limit MUST be re-encoded at a bitrate fitted to the limit and the video's length, keeping its resolution; if the result is still over the limit, it MUST be re-encoded at 480p.
-- **FR-015**: When no re-encoded copy fits, the bridge MUST post a notice in reply to the request saying the video was too large for Discord and can be watched in the web app.
+- **FR-015**: When no re-encoded copy fits, the bridge MUST post a plain system notice in reply to the request, in the form "Video too large for Discord — watch it in the web app".
 - **FR-016**: Shrinking MUST affect only the copy posted to Discord; the app MUST keep and show the original video.
 
 **Retrying delivery**
