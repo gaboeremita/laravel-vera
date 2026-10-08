@@ -8,6 +8,14 @@
 
 **Input**: User description: "Add video generation alongside image generation. The user can ask for a video with a /create-video command, and agent-mode assistants get a generate_video tool, both mirroring /create-image and generate_image. An image attached to the request is used as the video's first frame. Videos are generated through OpenRouter's asynchronous video endpoint, so generation runs in the background: the chat shows a placeholder with the current status that turns into a playable video when it is ready, and an app-wide notice tells the user the video is ready (or failed) wherever they are in the app. Each assistant gets a Video Gen providers page, mirroring the Image Gen providers page, to configure providers and models and select the one it uses. Input images reach the provider through a public address set separately from the app's own address (a tunnel such as herd share). Videos are stored as their own records, separate from images."
 
+## Clarifications
+
+### Session 2026-10-07
+
+- Q: When you ask for a video, which images can be used as its first frame? → A: Only an image attached to the same message as the request.
+- Q: If you ask for a specific length or shape, should that request change the video's settings? → A: Yes. The assistant sets length, aspect ratio and sound from what you asked for, the model's defaults cover anything you didn't mention, and a value the model can't produce is replaced by the closest one it supports.
+- Q: In later turns, how should the assistant know what's in a video it made earlier? → A: Each video message carries the description it was generated from and its current status (generating, ready or failed).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Ask for a video and watch it arrive in the chat (Priority: P1)
@@ -73,6 +81,7 @@ In a conversation with an agent-mode assistant that has a video model selected, 
 1. **Given** an agent-mode assistant with a video model selected, **When** the user asks for a video in plain words, **Then** the assistant starts a video and the chat shows its placeholder.
 2. **Given** an agent-mode assistant with no video model selected, **When** the user asks for a video, **Then** the assistant is not offered the ability to make one.
 3. **Given** the assistant has started a video, **When** it finishes its reply, **Then** the reply arrives without waiting for the video.
+4. **Given** an agent-mode assistant with a video model selected, **When** the user chats without asking for a video, **Then** the assistant replies without starting one.
 
 ---
 
@@ -102,7 +111,7 @@ From an assistant's menu, the user opens a Video Gen page laid out like the Imag
 - The user asks for a second video while the first is still generating: both proceed independently, each in its own message with its own placeholder and notice.
 - The conversation is deleted while its video is still generating: the background work stops without error, and no notice is shown for it.
 - The user is in a world conversation: `/create-video` and the assistant's video ability work the same as in a regular conversation.
-- The selected model does not support a requested setting (for example, a length it cannot produce): the provider's rejection is shown as the failure reason.
+- The user asks for a setting the selected model cannot produce (for example, a 40 second clip from a model that tops out at 30): the video is generated with the closest value the model supports.
 - An attached image is too large or in a format the provider rejects: the provider's rejection is shown as the failure reason.
 
 ## Requirements *(mandatory)*
@@ -115,10 +124,12 @@ From an assistant's menu, the user opens a Video Gen page laid out like the Imag
 - **FR-002**: The system MUST reject `/create-video` with no description, asking the user to describe the video.
 - **FR-003**: The system MUST reject a video request when the assistant has no video model available, telling the user no video model is configured.
 - **FR-004**: The system MUST improve the user's description into a fuller video description before sending it to the provider, the same way it does for image requests.
-- **FR-005**: When the user's message carries an attached image, the system MUST send that image to the provider as the video's first frame.
+- **FR-005**: When the user's message carries an attached image, the system MUST send that image to the provider as the video's first frame. Only an image attached to the same message as the request is used; earlier images in the conversation are never used as a first frame.
+- **FR-005a**: When the request asks for a length, aspect ratio, or sound on or off, the video MUST use what was asked; anything not asked for MUST use the selected model's defaults. With `/create-video` and with the assistant's own videos alike, the assistant reads these from the request.
+- **FR-005b**: A requested value the selected model cannot produce MUST be replaced by the closest value the model supports.
 - **FR-006**: The system MUST make an attached image reachable by the provider through the configured public address, and MUST reject a request with an attached image when no public address is configured.
 - **FR-007**: After a `/create-video` request is accepted, the assistant MUST reply in character, aware of what the video will show, without waiting for the video to finish.
-- **FR-008**: Agent-mode assistants with a video model available MUST be offered the ability to start a video with a description they write; assistants without one MUST NOT be offered it.
+- **FR-008**: Agent-mode assistants with a video model available MUST be offered the ability to start a video with a description they write; assistants without one MUST NOT be offered it. The assistant decides from the conversation whether the user is asking for a video, guided by an instruction to start one when the user asks for a video, clip or animation.
 - **FR-009**: When an agent-mode assistant starts a video, its reply MUST finish without waiting for the video.
 
 **Generation and delivery**
@@ -126,6 +137,7 @@ From an assistant's menu, the user opens a Video Gen page laid out like the Imag
 - **FR-010**: The system MUST generate each video in the background and track its status as queued, generating, completed or failed.
 - **FR-011**: The system MUST keep its own copy of every finished video, since the provider keeps results only briefly.
 - **FR-012**: The system MUST attach each video to the assistant message it belongs to, so it is shown in that message on every later view of the conversation.
+- **FR-012a**: In every later turn of the conversation, the assistant MUST see each video message's description and its current status (generating, ready or failed), so it can talk about the video.
 - **FR-013**: The system MUST record a failure reason for every failed video: the provider's error, an expiry or cancellation, a download failure, or a timeout after the maximum wait.
 - **FR-014**: The system MUST log every failure.
 - **FR-015**: The system MUST stop tracking a video without error if its conversation is deleted before it finishes.
@@ -152,7 +164,7 @@ From an assistant's menu, the user opens a Video Gen page laid out like the Imag
 ### Key Entities
 
 - **Video Gen Provider**: A service the user's videos are generated with. Belongs to one user. Has a name, an address, an API key and a format that says how to talk to it.
-- **Video Gen Model**: A model offered by a provider, with default settings for length, resolution, aspect ratio, sound and maximum wait. An assistant can have one selected.
+- **Video Gen Model**: A model offered by a provider, with default settings for length, resolution, aspect ratio, sound and maximum wait, and the lengths and aspect ratios it supports. An assistant can have one selected.
 - **Video**: A generated video. Belongs to one assistant message. Records the provider's job reference, the status (queued, generating, completed, failed), the failure reason when it failed, the description it was generated from, and, once finished, the stored file, its length and its size.
 
 ## Success Criteria *(mandatory)*
