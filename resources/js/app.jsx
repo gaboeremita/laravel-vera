@@ -18,6 +18,7 @@ import PromptPage from './pages/PromptPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import ProvidersPage from './pages/ProvidersPage.jsx';
 import ImageGenProvidersPage from './pages/ImageGenProvidersPage.jsx';
+import VideoGenProvidersPage from './pages/VideoGenProvidersPage.jsx';
 import VoicePage from './pages/VoicePage.jsx';
 import WorldsPage from './pages/WorldsPage.jsx';
 import CreateWorldPage from './pages/CreateWorldPage.jsx';
@@ -65,6 +66,7 @@ createRoot(document.getElementById('root')).render(
                             <Route path="settings" element={<SettingsPage />} />
                             <Route path="providers" element={<ProvidersPage />} />
                             <Route path="image-gen-providers" element={<ImageGenProvidersPage />} />
+                            <Route path="video-gen-providers" element={<VideoGenProvidersPage />} />
                             <Route path="voice" element={<VoicePage />} />
                             <Route path="discord" element={<DiscordPage />} />
                         </Route>

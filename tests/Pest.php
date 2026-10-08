@@ -15,6 +15,8 @@ use App\Models\Quest;
 use App\Models\Region;
 use App\Models\Settings;
 use App\Models\User;
+use App\Models\VideoGenModel;
+use App\Models\VideoGenProvider;
 use App\Models\World;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
@@ -164,6 +166,31 @@ function imageGenHttpResponse(string $imageData = 'fake-image-bytes'): array
             'media_type' => 'image/png',
         ]],
     ];
+}
+
+function configureVideoGenModel(User $user, Assistant $assistant, array $config = []): VideoGenModel
+{
+    $videoGenModel = VideoGenModel::factory()
+        ->for(VideoGenProvider::factory()->for($user), 'provider')
+        ->create($config === [] ? [] : ['config' => $config]);
+
+    $settings = Settings::where('user_id', $user->id)->where('assistant_id', $assistant->id)->first();
+    $settings->update(['data' => [...$settings->data, 'video_gen_model_id' => $videoGenModel->id]]);
+
+    return $videoGenModel;
+}
+
+/**
+ * The description writer's JSON reply for a video request.
+ */
+function videoDescriptionResponse(string $description, ?int $duration = null, ?string $aspectRatio = null, ?bool $generateAudio = null): array
+{
+    return finalAnswerResponse(json_encode([
+        'description' => $description,
+        'duration' => $duration,
+        'aspect_ratio' => $aspectRatio,
+        'generate_audio' => $generateAudio,
+    ]));
 }
 
 /**

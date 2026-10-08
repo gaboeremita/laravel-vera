@@ -48,6 +48,15 @@ return [
         'timeout' => (int) env('IMAGE_GEN_TIMEOUT', 120),
     ],
 
+    'video_gen' => [
+        'url' => env('VIDEO_GEN_URL', 'https://openrouter.ai/api/v1/videos'),
+        'key' => env('VIDEO_GEN_API_KEY', env('AI_DEFAULT_API_KEY', '')),
+        'model' => env('VIDEO_GEN_MODEL'),
+        'format' => env('VIDEO_GEN_FORMAT', 'openrouter'),
+        'timeout' => (int) env('VIDEO_GEN_TIMEOUT', 600),
+        'public_url' => env('PUBLIC_TUNNEL_URL'),
+    ],
+
     'avatar_background' => [
         'cache_ttl' => (int) env('AVATAR_BACKGROUND_CACHE_TTL', 21600),
         'failure_cooldown' => (int) env('AVATAR_BACKGROUND_FAILURE_COOLDOWN', 300),

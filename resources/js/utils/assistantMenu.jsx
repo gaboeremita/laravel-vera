@@ -1,4 +1,4 @@
-import { Archive, Image, MessageCircle, MessagesSquare, Mic, ScrollText, Server, Settings } from 'lucide-react';
+import { Archive, Image, MessageCircle, MessagesSquare, Mic, ScrollText, Server, Settings, Video } from 'lucide-react';
 
 export function getAssistantMenuItems(assistantId) {
 	return [
@@ -6,6 +6,7 @@ export function getAssistantMenuItems(assistantId) {
 		{ label: 'Prompt', to: `/assistants/${assistantId}/prompt`, icon: ScrollText },
 		{ label: 'Providers', to: `/assistants/${assistantId}/providers`, icon: Server },
 		{ label: 'Image Gen', to: `/assistants/${assistantId}/image-gen-providers`, icon: Image },
+		{ label: 'Video Gen', to: `/assistants/${assistantId}/video-gen-providers`, icon: Video },
 		{ label: 'Voice', to: `/assistants/${assistantId}/voice`, icon: Mic },
 		{ label: 'Discord', to: `/assistants/${assistantId}/discord`, icon: MessageCircle },
 		{ label: 'Archive', to: `/assistants/${assistantId}/archive`, icon: Archive },

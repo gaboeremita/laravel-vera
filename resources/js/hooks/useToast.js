@@ -7,7 +7,7 @@ export function useToast() {
 
 	const addToast = useCallback((message, type = "error", extra = {}) => {
 		const id = ++toastId;
-		setToasts((prev) => [...prev, { id, message, type, imageUrl: extra.imageUrl ?? null }]);
+		setToasts((prev) => [...prev, { id, message, type, imageUrl: extra.imageUrl ?? null, action: extra.action ?? null }]);
 		return id;
 	}, []);
 

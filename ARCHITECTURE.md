@@ -1329,6 +1329,15 @@ Both entry points below converge on **`ImageGenerationService::generate()`**:
 
 **Agent tool (`generate_image`)** — called by the LLM mid-agent-loop like any other tool. `ImageGenerationTool::handle()` creates an empty carrier assistant message, attaches the generated image to it via `Image::storeFromBase64()`, and returns `{status, enhanced_prompt, image_url}` as the tool result — the image is already visible to the user by the time the loop's next step (or final reply) runs, so the model doesn't need to describe it.
 
+### Video Generation
+
+Video generation copies the image-generation layering (`VideoGenProvider` contract, `VideoGenManager`, `OpenRouterVideoGenProvider`, `VideoGenPromptEnhancer`, `VideoGenerationService`), with one structural difference: the result arrives in the background.
+
+1. **Start** — `/create-video` (`ConversationController::startVideoMessage`) or the `generate_video` tool calls `VideoGenerationService::improveDescription()`, which asks the LLM for a JSON object holding the description plus any requested `duration`, `aspect_ratio` and `generate_audio`. `start()` merges those over the model's `config` defaults, replaces length and aspect ratio with the closest values the provider lists for the model (`GET {url}/models`, cached for a day), creates a `queued` `Video` on the assistant message, and dispatches `PollVideoGeneration`. The chat reply returns without waiting.
+2. **`PollVideoGeneration`** — the first run submits the job to OpenRouter (`POST {url}`), with the attached image as `frame_images[first_frame]`, linked through `config('ai.video_gen.public_url')`. Later runs read the status (`GET {url}/{id}`) and re-queue themselves every 30 s until it is final. `retryUntil()` is the video's creation time plus the model's `timeout`. A finished video is downloaded with the API key and stored on the `public` disk. Every failure (rejected submit, failed or expired job, failed download, timeout) ends as `failed` with a reason and is logged. `$deleteWhenMissingModels` drops the job silently when the conversation was deleted.
+3. **Broadcasts** — every status change sends `VideoGenerationStatusUpdated` (`video-generation.updated` on `conversation.{id}`), which `useConversationVideos` applies to the matching message. Final states also send `VideoGenerationFinished` (`video-generation.finished` on the per-user `user.{id}` channel), which `useVideoGenerationNotices` in `AuthenticatedLayout` turns into a toast with an OPEN action.
+4. **Later turns** — `BuildConversationHistory` includes messages that carry a video and appends `Video::historyNote()` (`[Video: "<description>" — generating|ready|failed: reason]`), so the assistant can talk about earlier videos.
+
 ### Known Limitations
 
 - **`pcntl` dependency** — tool-call timeout enforcement hard-requires the `pcntl` extension (see [Loop Mechanics](#loop-mechanics)); there's no fallback timeout mechanism for environments without it.

@@ -53,6 +53,7 @@ use App\Services\AgentLoop\Tools\BasicCalculatorTool;
 use App\Services\AgentLoop\Tools\ChangeBackgroundTool;
 use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
 use App\Services\AgentLoop\Tools\ImageGenerationTool;
+use App\Services\AgentLoop\Tools\VideoGenerationTool;
 use App\Services\AgentLoop\Tools\World\AcknowledgeTool;
 use App\Services\AgentLoop\Tools\World\ActivityGate;
 use App\Services\AgentLoop\Tools\World\AdjustFeelingsTool;
@@ -79,6 +80,7 @@ use App\Services\ImageGenProviders\ImageGenerationService;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\LlmResponseTagParser;
 use App\Services\TtsProviders\TtsManager;
+use App\Services\VideoGenProviders\VideoGenerationService;
 use App\Traits\ResolvesAssistantUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -95,7 +97,7 @@ class ConversationController extends Controller
 
     private const IMAGE_GEN_COMMAND = '/create-image ';
 
-    private const COMMANDS = ['/create-image', '/change-background', '/send-voice-message'];
+    private const COMMANDS = ['/create-image', '/create-video', '/change-background', '/send-voice-message'];
 
     private const TTS_TRUNCATION_LENGTH = 200;
 
@@ -127,7 +129,7 @@ class ConversationController extends Controller
 
         $query = $conversation->messages()
             ->where('role', '!=', 'tool_call')
-            ->with('image')
+            ->with(['image', 'video'])
             ->orderByDesc('created_at');
 
         if ($request->has('before')) {
@@ -143,7 +145,9 @@ class ConversationController extends Controller
 
         $messages->transform(function ($message) {
             $message->image_url = $message->image?->url;
-            unset($message->image);
+            $videoPayload = $message->video?->toChatPayload();
+            unset($message->image, $message->video);
+            $message->setAttribute('video', $videoPayload);
 
             return $message;
         });
@@ -288,9 +292,10 @@ class ConversationController extends Controller
             'content' => $lastUserMessage['content'] ?? '',
         ]);
 
+        $attachedImage = null;
         if (! empty($lastUserMessage['images'][0])) {
             $storagePath = "messages/{$request->user()->id}/{$conversation->id}";
-            Image::storeFromBase64($lastUserMessage['images'][0], $message, $storagePath);
+            $attachedImage = Image::storeFromBase64($lastUserMessage['images'][0], $message, $storagePath);
         }
 
         $imageGenPrompt = $this->extractImageGenPrompt($lastUserMessage['content'] ?? null);
@@ -314,6 +319,41 @@ class ConversationController extends Controller
                 'emotion' => $generated['emotion'],
                 'intimate' => $generated['intimate'],
                 'pose' => $generated['pose'],
+                'tts_instructions' => null,
+            ]);
+        }
+
+        $videoGenPrompt = $this->extractVideoGenPrompt($lastUserMessage['content'] ?? null);
+
+        if ($videoGenPrompt !== null) {
+            if ($videoGenPrompt === '') {
+                return response()->json(['message' => 'Describe what video to generate after /create-video.'], 422);
+            }
+
+            $videoGenerationService = new VideoGenerationService;
+
+            if (! $videoGenerationService->isAvailableFor($assistantUser)) {
+                return response()->json(['message' => 'No video generation model is configured for this assistant.'], 422);
+            }
+
+            if ($attachedImage !== null && ! VideoGenerationService::hasPublicUrl()) {
+                return response()->json(['message' => VideoGenerationService::missingPublicUrlMessage()], 422);
+            }
+
+            try {
+                $started = $this->startVideoMessage($request, $assistantUser, $conversation, $videoGenerationService, $videoGenPrompt, $attachedImage);
+            } catch (\RuntimeException $e) {
+                return response()->json(['message' => $e->getMessage()], 502);
+            }
+
+            return response()->json([
+                'conversation_id' => $conversation->id,
+                'content' => $started['content'],
+                'video' => $started['video'],
+                'thinking' => $started['enhanced_prompt'],
+                'emotion' => $started['emotion'],
+                'intimate' => $started['intimate'],
+                'pose' => $started['pose'],
                 'tts_instructions' => null,
             ]);
         }
@@ -486,6 +526,11 @@ class ConversationController extends Controller
                     new GetCurrentDatetimeTool,
                     new BasicCalculatorTool,
                 ];
+
+                $videoGenerationService = new VideoGenerationService;
+                if ($videoGenerationService->isAvailableFor($assistantUser)) {
+                    $tools[] = new VideoGenerationTool($videoGenerationService, $assistantUser, $conversation);
+                }
 
                 if ($imageGenerationService->isAvailableFor($assistantUser)) {
                     $tools[] = new ImageGenerationTool($imageGenerationService, $assistantUser, $conversation);
@@ -767,6 +812,17 @@ class ConversationController extends Controller
         return trim(substr($content, strlen($match[0])));
     }
 
+    private function extractVideoGenPrompt(?string $content): ?string
+    {
+        $content = trim($content ?? '');
+
+        if (! preg_match('/^\/create-video(?:\s+|$)/i', $content, $match)) {
+            return null;
+        }
+
+        return trim(substr($content, strlen($match[0])));
+    }
+
     private function extractAvatarBackgroundPrompt(?string $content): ?string
     {
         $content = trim($content ?? '');
@@ -889,6 +945,41 @@ class ConversationController extends Controller
         ];
     }
 
+    /**
+     * Runs the /create-video start (describe -> in-character reaction -> persist -> queue).
+     * The video itself arrives later through PollVideoGeneration.
+     *
+     * @return array{content: string, emotion: ?string, intimate: bool, pose: ?string, video: array<string, mixed>, enhanced_prompt: string}
+     *
+     * @throws \RuntimeException if the description or the reaction LLM call fails
+     */
+    private function startVideoMessage(Request $request, AssistantUser $assistantUser, Conversation $conversation, VideoGenerationService $videoGenerationService, string $rawPrompt, ?Image $attachedImage): array
+    {
+        $described = $videoGenerationService->improveDescription($assistantUser, $conversation, $rawPrompt);
+
+        $reaction = $this->reactToStartedVideo($request, $assistantUser, $conversation, $rawPrompt, $described['description']);
+        $parsed = $this->extractExpressionTag($reaction->content, $assistantUser->assistant);
+
+        $assistantMessage = $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => $parsed['content'],
+            'expression' => Message::expressionFrom($parsed),
+        ]);
+
+        $video = $videoGenerationService->start($assistantUser, $assistantMessage, $described['description'], $described, $attachedImage);
+
+        $this->checkpointAutoSummarize($conversation, $assistantMessage->id);
+
+        return [
+            'content' => $parsed['content'],
+            'emotion' => $parsed['emotion'],
+            'intimate' => $parsed['intimate'],
+            'pose' => $parsed['pose'],
+            'video' => $video->toChatPayload(),
+            'enhanced_prompt' => $described['description'],
+        ];
+    }
+
     private function stripForSpeech(string $text): string
     {
         $text = preg_replace('/\A(?:\s*\[[^\]\r\n]+\])+\s*/u', ' ', $text);
@@ -946,6 +1037,39 @@ class ConversationController extends Controller
 
         $director->withLongTermMemory($conversation);
         $director->addToTurn(TurnSection::CurrentState, 'what just happened', "[You just generated and are sending an image. What it depicts: \"{$enhancedPrompt}\"]");
+
+        $history = app(BuildConversationHistory::class)->handle($conversation, $assistantModel);
+        $currentMessage = array_pop($history);
+
+        $llm = (new LlmManager)->forAssistantUser($assistantUser);
+
+        return $llm->chat(
+            messages: app(ComposeChatRequest::class)->handle($director->build(), $history, $currentMessage),
+            conversationKey: $conversation->providerSessionKey(),
+        );
+    }
+
+    /**
+     * Gets the assistant's in-character reaction to having just started making a video,
+     * using the same persona/emotion-tag context as a normal chat reply.
+     */
+    private function reactToStartedVideo(Request $request, AssistantUser $assistantUser, Conversation $conversation, string $rawPrompt, string $description): LlmResponse
+    {
+        $assistantModel = $assistantUser->assistant;
+
+        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation)];
+
+        $director = new PromptDirector($assistantModel->prompt);
+        app(AppendExpressionTags::class)->handle($director, $assistantModel, $excludedSections);
+        $director->except($excludedSections);
+
+        $archive = $assistantModel->archive;
+        if ($archive) {
+            $director->withRetrieval($rawPrompt, $archive->id);
+        }
+
+        $director->withLongTermMemory($conversation);
+        $director->addToTurn(TurnSection::CurrentState, 'what just happened', "[You just started making a video. What it will show: \"{$description}\"]");
 
         $history = app(BuildConversationHistory::class)->handle($conversation, $assistantModel);
         $currentMessage = array_pop($history);

@@ -118,9 +118,11 @@ class BuildConversationHistory
     {
         return $conversation->messages()
             ->whereIn('role', ['user', 'assistant'])
-            ->whereNotNull('content')
-            ->where('content', '!=', '')
+            ->where(fn ($query) => $query
+                ->where(fn ($withText) => $withText->whereNotNull('content')->where('content', '!=', ''))
+                ->orWhereHas('video'))
             ->when($excludeMessageId !== null, fn ($query) => $query->where('id', '!=', $excludeMessageId))
+            ->with('video')
             ->orderBy('id')
             ->get(self::COLUMNS)
             ->values();
@@ -131,9 +133,15 @@ class BuildConversationHistory
      */
     private function forChat(Message $message, Assistant $assistant): array
     {
+        $content = $message->role === 'assistant' ? $this->tagParser->parse($message->content ?? '', $assistant)['content'] : $message->content;
+
+        if ($message->video !== null) {
+            $content = trim("{$content}\n{$message->video->historyNote()}");
+        }
+
         return [
             'role' => $message->role,
-            'content' => $message->role === 'assistant' ? $this->tagParser->parse($message->content, $assistant)['content'] : $message->content,
+            'content' => $content,
         ];
     }
 }

@@ -132,6 +132,14 @@ IMAGE_GEN_MODEL=bytedance-seed/seedream-4.5
 IMAGE_GEN_FORMAT=openrouter        # openrouter | openai_compatible
 IMAGE_GEN_TIMEOUT=120
 
+# Video generation fallback (optional — only used if no video-gen model is selected in the UI)
+VIDEO_GEN_URL=https://openrouter.ai/api/v1/videos
+VIDEO_GEN_API_KEY=
+VIDEO_GEN_MODEL=                   # e.g. bytedance/seedance-2.0; video generation is off when empty and no model is selected
+VIDEO_GEN_FORMAT=openrouter
+VIDEO_GEN_TIMEOUT=600              # maximum wait in seconds before a video is marked failed
+PUBLIC_TUNNEL_URL=                 # public HTTPS address of this site (e.g. from `herd share`), needed for videos from an attached image
+
 # Agent mode (optional — tune tool-calling behavior for agent-mode assistants)
 AGENT_STEP_LIMIT=10
 AGENT_TOOL_TIMEOUT=60
@@ -208,6 +216,18 @@ Two ways to generate an image:
 - **Agent tool** — an agent-mode assistant can call the `generate_image` tool on its own mid-conversation when asked to draw or show something. See [Agent Mode](#agent-mode) below.
 
 Both share the same enhancement/generation pipeline — see [ARCHITECTURE.md → Agent Mode & Image Generation](./ARCHITECTURE.md#agent-mode--image-generation) for the full flow.
+
+### Video Generation Providers
+
+Video generation mirrors image generation. Providers and models are managed through the **Video Gen Providers** page in the UI (`/assistants/:id/video-gen-providers`), with the same fields. A new provider starts with a config schema for `duration`, `resolution`, `aspect_ratio`, `generate_audio` and `timeout`, which each model fills with its defaults. The only format is `openrouter`. If no model is selected, the fallback config from `.env` (`VIDEO_GEN_*`) is used.
+
+Two ways to generate a video:
+- **Manual** — type `/create-video <description>` in the web chat; the assistant writes a detailed video description, replies in character, and the video appears in that message when it is ready. A length, shape or sound you ask for ("a vertical 10 second clip") replaces the model's defaults, adjusted to the closest value the model supports.
+- **Agent tool** — an agent-mode assistant can call the `generate_video` tool when you ask for a video, clip or animation.
+
+An image attached to the request becomes the video's first frame. The provider fetches it through `PUBLIC_TUNNEL_URL`, so the tunnel must be running when the video starts.
+
+Videos are generated in the background by a queued job, so the queue worker and Reverb must be running (`composer run dev` starts both). The message shows the video's status and turns into a player when it is ready, and a notice appears on any page of the app when it finishes or fails. See [ARCHITECTURE.md → Video Generation](./ARCHITECTURE.md#video-generation).
 
 ### Agent Mode
 
@@ -695,6 +715,7 @@ laravel-vera/
 - **Per-provider/per-model voice prompts** — backend-specific instructions (e.g. Orpheus's inline vocal tags) live on the `VoiceProvider`/`VoiceModel` record and are injected only while that backend is active, via the same visual prompt-tree editor used for assistant prompts
 - **Agent mode** — assistants can be switched to an agentic loop that calls tools (`get_current_datetime`, `basic_calculator`, `generate_image`) across multiple steps before replying, with a step limit, per-tool timeout/retry, and a live progress indicator in the chat UI. See [Agent Mode](#agent-mode)
 - **Image generation** — DB-managed, user-editable provider/model catalog (same pattern as LLM providers); generate an image manually via `/create-image <description>` in chat, or let an agent-mode assistant call it as a tool. See [Image Generation Providers](#image-generation-providers)
+- **Video generation** — the same catalog pattern for video models; `/create-video <description>` or the `generate_video` agent tool, with an optional attached image as the first frame, generated in the background with live status in the chat and an app-wide notice when it is ready. See [Video Generation Providers](#video-generation-providers)
 - **Items, inventory and credits in worlds** — per-world items with images and sounds, inventories for the player, residents and objects, vendors, residents who give and ask for things in character, and object activities that cost, give and require items, judged and narrated by an LLM. See [Items, Inventory and Credits](#items-inventory-and-credits)
 - **Configurable 3D worlds** — shared, single-room 3D spaces you explore in first person, with assistant and NPC residents you approach and chat with in place, organized into per-user sessions you can resume, start fresh, or delete. See [Worlds](#worlds)
 
