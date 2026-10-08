@@ -109,6 +109,7 @@ All routes behind `auth:sanctum` middleware:
 | PUT | `/api/assistants/{assistant}/settings/model` | `SettingsController@selectModel` |
 | PUT | `/api/assistants/{assistant}/settings/voice-model` | `SettingsController@selectVoiceModel` |
 | PUT | `/api/assistants/{assistant}/settings/image-gen-model` | `SettingsController@selectImageGenModel` |
+| PUT | `/api/assistants/{assistant}/settings/video-gen-model` | `SettingsController@selectVideoGenModel` |
 | PUT | `/api/assistants/{assistant}/settings/voice` | `SettingsController@updateVoice` |
 | PUT | `/api/assistants/{assistant}/settings/discord` | `SettingsController@updateDiscord` (per-channel trigger mode) |
 | GET | `/api/assistants/{assistant}/discord/discovery` | `DiscordController@discovery` — proxies node-discord-api, syncs `discord_servers`/`discord_channels`, merges in trigger mode + prompt |
@@ -152,6 +153,13 @@ All routes behind `auth:sanctum` middleware:
 | POST | `/api/image-gen-providers/{provider}/models` | `ImageGenModelController@store` |
 | PATCH | `/api/image-gen-providers/{provider}/models/{model}` | `ImageGenModelController@update` |
 | DELETE | `/api/image-gen-providers/{provider}/models/{model}` | `ImageGenModelController@destroy` |
+| GET | `/api/video-gen-providers` | `VideoGenProviderController@index` |
+| POST | `/api/video-gen-providers` | `VideoGenProviderController@store` |
+| PATCH | `/api/video-gen-providers/{id}` | `VideoGenProviderController@update` |
+| DELETE | `/api/video-gen-providers/{id}` | `VideoGenProviderController@destroy` |
+| POST | `/api/video-gen-providers/{provider}/models` | `VideoGenModelController@store` |
+| PATCH | `/api/video-gen-providers/{provider}/models/{model}` | `VideoGenModelController@update` |
+| DELETE | `/api/video-gen-providers/{provider}/models/{model}` | `VideoGenModelController@destroy` |
 | GET | `/api/voice-providers` | `VoiceProviderController@index` |
 | POST | `/api/voice-providers` | `VoiceProviderController@store` |
 | PUT | `/api/voice-providers/{id}` | `VoiceProviderController@update` |
@@ -217,18 +225,18 @@ Full conversation lifecycle, scoped to `assistants/{assistant}`:
 - `store` — creates a new conversation; seeds the first message from `Assistant->opening_message`
 - `destroy` — deletes a conversation (cascades to messages)
 - `update` — renames a conversation
-- `show` — returns paginated messages with image URLs resolved from storage
+- `show` — returns paginated messages with image URLs resolved from storage and each generated video's status payload (`video`)
 - `sendMessage`:
   1. Validates `messages[]` array (role/content/images)
   2. Saves the last user message; stores any attached image via `Image::storeFromBase64()`
-  3. If the message starts with `/create-image `, branches into the shared image-generation pipeline instead of the steps below — see [Agent Mode & Image Generation](#agent-mode--image-generation)
+  3. If the message starts with `/create-image `, branches into the shared image-generation pipeline instead of the steps below — see [Agent Mode & Image Generation](#agent-mode--image-generation). A leading `/create-video ` likewise branches into `startVideoMessage()`, which replies in character and queues the video — see [Video Generation](#video-generation)
   4. Loads the `Assistant` model and its emotion set
   5. Builds system prompt via `PromptDirector($assistant->prompt)` — prompt comes from the DB
   6. Injects available emotions and runs RAG retrieval against the linked archive if available
   7. Resolves the LLM provider via `LlmManager::forAssistantUser()`
   8. If `$assistant->mode === AssistantMode::Agent`, requires the resolved model to support tool-calling (422 otherwise) and runs the turn through `AgentLoopRunner` instead of a single `chat()` call; otherwise calls `chat()` directly
   9. Saves the assistant reply (content + thinking)
-  10. Returns `conversation_id`, `content`, `thinking`, and — for agent-mode turns — `tool_calls` (the loop's tool-call summary, e.g. any images generated mid-turn)
+  10. Returns `conversation_id`, `content`, `thinking`, and — for agent-mode turns — `tool_calls` (the loop's tool-call summary, e.g. any images generated or videos started mid-turn)
 - `sendDiscordMessage` — the Discord equivalent, called by node-discord-api rather than the browser. Takes `channel_id`/`message_id`/`content`/`images` instead of a client-supplied history array. See [Discord Integration](#discord-integration) for the full flow; the auto-summarize checkpoint logic (`checkpointAutoSummarize`) is a private method shared between this and `sendMessage` rather than duplicated
 
 **`AiProviderController`**
@@ -239,6 +247,9 @@ CRUD for `AiModel` records nested under a provider. Manages `name`, `endpoint`, 
 
 **`ImageGenProviderController`** / **`ImageGenModelController`**
 CRUD for `ImageGenProvider`/`ImageGenModel`, scoped to the authenticated user — structurally identical to `AiProviderController`/`AiModelController` (same encrypted `api_key`/`has_key` pattern, same nested-model shape), not seeded like the voice catalog. Selection is via `SettingsController::selectImageGenModel`, mirroring `selectModel`.
+
+**`VideoGenProviderController`** / **`VideoGenModelController`**
+Same as the image-gen pair, for `VideoGenProvider`/`VideoGenModel`. Selection is via `SettingsController::selectVideoGenModel`, stored in `Settings.data['video_gen_model_id']`.
 
 **`AgentProgressController`**
 Single `show` action: reads `Cache::get("agent-progress:{$conversationId}")` and returns `{ in_progress, status }`. Polled by the frontend (`AgentProgressIndicator`) every 2s while an agent-mode turn is in flight — see [Agent Mode & Image Generation](#agent-mode--image-generation).
@@ -441,6 +452,10 @@ Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `on
 - `provider_id`, `name`, `endpoint`, `config` (JSON, e.g. `timeout`), `additional_config` (JSON), `prompt`
 - Belongs to `ImageGenProvider`
 
+**`VideoGenProvider`** / **`VideoGenModel`**
+- Same columns and pattern as `ImageGenProvider`/`ImageGenModel`; `format` is `VideoGenProviderFormat` (`openrouter`)
+- The model's `config` holds the video defaults read by the code: `duration`, `resolution`, `aspect_ratio`, `generate_audio`, and `timeout` (maximum wait in seconds)
+
 **`VoiceProvider`**
 - `name`, `url`, `api_key` (nullable, encrypted), `format` (`VoiceProviderFormat` enum), `instructions` (text — shown in the Voice UI, e.g. what local processes to start), `prompt` (nullable JSON — injected into voice-mode conversations while this provider is active)
 - `api_key` hidden; `has_key` appended, same as `AiProvider`
@@ -462,6 +477,7 @@ Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `on
 - `thinking` stores the LLM's internal reasoning chain
 - `emotion` is defined but not yet written by the controller (frontend-only state) for web-originated messages — Discord and Telegram both do parse and store it (see [Discord Integration](#discord-integration))
 - `discord_message_id` holds the real Discord snowflake for messages that came from Discord, used to dedupe when a single Discord message triggers more than one assistant
+- morphOne `Image` (an attachment or a generated image) and morphOne `Video` (a generated video)
 
 **`DiscordServer`** — `discord_guild_id` (unique), `name`. Global catalog, not per-assistant; synced from node-discord-api's live view on every `discovery` call. Has many `DiscordChannel`s
 
@@ -480,13 +496,15 @@ Accepts the `Assistant->prompt` JSON array (from DB) as its config. Supports `on
 **`Tag`** — `name`, `user_id`
 
 **`Image`** — polymorphic (`imageable_type/id`), disk-stored, `url` accessor
-**`Video`** — polymorphic (`videoable_type/id`), disk-stored, `url` accessor
+**`Video`** — polymorphic (`videoable_type/id`), disk-stored, `url` accessor (null until a generated video has a file). Holds emotion videos and generated videos; the generation columns (`status` as `VideoStatus`, `job_id`, `prompt`, `duration`, `aspect_ratio`, `generate_audio`, `video_gen_model_id`, `first_frame_image_id`, `failure_reason`) are null on emotion rows. `toChatPayload()` is the shape the chat and broadcasts use; `historyNote()` is the line later turns see
 
 **`World`** / **`WorldResident`** / **`WorldUser`** / **`WorldSession`** / **`ResidentActivity`** / **`WorldSessionResident`** — see [Worlds](#worlds) for the full model shape and behavior. `World.layout` holds the parsed environment markers; `ResidentActivity` is a resident's recorded actions and outcomes per session; `WorldSessionResident` is her saved state per session.
 
 ### Jobs
 
 **`EmbedArchiveEntry`** — async job dispatched by `ArchiveController` when an entry is created or its content changes; handles vector embedding for RAG retrieval.
+
+**`PollVideoGeneration`** — one per generated video: submits it to the provider, re-queues itself every 30s until the job is final, downloads the file, and broadcasts every status change. See [Video Generation](#video-generation).
 
 ### Artisan Commands
 
@@ -528,12 +546,13 @@ The app uses React Router. `app.jsx` defines all routes:
   settings                           → SettingsPage
   providers                          → ProvidersPage
   image-gen-providers                → ImageGenProvidersPage
+  video-gen-providers                → VideoGenProvidersPage
   voice                              → VoicePage
   discord                            → DiscordPage
 *                                    → redirect to /
 ```
 
-`AuthenticatedLayout` wraps all protected routes — handles auth check on mount and provides emotion state, boot sequence, and toast context via `useOutletContext`.
+`AuthenticatedLayout` wraps all protected routes — handles auth check on mount and provides emotion state, boot sequence, and toast context via `useOutletContext`. It keeps the signed-in user's id from the auth check and mounts `useVideoGenerationNotices`, so a video-ready notice reaches any page.
 
 `AssistantLayout` wraps all assistant-scoped routes — fetches conversations, assistant info, and settings on `assistantId` change; passes `assistantId`, `assistantName`, `archiveId`, `conversations`, `setConversations`, and `fetchConversations` down via outlet context.
 
@@ -572,9 +591,9 @@ Lists conversations for the active assistant. Create, select (navigate to `conve
 **`ChatPage`**
 Main chat interface:
 - Message list with `ChatMessage` components
-- Input bar with image attachment; a leading `/create-image ` triggers the manual image-generation pipeline (see [Agent Mode & Image Generation](#agent-mode--image-generation))
+- Input bar with image attachment; a leading `/create-image ` triggers the manual image-generation pipeline (see [Agent Mode & Image Generation](#agent-mode--image-generation)), and a leading `/create-video ` starts a video, using an attached image as its first frame (see [Video Generation](#video-generation))
 - Emotion tag parsed from each response → `Portrait` expression swap
-- For agent-mode assistants, `AgentProgressIndicator` polls and shows the loop's current status while a reply is in flight; images generated mid-loop by the `generate_image` tool arrive in the response's `tool_calls` and render inline alongside the reply
+- For agent-mode assistants, `AgentProgressIndicator` polls and shows the loop's current status while a reply is in flight; images generated mid-loop by the `generate_image` tool arrive in the response's `tool_calls` and render inline alongside the reply; videos started by `generate_video` arrive the same way as placeholder messages that `useConversationVideos` updates live
 - `BootSequence` plays on first load for a new conversation
 - The input's contents are debounced into `localStorage` (`chatDraft:{assistantId}:{conversationId}`) and restored on return — client-only, no backend involved. Cleared on send; not shared across devices/browsers
 - A "Memory" link navigates to `MemoryPage` for this conversation
@@ -602,6 +621,9 @@ AI provider and model management:
 
 **`ImageGenProvidersPage`**
 Image-gen provider and model management — structurally identical to `ProvidersPage` (full CRUD, not read-only like `VoicePage`): `useImageGenProviders` hook, `ImageGenProviderAccordion` per provider, `ImageGenModelAccordion` nested per model showing `SELECT`/`● ACTIVE`. Selection persists to `Settings.data['image_gen_model_id']` via `PUT .../settings/image-gen-model`.
+
+**`VideoGenProvidersPage`**
+Video-gen provider and model management — the same page as `ImageGenProvidersPage` (`useVideoGenProviders`, `VideoGenProviderAccordion`, `VideoGenModelAccordion`). A new provider starts with the OpenRouter videos URL and a config schema for `duration`, `resolution`, `aspect_ratio`, `generate_audio` and `timeout`. Selection persists to `Settings.data['video_gen_model_id']` via `PUT .../settings/video-gen-model`.
 
 **`VoicePage`**
 Voice provider/model catalog — structurally the same pattern as `ProvidersPage`, full CRUD:
@@ -646,6 +668,12 @@ Model config form (name, endpoint, thinking key, supports-tools checkbox, prompt
 
 **`ImageGenProviderAccordion`** / **`ImageGenModelAccordion`**
 Same shape as `ProviderAccordion`/`ModelAccordion` (full editable config form, `SELECT`/`● ACTIVE` header badge) applied to `ImageGenProvider`/`ImageGenModel` instead of `AiProvider`/`AiModel`.
+
+**`VideoGenProviderAccordion`** / **`VideoGenModelAccordion`**
+The image-gen accordions applied to `VideoGenProvider`/`VideoGenModel`, with OpenRouter as the only format.
+
+**`MessageVideo`**
+Renders a message's generated video: the thinking animation with "Queued…" or "Generating video…", a `<video controls>` player once completed, or "Video failed: reason". `ChatMessage` renders it right after the message's image.
 
 **`AgentProgressIndicator`**
 Polls `GET .../agent-progress` every 2s while a `ChatPage` reply is in flight for an agent-mode assistant; renders the loop's current status text with a pulsing dot, or nothing if idle/no status. State reset (`wasActive`/`setStatus(null)`) is computed during render rather than in an effect, per [Constitution Principle VIII](./.specify/memory/constitution.md#viii-state-derivation-happens-during-render-not-in-effects).
@@ -752,12 +780,18 @@ When no assistant is active, renders a neutral waiting state.
 **`useImageGenProviders(addToast, assistantId)`**
 - Same shape as `useProviders` (full CRUD, not read-only): loads `GET /api/image-gen-providers` and the active `image_gen_model_id` from settings; create/update/delete for both providers and models; `selectModel`/`deselectModel` write through to `PUT .../settings/image-gen-model`
 
+**`useVideoGenProviders(addToast, assistantId)`** — the same hook for video-gen providers and models, writing the selection to `PUT .../settings/video-gen-model`
+
+**`useConversationVideos(conversationId, onVideoUpdated)`** — listens for `.video-generation.updated` on `private conversation.{id}`; `useConversationChat` uses it to swap the matching message's `video`. It removes only its own listener on cleanup, since `echo.leave()` would also cut off `useAvatarBackground` on the same channel
+
+**`useVideoGenerationNotices(userId, addToast, navigate)`** — listens for `.video-generation.finished` on `private user.{id}` and shows a toast with an OPEN action that navigates to the conversation
+
 **`useDiscordSettings(addToast, assistantId)`**
 - Loads everything from a single `GET .../discord/discovery` call — guilds, channels, trigger mode, and prompt all arrive together (unlike `useVoiceProviders`, which needs two requests), since `DiscordController@discovery` already merges the DB config in server-side
 - `setChannelTrigger(guild, channel, mode)` — saves immediately via `PUT .../settings/discord`, sending the full recomputed channel list (that endpoint replaces the whole set rather than patching one row)
 
 **`useEmotions`** — fetches emotion name → `{ image_url, video_url }` map; `fetchEmotions(assistantId)` to reload for a specific assistant
-**`useToast`** — add/remove toasts with auto-dismiss
+**`useToast`** — add/remove toasts with auto-dismiss; a toast can carry an `action` (`{ label, onClick }`) that `ToastContainer` renders as a button
 
 ### Utilities
 
@@ -1299,20 +1333,21 @@ interface AgentTool {
 }
 ```
 
-Three tools ship today, all in `app/Services/AgentLoop/Tools/`:
+Four tools ship today, all in `app/Services/AgentLoop/Tools/`:
 
 | Tool | Purpose |
 |---|---|
 | `get_current_datetime` | Returns the current date/time in `config('app.timezone')`, ISO 8601 |
 | `basic_calculator` | Evaluates an arithmetic expression via a small hand-rolled recursive-descent parser (`+ - * /`, parentheses) — no `eval()` |
 | `generate_image` | Runs the shared image-generation pipeline (below) and returns `image_url` + the LLM-enhanced prompt actually sent to the provider |
+| `generate_video` | Starts a video in the background (see [Video Generation](#video-generation)) and returns `{status, video_id, enhanced_prompt}`; takes optional `duration`, `aspect_ratio` and `generate_audio` from what the user asked for |
 
-`AgentLoopRunner` is constructed with the tool list per request (`ConversationController::sendMessage` wires `[new GetCurrentDatetimeTool, new BasicCalculatorTool, new ImageGenerationTool(...)]`) — there's no service-container-wide tool registry to edit; adding a tool means implementing `AgentTool` and adding it to that array.
+`AgentLoopRunner` is constructed with the tool list per request (`ConversationController::sendMessage` wires `[new GetCurrentDatetimeTool, new BasicCalculatorTool, new VideoGenerationTool(...), new ImageGenerationTool(...)]`, each generation tool only when its service is available, and no `GetCurrentDatetimeTool` inside a world) — there's no service-container-wide tool registry to edit; adding a tool means implementing `AgentTool` and adding it to that array.
 
 ### Loop Mechanics
 
 - **Step limit** — `config('agent.step_limit')` (`AGENT_STEP_LIMIT`, default 10), overridable per assistant via `agent_config.step_limit`. Each tool call consumes one step; if the limit is hit mid-loop, the runner asks the LLM for a final summary of what was and wasn't accomplished rather than returning nothing.
-- **Tool timeout** — each `handle()` call is bounded by `tool->timeoutSeconds()` (`config('agent.tool_timeout')`, `AGENT_TOOL_TIMEOUT`, default 60s; the image-gen tool adds 30s on top of the resolved image-gen provider's own timeout) via `pcntl_alarm` — **this requires the `pcntl` PHP extension**; without it, every tool call throws immediately. `pcntl` is unavailable on Windows and disabled by default on some hosts.
+- **Tool timeout** — each `handle()` call is bounded by `tool->timeoutSeconds()` (`config('agent.tool_timeout')`, `AGENT_TOOL_TIMEOUT`, default 60s; the image-gen tool adds 30s on top of the resolved image-gen provider's own timeout; the video tool allows the default LLM timeout plus 30s, since it only writes the description and queues the video) via `pcntl_alarm` — **this requires the `pcntl` PHP extension**; without it, every tool call throws immediately. `pcntl` is unavailable on Windows and disabled by default on some hosts.
 - **Retries** — `executeWithRetries()` retries the identical call up to `tool->retryAttempts()` times (`config('agent.tool_retry_attempts')`, `AGENT_TOOL_RETRY_ATTEMPTS`, default 3) before surfacing the error to the LLM as a `tool` message. If `maxConsecutiveFailures` (same config value) is hit across *different* tool calls in a row, the loop ends early with an apologetic final message instead of continuing to burn steps.
 - **Tool-usage steering** — every request in the loop carries the same `tools` definitions, including the turn right after a tool result comes back. Without this, models observed in testing would sometimes describe an already-executed tool call as text instead of answering — `withToolUsageInstructions()` prepends an explicit system instruction to counter it.
 - **Model requirement** — agent mode requires an explicitly selected `AiModel` with `supports_tools: true`; `sendMessage` returns 422 if the assistant is in agent mode but no such model is selected.
@@ -1329,12 +1364,23 @@ Both entry points below converge on **`ImageGenerationService::generate()`**:
 
 **Agent tool (`generate_image`)** — called by the LLM mid-agent-loop like any other tool. `ImageGenerationTool::handle()` creates an empty carrier assistant message, attaches the generated image to it via `Image::storeFromBase64()`, and returns `{status, enhanced_prompt, image_url}` as the tool result — the image is already visible to the user by the time the loop's next step (or final reply) runs, so the model doesn't need to describe it.
 
+### Video Generation
+
+Video generation copies the image-generation layering (`VideoGenProvider` contract, `VideoGenManager`, `OpenRouterVideoGenProvider`, `VideoGenPromptEnhancer`, `VideoGenerationService`), with one structural difference: the result arrives in the background.
+
+1. **Start** — `/create-video` (`ConversationController::startVideoMessage`) or the `generate_video` tool calls `VideoGenerationService::improveDescription()`, which asks the LLM for a JSON object holding the description plus any requested `duration`, `aspect_ratio` and `generate_audio`. `start()` merges those over the model's `config` defaults, replaces length and aspect ratio with the closest values the provider lists for the model (`GET {url}/models`, cached for a day), creates a `queued` `Video` on the assistant message, and dispatches `PollVideoGeneration`. The chat reply returns without waiting.
+2. **`PollVideoGeneration`** — the first run submits the job to OpenRouter (`POST {url}`), with the attached image as `frame_images[first_frame]`, linked through `config('ai.video_gen.public_url')`. Later runs read the status (`GET {url}/{id}`) and re-queue themselves every 30 s until it is final. `retryUntil()` is the video's creation time plus the model's `timeout`. A finished video is downloaded with the API key and stored on the `public` disk. Every failure (rejected submit, failed or expired job, failed download, timeout) ends as `failed` with a reason and is logged. Generated videos are rows in the shared polymorphic `videos` table (with the message as `videoable`), next to emotion videos; since the morph has no database cascade, the job stops silently when the video's message is gone.
+3. **Broadcasts** — every status change sends `VideoGenerationStatusUpdated` (`video-generation.updated` on `conversation.{id}`), which `useConversationVideos` applies to the matching message. Final states also send `VideoGenerationFinished` (`video-generation.finished` on the per-user `user.{id}` channel), which `useVideoGenerationNotices` in `AuthenticatedLayout` turns into a toast with an OPEN action.
+4. **Later turns** — `BuildConversationHistory` includes messages that carry a video and appends `Video::historyNote()` (`[Video: "<description>" — generating|ready|failed: reason]`), so the assistant can talk about earlier videos.
+
 ### Known Limitations
 
 - **`pcntl` dependency** — tool-call timeout enforcement hard-requires the `pcntl` extension (see [Loop Mechanics](#loop-mechanics)); there's no fallback timeout mechanism for environments without it.
 - **Mode is per-assistant, not per-message** — there's no way to run a single one-off tool-using turn with an otherwise plain assistant, or vice versa; switching modes means editing the assistant.
 - **Progress reporting is coarse** — `AgentProgressIndicator` polls a single cached status string every 2s; it shows *that* a tool is running, not intermediate output from a long-running tool call.
-- **Image-gen catalog is user-CRUD, unlike voice** — deliberately mirrors the LLM provider pattern (`AiProvider`/`AiModel`) rather than the seeded `VoiceProvider` pattern; no `ImageGenProviderSeeder` exists.
+- **Image-gen catalog is user-CRUD, unlike voice** — deliberately mirrors the LLM provider pattern (`AiProvider`/`AiModel`) rather than the seeded `VoiceProvider` pattern; no `ImageGenProviderSeeder` exists. The video-gen catalog follows the same pattern.
+- **Video input images need a tunnel** — OpenRouter only fetches first-frame images from public HTTPS URLs, so `PUBLIC_TUNNEL_URL` must point at a running tunnel when a video from an image starts.
+- **Video generation is web-only** — `/create-video` and `generate_video` exist only in the web chat; Discord and Telegram have no placeholder or notice to show.
 
 ---
 
@@ -1435,13 +1481,16 @@ laravel-vera/
 │   │   ├── AgentTool.php                       interface: name/description/parameters + handle() + timeoutSeconds/retryAttempts
 │   │   ├── LlmProvider.php                     interface: chat() + fromModel()
 │   │   ├── SttProvider.php                     interface: transcribe(audio): string
-│   │   └── TtsProvider.php                     interface: fromModel + synthesize(text, voice?, options?) + contentType() + parseLlmResponse() + llmOptions()
+│   │   ├── TtsProvider.php                     interface: fromModel + synthesize(text, voice?, options?) + contentType() + parseLlmResponse() + llmOptions()
+│   │   └── VideoGenProvider.php                interface: submit() / status() / download() / supportedSettings() + fromModel()
 │   ├── Directors/PromptDirector.php            reads assistant prompt config, filters, builds
 │   ├── DTOs/
 │   │   ├── AgentRunResult.php                  content + toolCalls summary, returned by AgentLoopRunner::run()
 │   │   ├── ImageGenResult.php                   image data + content type + enhanced prompt, returned by ImageGenerationService::generate()
 │   │   ├── LlmResponse.php                     content + thinking
 │   │   ├── ToolCallRequest.php                 id/name/arguments, parsed from an LLM tool-call response
+│   │   ├── VideoGenJobStatus.php               VideoStatus + download URL or error, returned by VideoGenProvider::status()
+│   │   ├── VideoGenSupportedSettings.php       durations + aspect ratios, returned by VideoGenProvider::supportedSettings()
 │   │   └── VoiceModeResult.php                  content + ttsInstructions, returned by TtsProvider::parseLlmResponse()
 │   ├── Enums/
 │   │   ├── AiProviderFormat.php                generic | anthropic → provider class
@@ -1449,6 +1498,8 @@ laravel-vera/
 │   │   ├── AssistantKind.php                   assistant | world_npc
 │   │   ├── WorldResidentBehavior.php           stationary | roam
 │   │   ├── ImageGenProviderFormat.php           openrouter | openai_compatible → provider class
+│   │   ├── VideoGenProviderFormat.php          openrouter → provider class
+│   │   ├── VideoStatus.php                     queued | generating | completed | failed
 │   │   └── VoiceProviderFormat.php             openai_compatible | openai_tts | deepgram | elevenlabs → provider class
 │   ├── Http/Controllers/
 │   │   ├── Auth/AuthController.php             login/logout
@@ -1462,13 +1513,15 @@ laravel-vera/
 │   │       ├── AssistantEmotionController.php  per-assistant emotion store/update/destroy
 │   │       ├── AssistantMemoryPromptController.php  show/update AssistantUser.memory_prompt
 │   │       ├── AssistantPromptController.php   prompt CRUD (show/store/update/destroy)
-│   │       ├── ConversationController.php      CRUD + sendMessage (voice_mode flag, /create-image, agent-mode dispatch, voice provider/model prompt injection) + sendDiscordMessage
+│   │       ├── ConversationController.php      CRUD + sendMessage (voice_mode flag, /create-image, /create-video, agent-mode dispatch, voice provider/model prompt injection) + sendDiscordMessage
 │   │       ├── ConversationMemoryController.php  show/update/summarize/unlock long-term memory
 │   │       ├── DiscordController.php           discovery proxy (syncs discord_servers/channels) + server/channel prompt updates
 │   │       ├── EmotionController.php           serve emotions (locked/unlocked)
 │   │       ├── ImageGenProviderController.php  provider CRUD, same pattern as AiProviderController
 │   │       ├── ImageGenModelController.php     model CRUD, same pattern as AiModelController
-│   │       ├── SettingsController.php          theme + LLM model + voice model + voice selection + image-gen model + Discord trigger mode
+│   │       ├── VideoGenProviderController.php  provider CRUD, same pattern as ImageGenProviderController
+│   │       ├── VideoGenModelController.php     model CRUD, same pattern as ImageGenModelController
+│   │       ├── SettingsController.php          theme + LLM model + voice model + voice selection + image-gen model + video-gen model + Discord trigger mode
 │   │       ├── VoiceController.php             transcribe / synthesize
 │   │       ├── VoiceProviderController.php     full CRUD (same pattern as AiProviderController); prompt-only update endpoint too
 │   │       ├── VoiceModelController.php        full CRUD; store() currently broken, see issue #63
@@ -1478,17 +1531,20 @@ laravel-vera/
 │   │       └── NpcController.php               dedicated NPC CRUD, delegates creation to AssistantController::store()
 │   ├── Jobs/
 │   │   ├── EmbedArchiveEntry.php                async vector embedding for archive entries
+│   │   ├── PollVideoGeneration.php             submits a generated video, re-queues itself every 30s, downloads it, broadcasts status
 │   │   └── SummarizeConversation.php            queues Actions\SummarizeConversation; 3 tries, 10s backoff, releases the memory_summarizing_at lock on success/failure
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Assistant.php                       name/slug/prompt/opening_message/archive_id/mode/agent_config
 │   │   ├── AssistantUser.php                   pivot; has many Conversations, AssistantDiscordServers/Channels; memory_prompt (json)
 │   │   ├── WorldUser.php                       pivot; has many WorldSessions — worlds are shared per user, not owned by user_id
-│   │   ├── Settings.php                        data JSON (theme, ai_model_id, tts_model_id, tts_voice, image_gen_model_id) + voiceCacheKey()
+│   │   ├── Settings.php                        data JSON (theme, ai_model_id, tts_model_id, tts_voice, image_gen_model_id, video_gen_model_id) + voiceCacheKey()
 │   │   ├── AiProvider.php                      url/api_key(encrypted)/format/config_schema
 │   │   ├── AiModel.php                         name/endpoint/thinking_key/supports_tools/prompt/config/additional_config
 │   │   ├── ImageGenProvider.php                url/api_key(encrypted)/format/config_schema — user-owned, same pattern as AiProvider
 │   │   ├── ImageGenModel.php                   provider_id/name/endpoint/config/additional_config/prompt
+│   │   ├── VideoGenProvider.php                same shape as ImageGenProvider, format openrouter
+│   │   ├── VideoGenModel.php                   same shape as ImageGenModel; config holds the video defaults
 │   │   ├── VoiceProvider.php                   name/url/api_key(encrypted)/format/instructions/prompt — seeded, not user_id-owned
 │   │   ├── VoiceModel.php                      provider_id/name/endpoint/voices/config/prompt
 │   │   ├── DiscordServer.php                   discord_guild_id/name — global catalog, synced from discovery
@@ -1502,7 +1558,7 @@ laravel-vera/
 │   │   ├── ArchiveEntry.php                    title/content/keywords, many-to-many Tags
 │   │   ├── Tag.php
 │   │   ├── Image.php                           polymorphic, disk-stored, url accessor
-│   │   ├── Video.php                           polymorphic, disk-stored, url accessor
+│   │   ├── Video.php                           polymorphic, disk-stored, url accessor; emotion videos + generated videos (status/prompt/job id/failure reason)
 │   │   ├── World.php                           name/slug/description/environment metadata/assistant+npc context prompts/settings (incl. theme); shared via WorldUser
 │   │   ├── WorldResident.php                   world_id/assistant_id/position/rotation/behavior/behavior_settings/opening_message/custom_prompt
 │   │   └── WorldSession.php                    world_user_id/title/position (json) — one user's resumable thread in a world
@@ -1517,13 +1573,19 @@ laravel-vera/
 │       │   └── Tools/
 │       │       ├── BasicCalculatorTool.php     arithmetic expression evaluator (hand-rolled parser, no eval())
 │       │       ├── GetCurrentDatetimeTool.php  current date/time in app timezone
-│       │       └── ImageGenerationTool.php     generate_image — wraps ImageGenerationService, attaches image to a carrier message
+│       │       ├── ImageGenerationTool.php     generate_image — wraps ImageGenerationService, attaches image to a carrier message
+│       │       └── VideoGenerationTool.php     generate_video — writes the description, queues the video on a carrier message
 │       ├── ImageGenProviders/
 │       │   ├── ImageGenManager.php             forAssistantUser() / resolveImageGenModel() / fromModel() / fromConfig()
 │       │   ├── ImageGenerationService.php      shared generate() used by both /create-image and the agent tool
 │       │   ├── ImageGenPromptEnhancer.php      LLM rewrites the raw request into a concrete image prompt (persona + RAG + history)
 │       │   ├── OpenRouterImageGenProvider.php  OpenRouter images API, fromModel()
 │       │   └── OpenAiCompatibleImageGenProvider.php  any OpenAI-compatible image-gen backend, fromModel()
+│       ├── VideoGenProviders/
+│       │   ├── VideoGenManager.php             forAssistantUser() / resolveVideoGenModel() / fromModel() / fromConfig() / configuredModel()
+│       │   ├── VideoGenerationService.php      shared start() used by /create-video and the agent tool; closest supported length/shape; first-frame URL
+│       │   ├── VideoGenPromptEnhancer.php      LLM writes the video description plus requested length/shape/sound as JSON
+│       │   └── OpenRouterVideoGenProvider.php  OpenRouter videos API (submit, status, download, models listing), fromModel()
 │       ├── LlmProviders/
 │       │   ├── LlmManager.php                  forAssistantUser() / fromConfig()
 │       │   ├── GenericProvider.php             OpenAI-compatible, fromModel()
@@ -1537,18 +1599,19 @@ laravel-vera/
 │       └── TelegramService.php                 getUpdates + sendMessage
 ├── config/
 │   ├── agent.php                               tool_timeout / step_limit / tool_retry_attempts / progress_cache_ttl
-│   └── ai.php                                  default provider + embedding + stt + tts (fallback) + image_gen (fallback) + telegram + discord
+│   └── ai.php                                  default provider + embedding + stt + tts (fallback) + image_gen (fallback) + video_gen (fallback + PUBLIC_TUNNEL_URL) + telegram + discord
 ├── database/
 │   ├── migrations/                             all tables, incl. voice_providers/voice_models + discord_servers/channels + worlds/world_residents/world_user/world_sessions
 │   └── seeders/VoiceProviderSeeder.php         seeds the TTS catalog (Orpheus, KittenTTS); re-run to add more
 ├── routes/
 │   ├── web.php                                 SPA entry + auth routes + /vendor/vad/{file}
-│   └── api.php                                 all API routes (sanctum protected)
+│   ├── api.php                                 all API routes (sanctum protected)
+│   └── channels.php                            private broadcast channels: conversation.{id}, world-session.{id}, user.{id}
 ├── resources/js/
 │   ├── app.jsx                                 React mount + router
 │   ├── contexts/ThemeContext.jsx               global theme state
 │   ├── layouts/
-│   │   ├── AuthenticatedLayout.jsx             auth guard + emotion state + boot sequence
+│   │   ├── AuthenticatedLayout.jsx             auth guard + emotion state + boot sequence + video-ready notices
 │   │   └── AssistantLayout.jsx                 assistant-scoped context (conversations, settings)
 │   ├── pages/
 │   │   ├── LoginPage.jsx
@@ -1564,6 +1627,7 @@ laravel-vera/
 │   │   ├── SettingsPage.jsx                    theme only
 │   │   ├── ProvidersPage.jsx
 │   │   ├── ImageGenProvidersPage.jsx           image-gen provider/model CRUD, same pattern as ProvidersPage
+│   │   ├── VideoGenProvidersPage.jsx           video-gen provider/model CRUD, same pattern as ImageGenProvidersPage
 │   │   ├── VoicePage.jsx                       voice provider/model CRUD; select model/voice, edit prompts
 │   │   ├── DiscordPage.jsx                     servers/channels; trigger mode + prompt editor per channel
 │   │   ├── WorldsPage.jsx                      list/edit worlds; enter goes to sessions page
@@ -1582,6 +1646,8 @@ laravel-vera/
 │   │   ├── ProviderAccordion.jsx               provider form + nested models
 │   │   ├── ImageGenProviderAccordion.jsx       image-gen provider form + nested models
 │   │   ├── ImageGenModelAccordion.jsx          image-gen model form + select/deselect
+│   │   ├── VideoGenProviderAccordion.jsx       video-gen provider form + nested models
+│   │   ├── VideoGenModelAccordion.jsx          video-gen model form + select/deselect
 │   │   ├── AgentProgressIndicator.jsx          polls and shows agent-loop status during an in-progress turn
 │   │   ├── VoiceProviderAccordion.jsx          editable provider form (instructions auto-linked) + prompt editor
 │   │   ├── VoiceModelAccordion.jsx             editable model form + free-text voice picker (datalist hints) + prompt editor
@@ -1596,10 +1662,11 @@ laravel-vera/
 │   │   ├── Header.jsx                          navigation header — no hardcoded assistant-name branding
 │   │   ├── Portrait.jsx                        expression display (3 render modes)
 │   │   ├── ChatMessage.jsx                     message rendering
+│   │   ├── MessageVideo.jsx                    generated video: status placeholder, player, or failure
 │   │   ├── ThinkingBlock.jsx                   collapsible LLM reasoning
 │   │   ├── BootSequence.jsx                    startup animation
 │   │   ├── ConversationList.jsx                sidebar list
-│   │   ├── ToastContainer.jsx                  toast display
+│   │   ├── ToastContainer.jsx                  toast display, optional action button
 │   │   ├── Scanlines.jsx                       CRT overlay
 │   │   ├── WorldCard.jsx                       world card (edit/enter → sessions page)
 │   │   ├── WorldForm.jsx                       shared create/edit world form: metadata, environment, theme, context prompts
@@ -1623,6 +1690,9 @@ laravel-vera/
 │   │   ├── usePromptTree.js                    generic prompt tree state (caller supplies persistence)
 │   │   ├── useProviders.js                     provider/model CRUD + activeModelId
 │   │   ├── useImageGenProviders.js             image-gen provider/model CRUD + active model state
+│   │   ├── useVideoGenProviders.js             video-gen provider/model CRUD + active model state
+│   │   ├── useConversationVideos.js            live video status updates from the conversation channel
+│   │   ├── useVideoGenerationNotices.js        app-wide video-ready/failed toasts from the user channel
 │   │   ├── useConversationMemory.js             memory show/save/summarize/unlock, polls while summarizing
 │   │   ├── useConversationChat.js              shared message send/receive + pose-tag parsing, used by ChatPage and WorldChat
 │   │   ├── useVoiceProviders.js                provider/model CRUD + model/voice selection

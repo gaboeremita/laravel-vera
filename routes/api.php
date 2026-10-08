@@ -49,6 +49,8 @@ use App\Http\Controllers\Api\ResidentObservationController;
 use App\Http\Controllers\Api\ResidentStateController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StartingInventoryController;
+use App\Http\Controllers\Api\VideoGenModelController;
+use App\Http\Controllers\Api\VideoGenProviderController;
 use App\Http\Controllers\Api\VoiceController;
 use App\Http\Controllers\Api\VoiceModelController;
 use App\Http\Controllers\Api\VoiceProviderController;
@@ -173,6 +175,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/settings/model', [SettingsController::class, 'selectModel'])->name('settings.selectModel');
         Route::put('/settings/voice-model', [SettingsController::class, 'selectVoiceModel'])->name('settings.selectVoiceModel');
         Route::put('/settings/image-gen-model', [SettingsController::class, 'selectImageGenModel'])->name('settings.selectImageGenModel');
+        Route::put('/settings/video-gen-model', [SettingsController::class, 'selectVideoGenModel'])->name('settings.selectVideoGenModel');
         Route::put('/settings/voice', [SettingsController::class, 'updateVoice'])->name('settings.updateVoice');
         Route::put('/settings/discord', [SettingsController::class, 'updateDiscord'])->name('settings.updateDiscord');
         Route::get('/discord/discovery', [DiscordController::class, 'discovery'])->name('discord.discovery');
@@ -240,6 +243,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/image-gen-providers/{provider}/models', [ImageGenModelController::class, 'store'])->name('image-gen-models.store');
     Route::patch('/image-gen-providers/{provider}/models/{model}', [ImageGenModelController::class, 'update'])->name('image-gen-models.update');
     Route::delete('/image-gen-providers/{provider}/models/{model}', [ImageGenModelController::class, 'destroy'])->name('image-gen-models.destroy');
+
+    Route::get('/video-gen-providers', [VideoGenProviderController::class, 'index'])->name('video-gen-providers.index');
+    Route::post('/video-gen-providers', [VideoGenProviderController::class, 'store'])->name('video-gen-providers.store');
+    Route::patch('/video-gen-providers/{id}', [VideoGenProviderController::class, 'update'])->name('video-gen-providers.update');
+    Route::delete('/video-gen-providers/{id}', [VideoGenProviderController::class, 'destroy'])->name('video-gen-providers.destroy');
+
+    Route::post('/video-gen-providers/{provider}/models', [VideoGenModelController::class, 'store'])->name('video-gen-models.store');
+    Route::patch('/video-gen-providers/{provider}/models/{model}', [VideoGenModelController::class, 'update'])->name('video-gen-models.update');
+    Route::delete('/video-gen-providers/{provider}/models/{model}', [VideoGenModelController::class, 'destroy'])->name('video-gen-models.destroy');
 
     Route::get('/voice-providers', [VoiceProviderController::class, 'index'])->name('voice-providers.index');
     Route::post('/voice-providers', [VoiceProviderController::class, 'store'])->name('voice-providers.store');

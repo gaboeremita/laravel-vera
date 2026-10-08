@@ -21,6 +21,22 @@ export default function ToastContainer({ toasts, onDismiss }) {
                         {toast.message}
                     </span>
 
+					{toast.action && (
+						<button
+							onClick={() => {
+								toast.action.onClick();
+								onDismiss(toast.id);
+							}}
+							className={`shrink-0 cursor-pointer tracking-[0.15em] uppercase text-[0.6rem] font-bold transition-colors ${
+								toast.type === "error"
+									? "text-danger/50 hover:text-danger"
+									: "text-accent/50 hover:text-accent"
+							}`}
+						>
+							{toast.action.label}
+						</button>
+					)}
+
 					<button
 						onClick={() => onDismiss(toast.id)}
 						className={`shrink-0 cursor-pointer text-[0.7rem] transition-colors ${

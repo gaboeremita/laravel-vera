@@ -1,10 +1,10 @@
 # VERA
 
-Multi-assistant AI platform with RAG-driven context, agentic capabilities, tool calling, pluggable LLM providers, voice I/O, image generation, external integration (Discord and Telegram), long term memory and themeable interfaces. Built with Laravel and React.
+Multi-assistant AI platform with RAG-driven context, agentic capabilities, tool calling, pluggable LLM providers, voice I/O, image and video generation, external integration (Discord and Telegram), long term memory and themeable interfaces. Built with Laravel and React.
 
 ## Overview
 
-VERA is a multi-assistant AI platform with agent mode, voice I/O, and deep integration across channels. Each assistant has its own independently configurable prompt, expression set, and knowledge base — all managed in the database. Assistants can operate in agent mode, calling tools across multiple steps to answer, calculate, or generate images. They respond through the web app, Telegram, and Discord. Voice mode lets you speak to an assistant and hear replies back, with pluggable STT and TTS backends. A RAG-powered archive injects relevant knowledge into every conversation, and long-term memory keeps assistants coherent across sessions. LLM, TTS, and image generation providers are all DB-managed and swappable from the UI — no config file edits needed.
+VERA is a multi-assistant AI platform with agent mode, voice I/O, and deep integration across channels. Each assistant has its own independently configurable prompt, expression set, and knowledge base — all managed in the database. Assistants can operate in agent mode, calling tools across multiple steps to answer, calculate, or generate images and videos. They respond through the web app, Telegram, and Discord. Voice mode lets you speak to an assistant and hear replies back, with pluggable STT and TTS backends. A RAG-powered archive injects relevant knowledge into every conversation, and long-term memory keeps assistants coherent across sessions. LLM, TTS, image and video generation providers are all DB-managed and swappable from the UI — no config file edits needed.
 
 ## Tech Stack
 
@@ -132,6 +132,14 @@ IMAGE_GEN_MODEL=bytedance-seed/seedream-4.5
 IMAGE_GEN_FORMAT=openrouter        # openrouter | openai_compatible
 IMAGE_GEN_TIMEOUT=120
 
+# Video generation fallback (optional — only used if no video-gen model is selected in the UI)
+VIDEO_GEN_URL=https://openrouter.ai/api/v1/videos
+VIDEO_GEN_API_KEY=
+VIDEO_GEN_MODEL=                   # e.g. bytedance/seedance-2.0; video generation is off when empty and no model is selected
+VIDEO_GEN_FORMAT=openrouter
+VIDEO_GEN_TIMEOUT=600              # maximum wait in seconds before a video is marked failed
+PUBLIC_TUNNEL_URL=                 # public HTTPS address of this site (e.g. from `herd share`), needed for videos from an attached image
+
 # Agent mode (optional — tune tool-calling behavior for agent-mode assistants)
 AGENT_STEP_LIMIT=10
 AGENT_TOOL_TIMEOUT=60
@@ -209,6 +217,18 @@ Two ways to generate an image:
 
 Both share the same enhancement/generation pipeline — see [ARCHITECTURE.md → Agent Mode & Image Generation](./ARCHITECTURE.md#agent-mode--image-generation) for the full flow.
 
+### Video Generation Providers
+
+Video generation mirrors image generation. Providers and models are managed through the **Video Gen Providers** page in the UI (`/assistants/:id/video-gen-providers`), with the same fields. A new provider starts with a config schema for `duration`, `resolution`, `aspect_ratio`, `generate_audio` and `timeout`, which each model fills with its defaults. The only format is `openrouter`. If no model is selected, the fallback config from `.env` (`VIDEO_GEN_*`) is used.
+
+Two ways to generate a video:
+- **Manual** — type `/create-video <description>` in the web chat; the assistant writes a detailed video description, replies in character, and the video appears in that message when it is ready. A length, shape or sound you ask for ("a vertical 10 second clip") replaces the model's defaults, adjusted to the closest value the model supports.
+- **Agent tool** — an agent-mode assistant can call the `generate_video` tool when you ask for a video, clip or animation.
+
+An image attached to the request becomes the video's first frame. The provider fetches it through `PUBLIC_TUNNEL_URL`, so the tunnel must be running when the video starts.
+
+Videos are generated in the background by a queued job, so the queue worker and Reverb must be running (`composer run dev` starts both). The message shows the video's status and turns into a player when it is ready, and a notice appears on any page of the app when it finishes or fails. See [ARCHITECTURE.md → Video Generation](./ARCHITECTURE.md#video-generation).
+
 ### Agent Mode
 
 Each assistant has a `mode`: **assistant** (default — a single reply per turn, no tools) or **agent** (the assistant can call tools across multiple steps before replying). Set on the assistant's edit page.
@@ -218,6 +238,7 @@ Agent mode requires an explicitly selected LLM model that supports tool-calling 
 - `get_current_datetime` — current date/time
 - `basic_calculator` — arithmetic expressions
 - `generate_image` — generates and shows an image (shares the pipeline described above)
+- `generate_video` — starts a video in the background when the user asks for a video, clip or animation; see [Video Generation Providers](#video-generation-providers)
 
 Step limit, tool timeout, and retry behavior are configured via the `AGENT_*` env vars above, with an optional per-assistant `step_limit` override in `agent_config`. While an agent-mode turn is in progress, the chat UI shows the loop's current status (e.g. "Calling tool: generate_image"), polled from the backend. See [ARCHITECTURE.md → Agent Mode & Image Generation](./ARCHITECTURE.md#agent-mode--image-generation) for the full loop mechanics, timeout enforcement (requires the `pcntl` PHP extension), and known limitations.
 
@@ -421,7 +442,8 @@ laravel-vera/
 │   │   ├── AgentTool.php                     # Interface for agent-mode tools (name/description/parameters/handle)
 │   │   ├── LlmProvider.php                   # LLM interface (chat method)
 │   │   ├── SttProvider.php                   # STT interface (transcribe)
-│   │   └── TtsProvider.php                   # TTS interface (synthesize + fromModel)
+│   │   ├── TtsProvider.php                   # TTS interface (synthesize + fromModel)
+│   │   └── VideoGenProvider.php              # Video-gen interface (submit/status/download/supportedSettings + fromModel)
 │   ├── Directors/
 │   │   └── PromptDirector.php                # Reads assistant prompt config, builds system prompt
 │   ├── DTOs/
@@ -429,6 +451,8 @@ laravel-vera/
 │   │   ├── ImageGenResult.php                 # Generated image: raw data + content type + enhanced prompt
 │   │   ├── LlmResponse.php                   # Unified response: content + thinking
 │   │   ├── ToolCallRequest.php               # Parsed LLM tool-call request: id/name/arguments
+│   │   ├── VideoGenJobStatus.php             # Provider job status: VideoStatus + download URL or error
+│   │   ├── VideoGenSupportedSettings.php     # Durations and aspect ratios a video model supports
 │   │   └── VoiceModeResult.php               # content + ttsInstructions, from TtsProvider::parseLlmResponse()
 │   ├── Enums/
 │   │   ├── AiProviderFormat.php              # generic | anthropic
@@ -437,6 +461,8 @@ laravel-vera/
 │   │   ├── WorldResidentBehavior.php         # stationary | roam | autonomous
 │   │   ├── Posture.php                       # standing | sitting | lying | reclining | swimming
 │   │   ├── ImageGenProviderFormat.php        # openrouter | openai_compatible
+│   │   ├── VideoGenProviderFormat.php        # openrouter
+│   │   ├── VideoStatus.php                   # queued | generating | completed | failed
 │   │   └── VoiceProviderFormat.php           # openai_compatible | openai_tts | deepgram | elevenlabs
 │   ├── Http/Controllers/
 │   │   ├── Auth/
@@ -451,13 +477,15 @@ laravel-vera/
 │   │       ├── AssistantEmotionController.php# Per-assistant emotion store/update/destroy
 │   │       ├── AssistantMemoryPromptController.php # Show/update per-assistant memory summarization instructions
 │   │       ├── AssistantPromptController.php # Prompt CRUD (show/store/update/destroy)
-│   │       ├── ConversationController.php    # CRUD + message sending (voice_mode flag, /create-image, agent-mode dispatch, sendDiscordMessage)
+│   │       ├── ConversationController.php    # CRUD + message sending (voice_mode flag, /create-image, /create-video, agent-mode dispatch, sendDiscordMessage)
 │   │       ├── ConversationMemoryController.php # Show/update/summarize/unlock a conversation's long-term memory
 │   │       ├── DiscordController.php         # Discovery proxy (syncs discord_servers/channels) + server/channel prompt updates
 │   │       ├── EmotionController.php         # Serve emotions with image/video URLs
 │   │       ├── ImageGenProviderController.php# CRUD for image-gen providers
 │   │       ├── ImageGenModelController.php   # CRUD for image-gen models
-│   │       ├── SettingsController.php        # Theme + active LLM/voice/image-gen model + voice selection + Discord trigger mode
+│   │       ├── VideoGenProviderController.php# CRUD for video-gen providers
+│   │       ├── VideoGenModelController.php   # CRUD for video-gen models
+│   │       ├── SettingsController.php        # Theme + active LLM/voice/image-gen/video-gen model + voice selection + Discord trigger mode
 │   │       ├── VoiceController.php           # Transcribe / synthesize
 │   │       ├── VoiceProviderController.php   # Full CRUD + prompt-only update
 │   │       ├── VoiceModelController.php      # Full CRUD + prompt-only update (store() currently broken)
@@ -473,11 +501,13 @@ laravel-vera/
 │   │   ├── Assistant.php                     # Assistant config (prompt, opening_message, emotions, mode, agent_config)
 │   │   ├── AssistantUser.php                 # Pivot: user ↔ assistant; memory_prompt (json)
 │   │   ├── WorldUser.php                     # Pivot: user ↔ world (worlds are shared the same way assistants are)
-│   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model, voice, image-gen model)
+│   │   ├── Settings.php                      # Per-user, per-assistant settings (theme, model, voice, image-gen and video-gen model)
 │   │   ├── AiProvider.php                    # DB-managed LLM provider
 │   │   ├── AiModel.php                       # DB-managed LLM model
 │   │   ├── ImageGenProvider.php               # User-managed image-gen provider
 │   │   ├── ImageGenModel.php                  # User-managed image-gen model
+│   │   ├── VideoGenProvider.php               # User-managed video-gen provider
+│   │   ├── VideoGenModel.php                  # User-managed video-gen model (config holds duration/resolution/aspect_ratio/generate_audio/timeout)
 │   │   ├── VoiceProvider.php                 # User-managed TTS provider (seeder pre-populates 2 convenience entries)
 │   │   ├── VoiceModel.php                    # User-managed TTS model
 │   │   ├── DiscordServer.php                 # Known Discord server (guild id + name)
@@ -491,7 +521,7 @@ laravel-vera/
 │   │   ├── ArchiveEntry.php
 │   │   ├── Tag.php
 │   │   ├── Image.php                         # Polymorphic, stored on disk
-│   │   ├── Video.php                         # Polymorphic, stored on disk
+│   │   ├── Video.php                         # Polymorphic, stored on disk: emotion videos and generated videos (status, prompt, job id, failure reason)
 │   │   ├── World.php                         # name/slug/description, environment metadata, assistant/npc context prompts, settings (incl. theme); shared via WorldUser, not owned directly
 │   │   ├── WorldResident.php                 # A world's placement of an assistant/NPC: position, rotation, behavior, per-placement overrides
 │   │   ├── WorldSession.php                  # One user's continuous thread in a world: title, last recorded position (json); owns its own conversations
@@ -501,6 +531,7 @@ laravel-vera/
 │   │   └── WorldPolicy.php                   # Worlds are scoped to users granted access via WorldUser
 │   ├── Jobs/
 │   │   ├── EmbedArchiveEntry.php             # Async vector embedding for archive entries
+│   │   ├── PollVideoGeneration.php           # Submits a generated video, re-queues itself every 30s until done, downloads it, broadcasts status
 │   │   └── SummarizeConversation.php         # Queues Actions\SummarizeConversation; manages the memory_summarizing_at lock
 │   ├── Providers/
 │   │   ├── AppServiceProvider.php            # Binds EmbeddingProvider, SttProvider
@@ -512,6 +543,7 @@ laravel-vera/
 │       │       ├── BasicCalculatorTool.php   # basic_calculator tool
 │       │       ├── GetCurrentDatetimeTool.php# get_current_datetime tool
 │       │       ├── ImageGenerationTool.php   # generate_image tool
+│       │       ├── VideoGenerationTool.php   # generate_video tool
 │       │       └── World/                    # Resident world tools: where_can_i, what_is_in, describe, go_to, follow, stop, use, zone, swim_to_edge, wander, plan
 │       ├── ImageGenProviders/
 │       │   ├── ImageGenManager.php           # Resolves provider: DB model → config fallback (mirrors LlmManager)
@@ -519,6 +551,11 @@ laravel-vera/
 │       │   ├── ImageGenPromptEnhancer.php    # LLM rewrites the raw prompt using persona/RAG/history
 │       │   ├── OpenRouterImageGenProvider.php
 │       │   └── OpenAiCompatibleImageGenProvider.php
+│       ├── VideoGenProviders/
+│       │   ├── VideoGenManager.php           # Resolves provider: DB model → config fallback (mirrors ImageGenManager)
+│       │   ├── VideoGenerationService.php    # Shared start() used by /create-video and the agent tool; closest supported length/shape
+│       │   ├── VideoGenPromptEnhancer.php    # LLM writes the video description plus requested length/shape/sound as JSON
+│       │   └── OpenRouterVideoGenProvider.php
 │       ├── LlmProviders/
 │       │   ├── LlmManager.php                # Resolves provider: DB model → config fallback
 │       │   ├── GenericProvider.php           # OpenAI-compatible API
@@ -532,7 +569,7 @@ laravel-vera/
 │       └── TelegramService.php               # Telegram API wrapper
 ├── config/
 │   ├── agent.php                             # Step limit, tool timeout, retry attempts, progress cache TTL
-│   └── ai.php                                # Default LLM + embedding + stt + tts + image_gen (fallback) + telegram + discord config
+│   └── ai.php                                # Default LLM + embedding + stt + tts + image_gen + video_gen (fallback) + telegram + discord config
 ├── .specify/                                 # Spec Kit (SDD) install: constitution, templates, extensions
 ├── specs/                                    # Per-feature spec/plan/tasks artifacts (spec-driven features)
 ├── database/
@@ -566,7 +603,7 @@ laravel-vera/
 │   ├── contexts/
 │   │   └── ThemeContext.jsx                  # Global theme state
 │   ├── layouts/
-│   │   ├── AuthenticatedLayout.jsx           # Auth guard + emotion state + boot sequence
+│   │   ├── AuthenticatedLayout.jsx           # Auth guard + emotion state + boot sequence + video-ready notices
 │   │   └── AssistantLayout.jsx               # Assistant-scoped context (conversations, settings)
 │   ├── pages/
 │   │   ├── LoginPage.jsx
@@ -582,6 +619,7 @@ laravel-vera/
 │   │   ├── SettingsPage.jsx                  # Theme only
 │   │   ├── ProvidersPage.jsx                 # AI provider/model management
 │   │   ├── ImageGenProvidersPage.jsx          # Image-gen provider/model management (same pattern as ProvidersPage)
+│   │   ├── VideoGenProvidersPage.jsx          # Video-gen provider/model management (same pattern as ImageGenProvidersPage)
 │   │   ├── VoicePage.jsx                     # Voice provider/model management; select model/voice, edit prompts
 │   │   ├── DiscordPage.jsx                   # Discord servers/channels; trigger mode + prompt editor per channel
 │   │   ├── WorldsPage.jsx                    # List/edit worlds; entering a world goes to its sessions page
@@ -599,6 +637,8 @@ laravel-vera/
 │   │   ├── ProviderAccordion.jsx             # Provider config + nested models
 │   │   ├── ImageGenProviderAccordion.jsx     # Image-gen provider config + nested models
 │   │   ├── ImageGenModelAccordion.jsx        # Image-gen model config + select/deselect
+│   │   ├── VideoGenProviderAccordion.jsx     # Video-gen provider config + nested models
+│   │   ├── VideoGenModelAccordion.jsx        # Video-gen model config + select/deselect
 │   │   ├── AgentProgressIndicator.jsx        # Polls and shows agent-loop status during an in-progress turn
 │   │   ├── VoiceProviderAccordion.jsx        # Editable provider form + prompt editor
 │   │   ├── VoiceModelAccordion.jsx           # Editable model form + voice picker (free text + hints) + prompt editor
@@ -613,10 +653,11 @@ laravel-vera/
 │   │   ├── Header.jsx                        # Navigation header
 │   │   ├── Portrait.jsx                      # Expression display
 │   │   ├── ChatMessage.jsx                   # Message rendering
+│   │   ├── MessageVideo.jsx                  # Generated video in a message: status placeholder, player, or failure
 │   │   ├── ThinkingBlock.jsx                 # Collapsible LLM reasoning
 │   │   ├── BootSequence.jsx                  # Boot animation
 │   │   ├── ConversationList.jsx              # Sidebar conversation list
-│   │   ├── ToastContainer.jsx                # Toast notification display
+│   │   ├── ToastContainer.jsx                # Toast notification display, with an optional action button
 │   │   ├── Scanlines.jsx                     # CRT scanline overlay
 │   │   ├── WorldCard.jsx                     # World card (edit/enter → sessions page)
 │   │   ├── WorldForm.jsx                     # Shared create/edit world form: metadata, environment, theme, context prompts
@@ -646,6 +687,9 @@ laravel-vera/
 │   │   ├── usePromptTree.js                  # Generic prompt tree editing state (reused by voice + Discord prompts)
 │   │   ├── useProviders.js                   # Provider/model CRUD + active model state
 │   │   ├── useImageGenProviders.js           # Image-gen provider/model CRUD + active model state
+│   │   ├── useVideoGenProviders.js           # Video-gen provider/model CRUD + active model state
+│   │   ├── useConversationVideos.js          # Applies live video status updates from the conversation channel
+│   │   ├── useVideoGenerationNotices.js      # App-wide toast when a video finishes or fails (user channel)
 │   │   ├── useConversationMemory.js          # Memory show/save/summarize/unlock, polls while summarizing
 │   │   ├── useConversationChat.js            # Shared message send/receive + pose-tag parsing, used by ChatPage and WorldChat
 │   │   ├── useResidentAgency.js              # Autonomous residents' decide-act-report loop while the user is in the world
@@ -695,8 +739,9 @@ laravel-vera/
 - **Voice Mode** — speak to an assistant and hear replies read back; local STT (whisper.cpp, single fixed backend) and pluggable, DB-managed TTS. See [Voice Mode](#voice-mode)
 - **Provider-agnostic TTS** — any backend speaking the OpenAI-compatible `/v1/audio/speech` shape plugs in via a seeded `VoiceProvider`/`VoiceModel` row, no new code. Orpheus and KittenTTS confirmed working
 - **Per-provider/per-model voice prompts** — backend-specific instructions (e.g. Orpheus's inline vocal tags) live on the `VoiceProvider`/`VoiceModel` record and are injected only while that backend is active, via the same visual prompt-tree editor used for assistant prompts
-- **Agent mode** — assistants can be switched to an agentic loop that calls tools (`get_current_datetime`, `basic_calculator`, `generate_image`) across multiple steps before replying, with a step limit, per-tool timeout/retry, and a live progress indicator in the chat UI. See [Agent Mode](#agent-mode)
+- **Agent mode** — assistants can be switched to an agentic loop that calls tools (`get_current_datetime`, `basic_calculator`, `generate_image`, `generate_video`) across multiple steps before replying, with a step limit, per-tool timeout/retry, and a live progress indicator in the chat UI. See [Agent Mode](#agent-mode)
 - **Image generation** — DB-managed, user-editable provider/model catalog (same pattern as LLM providers); generate an image manually via `/create-image <description>` in chat, or let an agent-mode assistant call it as a tool. See [Image Generation Providers](#image-generation-providers)
+- **Video generation** — the same catalog pattern for video models; `/create-video <description>` or the `generate_video` agent tool, with an optional attached image as the first frame, generated in the background with live status in the chat and an app-wide notice when it is ready. See [Video Generation Providers](#video-generation-providers)
 - **Items, inventory and credits in worlds** — per-world items with images and sounds, inventories for the player, residents and objects, vendors, residents who give and ask for things in character, and object activities that cost, give and require items, judged and narrated by an LLM. See [Items, Inventory and Credits](#items-inventory-and-credits)
 - **Configurable 3D worlds** — shared, single-room 3D spaces you explore in first person, with assistant and NPC residents you approach and chat with in place, organized into per-user sessions you can resume, start fresh, or delete. See [Worlds](#worlds)
 

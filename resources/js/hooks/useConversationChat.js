@@ -2,19 +2,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { parseEmotionFromResponse, parsePoseFromResponse } from '../utils/parsers.js';
+import useConversationVideos from './useConversationVideos.js';
 
 function mapMessage(msg, portraitType, poseNames, emotionNames) {
 	if (msg.role !== 'assistant') {
-		return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url };
+		return { id: msg.id, role: msg.role, content: msg.content, thinking: msg.thinking, image: msg.image_url, video: msg.video ?? null };
 	}
 
 	if (portraitType === 'avatar3d') {
 		const { text } = parsePoseFromResponse(msg.content, poseNames);
-		return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, toolCalls: msg.tool_calls ?? null, image: msg.image_url };
+		return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, toolCalls: msg.tool_calls ?? null, image: msg.image_url, video: msg.video ?? null };
 	}
 
 	const { emotion, text } = parseEmotionFromResponse(msg.content, emotionNames);
-	return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, toolCalls: msg.tool_calls ?? null, image: msg.image_url, emotion };
+	return { id: msg.id, role: msg.role, content: text, thinking: msg.thinking, toolCalls: msg.tool_calls ?? null, image: msg.image_url, video: msg.video ?? null, emotion };
 }
 
 /**
@@ -45,6 +46,11 @@ export function useConversationChat({
 	const [hasError, setHasError] = useState(false);
 	const [hasMore, setHasMore] = useState(false);
 	const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+	const applyVideoUpdate = useCallback((data) => {
+		setMessages((prev) => prev.map((m) => (m.video?.id === data.video.id ? { ...m, video: data.video } : m)));
+	}, []);
+	useConversationVideos(conversationId, applyVideoUpdate);
 
 	useEffect(() => {
 		if (!assistantId || !conversationId) return;
@@ -158,7 +164,7 @@ export function useConversationChat({
 					return;
 				}
 
-				if (data.image_url) {
+				if (data.image_url || data.video) {
 					if (data.intimate !== unlocked) fetchEmotions?.(assistantId);
 
 					if (portraitType === 'avatar3d') {
@@ -168,7 +174,7 @@ export function useConversationChat({
 					}
 
 					setHasError(false);
-					setMessages([...sent, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: data.content || '', thinking: data.thinking || null, image: data.image_url }]);
+					setMessages([...sent, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: data.content || '', thinking: data.thinking || null, image: data.image_url ?? null, video: data.video ?? null }]);
 					setIsLoading(false);
 					return;
 				}
@@ -201,6 +207,16 @@ export function useConversationChat({
 					.filter((call) => call.result?.image_url)
 					.map((call, index) => ({ id: `temp-${Date.now()}-image-${index}`, role: 'assistant', content: '', image: call.result.image_url }));
 
+				const startedVideoMessages = (data.tool_calls || [])
+					.filter((call) => call.result?.video_id)
+					.map((call, index) => ({
+						id: `temp-${Date.now()}-video-${index}`,
+						role: 'assistant',
+						content: '',
+						thinking: call.result.enhanced_prompt || null,
+						video: { id: call.result.video_id, status: 'queued', url: null, prompt: call.result.enhanced_prompt || '', failure_reason: null },
+					}));
+
 				if (portraitType === 'avatar3d') {
 					if (pose) onPoseChange?.({ name: pose, triggerId: Date.now() });
 				} else {
@@ -213,7 +229,7 @@ export function useConversationChat({
 				const sentWithUnderlines = missingTerms ? sent.map((m) => (m.id === userMsg.id ? { ...m, underlines: missingTerms.flatMap((term) => term.ranges) } : m)) : sent;
 
 				setHasError(false);
-				setMessages([...sentWithUnderlines, ...generatedImageMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, systemPrompt: data.system_prompt || null, usage: data.usage || null, ttsInstructions, toolCalls: data.tool_calls || null, audioBase64: data.audioBase64 || null, audioContentType: data.audioContentType || null, missingTerms }]);
+				setMessages([...sentWithUnderlines, ...generatedImageMessages, ...startedVideoMessages, { id: `temp-${Date.now()}-reply`, role: 'assistant', content: cleanText, thinking, systemPrompt: data.system_prompt || null, usage: data.usage || null, ttsInstructions, toolCalls: data.tool_calls || null, audioBase64: data.audioBase64 || null, audioContentType: data.audioContentType || null, missingTerms }]);
 				setIsLoading(false);
 				if (voiceMode) onVoiceReply?.(cleanText, ttsInstructions);
 				if (data.action) onAction?.(data.action, cleanText);

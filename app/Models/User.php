@@ -65,6 +65,11 @@ class User extends Authenticatable
         return $this->hasMany(ImageGenProvider::class);
     }
 
+    public function videoGenProviders(): HasMany
+    {
+        return $this->hasMany(VideoGenProvider::class);
+    }
+
     public function assistants(): BelongsToMany
     {
         return $this->belongsToMany(Assistant::class)

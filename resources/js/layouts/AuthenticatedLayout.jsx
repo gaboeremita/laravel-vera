@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { useEmotions } from '../hooks/useEmotions.js';
 import { useToast } from '../hooks/useToast.js';
+import useVideoGenerationNotices from '../hooks/useVideoGenerationNotices.js';
 import Portrait from '../components/Portrait.jsx';
 import Scanlines from '../components/Scanlines.jsx';
 import BootSequence from '../components/BootSequence.jsx';
 import ToastContainer from '../components/ToastContainer.jsx';
 
 export default function AuthenticatedLayout() {
+	const navigate = useNavigate();
 	const [authState, setAuthState] = useState('checking');
+	const [userId, setUserId] = useState(null);
 	const [booted, setBooted] = useState(() => {
 		return sessionStorage.getItem('vera-booted') === 'true';
 	});
@@ -23,11 +26,14 @@ export default function AuthenticatedLayout() {
 
 	const { emotionNames, poses, fetchEmotions, getImageUrl, getVideoUrl, getVrmBlendshapes, getPoseBlendshapes, getPoseAnimationUrl, unlocked, portraitType, vrmUrl } = useEmotions();
 	const { toasts, addToast, removeToast } = useToast();
+	useVideoGenerationNotices(userId, addToast, navigate);
 
 	useEffect(() => {
 		api.get(route('user.show'))
-			.then((res) => {
+			.then(async (res) => {
 				if (res.ok) {
+					const user = await res.json();
+					setUserId(user.id);
 					setAuthState('authenticated');
 				} else {
 					setAuthState('unauthenticated');

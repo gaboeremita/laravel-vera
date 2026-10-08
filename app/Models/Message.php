@@ -93,4 +93,9 @@ class Message extends Model
     {
         return $this->morphOne(Image::class, 'imageable');
     }
+
+    public function video(): MorphOne
+    {
+        return $this->morphOne(Video::class, 'videoable');
+    }
 }

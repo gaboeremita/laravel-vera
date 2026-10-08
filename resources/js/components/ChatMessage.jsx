@@ -5,6 +5,7 @@ import ThinkingBlock from "./ThinkingBlock";
 import VoiceInstructionsBlock from "./VoiceInstructionsBlock";
 import AgentToolCallsTrace from "./AgentToolCallsTrace";
 import VoiceMessagePlayer from "./VoiceMessagePlayer";
+import MessageVideo from "./MessageVideo";
 import veraAvatar from '../../images/vera-avatar.png';
 import { underlinedParts } from '../utils/termHighlights.js';
 
@@ -175,7 +176,7 @@ function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
             </span>
 
             {isAssistant && msg.thinking && (
-                <ThinkingBlock content={msg.thinking} label={msg.image ? 'Image Prompt' : 'Thinking Process'} />
+                <ThinkingBlock content={msg.thinking} label={msg.video ? 'Video Prompt' : msg.image ? 'Image Prompt' : 'Thinking Process'} />
             )}
             {isAssistant && msg.systemPrompt && (
                 <ThinkingBlock content={msg.systemPrompt} label={`Prompt sent · ${msg.systemPrompt.length.toLocaleString()} characters · ~${Math.round(msg.systemPrompt.length / 4).toLocaleString()} tokens`} plain />
@@ -194,6 +195,8 @@ function ChatMessage({ msg, assistantName = 'ASSISTANT' }) {
                     className="mt-1 mb-2 max-h-48 rounded border border-line-1"
                 />
             )}
+
+            {msg.video && <MessageVideo video={msg.video} />}
 
             <div className={`mt-0.5 text-sm ${isAssistant ? 'text-fg-1' : 'text-fg-2'}`}>
                 {isAssistant ? (

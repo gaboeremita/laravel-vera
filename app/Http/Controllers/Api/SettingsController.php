@@ -47,6 +47,7 @@ class SettingsController extends Controller
             'available_themes' => array_column(Theme::cases(), 'value'),
             'ai_model_id' => $settings?->data['ai_model_id'] ?? null,
             'image_gen_model_id' => $settings?->data['image_gen_model_id'] ?? null,
+            'video_gen_model_id' => $settings?->data['video_gen_model_id'] ?? null,
             'tts_model_id' => $settings?->data['tts_model_id'] ?? null,
             'tts_voice' => $settings?->data['tts_voice'] ?? null,
             'discordVoiceResponseMode' => $settings?->data['discordVoiceResponseMode'] ?? 'both',
@@ -147,6 +148,30 @@ class SettingsController extends Controller
         $settings->update(['data' => $data]);
 
         return response()->json(['image_gen_model_id' => $validated['image_gen_model_id']]);
+    }
+
+    public function selectVideoGenModel(Request $request, int $assistant): JsonResponse
+    {
+        $validated = $request->validate([
+            'video_gen_model_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('video_gen_models', 'id')->where(fn ($q) => $q->whereIn('provider_id', $request->user()->videoGenProviders()->select('id'))),
+            ],
+        ]);
+
+        $settings = $request->user()->settings()
+            ->where('assistant_id', $assistant)
+            ->firstOrCreate(
+                ['user_id' => $request->user()->id, 'assistant_id' => $assistant],
+                ['data' => []]
+            );
+
+        $data = $settings->data ?? [];
+        $data['video_gen_model_id'] = $validated['video_gen_model_id'];
+        $settings->update(['data' => $data]);
+
+        return response()->json(['video_gen_model_id' => $validated['video_gen_model_id']]);
     }
 
     public function selectVoiceModel(Request $request, int $assistant): JsonResponse
