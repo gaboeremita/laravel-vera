@@ -19,7 +19,7 @@ A first frame is sent as `frame_images: [{ "type": "image_url", "image_url": { "
 
 ## R2. Waiting for the result: background job that re-queues itself
 
-**Decision**: `PollVideoGeneration` is a queued job that handles one video. Each run either submits the job (first run) or checks its status once. While the status is `pending` or `in_progress`, the job calls `$this->release(self::POLL_SECONDS)` (30 s, OpenRouter's suggested interval). `retryUntil()` returns the video's `created_at` plus the model's `timeout` (default 600 s). When that deadline passes, Laravel fails the job, and `failed()` marks the video failed with a timeout reason. `$deleteWhenMissingModels = true` makes the job disappear silently when the conversation, and with it the message and video, has been deleted (FR-015).
+**Decision**: `PollVideoGeneration` is a queued job that handles one video. Each run either submits the job (first run) or checks its status once. While the status is `pending` or `in_progress`, the job calls `$this->release(self::POLL_SECONDS)` (30 s, OpenRouter's suggested interval). `retryUntil()` returns the video's `created_at` plus the model's `timeout` (default 600 s). When that deadline passes, Laravel fails the job, and `failed()` marks the video failed with a timeout reason. The job stops without broadcasting when the video's message is gone because its conversation was deleted (FR-015, see R9), and `$deleteWhenMissingModels = true` drops it when the video row itself is gone.
 
 **Rationale**:
 - Releasing back to the queue frees the worker between checks; a `sleep` loop would hold it for minutes.
@@ -85,11 +85,13 @@ A first frame is sent as `frame_images: [{ "type": "image_url", "image_url": { "
 
 ## R9. Video record shape
 
-**Decision**: A `videos` table with a plain `message_id` foreign key (cascade on delete), separate from `images`.
+**Decision**: Generated videos are rows in the existing polymorphic `videos` table, which already holds emotion videos, with the message as their `videoable`. A new migration adds nullable generation columns and makes `path` nullable. The existing `Video` model is extended rather than replaced.
 
-**Rationale**:
-- Only messages own videos, so the polymorphic `imageable` shape `images` needs has no second caller here (Principle VII).
-- A cascading foreign key also removes videos with their conversation, which R2's missing-model handling relies on.
+**Rationale**: this is how generated images work: they share `images` with every other image through `imageable`. Emotion rows keep working with the new columns null.
+
+**Alternatives considered**: A separate table for generated videos. It would split one kind of media file across two tables and two models, unlike images.
+
+**Gotcha**: a morph relation has no database cascade. Deleting a conversation cascades to its messages, but a message's videos are left behind. `PollVideoGeneration` therefore treats a video whose message is gone like a missing model and stops (FR-015).
 
 ## R10. Where the feature is offered
 

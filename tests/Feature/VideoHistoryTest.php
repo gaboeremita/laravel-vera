@@ -10,7 +10,7 @@ test('later turns see each video with its description and status', function (str
     [, $assistant, $conversation] = setUpAgentAssistant();
     $conversation->messages()->create(['role' => 'user', 'content' => 'make me a clip of the beach']);
     $carrier = $conversation->messages()->create(['role' => 'assistant', 'content' => '']);
-    $factory = Video::factory()->for($carrier);
+    $factory = Video::factory()->for($carrier, 'videoable');
     $factory = match ($state) {
         'generating' => $factory->generating(),
         'completed' => $factory->completed(),
@@ -32,7 +32,7 @@ test('later turns see each video with its description and status', function (str
 test('a reply that started a video keeps its text and adds the note', function () {
     [, $assistant, $conversation] = setUpAgentAssistant();
     $reply = $conversation->messages()->create(['role' => 'assistant', 'content' => 'Filming now.']);
-    Video::factory()->for($reply)->create(['prompt' => 'A cat on a piano']);
+    Video::factory()->for($reply, 'videoable')->create(['prompt' => 'A cat on a piano']);
 
     $history = app(BuildConversationHistory::class)->handle($conversation, $assistant);
 

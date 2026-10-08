@@ -16,7 +16,8 @@ class VideoFactory extends Factory
     public function definition(): array
     {
         return [
-            'message_id' => Message::factory()->state(['role' => 'assistant']),
+            'videoable_type' => (new Message)->getMorphClass(),
+            'videoable_id' => Message::factory()->state(['role' => 'assistant']),
             'video_gen_model_id' => VideoGenModel::factory(),
             'status' => VideoStatus::Queued,
             'prompt' => fake()->sentence(),

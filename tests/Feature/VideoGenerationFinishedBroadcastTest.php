@@ -11,7 +11,7 @@ uses(RefreshDatabase::class);
 test('a finished video is announced on its owner\'s channel', function () {
     [$user, $assistant, $conversation] = setUpAgentAssistant();
     $message = $conversation->messages()->create(['role' => 'assistant', 'content' => 'On it.']);
-    $video = Video::factory()->for($message)->failed('content policy')->create();
+    $video = Video::factory()->for($message, 'videoable')->failed('content policy')->create();
 
     $event = new VideoGenerationFinished($video);
 

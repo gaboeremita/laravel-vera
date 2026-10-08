@@ -27,7 +27,7 @@ Video generation is image generation's twin, with one structural difference: the
 
 **Primary Dependencies**: Existing only: Laravel HTTP client and queue (`database` driver), Reverb + Laravel Echo, `PromptDirector`, `LlmManager`, `AgentLoopRunner`, `SchemaForm`/`SchemaEditor`, `Accordion`, `useToast`, Tailwind v4, lucide-react. No new packages.
 
-**Storage**: PostgreSQL, with three new tables (`video_gen_providers`, `video_gen_models`, `videos`). Files go on the `public` disk under `messages/{userId}/{conversationId}/`, like images.
+**Storage**: PostgreSQL, with two new tables (`video_gen_providers`, `video_gen_models`) and nullable generation columns on the existing polymorphic `videos` table. Files go on the `public` disk under `messages/{userId}/{conversationId}/`, like images.
 
 **Testing**: Pest 4 feature tests with factories for the three new models, `Http::fake` sequences for the provider, `Queue::fake`/`Bus::fake` for dispatch, `Event::fake` for broadcasts, and `Storage::fake('public')`.
 
@@ -49,12 +49,12 @@ Video generation is image generation's twin, with one structural difference: the
 | Principle | Status |
 |---|---|
 | I. Lint-enforced style | Pint and ESLint run once at push/PR time, per CLAUDE.md |
-| II. Append-only migrations | Three new create-table migrations. No existing migration is edited. |
+| II. Append-only migrations | Two new create-table migrations and one that adds columns to `videos`. No existing migration is edited. |
 | III. Comments justify only non-obvious decisions | Comments only on why the conversation-channel hook doesn't call `echo.leave`, and why the job re-queues itself instead of sleeping |
 | IV. Data isolation by ownership | Providers and models are scoped through `$request->user()->videoGenProviders()`. Model resolution checks the provider's `user_id`, as `ImageGenManager::resolveImageGenModel` does. The `user.{id}` channel authorizes only its owner. Videos are reached through the user's own conversation. |
 | V. Errors fail loudly | Every failure ends in `failed` with a reason, is logged, and broadcasts. JSON fallback and unreadable supported-settings lists log warnings. No empty catches. |
 | VI. Feature-test-first, factory-backed | New factories `VideoGenProviderFactory`, `VideoGenModelFactory`, `VideoFactory` (with `completed()`/`failed()` states). Feature tests through the HTTP endpoints, the tool and the job. |
-| VII. No speculative abstraction | Only the OpenRouter format exists. The enum and `providerClass()` copy image generation's shape, which the manager needs. `videos` uses a plain `message_id` foreign key because only messages own videos. |
+| VII. No speculative abstraction | Only the OpenRouter format exists. The enum and `providerClass()` copy image generation's shape, which the manager needs. Generated videos reuse the existing polymorphic `videos` table, as generated images reuse `images`. |
 | VIII. Render-time derivation | `useConversationVideos` and `useVideoGenerationNotices` define their listeners inside the effect, as `useAvatarBackground` does. Message updates are applied in the event callback, not by syncing state in an effect. |
 
 Gate: pass. Re-checked after Phase 1 design: pass.
@@ -86,8 +86,8 @@ app/
 ├── Enums/VideoStatus.php                             # queued, generating, completed, failed
 ├── Models/VideoGenProvider.php                       # ← Models/ImageGenProvider
 ├── Models/VideoGenModel.php                          # ← Models/ImageGenModel
-├── Models/Video.php                                  # ← Models/Image: url accessor, storeDownloaded(), historyNote()
-├── Models/Message.php                                # + video() HasOne
+├── Models/Video.php                                  # existing; + generation fields, model(), firstFrame(), storeDownloaded(), historyNote()
+├── Models/Message.php                                # + video() MorphOne, like image()
 ├── Models/User.php                                   # + videoGenProviders()
 ├── Services/VideoGenProviders/
 │   ├── VideoGenManager.php                           # ← ImageGenManager (resolveVideoGenModel, fromModel, fromConfig)
@@ -110,7 +110,7 @@ routes/channels.php                                   # + user.{userId}
 database/migrations/
 ├── xxxx_create_video_gen_providers_table.php         # ← create_image_gen_providers_table (prompt as json from the start)
 ├── xxxx_create_video_gen_models_table.php            # ← create_image_gen_models_table
-└── xxxx_create_videos_table.php
+└── xxxx_add_generation_columns_to_videos_table.php
 database/factories/{VideoGenProvider,VideoGenModel,Video}Factory.php
 
 resources/js/

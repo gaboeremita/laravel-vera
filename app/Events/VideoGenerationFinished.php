@@ -25,7 +25,7 @@ class VideoGenerationFinished implements ShouldBroadcastNow
 
     public function __construct(Video $video)
     {
-        $conversation = $video->message->conversation;
+        $conversation = $video->videoable->conversation;
         $assistantUser = $conversation->assistantUser();
 
         $this->userId = $assistantUser->user_id;

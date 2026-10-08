@@ -33,7 +33,7 @@ class PollVideoGeneration implements ShouldQueue
 
     public function handle(VideoGenManager $videoGenManager, VideoGenerationService $videoGenerationService): void
     {
-        if ($this->video->status->isFinished()) {
+        if ($this->video->status->isFinished() || $this->messageIsGone($this->video)) {
             return;
         }
 
@@ -81,7 +81,7 @@ class PollVideoGeneration implements ShouldQueue
     {
         $video = $this->video->fresh();
 
-        if ($video === null || $video->status->isFinished()) {
+        if ($video === null || $video->status->isFinished() || $this->messageIsGone($video)) {
             return;
         }
 
@@ -89,6 +89,15 @@ class PollVideoGeneration implements ShouldQueue
         $this->markFailed($exception instanceof MaxAttemptsExceededException
             ? 'Video generation timed out after '.app(VideoGenerationService::class)->maximumWaitSeconds($video).' seconds.'
             : $exception->getMessage());
+    }
+
+    /**
+     * Videos hang off their message through a morph, which the database does not
+     * cascade, so a deleted conversation leaves the video behind without a message.
+     */
+    private function messageIsGone(Video $video): bool
+    {
+        return $video->videoable?->conversation === null;
     }
 
     /**
@@ -117,7 +126,7 @@ class PollVideoGeneration implements ShouldQueue
         try {
             $provider->download($contentUrl, $tempPath);
 
-            $conversation = $this->video->message->conversation;
+            $conversation = $this->video->videoable->conversation;
             $userId = $conversation->assistantUser()?->user_id;
             $this->video->storeDownloaded($tempPath, "messages/{$userId}/{$conversation->id}");
             $this->video->status = VideoStatus::Completed;
@@ -142,7 +151,7 @@ class PollVideoGeneration implements ShouldQueue
 
         Log::error('Video generation failed', [
             'video_id' => $this->video->id,
-            'message_id' => $this->video->message_id,
+            'message_id' => $this->video->videoable_id,
             'error' => $reason,
         ]);
 

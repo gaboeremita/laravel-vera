@@ -1,6 +1,6 @@
 # Data Model: Video Generation
 
-Three new tables. `video_gen_providers` and `video_gen_models` copy `image_gen_providers` and `image_gen_models` column for column. The model selected for an assistant lives in the existing `settings.data` JSON, next to `image_gen_model_id`.
+Two new tables and new columns on an existing one. `video_gen_providers` and `video_gen_models` copy `image_gen_providers` and `image_gen_models` column for column. Generated videos go in the existing polymorphic `videos` table, which already holds emotion videos, the same way generated images share `images` with every other image. The model selected for an assistant lives in the existing `settings.data` JSON, next to `image_gen_model_id`.
 
 ## video_gen_providers
 
@@ -39,34 +39,31 @@ Copies `image_gen_models`.
 
 The supported durations and aspect ratios are not stored. They are read from the provider and cached (research R5).
 
-## videos
+## videos (existing table, new columns)
+
+The table already has `id`, `videoable_type`/`videoable_id` (morphs), `path`, `disk`, `mime_type`, `size` and timestamps, used by `Emotion::video()`. A new migration makes `path` nullable (a generated video has no file until it is downloaded) and adds the columns below, all nullable so emotion rows are unaffected. A generated video's `videoable` is the assistant message that shows it.
 
 | Column | Type | Notes |
 |---|---|---|
-| id | bigint PK | |
-| message_id | FK messages, cascade on delete | The assistant message that shows the video |
 | video_gen_model_id | FK video_gen_models, nullable, null on delete | The model it is generated with; null when the configured fallback (`ai.video_gen`) is used or the model was deleted |
-| status | string, cast `VideoStatus` | `queued`, `generating`, `completed`, `failed` |
+| status | string, nullable, cast `VideoStatus` | `queued`, `generating`, `completed`, `failed`; null on emotion videos |
 | job_id | string, nullable | Provider job id, set on submission |
-| prompt | text | The improved description sent to the provider |
+| prompt | text, nullable | The improved description sent to the provider |
 | duration | unsigned smallint, nullable | Seconds requested, after the closest-value adjustment |
 | aspect_ratio | string, nullable | As requested, after adjustment |
 | generate_audio | boolean, nullable | As requested |
 | first_frame_image_id | FK images, nullable, null on delete | The attached image used as the first frame |
 | failure_reason | text, nullable | Set when `failed` |
-| path | string, nullable | Stored file, set when `completed` |
-| disk | string, default `public` | |
-| mime_type | string, nullable | |
-| size | unsigned bigint, nullable | Bytes |
-| timestamps | | `created_at` starts the maximum wait |
 
-**Model** `App\Models\Video`:
-- `message()` BelongsTo, `model()` BelongsTo `VideoGenModel`, `firstFrame()` BelongsTo `Image`.
-- `url` accessor (`Storage::disk($this->disk)->url($this->path)`, null until completed), like `Image::getUrlAttribute`.
+The existing `path`, `mime_type` and `size` are filled when a generated video completes, and `created_at` starts the maximum wait.
+
+**Model** `App\Models\Video` (existing, extended):
+- Keeps `videoable()` MorphTo; adds `model()` BelongsTo `VideoGenModel` and `firstFrame()` BelongsTo `Image`.
+- `url` accessor returns null while `path` is null.
 - `historyNote()`: the one line the assistant sees in later turns (research R7).
 - `storeDownloaded(string $tempPath, string $storagePath)`: moves the file onto the disk and fills `path`, `mime_type` and `size`, like `Image::storeFromBase64`.
 
-`Message::video()` HasOne.
+`Message::video()` MorphOne (`videoable`), like `Message::image()`.
 
 ## Enums
 

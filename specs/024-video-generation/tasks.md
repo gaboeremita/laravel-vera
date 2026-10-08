@@ -33,25 +33,25 @@ Laravel + React in one repository: `app/`, `config/`, `database/`, `routes/`, `r
 - [X] T001 Create the migrations with `php artisan make:migration --no-interaction`, in this order:
   - `create_video_gen_providers_table`: copies `database/migrations/2026_08_18_234520_create_image_gen_providers_table.php`, with `prompt` as `json` from the start and `format` as an enum over `VideoGenProviderFormat` values, default `openrouter`.
   - `create_video_gen_models_table`: copies `2026_08_18_234521_create_image_gen_models_table.php`, with `prompt` as `json` and `provider_id` constrained to `video_gen_providers`.
-  - `create_videos_table`: the columns in data-model.md.
+  - `add_generation_columns_to_videos_table`: makes `path` nullable on the existing `videos` table and adds the nullable columns in data-model.md.
 - [X] T002 [P] Create `app/Enums/VideoGenProviderFormat.php`, which copies `app/Enums/ImageGenProviderFormat.php`: one case `OpenRouter = 'openrouter'`, and `providerClass()` returning `OpenRouterVideoGenProvider::class`.
 - [X] T003 [P] Create `app/Enums/VideoStatus.php`, a string-backed enum with `Queued = 'queued'`, `Generating = 'generating'`, `Completed = 'completed'` and `Failed = 'failed'`, plus `isFinished(): bool` (true for `Completed` and `Failed`).
 - [X] T004 [P] Create `app/Models/VideoGenProvider.php` and `app/Models/VideoGenModel.php`, copying `app/Models/ImageGenProvider.php` and `app/Models/ImageGenModel.php`: `#[Fillable]`, `$hidden = ['api_key']`, the `has_key` append, casts, and relations. Add `HasFactory`.
-- [X] T005 [P] Create `app/Models/Video.php`:
+- [X] T005 [P] Extend the existing `app/Models/Video.php`, keeping `videoable()` and its emotion fields:
   - `#[Fillable]` with every data-model.md column except `id` and timestamps.
   - Casts: `status` to `VideoStatus`, `generate_audio` to boolean.
-  - Relations: `message()`, `model()` (BelongsTo `VideoGenModel`, `video_gen_model_id`), `firstFrame()` (BelongsTo `Image`, `first_frame_image_id`).
+  - Relations: `videoable()` stays; add `model()` (BelongsTo `VideoGenModel`, `video_gen_model_id`) and `firstFrame()` (BelongsTo `Image`, `first_frame_image_id`).
   - A `url` accessor that returns null without `path`, otherwise copies `Image::getUrlAttribute`.
   - `toChatPayload(): array` returning `id`, `status`, `url`, `prompt`, `duration`, `aspect_ratio`, `failure_reason`, in the shape in contracts/api.md.
   - `historyNote(): string` returning `[Video: "<prompt>" — generating]`, `— ready]` or `— failed: <failure_reason>]`. `queued` counts as generating. The assistant sees "ready" for the `Completed` status, matching FR-012a's wording.
   - `storeDownloaded(string $tempPath, string $storagePath): void`: puts the file on the `public` disk as `{storagePath}/{uuid}.mp4` and fills `path`, `disk`, `mime_type` (`video/mp4`) and `size`.
 
   Add `HasFactory`.
-- [X] T006 [P] Add `video(): HasOne` to `app/Models/Message.php`, next to `image()`. Add `videoGenProviders(): HasMany` to `app/Models/User.php`, next to `imageGenProviders()`.
+- [X] T006 [P] Add `video(): MorphOne` (`videoable`) to `app/Models/Message.php`, next to `image()`. Add `videoGenProviders(): HasMany` to `app/Models/User.php`, next to `imageGenProviders()`.
 - [X] T007 [P] Create the factories:
   - `database/factories/VideoGenProviderFactory.php`: belongs to a `User`, with `url` `https://fake-video.test/api/v1/videos`, `api_key` `test-key`, `format` `openrouter`.
   - `database/factories/VideoGenModelFactory.php`: belongs to a provider, with `endpoint` `test/video-model` and `config` `['duration' => 5, 'aspect_ratio' => '16:9', 'generate_audio' => false, 'timeout' => 600]`.
-  - `database/factories/VideoFactory.php`: belongs to an assistant `Message` and a `VideoGenModel`, with `status` `queued` and a `prompt`, plus the states `generating()`, `completed()` (sets `path`, `mime_type`, `size`) and `failed(string $reason = 'Provider error')`.
+  - `database/factories/VideoFactory.php`: `videoable` is an assistant `Message`, and it belongs to a `VideoGenModel`, with `status` `queued` and a `prompt`, plus the states `generating()`, `completed()` (sets `path`, `mime_type`, `size`) and `failed(string $reason = 'Provider error')`.
 - [X] T008 [P] Add a `video_gen` block to `config/ai.php` after `image_gen`, with the keys in contracts/api.md Environment:
   - `url`, defaulting to `https://openrouter.ai/api/v1/videos`
   - `key`, defaulting to `VIDEO_GEN_API_KEY` and then `AI_DEFAULT_API_KEY`

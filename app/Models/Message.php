@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -95,8 +94,8 @@ class Message extends Model
         return $this->morphOne(Image::class, 'imageable');
     }
 
-    public function video(): HasOne
+    public function video(): MorphOne
     {
-        return $this->hasOne(Video::class);
+        return $this->morphOne(Video::class, 'videoable');
     }
 }

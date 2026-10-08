@@ -22,8 +22,8 @@ class VideoGenerationStatusUpdated implements ShouldBroadcastNow
 
     public function __construct(Video $video)
     {
-        $this->conversationId = $video->message->conversation_id;
-        $this->messageId = $video->message_id;
+        $this->conversationId = $video->videoable->conversation_id;
+        $this->messageId = $video->videoable_id;
         $this->video = $video->toChatPayload();
     }
 

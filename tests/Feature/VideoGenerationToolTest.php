@@ -82,7 +82,7 @@ test('calling the tool queues a video on its own message and the reply does not 
     $video = Video::sole();
     expect($video->status)->toBe(VideoStatus::Queued)
         ->and($video->prompt)->toBe('A sunny beach, waves rolling in')
-        ->and($video->message->content)->toBe('')
+        ->and($video->videoable->content)->toBe('')
         ->and($video->duration)->toBe(5);
 
     $result = collect($response->json('tool_calls'))->firstWhere('name', 'generate_video')['result'];

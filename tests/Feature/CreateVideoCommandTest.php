@@ -74,8 +74,8 @@ test('a video request replies in character and queues a video with the model def
         ->assertJsonPath('video.url', null);
 
     $video = Video::sole();
-    expect($video->message->role)->toBe('assistant')
-        ->and($video->message->content)->toBe('Give me a moment, the cat is warming up.')
+    expect($video->videoable->role)->toBe('assistant')
+        ->and($video->videoable->content)->toBe('Give me a moment, the cat is warming up.')
         ->and($video->video_gen_model_id)->toBe($model->id)
         ->and($video->status)->toBe(VideoStatus::Queued)
         ->and($video->prompt)->toBe('A slow dolly shot of a cat walking across piano keys')
@@ -172,7 +172,7 @@ test('the conversation shows the video on its message', function () {
         ->assertSuccessful()
         ->json('messages');
 
-    $withVideo = collect($messages)->firstWhere('id', $video->message_id);
+    $withVideo = collect($messages)->firstWhere('id', $video->videoable_id);
     expect($withVideo['video'])->toMatchArray(['id' => $video->id, 'status' => 'queued', 'prompt' => 'A cat on a piano'])
         ->and(collect($messages)->where('role', 'user')->first()['video'])->toBeNull();
 });

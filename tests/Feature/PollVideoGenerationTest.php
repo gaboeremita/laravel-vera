@@ -28,7 +28,7 @@ function videoInConversation(array $attributes = []): Video
     $model = configureVideoGenModel($user, $assistant);
     $message = $conversation->messages()->create(['role' => 'assistant', 'content' => 'On it.']);
 
-    return Video::factory()->for($message)->for($model, 'model')->create($attributes);
+    return Video::factory()->for($message, 'videoable')->for($model, 'model')->create($attributes);
 }
 
 function runVideoJob(Video $video): PollVideoGeneration
@@ -78,7 +78,7 @@ test('a finished job is downloaded, stored and announced', function () {
         ->and($video->url)->not->toBeNull();
     Storage::disk('public')->assertExists($video->path);
     Event::assertDispatched(VideoGenerationStatusUpdated::class, fn ($event) => $event->video['status'] === 'completed');
-    Event::assertDispatched(VideoGenerationFinished::class, fn ($event) => $event->status === 'completed' && $event->conversationId === $video->message->conversation_id);
+    Event::assertDispatched(VideoGenerationFinished::class, fn ($event) => $event->status === 'completed' && $event->conversationId === $video->videoable->conversation_id);
 });
 
 test('a job that ends badly fails the video with the reason', function (array $body, string $reason) {
@@ -138,21 +138,23 @@ test('the deadline is the video creation time plus the model timeout', function 
 });
 
 test('a deleted conversation ends the job quietly', function () {
-    $video = videoInConversation(['job_id' => 'job-1']);
-    $job = new PollVideoGeneration($video);
-    $serialized = serialize($job);
+    $video = videoInConversation(['job_id' => 'job-1', 'status' => VideoStatus::Generating]);
+    Http::fake();
 
-    $video->message->conversation->delete();
+    $video->videoable->conversation->delete();
+    $job = runVideoJob($video->fresh());
+    $job->failed(new RuntimeException('late failure'));
 
-    expect(Video::count())->toBe(0)
-        ->and($job->deleteWhenMissingModels)->toBeTrue();
-    expect(fn () => unserialize($serialized))->toThrow(Illuminate\Database\Eloquent\ModelNotFoundException::class);
+    $job->assertNotReleased();
+    Http::assertNothingSent();
+    Event::assertNotDispatched(VideoGenerationStatusUpdated::class);
     Event::assertNotDispatched(VideoGenerationFinished::class);
+    expect($video->fresh()->status)->toBe(VideoStatus::Generating);
 });
 
 test('two videos in one conversation are tracked separately', function () {
     $first = videoInConversation(['job_id' => 'job-1', 'status' => VideoStatus::Generating]);
-    $second = Video::factory()->for($first->message)->for($first->model, 'model')->create(['job_id' => 'job-2', 'status' => VideoStatus::Generating]);
+    $second = Video::factory()->for($first->videoable, 'videoable')->for($first->model, 'model')->create(['job_id' => 'job-2', 'status' => VideoStatus::Generating]);
     Http::fake([
         'fake-video.test/api/v1/videos/job-1' => Http::response(['status' => 'failed', 'error' => 'content policy']),
         'fake-video.test/api/v1/videos/job-2' => Http::response(['status' => 'in_progress']),
@@ -169,7 +171,7 @@ test('two videos in one conversation are tracked separately', function () {
 test('an attached image is sent as the first frame through the public address', function () {
     config(['ai.video_gen.public_url' => 'https://tunnel.test/']);
     $video = videoInConversation();
-    $image = Image::storeFromBase64(base64_encode("\x89PNG fake"), $video->message, 'messages/1/1');
+    $image = Image::storeFromBase64(base64_encode("\x89PNG fake"), $video->videoable, 'messages/1/1');
     $video->update(['first_frame_image_id' => $image->id]);
     Http::fake(['fake-video.test/api/v1/videos' => Http::response(['id' => 'job-1'], 202)]);
 
@@ -182,7 +184,7 @@ test('an attached image is sent as the first frame through the public address', 
 test('a provider rejecting the image fails the video with its reason', function () {
     config(['ai.video_gen.public_url' => 'https://tunnel.test']);
     $video = videoInConversation();
-    $image = Image::storeFromBase64(base64_encode("\x89PNG fake"), $video->message, 'messages/1/1');
+    $image = Image::storeFromBase64(base64_encode("\x89PNG fake"), $video->videoable, 'messages/1/1');
     $video->update(['first_frame_image_id' => $image->id]);
     Http::fake(['fake-video.test/api/v1/videos' => Http::response(['error' => ['message' => 'could not fetch image']], 400)]);
 

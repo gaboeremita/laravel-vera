@@ -4,34 +4,34 @@ namespace App\Models;
 
 use App\Enums\VideoStatus;
 use Database\Factories\VideoFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-#[Fillable([
-    'message_id',
-    'video_gen_model_id',
-    'status',
-    'job_id',
-    'prompt',
-    'duration',
-    'aspect_ratio',
-    'generate_audio',
-    'first_frame_image_id',
-    'failure_reason',
-    'path',
-    'disk',
-    'mime_type',
-    'size',
-])]
 class Video extends Model
 {
     /** @use HasFactory<VideoFactory> */
     use HasFactory;
+
+    protected $fillable = [
+        'path',
+        'disk',
+        'mime_type',
+        'size',
+        'original_name',
+        'video_gen_model_id',
+        'status',
+        'job_id',
+        'prompt',
+        'duration',
+        'aspect_ratio',
+        'generate_audio',
+        'first_frame_image_id',
+        'failure_reason',
+    ];
 
     protected function casts(): array
     {
@@ -41,9 +41,9 @@ class Video extends Model
         ];
     }
 
-    public function message(): BelongsTo
+    public function videoable(): MorphTo
     {
-        return $this->belongsTo(Message::class);
+        return $this->morphTo();
     }
 
     public function model(): BelongsTo
@@ -57,15 +57,15 @@ class Video extends Model
     }
 
     /**
-     * Get the full accessible URL for this video, once it is stored.
+     * Get the full accessible URL for this video, or null while a generated video has no file yet.
      */
-    protected function url(): Attribute
+    public function getUrlAttribute(): ?string
     {
-        return Attribute::get(fn (): ?string => $this->path === null ? null : Storage::disk($this->disk)->url($this->path));
+        return $this->path === null ? null : Storage::disk($this->disk)->url($this->path);
     }
 
     /**
-     * @return array{id: int, status: string, url: ?string, prompt: string, duration: ?int, aspect_ratio: ?string, failure_reason: ?string}
+     * @return array{id: int, status: string, url: ?string, prompt: ?string, duration: ?int, aspect_ratio: ?string, failure_reason: ?string}
      */
     public function toChatPayload(): array
     {
