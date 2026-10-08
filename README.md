@@ -162,6 +162,7 @@ TELEGRAM_DOWNLOAD_TIMEOUT=30   # downloading an attached file's bytes
 DISCORD_API_URL=http://localhost:3001
 DISCORD_API_SECRET=
 DISCORD_API_TIMEOUT=10
+DISCORD_API_DELIVERY_TIMEOUT=180   # how long to wait for the bridge to post a finished video
 ```
 
 ### LLM Providers
@@ -352,12 +353,12 @@ Any assistant can hold conversations in Discord, the same way it does through th
 ### Setup
 
 1. Clone and configure [node-discord-api](https://github.com/gaboeremita/node-discord-api) separately — it holds Discord bot tokens and the Gateway connections, and is never given database access; it only talks to this app over HTTP.
-2. Set `DISCORD_API_URL` and `DISCORD_API_SECRET` in this app's `.env` to match the bridge's own `DISCORD_API_PORT`/`DISCORD_API_SECRET` — this secret authenticates the bridge's discovery requests into this app.
+2. Set `DISCORD_API_URL` and `DISCORD_API_SECRET` in this app's `.env` to match the bridge's own `DISCORD_API_PORT`/`DISCORD_API_SECRET` — this secret authenticates this app's calls to the bridge: channel discovery and video delivery.
 3. Generate a Sanctum token for the bridge to authenticate as your user when relaying messages:
    ```bash
    php artisan tinker --execute 'echo App\Models\User::find(1)->createToken("discord-api")->plainTextToken;'
    ```
-   Put that token in the bridge's own `.env` as `DISCORD_API_TOKEN` — it's how the bridge calls this app's `discord-messages` endpoint as you, separate from the shared secret above (which only protects the discovery endpoint).
+   Put that token in the bridge's own `.env` as `DISCORD_API_TOKEN` — it's how the bridge calls this app's `discord-messages` endpoint as you, separate from the shared secret above (which only protects this app's calls to the bridge).
 4. Go to an assistant's **Discord** page (`/assistants/:id/discord`) to see which Discord servers/channels its bot is currently in, set each channel's trigger mode (off / always / on mention / on mention-by-name), and write optional per-server and per-channel prompt context.
 
 ### How it fits together
@@ -366,6 +367,12 @@ This app never talks to Discord directly and never stores a bot token. The bridg
 
 - `GET /api/assistants/{assistant}/discord/discovery` — returns the bridge's live view of its servers/channels, and this app's own config for each (trigger mode, prompt). Also syncs `discord_servers`/`discord_channels` so they have a stable internal id to attach prompts to.
 - `POST /api/assistants/{assistant}/discord-messages` — the bridge calls this once it decides a message should get a reply (per the trigger mode). Conversation history for that Discord channel is resolved and loaded entirely server-side, same as Telegram — the bridge only ever sends the new message, never the whole history.
+
+This app also calls the bridge once per video requested from Discord:
+
+- `POST {DISCORD_API_URL}/assistants/{assistant}/channels/{channel}/videos` — sent when a video started with `/create-video` in Discord finishes or fails, with the address of the finished video (or the failure reason) and the Discord message it answers. It's queued and retried 5 times (10 s, 30 s, 1 min, 2 min, 5 min) when the bridge is down, then logged. A wrong secret or a post Discord refuses is logged without retrying.
+
+`/create-video` works from Discord the same way it does in the web chat, including an attached image as the first frame (which needs `PUBLIC_TUNNEL_URL`). The bridge posts the in-character reply right away and the video later, once it's ready.
 
 ## Worlds
 
@@ -529,6 +536,8 @@ laravel-vera/
 │   │   └── WorldSessionResident.php          # A resident's saved position, spot and posture in a session
 │   ├── Policies/
 │   │   └── WorldPolicy.php                   # Worlds are scoped to users granted access via WorldUser
+│   ├── Listeners/
+│   │   └── DeliverVideoToDiscord.php         # Queued on VideoGenerationFinished: sends a Discord conversation's finished/failed video to the bridge, with retries
 │   ├── Jobs/
 │   │   ├── EmbedArchiveEntry.php             # Async vector embedding for archive entries
 │   │   ├── PollVideoGeneration.php           # Submits a generated video, re-queues itself every 30s until done, downloads it, broadcasts status

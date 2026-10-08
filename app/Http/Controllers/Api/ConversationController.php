@@ -1061,6 +1061,12 @@ class ConversationController extends Controller
 
         $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation)];
 
+        if ($conversation->discord_channel_id) {
+            // Discord has no UI to render an emotion/pose tag against — same reasoning as the normal Discord reply flow.
+            $excludedSections[] = 'emotion tags';
+            $excludedSections[] = 'pose tags';
+        }
+
         $director = new PromptDirector($assistantModel->prompt);
         app(AppendExpressionTags::class)->handle($director, $assistantModel, $excludedSections);
         $director->except($excludedSections);
@@ -1198,9 +1204,10 @@ class ConversationController extends Controller
             'content' => $content,
         ]);
 
+        $attachedImage = null;
         if (! empty($validated['images'][0])) {
             $storagePath = "messages/{$request->user()->id}/{$conversation->id}";
-            Image::storeFromBase64($validated['images'][0], $message, $storagePath);
+            $attachedImage = Image::storeFromBase64($validated['images'][0], $message, $storagePath);
         }
 
         $imageGenPrompt = $this->extractImageGenPrompt($validated['content'] ?? null);
@@ -1226,6 +1233,38 @@ class ConversationController extends Controller
                 'content' => $generated['content'],
                 'image_url' => $generated['image_url'],
             ]);
+        }
+
+        $videoGenPrompt = $this->extractVideoGenPrompt($validated['content'] ?? null);
+
+        if ($videoGenPrompt !== null) {
+            if ($videoGenPrompt === '') {
+                return response()->json(['message' => 'Describe what video to generate after /create-video.'], 422);
+            }
+
+            $videoGenerationService = new VideoGenerationService;
+
+            if (! $videoGenerationService->isAvailableFor($assistantUser)) {
+                return response()->json(['message' => 'No video generation model is configured for this assistant.'], 422);
+            }
+
+            if ($attachedImage !== null && ! VideoGenerationService::hasPublicUrl()) {
+                return response()->json(['message' => VideoGenerationService::missingPublicUrlMessage()], 422);
+            }
+
+            try {
+                $started = $this->startVideoMessage($request, $assistantUser, $conversation, $videoGenerationService, $videoGenPrompt, $attachedImage);
+            } catch (\RuntimeException $e) {
+                return response()->json(['message' => $e->getMessage()], 502);
+            }
+
+            if ($conversation->title === 'New conversation') {
+                $conversation->update([
+                    'title' => str($validated['content'] ?? '')->limit(50)->toString(),
+                ]);
+            }
+
+            return response()->json(['content' => $started['content']]);
         }
 
         $assistantModel = $assistantUser->assistant;

@@ -10,11 +10,6 @@ uses(RefreshDatabase::class);
 /**
  * @return array<int, string>
  */
-function offeredToolNames(): array
-{
-    return collect(Http::recorded()->first()[0]['tools'] ?? [])->pluck('function.name')->all();
-}
-
 test('the background tool is offered to 3D avatar assistants in agent mode', function () {
     [$user, $assistant, $conversation] = setUpAgentAssistant('agent', ['portrait_type' => 'avatar3d']);
 

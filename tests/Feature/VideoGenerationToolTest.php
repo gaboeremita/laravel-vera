@@ -39,11 +39,6 @@ function fakeVideoToolTurn(array $toolArguments, array $description): void
     ]);
 }
 
-function offeredToolNames(): array
-{
-    return collect(Http::recorded()->first()[0]['tools'] ?? [])->pluck('function.name')->all();
-}
-
 test('the video tool is offered only when a video model is available', function () {
     [$user, $assistant, $conversation] = setUpAgentAssistant();
     config(['ai.video_gen.model' => null]);

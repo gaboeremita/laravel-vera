@@ -15,7 +15,7 @@ test('a message starting with an unknown command is rejected with the available 
         ['message' => ['content' => '/create-background-image the library']],
     )
         ->assertStatus(422)
-        ->assertJson(['message' => 'Unknown command /create-background-image. Available commands: /create-image, /change-background, /send-voice-message.']);
+        ->assertJson(['message' => 'Unknown command /create-background-image. Available commands: /create-image, /create-video, /change-background, /send-voice-message.']);
 
     Http::assertNothingSent();
     expect($conversation->messages()->count())->toBe(0);

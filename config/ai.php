@@ -82,5 +82,6 @@ return [
         'api_url' => env('DISCORD_API_URL', 'http://localhost:3001'),
         'api_secret' => env('DISCORD_API_SECRET'),
         'timeout' => (int) env('DISCORD_API_TIMEOUT', 10),
+        'delivery_timeout' => (int) env('DISCORD_API_DELIVERY_TIMEOUT', 180),
     ],
 ];
