@@ -106,7 +106,7 @@ When the Discord API service can't be reached as a video finishes, the app tries
 
 **Retrying delivery**
 
-- **FR-011**: When the Discord API service can't be reached, has no bot for the assistant, or can't download the video, the app MUST retry delivery 5 times, waiting 10 seconds, 30 seconds, 1 minute, 2 minutes and 5 minutes between attempts.
+- **FR-011**: When the Discord API service can't be reached, has no bot for the assistant, can't download the video, or answers with any other error besides those in FR-013, the app MUST retry delivery 5 times, waiting 10 seconds, 30 seconds, 1 minute, 2 minutes and 5 minutes between attempts.
 - **FR-012**: After the last retry fails, the app MUST log the failure with the video and conversation, and stop.
 - **FR-013**: When the Discord API service answers that Discord refused the post or that the secret is wrong, the app MUST log the failure and not retry.
 

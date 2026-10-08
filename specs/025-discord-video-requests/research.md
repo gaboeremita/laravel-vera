@@ -18,10 +18,11 @@
 | Connection error or timeout | Throw, so the queue retries |
 | 404 (no bot for the assistant) | Throw, so the queue retries |
 | 502 (the service couldn't download the video) | Throw, so the queue retries |
-| 422 (Discord refused the post) | Log and `$this->fail()`, no retry (FR-013) |
-| 401 (wrong secret) | Log and `$this->fail()`, no retry (FR-013) |
+| Any other non-2xx | Throw, so the queue retries |
+| 422 (Discord refused the post) | `$this->fail()`, no retry (FR-013) |
+| 401 (wrong secret) | `$this->fail()`, no retry (FR-013) |
 
-`failed()` logs the video ID, the conversation ID and the last error (FR-012).
+`failed()` logs the video ID, the conversation ID and the error, once per delivery that ends without a post (FR-012, FR-013). `$this->fail()` runs `failed()` too, so refused posts are logged there as well.
 
 **Rationale**: A job-level `$tries` overrides the worker's `--tries=1` from `composer run dev`. The waits add up to about 9 minutes (SC-004).
 

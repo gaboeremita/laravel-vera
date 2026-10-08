@@ -1073,6 +1073,22 @@ sequenceDiagram
     D->>U: sees the reply
 ```
 
+### Video Requests
+
+`/create-video` from Discord takes the same path as in the web chat: `sendDiscordMessage` branches into `startVideoMessage()` right after the `/create-image` branch, with the same rejections (no description, no video model, an attached image without `PUBLIC_TUNNEL_URL`). The attached image becomes the first frame. The response is `{ content }` only, the in-character reply, which `reactToStartedVideo()` writes without emotion or pose tags for Discord conversations.
+
+The video itself reaches Discord later. `PollVideoGeneration` dispatches `VideoGenerationFinished` once the video is completed or failed, and the queued listener `DeliverVideoToDiscord` (only queued when the conversation has a `discord_channel_id`) calls the bridge:
+
+```text
+POST {DISCORD_API_URL}/assistants/{assistantId}/channels/{channelId}/videos
+X-Internal-Secret: {DISCORD_API_SECRET}
+{ replyToMessageId, videoUrl } | { replyToMessageId, failureReason }
+```
+
+- `replyToMessageId` is the `discord_message_id` of the user message just before the video's message. That holds because the bridge sends this app one Discord request at a time.
+- The listener waits up to `DISCORD_API_DELIVERY_TIMEOUT` (default 180 s), because the bridge answers only after posting.
+- A 401 or 422 fails the delivery without retrying. Anything else that isn't 2xx, or no answer at all, is retried 5 times (10 s, 30 s, 1 min, 2 min, 5 min). `failed()` logs `Discord video delivery failed` with the video and conversation IDs.
+
 ### Trigger Modes
 
 Each `(assistant, channel)` pair has a `trigger_mode` on `assistant_discord_channels`: **`off`** (default — the assistant ignores everything in that channel), **`always`** (responds to every non-bot message), **`mention`** (responds only when actually @mentioned — a real Discord mention, the `<@user_id>` form the client inserts when you pick someone from the autocomplete, not just typing their name as text), or **`mentioned_by_name`** (responds when the assistant's name appears as plain text, so another bot — which can't resolve a real Discord id the way a human client can — can still address it). node-discord-api fetches this config from `SettingsController@show` on login and refreshes it every 60 seconds, so a trigger-mode change made on the Discord settings page takes effect without restarting the bridge. The actual message-matching logic for all four modes lives in node-discord-api, not this app — this app only stores and serves the selected mode.

@@ -24,7 +24,7 @@ description: "Task list for Discord video requests"
 
 **Purpose**: Configuration for the delivery request
 
-- [ ] T001 Add `'delivery_timeout' => (int) env('DISCORD_API_DELIVERY_TIMEOUT', 180),` to the `discord` block in `config/ai.php`, after `timeout`. Add `DISCORD_API_DELIVERY_TIMEOUT=180` to `.env.example` next to the other `DISCORD_API_*` keys.
+- [X] T001 Add `'delivery_timeout' => (int) env('DISCORD_API_DELIVERY_TIMEOUT', 180),` to the `discord` block in `config/ai.php`, after `timeout`. Add `DISCORD_API_DELIVERY_TIMEOUT=180` to `.env.example` next to the other `DISCORD_API_*` keys.
 
 ---
 
@@ -36,20 +36,21 @@ description: "Task list for Discord video requests"
 
 ### Tests for User Story 1
 
-- [ ] T002 [US1] Create `tests/Feature/DiscordCreateVideoTest.php`. Use `RefreshDatabase`, `Queue::fake()`, `setUpAgentAssistant('assistant')` and `configureVideoGenModel()` from `tests/Pest.php`, and post to `/api/assistants/{id}/discord-messages` with `actingAs($user)` as `tests/Feature/DiscordVoiceMessageTest.php` does. Fake the LLM with `Http::fake` the way `tests/Feature/CreateVideoCommandTest.php` does for the description and the reply. Cover:
+- [X] T002 [US1] Create `tests/Feature/DiscordCreateVideoTest.php`. Use `RefreshDatabase`, `Queue::fake()`, `setUpAgentAssistant('assistant')` and `configureVideoGenModel()` from `tests/Pest.php`, and post to `/api/assistants/{id}/discord-messages` with `actingAs($user)` as `tests/Feature/DiscordVoiceMessageTest.php` does. Fake the LLM with `Http::fake` the way `tests/Feature/CreateVideoCommandTest.php` does for the description and the reply. Cover:
   - `/create-video a cat` with `channel_id` and `message_id` returns 200 with `content` only (no `video` key), creates an assistant message with a `queued` `Video`, and pushes `PollVideoGeneration`.
   - The user message stores the sent `message_id` as `discord_message_id`.
   - `/create-video` with no description returns 422 with `Describe what video to generate after /create-video.` and pushes nothing.
   - No video model returns 422 with `No video generation model is configured for this assistant.`
+  - When the faked LLM answers the description request with a 500, the endpoint returns 502 with the error message, creates no `Video` and pushes nothing.
   - The in-character reply request to the LLM leaves out the emotion and pose tag sections: give the assistant a pose with `Pose::factory()` and `portrait_type` `avatar3d`, then assert `promptOfRequest()` does not contain `# POSE TAGS` or `# EMOTION TAGS`, as `tests/Feature/Api/ConversationPosePromptTest.php` asserts sections.
 
 ### Implementation for User Story 1
 
-- [ ] T003 [US1] In `app/Http/Controllers/Api/ConversationController.php`, `sendDiscordMessage()`:
+- [X] T003 [US1] In `app/Http/Controllers/Api/ConversationController.php`, `sendDiscordMessage()`:
   - Keep the `Image` returned by `Image::storeFromBase64($validated['images'][0], ...)` in `$attachedImage` (null when there is no image).
   - After the `/create-image` branch, add a `/create-video` branch mirroring the one in `chat()`: `extractVideoGenPrompt()`, the empty-description 422, `isAvailableFor()` and its 422, the `hasPublicUrl()` check for `$attachedImage` and its 422, then `startVideoMessage($request, $assistantUser, $conversation, $videoGenerationService, $videoGenPrompt, $attachedImage)` inside a `try`/`catch (\RuntimeException $e)` that returns 502 with the message.
   - Update the conversation title as the `/create-image` branch does, and return `response()->json(['content' => $started['content']])`.
-- [ ] T004 [US1] In `reactToStartedVideo()` in the same controller, add the `if ($conversation->discord_channel_id)` block from `reactToGeneratedImage()` that appends `'emotion tags'` and `'pose tags'` to `$excludedSections`, before the `PromptDirector` is built. Keep the comment wording from `reactToGeneratedImage()`.
+- [X] T004 [US1] In `reactToStartedVideo()` in the same controller, add the `if ($conversation->discord_channel_id)` block from `reactToGeneratedImage()` that appends `'emotion tags'` and `'pose tags'` to `$excludedSections`, before the `PromptDirector` is built. Keep the comment wording from `reactToGeneratedImage()`.
 
 **Checkpoint**: Discord requests start videos and get the in-character reply.
 
@@ -63,13 +64,13 @@ description: "Task list for Discord video requests"
 
 ### Tests for User Story 2
 
-- [ ] T005 [US2] Add to `tests/Feature/DiscordCreateVideoTest.php`:
+- [X] T005 [US2] Add to `tests/Feature/DiscordCreateVideoTest.php`:
   - With `config(['ai.video_gen.public_url' => 'https://tunnel.test'])` and `Storage::fake('public')`, `/create-video` with `images: [<base64 png>]` creates the `Video` with `first_frame_image_id` set to the `Image` stored on the user message.
   - With `public_url` null, the same request returns 422 with `Set PUBLIC_TUNNEL_URL to generate a video from an image.` and pushes nothing.
 
 ### Implementation for User Story 2
 
-- [ ] T006 [US2] Confirm T003 passes `$attachedImage` to `startVideoMessage()` and runs the `hasPublicUrl()` check before it. Fix `sendDiscordMessage()` in `app/Http/Controllers/Api/ConversationController.php` if the US2 tests fail.
+- [X] T006 [US2] Confirm T003 passes `$attachedImage` to `startVideoMessage()` and runs the `hasPublicUrl()` check before it. Fix `sendDiscordMessage()` in `app/Http/Controllers/Api/ConversationController.php` if the US2 tests fail.
 
 **Checkpoint**: First-frame videos work from Discord.
 
@@ -83,25 +84,26 @@ description: "Task list for Discord video requests"
 
 ### Tests for User Story 3
 
-- [ ] T007 [US3] Create `tests/Feature/DeliverVideoToDiscordTest.php`. Use `RefreshDatabase` and `Http::fake()`, and set `config(['ai.discord.api_url' => 'http://discord-api.test', 'ai.discord.api_secret' => 'secret'])`. Build the conversation with `discord_channel_id`, a user message with `discord_message_id`, and an assistant message carrying `Video::factory()->completed()`. Call `app(DeliverVideoToDiscord::class)->handle(new VideoGenerationFinished($video))` directly. Cover:
+- [X] T007 [US3] Create `tests/Feature/DeliverVideoToDiscordTest.php`. Use `RefreshDatabase` and `Http::fake()`, and set `config(['ai.discord.api_url' => 'http://discord-api.test', 'ai.discord.api_secret' => 'secret'])`. Build the conversation with `discord_channel_id`, a user message with `discord_message_id`, and an assistant message carrying `Video::factory()->completed()`. Call `app(DeliverVideoToDiscord::class)->handle(new VideoGenerationFinished($video))` directly. Cover:
   - It POSTs to `http://discord-api.test/assistants/{assistantId}/channels/{channelId}/videos` with the `X-Internal-Secret: secret` header and body `{replyToMessageId, videoUrl}`, where `videoUrl` equals `$video->url`.
   - A `Video::factory()->failed('Provider error')` sends `{replyToMessageId, failureReason: 'Provider error'}` with no `videoUrl`.
   - `replyToMessageId` is the `discord_message_id` of the user message just before the video's message, even when an older user message in the same conversation has a different one.
   - `replyToMessageId` is null when that user message has none.
+  - Two request/reply pairs in the same conversation, each reply carrying its own video: each delivery's `replyToMessageId` is the `discord_message_id` of the request just before that video's message.
   - `shouldQueue()` is false for a conversation without `discord_channel_id`.
   - `handle()` sends nothing when the conversation was deleted after the event was created.
 
 ### Implementation for User Story 3
 
-- [ ] T008 [US3] Add `public int $videoId;` to `app/Events/VideoGenerationFinished.php`, set from `$video->id` in the constructor, next to `conversationId`.
-- [ ] T009 [US3] Create `app/Listeners/DeliverVideoToDiscord.php` (auto-discovered like `app/Listeners/UnlockQuests.php`; no registration). Make it implement `ShouldQueue` and use `InteractsWithQueue`. Give it:
+- [X] T008 [US3] Add `public int $videoId;` to `app/Events/VideoGenerationFinished.php`, set from `$video->id` in the constructor, next to `conversationId`.
+- [X] T009 [US3] Create `app/Listeners/DeliverVideoToDiscord.php` (auto-discovered like `app/Listeners/UnlockQuests.php`; no registration). Make it implement `ShouldQueue` and use `InteractsWithQueue`. Give it:
   - `shouldQueue(VideoGenerationFinished $event): bool`, true only when `Conversation::whereKey($event->conversationId)->whereNotNull('discord_channel_id')->exists()` (FR-010).
   - A private `replyTarget(Video $video): ?string` returning the `discord_message_id` of the latest `role = 'user'` message in the same conversation with an `id` lower than `$video->videoable_id` (research R4). Add one comment above it saying the earlier user message is reliable because Discord requests arrive one at a time.
   - `handle(VideoGenerationFinished $event): void`:
     - Load `Video::find($event->videoId)` and `Conversation::find($event->conversationId)`; return when either is null.
     - Read `config('ai.discord')` and POST with `Http::timeout($apiConfig['delivery_timeout'])->withHeaders(['X-Internal-Secret' => $apiConfig['api_secret']])` to `{api_url}/assistants/{assistantId}/channels/{discord_channel_id}/videos`, where `assistantId` is `$conversation->assistantUser()->assistant_id`.
     - Send `replyToMessageId` from `replyTarget()`, plus `videoUrl` (`$video->url`) when `$video->status === VideoStatus::Completed`, or `failureReason` (`$video->failure_reason`) otherwise.
-    - Return on a 2xx answer.
+    - Return on a 2xx answer. On any other answer, throw a `RuntimeException` with the status and body. A connection exception propagates as it is. US4 refines which answers stop instead of retrying.
 
 **Checkpoint**: Every Discord video's outcome is sent once.
 
@@ -115,19 +117,18 @@ description: "Task list for Discord video requests"
 
 ### Tests for User Story 4
 
-- [ ] T010 [US4] Add to `tests/Feature/DeliverVideoToDiscordTest.php`:
+- [X] T010 [US4] Add to `tests/Feature/DeliverVideoToDiscordTest.php`:
   - `backoff()` returns `[10, 30, 60, 120, 300]`, `$tries` is 6, and `$timeout` is 200.
-  - A connection exception (`Http::fake(fn () => throw new ConnectionException('down'))`), a 404 and a 502 each make `handle()` throw.
-  - A 422 and a 401 do not throw. They call `fail()` on the job and log an error: give the listener a mocked job with `$listener->setJob($job)`, expect `fail` once, and use `Log::spy()`.
-  - `failed($event, $exception)` logs an error with `video_id` and `conversation_id`.
+  - A connection exception (`Http::fake(fn () => throw new ConnectionException('down'))`), a 404, a 502 and a 500 each make `handle()` throw.
+  - A 422 and a 401 do not throw. They call `fail()` on the job once with an exception carrying the status and body: give the listener a mocked job with `$listener->setJob($job)` and expect `fail` once.
+  - `failed($event, $exception)` logs one error, `Discord video delivery failed`, with `video_id`, `conversation_id` and the exception message (use `Log::spy()`).
 
 ### Implementation for User Story 4
 
-- [ ] T011 [US4] In `app/Listeners/DeliverVideoToDiscord.php`:
+- [X] T011 [US4] In `app/Listeners/DeliverVideoToDiscord.php`:
   - Add `public int $tries = 6;`, `public int $timeout = 200;` and `backoff(): array` returning `[10, 30, 60, 120, 300]`.
-  - On a connection exception, 404 or 502, throw a `RuntimeException` with the status and body so the queue retries.
-  - On 401 or 422, `Log::error('Discord video delivery refused', [...])` with `video_id`, `conversation_id`, status and body, then `$this->fail(...)` and return.
-  - Add `failed(VideoGenerationFinished $event, Throwable $exception): void` that logs `Discord video delivery failed` with `video_id`, `conversation_id` and the exception message (FR-012).
+  - On 401 or 422, call `$this->fail(new RuntimeException(...))` with the status and body, and return. Every other non-2xx answer keeps throwing from T009, so the queue retries.
+  - Add `failed(VideoGenerationFinished $event, Throwable $exception): void` that logs `Discord video delivery failed` with `video_id`, `conversation_id` and the exception message. It is the only place delivery failures are logged, for both refused posts and exhausted retries (FR-012, FR-013).
 
 **Checkpoint**: Every Discord video ends with a delivery or a logged failure.
 
@@ -135,9 +136,9 @@ description: "Task list for Discord video requests"
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T012 [P] Update `README.md`: in the Discord section, document `/create-video` from Discord, the first-frame rule, and `DISCORD_API_DELIVERY_TIMEOUT`. Add `DeliverVideoToDiscord.php` to the Project Structure tree under a `Listeners/` entry.
-- [ ] T013 [P] Update `ARCHITECTURE.md`: add the delivery flow (`VideoGenerationFinished` → `DeliverVideoToDiscord` → `POST /assistants/{assistantId}/channels/{channelId}/videos`) next to the discovery call, and the `/create-video` branch in the Discord message flow.
-- [ ] T014 Run `php -l` on `app/Listeners/DeliverVideoToDiscord.php`, `app/Events/VideoGenerationFinished.php` and `app/Http/Controllers/Api/ConversationController.php` (parse checks only, per CLAUDE.md).
+- [X] T012 [P] Update `README.md`: in the Discord section, document `/create-video` from Discord, the first-frame rule, and `DISCORD_API_DELIVERY_TIMEOUT`. Add `DeliverVideoToDiscord.php` to the Project Structure tree under a `Listeners/` entry.
+- [X] T013 [P] Update `ARCHITECTURE.md`: add the delivery flow (`VideoGenerationFinished` → `DeliverVideoToDiscord` → `POST /assistants/{assistantId}/channels/{channelId}/videos`) next to the discovery call, and the `/create-video` branch in the Discord message flow.
+- [X] T014 Run `php -l` on `app/Listeners/DeliverVideoToDiscord.php`, `app/Events/VideoGenerationFinished.php` and `app/Http/Controllers/Api/ConversationController.php` (parse checks only, per CLAUDE.md).
 - [ ] T015 Walk through quickstart.md end-to-end scenarios 1–9 with the owner.
 - [ ] T016 When the owner says it is time to push: run `vendor/bin/pint --dirty --format agent`, `npm run lint` and `php artisan test --compact` once, and fix everything they surface.
 

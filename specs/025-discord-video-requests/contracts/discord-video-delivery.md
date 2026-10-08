@@ -40,5 +40,6 @@ Failed video:
 | No answer, connection error, timeout | Service unavailable | Retry |
 | 404 | No bot for the assistant | Retry |
 | 502 | The service couldn't download `videoUrl` | Retry |
+| Any other non-2xx | Unexpected error | Retry |
 | 401 | Wrong secret | Log, no retry |
 | 422 | Discord refused the post | Log, no retry |

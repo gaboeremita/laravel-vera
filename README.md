@@ -162,6 +162,7 @@ TELEGRAM_DOWNLOAD_TIMEOUT=30   # downloading an attached file's bytes
 DISCORD_API_URL=http://localhost:3001
 DISCORD_API_SECRET=
 DISCORD_API_TIMEOUT=10
+DISCORD_API_DELIVERY_TIMEOUT=180   # how long to wait for the bridge to post a finished video
 ```
 
 ### LLM Providers
@@ -367,6 +368,12 @@ This app never talks to Discord directly and never stores a bot token. The bridg
 - `GET /api/assistants/{assistant}/discord/discovery` — returns the bridge's live view of its servers/channels, and this app's own config for each (trigger mode, prompt). Also syncs `discord_servers`/`discord_channels` so they have a stable internal id to attach prompts to.
 - `POST /api/assistants/{assistant}/discord-messages` — the bridge calls this once it decides a message should get a reply (per the trigger mode). Conversation history for that Discord channel is resolved and loaded entirely server-side, same as Telegram — the bridge only ever sends the new message, never the whole history.
 
+This app also calls the bridge once per video requested from Discord:
+
+- `POST {DISCORD_API_URL}/assistants/{assistant}/channels/{channel}/videos` — sent when a video started with `/create-video` in Discord finishes or fails, with the address of the finished video (or the failure reason) and the Discord message it answers. It's queued and retried 5 times (10 s, 30 s, 1 min, 2 min, 5 min) when the bridge is down, then logged. A wrong secret or a post Discord refuses is logged without retrying.
+
+`/create-video` works from Discord the same way it does in the web chat, including an attached image as the first frame (which needs `PUBLIC_TUNNEL_URL`). The bridge posts the in-character reply right away and the video later, once it's ready.
+
 ## Worlds
 
 Beyond one-on-one chat, any assistant (or a lightweight NPC) can also live in a **World** — a single-room 3D space you explore in first person and where you approach and talk to residents in place, rather than through a conversation list. Reachable from the Home page alongside Assistants and NPCs. See [ARCHITECTURE.md → Worlds](./ARCHITECTURE.md#worlds) for the full runtime and data model.
@@ -529,6 +536,8 @@ laravel-vera/
 │   │   └── WorldSessionResident.php          # A resident's saved position, spot and posture in a session
 │   ├── Policies/
 │   │   └── WorldPolicy.php                   # Worlds are scoped to users granted access via WorldUser
+│   ├── Listeners/
+│   │   └── DeliverVideoToDiscord.php         # Queued on VideoGenerationFinished: sends a Discord conversation's finished/failed video to the bridge, with retries
 │   ├── Jobs/
 │   │   ├── EmbedArchiveEntry.php             # Async vector embedding for archive entries
 │   │   ├── PollVideoGeneration.php           # Submits a generated video, re-queues itself every 30s until done, downloads it, broadcasts status

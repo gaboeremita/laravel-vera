@@ -13,6 +13,8 @@ class VideoGenerationFinished implements ShouldBroadcastNow
 
     public int $userId;
 
+    public int $videoId;
+
     public int $conversationId;
 
     public int $assistantId;
@@ -29,6 +31,7 @@ class VideoGenerationFinished implements ShouldBroadcastNow
         $assistantUser = $conversation->assistantUser();
 
         $this->userId = $assistantUser->user_id;
+        $this->videoId = $video->id;
         $this->conversationId = $conversation->id;
         $this->assistantId = $assistantUser->assistant_id;
         $this->assistantName = $assistantUser->assistant->name;

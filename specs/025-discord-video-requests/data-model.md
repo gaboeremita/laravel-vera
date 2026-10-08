@@ -49,6 +49,6 @@ VideoGenerationFinished (completed | failed)
        no  → nothing
        yes → deliver
              ├─ 2xx                    → done
-             ├─ unreachable/404/502    → retry after 10s, 30s, 1m, 2m, 5m → log and stop
+             ├─ unreachable/other      → retry after 10s, 30s, 1m, 2m, 5m → log and stop
              └─ 401/422                → log and stop
 ```
