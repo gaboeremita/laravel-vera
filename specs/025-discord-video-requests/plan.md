@@ -73,6 +73,7 @@ specs/025-discord-video-requests/
 laravel-vera/
 ├── app/
 │   ├── Http/Controllers/Api/ConversationController.php   # /create-video branch in sendDiscordMessage; Discord exclusions in reactToStartedVideo
+│   ├── Events/VideoGenerationFinished.php                # carries videoId for the listener
 │   └── Listeners/DeliverVideoToDiscord.php               # new queued listener on VideoGenerationFinished
 ├── config/ai.php                                         # discord.delivery_timeout
 ├── .env.example                                          # DISCORD_API_DELIVERY_TIMEOUT
