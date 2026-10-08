@@ -482,10 +482,8 @@ class ConversationController extends Controller
                 }
 
                 $imageGenerationService = new ImageGenerationService;
-                $tools = [
-                    new GetCurrentDatetimeTool,
-                    new BasicCalculatorTool,
-                ];
+                $tools = $world === null ? [new GetCurrentDatetimeTool] : [];
+                $tools[] = new BasicCalculatorTool;
 
                 if ($imageGenerationService->isAvailableFor($assistantUser)) {
                     $tools[] = new ImageGenerationTool($imageGenerationService, $assistantUser, $conversation);

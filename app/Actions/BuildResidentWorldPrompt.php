@@ -214,7 +214,7 @@ class BuildResidentWorldPrompt
 
     public function idleInstruction(): string
     {
-        return "Your next step:\nSome time has passed since your last step. Read the moment before you choose: where you are, who is with you and what you are doing together, what you and the user last said to each other, and how that exchange felt. What this place offers is your natural first choice: its spots, its activities and the people in it. The longer you have been in one place, the more a change of scene appeals, so after a good while there you get restless and head somewhere else, with a reason. When you are sitting, reclining or lying, you settle in and stay a while: thinking, remembering, small gestures and talking are the natural things to do there, and you get up once you have been there a good while or something calls you away. Life is more than actions: sometimes you simply think about something, or a memory comes back to you, most of all while you rest and now and then while you are up and about. Pick what this moment calls for, the way you would in your own life. Let the mood of your last exchange with the user carry into what you do. When someone is with you and you go elsewhere, have a reason for leaving and tell or show it to them. Act by calling one action tool (go_to, use, zone, wander, swim_to_edge, follow, stop, talk_to, think or remember), call plan for something that takes several steps, use one pose tag, or stay as you are. Reply with exactly one short line of at most 20 words: a brief reason as a thought in parentheses, followed by what you do as a brief action in asterisks, for example (I want to forget about today) *walks to the bar for a drink*.";
+        return "Your next step:\nRead the moment before you choose: where you are, who is with you and what you are doing together, what you and the user last said to each other, and how that exchange felt. What this place offers is your natural first choice: its spots, its activities and the people in it. The more steps you have taken in one place, the more a change of scene appeals, so after several steps there you get restless and head somewhere else, with a reason. When you are sitting, reclining or lying, you settle in and stay a while: thinking, remembering, small gestures and talking are the natural things to do there, and you get up once you have taken several steps there or something calls you away. Life is more than actions: sometimes you simply think about something, or a memory comes back to you, most of all while you rest and now and then while you are up and about. Pick what this moment calls for, the way you would in your own life. Let the mood of your last exchange with the user carry into what you do. When someone is with you and you go elsewhere, have a reason for leaving and tell or show it to them. Act by calling one action tool (go_to, use, zone, wander, swim_to_edge, follow, stop, talk_to, think or remember), call plan for something that takes several steps, use one pose tag, or stay as you are. Reply with exactly one short line of at most 20 words: a brief reason as a thought in parentheses, followed by what you do as a brief action in asterisks, for example (I want to forget about today) *walks to the bar for a drink*.";
     }
 
     /**
@@ -359,9 +359,8 @@ class BuildResidentWorldPrompt
             if ($activity->outcome_reason !== null) {
                 $outcome .= " ({$activity->outcome_reason})";
             }
-            $minutes = (int) floor($activity->created_at->diffInMinutes(now(), true));
 
-            return "{$line}: {$outcome}, ".($minutes < 1 ? 'just now' : "{$minutes} min ago");
+            return "{$line}: {$outcome}";
         });
 
         return "Your recent activity, newest first:\n".$lines->implode("\n");
@@ -412,7 +411,7 @@ class BuildResidentWorldPrompt
     }
 
     /**
-     * How long she has been in the place she is in and at what she is doing,
+     * How many steps she has taken in the place she is in and at what she is doing,
      * why she is doing it and how she put it when she started, from the
      * activity behind her current state.
      *
@@ -423,14 +422,15 @@ class BuildResidentWorldPrompt
     {
         $activities = ResidentActivity::where('world_session_id', $session->id)->where('world_resident_id', $resident->id);
 
-        $arrivedAt = $zone === null ? null : ((clone $activities)->where('zone_id', '!=', $zone['id'])->latest('id')->value('created_at') ?? $session->created_at);
+        $leftLastPlaceId = $zone === null ? null : (clone $activities)->where('zone_id', '!=', $zone['id'])->latest('id')->value('id');
+        $stepsHere = $zone === null ? null : (clone $activities)->where('id', '>', $leftLastPlaceId ?? 0)->count();
         $activityId = $residentActivity['activity']['id'] ?? null;
         $current = $activityId === null ? null : (clone $activities)->where('activity', $activityId)->latest('id')->first();
         $narrated = $current === null ? null : (clone $activities)->where('id', '<=', $current->id)->whereNotNull('narration')->latest('id')->first();
 
         $lines = collect([
-            $arrivedAt !== null ? "You have been in {$zone['name']} for {$this->durationSince($arrivedAt)}." : null,
-            $current !== null ? "You have been at it for {$this->durationSince($current->created_at)}." : null,
+            $stepsHere === null ? null : ($stepsHere === 0 ? "You have just arrived in {$zone['name']}." : "You have taken {$this->steps($stepsHere)} in {$zone['name']}."),
+            $current !== null ? "You have taken {$this->steps((clone $activities)->where('id', '>=', $current->id)->count())} at it." : null,
             $current?->reason !== null ? "Why: {$current->reason}" : null,
             $narrated !== null ? "In your words when you started: {$narrated->narration}" : null,
         ])->filter();
@@ -438,11 +438,9 @@ class BuildResidentWorldPrompt
         return $lines->isEmpty() ? null : "What you are doing now:\n".$lines->implode("\n");
     }
 
-    private function durationSince(\DateTimeInterface $moment): string
+    private function steps(int $count): string
     {
-        $minutes = (int) floor(now()->diffInMinutes($moment, true));
-
-        return $minutes < 1 ? 'less than a minute' : ($minutes === 1 ? 'about a minute' : "about {$minutes} minutes");
+        return $count === 1 ? 'one step' : "{$count} steps";
     }
 
     private function describeActivity(ResidentActivity $activity): string

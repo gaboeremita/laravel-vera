@@ -146,7 +146,7 @@ class GenericProvider implements LlmProvider
                     'type' => 'function',
                     'function' => [
                         'name' => $toolCall['name'],
-                        'arguments' => json_encode($toolCall['arguments']),
+                        'arguments' => json_encode((object) $toolCall['arguments']),
                     ],
                 ], $message['tool_calls']),
             ];

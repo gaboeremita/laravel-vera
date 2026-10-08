@@ -3,6 +3,7 @@
 use App\Models\ResidentActivity;
 use App\Models\WorldSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
@@ -138,12 +139,24 @@ it('includes her recent activity, newest first, limited to the last eight', func
     $prompt = sentPrompt();
     expect($prompt)
         ->toContain('Your recent activity, newest first:')
-        ->toContain('- walked toward pool-terrace, from Music studio: failed (there is no way to get there), just now')
-        ->toContain('- walked toward place-1: completed, 1 min ago')
+        ->toContain('- walked toward pool-terrace, from Music studio: failed (there is no way to get there)')
+        ->toContain('- walked toward place-1: completed')
+        ->not->toContain('min ago')
         ->toContain('place-7')
         ->not->toContain('place-8')
         ->not->toContain('place-9');
     expect(strpos($prompt, 'pool-terrace, from'))->toBeLessThan(strpos($prompt, 'place-1:'));
+});
+
+it('gives a resident in a world no tool for the current date and time', function () {
+    $scenario = worldStateScenario();
+    $scenario[1]->update(['mode' => 'agent']);
+
+    sendWorldMessage($this, $scenario, [])->assertSuccessful();
+
+    expect(collect(Http::recorded()->last()[0]['tools'] ?? [])->pluck('function.name')->all())
+        ->toContain('basic_calculator')
+        ->not->toContain('get_current_datetime');
 });
 
 it('tells the resident her body moves only through her world tools', function () {
@@ -212,7 +225,7 @@ it('tells the resident the pose she holds, why she is doing what she is doing an
 
     expect(sentPrompt())
         ->toContain('reclining on the Pool lounger, doing "Recline", holding the pose "content"')
-        ->toContain("What you are doing now:\nYou have been in Pool terrace for less than a minute.\nYou have been at it for less than a minute.\nWhy: step 2 of 2 of get a drink\nIn your words when you started: *mixes a gin tonic, then takes it out to the lounger*");
+        ->toContain("What you are doing now:\nYou have taken 2 steps in Pool terrace.\nYou have taken one step at it.\nWhy: step 2 of 2 of get a drink\nIn your words when you started: *mixes a gin tonic, then takes it out to the lounger*");
 });
 
 it('rejects a resident state naming a spot the world does not have', function () {
