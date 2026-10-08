@@ -140,7 +140,7 @@ description: "Task list for Discord video requests"
 - [X] T013 [P] Update `ARCHITECTURE.md`: add the delivery flow (`VideoGenerationFinished` → `DeliverVideoToDiscord` → `POST /assistants/{assistantId}/channels/{channelId}/videos`) next to the discovery call, and the `/create-video` branch in the Discord message flow.
 - [X] T014 Run `php -l` on `app/Listeners/DeliverVideoToDiscord.php`, `app/Events/VideoGenerationFinished.php` and `app/Http/Controllers/Api/ConversationController.php` (parse checks only, per CLAUDE.md).
 - [ ] T015 Walk through quickstart.md end-to-end scenarios 1–9 with the owner.
-- [ ] T016 When the owner says it is time to push: run `vendor/bin/pint --dirty --format agent`, `npm run lint` and `php artisan test --compact` once, and fix everything they surface.
+- [X] T016 When the owner says it is time to push: run `vendor/bin/pint --dirty --format agent`, `npm run lint` and `php artisan test --compact` once, and fix everything they surface.
 
 ---
 

@@ -269,6 +269,11 @@ function sendWorldMessage($test, array $scenario, array $positions, array $extra
  * What a request told the model around the user's own words: the system
  * message, then the current user message, which carries this turn's sections.
  */
+function offeredToolNames(): array
+{
+    return collect(Http::recorded()->first()[0]['tools'] ?? [])->pluck('function.name')->all();
+}
+
 function promptOfRequest(int $index = 0): string
 {
     $messages = collect(Http::recorded()[$index][0]['messages'] ?? []);

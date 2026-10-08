@@ -1132,7 +1132,7 @@ Excluded sections for Discord (`except(['opening_message', 'voice mode', 'emotio
 - **No full member-list awareness** — an assistant knows which *other assistants* share a channel (from `assistant_discord_channels`), not which human members can see or are active in it. Real member visibility would need the `GUILD_MEMBERS` privileged intent (a third Developer Portal toggle beyond `MESSAGE_CONTENT`) plus an explicit `guild.members.fetch()` call on node-discord-api's side, and there's no cheap way to scope that down to "who can see this specific channel" beyond fetching everyone and checking permissions per member. Deliberately out of scope for now.
 - **node-discord-api is a separate, unmanaged process** — like the voice-mode backends, it isn't started, monitored, or restarted by Laravel, Herd, or a queue. If it isn't running, `DiscordController@discovery` degrades gracefully (returns `{guilds: [], message: '...'}` with a 502 rather than a hard error, so the settings page still renders), but no assistant will actually respond in Discord until it's started again.
 - **A single unhandled `client.login()` failure crashes every bot in the process, not just the one that failed** — all bots run in one Node process for simplicity (letting them share the discovery HTTP server and see each other's `client.user.id` locally), so a transient network failure on one bot's login is an unhandled promise rejection that takes the whole process down, not just that bot. Restarts have been rare enough in practice that this hasn't been fixed with retry/backoff logic yet.
-- **No test coverage** — `sendDiscordMessage`, `DiscordController`, and the sibling-message merge/dedup logic have no automated tests yet; not blocked on anything, just not written (see [Voice Mode → Known Limitations](#known-limitations)).
+- **Partial test coverage** — `sendDiscordMessage` has feature tests for voice messages (`DiscordVoiceMessageTest`) and `/create-video` (`DiscordCreateVideoTest`), and video delivery has `DeliverVideoToDiscordTest`. `DiscordController` and the sibling-message merge/dedup logic have no automated tests yet; not blocked on anything, just not written (see [Voice Mode → Known Limitations](#known-limitations)).
 
 ---
 
@@ -1396,7 +1396,7 @@ Video generation copies the image-generation layering (`VideoGenProvider` contra
 - **Progress reporting is coarse** — `AgentProgressIndicator` polls a single cached status string every 2s; it shows *that* a tool is running, not intermediate output from a long-running tool call.
 - **Image-gen catalog is user-CRUD, unlike voice** — deliberately mirrors the LLM provider pattern (`AiProvider`/`AiModel`) rather than the seeded `VoiceProvider` pattern; no `ImageGenProviderSeeder` exists. The video-gen catalog follows the same pattern.
 - **Video input images need a tunnel** — OpenRouter only fetches first-frame images from public HTTPS URLs, so `PUBLIC_TUNNEL_URL` must point at a running tunnel when a video from an image starts.
-- **Video generation is web-only** — `/create-video` and `generate_video` exist only in the web chat; Discord and Telegram have no placeholder or notice to show.
+- **Video generation is web chat and Discord only** — `/create-video` works in the web chat and in Discord (see [Discord Integration → Video Requests](#video-requests)). The `generate_video` agent tool exists only in the web chat, because Discord turns don't run the agent loop. Telegram offers neither.
 
 ---
 
@@ -1545,6 +1545,10 @@ laravel-vera/
 │   │       ├── WorldResidentController.php     add/update/remove a resident placement
 │   │       ├── WorldSessionController.php      per-user world sessions: index/store/rename/destroy + position updates
 │   │       └── NpcController.php               dedicated NPC CRUD, delegates creation to AssistantController::store()
+│   ├── Listeners/
+│   │   ├── AdvanceQuests.php                   moves quests forward when something they depend on happens
+│   │   ├── DeliverVideoToDiscord.php           queued on VideoGenerationFinished: sends a Discord conversation's finished/failed video to the bridge, with retries
+│   │   └── UnlockQuests.php                    when a quest ends, lets quests that require it start
 │   ├── Jobs/
 │   │   ├── EmbedArchiveEntry.php                async vector embedding for archive entries
 │   │   ├── PollVideoGeneration.php             submits a generated video, re-queues itself every 30s, downloads it, broadcasts status

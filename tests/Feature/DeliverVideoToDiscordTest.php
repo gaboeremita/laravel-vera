@@ -53,7 +53,7 @@ test('a finished Discord video is sent with its address and reply target', funct
     Http::assertSent(fn (Request $request) => $request->url() === "http://discord-api.test/assistants/{$assistantId}/channels/discord-channel-1/videos"
         && $request->method() === 'POST'
         && $request->header('X-Internal-Secret') === ['secret']
-        && $request->data() === ['replyToMessageId' => 'discord-request-1', 'videoUrl' => $video->url]);
+        && $request->data() === ['replyToMessageId' => 'discord-request-1', 'videoUrl' => $video->fresh()->url]);
 });
 
 test('a failed Discord video is sent with its failure reason', function () {

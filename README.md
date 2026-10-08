@@ -353,12 +353,12 @@ Any assistant can hold conversations in Discord, the same way it does through th
 ### Setup
 
 1. Clone and configure [node-discord-api](https://github.com/gaboeremita/node-discord-api) separately — it holds Discord bot tokens and the Gateway connections, and is never given database access; it only talks to this app over HTTP.
-2. Set `DISCORD_API_URL` and `DISCORD_API_SECRET` in this app's `.env` to match the bridge's own `DISCORD_API_PORT`/`DISCORD_API_SECRET` — this secret authenticates the bridge's discovery requests into this app.
+2. Set `DISCORD_API_URL` and `DISCORD_API_SECRET` in this app's `.env` to match the bridge's own `DISCORD_API_PORT`/`DISCORD_API_SECRET` — this secret authenticates this app's calls to the bridge: channel discovery and video delivery.
 3. Generate a Sanctum token for the bridge to authenticate as your user when relaying messages:
    ```bash
    php artisan tinker --execute 'echo App\Models\User::find(1)->createToken("discord-api")->plainTextToken;'
    ```
-   Put that token in the bridge's own `.env` as `DISCORD_API_TOKEN` — it's how the bridge calls this app's `discord-messages` endpoint as you, separate from the shared secret above (which only protects the discovery endpoint).
+   Put that token in the bridge's own `.env` as `DISCORD_API_TOKEN` — it's how the bridge calls this app's `discord-messages` endpoint as you, separate from the shared secret above (which only protects this app's calls to the bridge).
 4. Go to an assistant's **Discord** page (`/assistants/:id/discord`) to see which Discord servers/channels its bot is currently in, set each channel's trigger mode (off / always / on mention / on mention-by-name), and write optional per-server and per-channel prompt context.
 
 ### How it fits together
