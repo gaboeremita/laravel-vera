@@ -159,7 +159,7 @@ class AnthropicProvider implements LlmProvider
                     'type' => 'tool_use',
                     'id' => $toolCall['id'],
                     'name' => $toolCall['name'],
-                    'input' => $toolCall['arguments'],
+                    'input' => (object) $toolCall['arguments'],
                 ];
             }
 
