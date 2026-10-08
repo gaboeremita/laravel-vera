@@ -164,7 +164,7 @@ From an assistant's menu, the user opens a Video Gen page laid out like the Imag
 ### Key Entities
 
 - **Video Gen Provider**: A service the user's videos are generated with. Belongs to one user. Has a name, an address, an API key and a format that says how to talk to it.
-- **Video Gen Model**: A model offered by a provider, with default settings for length, resolution, aspect ratio, sound and maximum wait, and the lengths and aspect ratios it supports. An assistant can have one selected.
+- **Video Gen Model**: A model offered by a provider, with default settings for length, resolution, aspect ratio, sound and maximum wait, and the lengths and aspect ratios it supports, as the provider lists them. An assistant can have one selected.
 - **Video**: A generated video. Belongs to one assistant message. Records the provider's job reference, the status (queued, generating, completed, failed), the failure reason when it failed, the description it was generated from, and, once finished, the stored file, its length and its size.
 
 ## Success Criteria *(mandatory)*
@@ -187,5 +187,6 @@ From an assistant's menu, the user opens a Video Gen page laid out like the Imag
 - Extending an existing video is out of scope. The provider does not offer it.
 - Videos are stored as their own records, separate from images, because they carry status, job and length details that images do not have.
 - The assistant's in-character reply to `/create-video` is generated when the request starts. The assistant does not react again when the video arrives.
+- `/create-video` and the assistant's video ability are available in the web chat. Discord and Telegram conversations do not offer them.
 - The notice is shown only in open tabs of the app. System notifications, sounds, and messages over Telegram or Discord are out of scope.
 - Video generation costs come from the user's own provider account. The app shows no prices.
