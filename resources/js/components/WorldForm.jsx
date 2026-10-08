@@ -3,11 +3,12 @@ import Accordion from './common/Accordion.jsx';
 import PassageSelect from './PassageSelect.jsx';
 import NarratorModelSelect from './NarratorModelSelect.jsx';
 import Toggle from './common/Toggle.jsx';
+import SentimentsEditor from './SentimentsEditor.jsx';
 import { FIELD_LABEL, FIELD_INPUT } from '../utils/formFieldStyles.js';
 
 export default function WorldForm({ value, onChange, regions = null, imagesEditor = null, itemsEditor = null, playerInventoryEditor = null, isSaving, onSubmit }) {
 	const update = (field, fieldValue) => onChange({ ...value, [field]: fieldValue });
-	const [sections, setSections] = useState({ details: false, prompts: false, start: false });
+	const [sections, setSections] = useState({ details: false, prompts: false, sentiments: true, start: false });
 	const toggle = (section) => setSections((current) => ({ ...current, [section]: !current[section] }));
 	const spawn = value.spawnRegionId ? { regionId: value.spawnRegionId, passageId: value.spawnPassageId } : null;
 
@@ -44,6 +45,9 @@ export default function WorldForm({ value, onChange, regions = null, imagesEdito
 						<span className="text-fg-2 text-sm">Review reveals <span className="text-fg-3 text-xs">— the narrator model checks that the moment fits before a character shares a secret</span></span>
 					</div>
 				)}
+			</Accordion>
+			<Accordion label="SENTIMENTS" collapsed={sections.sentiments} onToggle={() => toggle('sentiments')}>
+				<SentimentsEditor value={value.sentiments ?? []} onChange={(sentiments) => update('sentiments', sentiments)} />
 			</Accordion>
 			{itemsEditor}
 			{regions && (

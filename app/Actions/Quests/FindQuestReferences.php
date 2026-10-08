@@ -111,7 +111,7 @@ class FindQuestReferences
                 'has' => $add('items', $value['item'] ?? null),
                 'knows' => $add('facts', $value),
                 'acknowledged' => [$add('facts', $value['fact'] ?? null), $add('residents', $value['resident'] ?? null)],
-                'feeling', 'spentWith', 'messagesWith', 'othersInTheZone' => $add('residents', $value['resident'] ?? null),
+                'sentiment', 'spentWith', 'messagesWith', 'othersInTheZone' => $add('residents', $value['resident'] ?? null),
                 'gaveTo' => [$add('residents', $value['resident'] ?? null), $add('items', $value['item'] ?? null)],
                 'questState', 'declinedTimes' => $add('quests', $value['quest'] ?? null),
                 'giverIn' => $add('regions', $value['region'] ?? null),

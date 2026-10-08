@@ -113,7 +113,7 @@ class QuestConditions
             'flag' => is_string($value) ? $run->hasFlag($value) : $state->questEndedWithFlag((string) ($value['quest'] ?? ''), (string) ($value['name'] ?? '')),
             'question' => $run->questionMet((string) $value),
             'beat' => $run->hasFinished((string) $value),
-            'feeling' => $this->withinBounds($state->feeling((int) ($value['resident'] ?? 0), (string) ($value['kind'] ?? '')), $value),
+            'sentiment' => $this->withinBounds($state->sentiment((int) ($value['resident'] ?? 0), (string) ($value['kind'] ?? '')), $value),
             'questState' => $state->questState((string) ($value['quest'] ?? '')) === ($value['state'] ?? null),
             'declinedTimes' => $state->declinedTimes((string) ($value['quest'] ?? '')) >= (int) ($value['atLeast'] ?? 1),
             'gaveTo' => $state->gaveTo((int) ($value['resident'] ?? 0), (int) ($value['item'] ?? 0)) >= (int) ($value['atLeast'] ?? 1),
@@ -126,10 +126,10 @@ class QuestConditions
     /**
      * @param  array{atLeast?: float|int, atMost?: float|int}  $bounds
      */
-    private function withinBounds(float $feeling, array $bounds): bool
+    private function withinBounds(float $sentiment, array $bounds): bool
     {
-        return (! isset($bounds['atLeast']) || $feeling >= $bounds['atLeast'])
-            && (! isset($bounds['atMost']) || $feeling <= $bounds['atMost']);
+        return (! isset($bounds['atLeast']) || $sentiment >= $bounds['atLeast'])
+            && (! isset($bounds['atMost']) || $sentiment <= $bounds['atMost']);
     }
 
     /**

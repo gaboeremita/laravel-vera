@@ -46,7 +46,7 @@ describe('groups', function () {
 
     it('renders the turn sections under their headings, in order, leaving empty ones out', function () {
         $turn = layoutDirector()
-            ->addToTurn(TurnSection::RelationshipState, 'feelings', 'Trust: 3')
+            ->addToTurn(TurnSection::RelationshipState, 'sentiments', 'Trust: 3')
             ->addToTurn(TurnSection::CurrentState, 'inventory', 'You hold a lantern.')
             ->build()
             ->turn();

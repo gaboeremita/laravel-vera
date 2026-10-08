@@ -4,17 +4,18 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import WorldForm from '../components/WorldForm.jsx';
+import { toSentimentPayload } from '../components/SentimentsEditor.jsx';
 
 export default function CreateWorldPage() {
 	const navigate = useNavigate();
 	const { addToast } = useOutletContext();
-	const [value, setValue] = useState({ name: '', slug: '', description: '', assistantContextPrompt: '', npcContextPrompt: '' });
+	const [value, setValue] = useState({ name: '', slug: '', description: '', assistantContextPrompt: '', npcContextPrompt: '', sentiments: [] });
 	const [isSaving, setIsSaving] = useState(false);
 
 	const save = async () => {
 		setIsSaving(true);
 		try {
-			const response = await api.post(route('worlds.store'), value);
+			const response = await api.post(route('worlds.store'), { ...value, sentiments: toSentimentPayload(value.sentiments) });
 			const world = await response.json();
 			if (!response.ok) throw new Error(world.message);
 			navigate(`/worlds/${world.id}/edit`);

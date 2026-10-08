@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['name', 'slug', 'description', 'assistant_context_prompt', 'npc_context_prompt', 'spawn_region_id', 'spawn_passage_id', 'narrator_model_id', 'review_reveals'])]
+#[Fillable(['name', 'slug', 'description', 'assistant_context_prompt', 'npc_context_prompt', 'spawn_region_id', 'spawn_passage_id', 'narrator_model_id', 'review_reveals', 'sentiments'])]
 class World extends Model
 {
     /** @use HasFactory<WorldFactory> */
@@ -20,7 +20,18 @@ class World extends Model
 
     protected function casts(): array
     {
-        return ['review_reveals' => 'boolean'];
+        return ['review_reveals' => 'boolean', 'sentiments' => 'array'];
+    }
+
+    /**
+     * The names of the sentiments residents hold about the player in this
+     * world; sentiments is a list of {name, description}.
+     *
+     * @return array<int, string>
+     */
+    public function sentimentNames(): array
+    {
+        return array_column($this->sentiments ?? [], 'name');
     }
 
     public function users(): BelongsToMany

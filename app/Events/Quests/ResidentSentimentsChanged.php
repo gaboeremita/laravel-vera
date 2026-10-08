@@ -5,7 +5,7 @@ namespace App\Events\Quests;
 /**
  * How a resident feels about the player changed.
  */
-class ResidentFeelingsChanged extends QuestTriggerEvent
+class ResidentSentimentsChanged extends QuestTriggerEvent
 {
     public function __construct(int $sessionId, private readonly string $cause)
     {
@@ -14,7 +14,7 @@ class ResidentFeelingsChanged extends QuestTriggerEvent
 
     public function leaves(): array
     {
-        return ['feeling'];
+        return ['sentiment'];
     }
 
     public function cause(): ?string

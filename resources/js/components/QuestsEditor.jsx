@@ -59,11 +59,11 @@ function QuestRow({ worldId, quest, options, campaigns, onChanged, addToast }) {
 }
 
 /** The world's quests: each opens in the quest editor, with the problems the world has since introduced. */
-export default function QuestsEditor({ worldId, campaigns = [], onQuestsChange, addToast }) {
+export default function QuestsEditor({ worldId, campaigns = [], worldVersion = 0, onQuestsChange, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [adding, setAdding] = useState(false);
 	const [quests, setQuests] = useState([]);
-	const { options, reload: reloadOptions } = useQuestOptions(worldId, addToast);
+	const { options, reload: reloadOptions } = useQuestOptions(worldId, addToast, worldVersion);
 
 	const fetchQuests = useCallback(async () => {
 		const response = await api.get(route('worlds.quests.index', { world: worldId }));
@@ -83,7 +83,7 @@ export default function QuestsEditor({ worldId, campaigns = [], onQuestsChange, 
 		};
 		void load();
 		return () => { active = false; };
-	}, [fetchQuests, campaigns, addToast]);
+	}, [fetchQuests, campaigns, worldVersion, addToast]);
 
 	const reload = useCallback(async () => {
 		try {

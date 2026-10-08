@@ -11,7 +11,7 @@ use App\Models\CreditTransaction;
 use App\Models\ItemTransfer;
 use App\Models\Quest;
 use App\Models\QuestOffer;
-use App\Models\ResidentFeeling;
+use App\Models\ResidentSentiment;
 use App\Models\WorldSession;
 use App\Models\WorldSessionCampaign;
 use App\Models\WorldSessionQuest;
@@ -31,7 +31,7 @@ class QuestSessionState
      * @param  array<int, string>  $acknowledgements  "factId:residentId"
      * @param  Collection<string, WorldSessionQuest>  $latestRuns  by quest key
      * @param  Collection<string, WorldSessionCampaign>  $campaignEndings  by campaign key
-     * @param  array<int, array{romance: float, trust: float, liking: float}>  $feelings  by resident id
+     * @param  array<int, array<string, float>>  $sentiments  scores by sentiment name, by resident id
      * @param  array<string, int>  $itemsGiven  quantity the player handed over, by "residentId:itemId"
      * @param  array<int, int>  $creditsPaid  credits the player paid, by resident id
      * @param  array<string, array{pending: bool, lastAnswer: ?QuestOfferStatus, declined: int}>  $offers  by quest key; pending and lastAnswer are about the latest run
@@ -44,7 +44,7 @@ class QuestSessionState
         private readonly array $acknowledgements,
         private readonly Collection $latestRuns,
         private readonly Collection $campaignEndings,
-        private readonly array $feelings = [],
+        private readonly array $sentiments = [],
         private readonly array $itemsGiven = [],
         private readonly array $creditsPaid = [],
         private readonly array $offers = [],
@@ -68,8 +68,8 @@ class QuestSessionState
             $session->factAcknowledgements()->get(['fact_id', 'world_resident_id'])->map(fn ($row) => "{$row->fact_id}:{$row->world_resident_id}")->all(),
             $latestRuns,
             $session->campaignEndings()->with('campaign')->get()->keyBy(fn (WorldSessionCampaign $ending) => $ending->campaign->key),
-            ResidentFeeling::where('world_session_id', $session->id)->get()
-                ->mapWithKeys(fn (ResidentFeeling $feeling) => [$feeling->world_resident_id => $feeling->values()])
+            ResidentSentiment::where('world_session_id', $session->id)->get()
+                ->mapWithKeys(fn (ResidentSentiment $sentiment) => [$sentiment->world_resident_id => $sentiment->values ?? []])
                 ->all(),
             $handedOver(ItemTransfer::class)
                 ->selectRaw('to_inventory_id, item_id, sum(quantity) as total')->groupBy('to_inventory_id', 'item_id')->get()
@@ -136,12 +136,12 @@ class QuestSessionState
     }
 
     /**
-     * How the resident feels about the player; a resident with no feelings
-     * yet feels as every resident starts, at 0.
+     * How the resident feels about the player in one sentiment; one that
+     * never moved sits where every resident starts, at 0.
      */
-    public function feeling(int $residentId, string $kind): float
+    public function sentiment(int $residentId, string $kind): float
     {
-        return (float) ($this->feelings[$residentId][$kind] ?? 0);
+        return (float) ($this->sentiments[$residentId][$kind] ?? 0);
     }
 
     public function gaveTo(int $residentId, int $itemId): int

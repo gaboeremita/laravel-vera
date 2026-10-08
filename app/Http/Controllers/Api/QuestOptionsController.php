@@ -39,6 +39,7 @@ class QuestOptionsController extends Controller
                 'name' => $resident->assistant->name,
                 'toolsUnsupported' => ! $resident->canCallToolsFor($request->user()),
             ])->sortBy('name')->values(),
+            'sentiments' => $world->sentimentNames(),
             'items' => $world->items()->orderBy('name')->get(['id', 'name'])->map(fn (Item $item) => ['id' => $item->id, 'name' => $item->name]),
             'facts' => Fact::with('holder.assistant')->whereHas('holder', fn ($query) => $query->where('world_id', $world->id))->orderBy('topic')->get()
                 ->map(fn (Fact $fact) => ['id' => $fact->id, 'topic' => $fact->topic, 'holderName' => $fact->holder->assistant->name]),

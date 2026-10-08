@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "skills": {
+    "blender-convert-2d-3d": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-convert-2d-3d/SKILL.md",
+      "computedHash": "8ef21455d7df6d8407275a07a04e0a7d85d9cf80388a942735ee083b6f43ea1d"
+    },
+    "blender-convert-3d-2d": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-convert-3d-2d/SKILL.md",
+      "computedHash": "d811aa5678a907d5b1cba05b9fd333c9636fdff19e9d43f67c019cccecda0aec"
+    },
+    "blender-create-environment": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-create-environment/SKILL.md",
+      "computedHash": "19a97898bb63c64dc9724edccee0ac66d1c6df2bdb6b12869d1c653a7bc4f8b1"
+    },
+    "blender-create-greybox": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": ".codex/skills/blender-create-greybox/SKILL.md",
+      "computedHash": "709ce513f29f1e382f593d68c9418058ed018ee570bccfdab1ed2cc228a1d082"
+    },
+    "blender-create-model": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-create-model/SKILL.md",
+      "computedHash": "05badf5330586252de54a411282b84433f29f4e29be63a597e7f81bce6dd0388"
+    },
+    "blender-create-visual-target-2d": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-create-visual-target-2d/SKILL.md",
+      "computedHash": "0c26e395feb5f8e6ea39312ee3c3ece4cdc3008927c43c5ecb06c56c50f36b37"
+    },
+    "blender-game-export": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-game-export/SKILL.md",
+      "computedHash": "62f3414279a726e6d6e37e6a089745ef3691bdd76044e8f67aabddce66b83100"
+    },
+    "blender-light-camera": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-light-camera/SKILL.md",
+      "computedHash": "d19619b7f7e11f0dd39284c10e4ed7280a7a07c3385a7470cae2b4457c1b4458"
+    },
+    "blender-materials": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-materials/SKILL.md",
+      "computedHash": "d5c76cc835f24a2c626ff1a1e27586ba41cad503a525e5a636420176deae798c"
+    },
+    "blender-procedural-geometry": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-procedural-geometry/SKILL.md",
+      "computedHash": "b46ff42d0ce4eddaadfb1fd1b4ead70e9f2520e9af705aedebd33b1cfddb958c"
+    },
+    "blender-render": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-render/SKILL.md",
+      "computedHash": "eacc3e19391f8918b7615ea041fa98421130dff2a422a9ccfaa8ab83ee501839"
+    },
+    "blender-review-optimize": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-review-optimize/SKILL.md",
+      "computedHash": "d18de48f001fcd3dbb374ae64644de8f5392ab5e0bc8d1f203ece4eea5c7795e"
+    },
+    "blender-rig-animate": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-rig-animate/SKILL.md",
+      "computedHash": "9bce37b6c959798817a46367645083fc9d08e1112252fdf582fb5c32c569a76b"
+    },
+    "blender-setup": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-setup/SKILL.md",
+      "computedHash": "48f97d6895cde45b19178914eae344da0b74eeb8ef5cded2908430a82f48237d"
+    },
+    "blender-uv-bake": {
+      "source": "SamuelAsherRivello/ai-skills-blender",
+      "sourceType": "github",
+      "skillPath": "skills/blender-uv-bake/SKILL.md",
+      "computedHash": "a4774e531ad069edb047f15200719d72a1f1fe0cb750d5f56214e2a5f8aa24a9"
+    }
+  }
+}

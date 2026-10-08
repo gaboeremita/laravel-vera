@@ -200,7 +200,7 @@ it('gives the author the causes, the giver\'s checks and whether the offer condi
     [$user, , , $region, , $session] = worldStateScenario();
     $quest = worldQuest($region->world, [], ['title' => 'The Mill']);
     $run = WorldSessionQuest::factory()->active()->create(['world_session_id' => $session->id, 'quest_id' => $quest->id]);
-    QuestEvent::factory()->create(['world_session_quest_id' => $run->id, 'type' => QuestEventType::BeatFinished, 'beat' => 'first', 'payload' => ['trigger' => 'ResidentFeelingsChanged', 'because' => 'Mara\'s trust is now 3.0']]);
+    QuestEvent::factory()->create(['world_session_quest_id' => $run->id, 'type' => QuestEventType::BeatFinished, 'beat' => 'first', 'payload' => ['trigger' => 'ResidentSentimentsChanged', 'because' => 'Mara\'s trust is now 3.0']]);
     QuestEvent::factory()->create(['world_session_quest_id' => $run->id, 'type' => QuestEventType::Offered, 'payload' => [
         'lookups' => [['quest' => 'The Mill', 'part' => 'your trust toward the user', 'value' => '1.0', 'asks' => 'at least 3']],
         'offerWhenHeld' => false,

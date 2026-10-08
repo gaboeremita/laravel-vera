@@ -12,12 +12,13 @@ import StartingInventoryEditor from '../components/StartingInventoryEditor.jsx';
 import useWorldInventoryConfig from '../hooks/useWorldInventoryConfig.js';
 import QuestsEditor from '../components/QuestsEditor.jsx';
 import CampaignsEditor from '../components/CampaignsEditor.jsx';
+import { toSentimentRows, toSentimentPayload } from '../components/SentimentsEditor.jsx';
 import useCampaigns from '../hooks/useCampaigns.js';
 
 const TABS = [{ id: 'world', label: 'WORLD' }, { id: 'regions', label: 'REGIONS' }];
 
 function toValue(world) {
-	return { ...world, spawnRegionId: world.spawnRegionId ?? null, spawnPassageId: world.spawnPassageId ?? null, regions: world.regions ?? [], residents: world.residents ?? [] };
+	return { ...world, spawnRegionId: world.spawnRegionId ?? null, spawnPassageId: world.spawnPassageId ?? null, regions: world.regions ?? [], residents: world.residents ?? [], sentiments: toSentimentRows(world.sentiments) };
 }
 
 export default function EditWorldPage() {
@@ -31,6 +32,7 @@ export default function EditWorldPage() {
 	const inventoryConfig = useWorldInventoryConfig(worldId, addToast);
 	const { campaigns, reload: reloadCampaigns } = useCampaigns(worldId, addToast);
 	const [questsVersion, setQuestsVersion] = useState(0);
+	const [worldVersion, setWorldVersion] = useState(0);
 	const questsChanged = useCallback(async () => {
 		setQuestsVersion((version) => version + 1);
 		await reloadCampaigns();
@@ -67,10 +69,12 @@ export default function EditWorldPage() {
 				name: value.name, slug: value.slug, description: value.description,
 				assistantContextPrompt: value.assistantContextPrompt, npcContextPrompt: value.npcContextPrompt,
 				spawnRegionId: value.spawnRegionId, spawnPassageId: value.spawnPassageId, narratorModelId: value.narratorModelId ?? null, reviewReveals: value.reviewReveals ?? true,
+				sentiments: toSentimentPayload(value.sentiments),
 			});
 			const saved = await response.json();
 			if (!response.ok) throw new Error(saved.message);
 			setValue(toValue(saved));
+			setWorldVersion((version) => version + 1);
 			addToast('World saved', 'success');
 		} catch (error) { addToast(error.message || 'Failed to save world', 'error'); } finally { setIsSaving(false); }
 	};
@@ -120,7 +124,7 @@ export default function EditWorldPage() {
 							isSaving={isSaving}
 							onSubmit={save}
 						/>
-						<QuestsEditor worldId={value.id} campaigns={campaigns} onQuestsChange={questsChanged} addToast={addToast} />
+						<QuestsEditor worldId={value.id} campaigns={campaigns} worldVersion={worldVersion} onQuestsChange={questsChanged} addToast={addToast} />
 						<CampaignsEditor worldId={value.id} campaigns={campaigns} questsVersion={questsVersion} onChanged={reloadCampaigns} addToast={addToast} />
 					</>
 				) : (

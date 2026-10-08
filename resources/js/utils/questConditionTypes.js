@@ -17,7 +17,7 @@ export const CONDITION_TYPES = [
 	{ type: 'flag', label: 'Flag' },
 	{ type: 'question', label: 'Question met' },
 	{ type: 'beat', label: 'Beat finished' },
-	{ type: 'feeling', label: 'Feeling', description: 'How the resident feels about the player right now.' },
+	{ type: 'sentiment', label: 'Sentiment', description: 'How the resident feels about the player right now.' },
 	{ type: 'questState', label: 'Quest state', description: 'Where another quest stands.' },
 	{ type: 'declinedTimes', label: 'Times declined', description: 'How many times the player turned down a quest\'s offer, walking away included.' },
 	{ type: 'gaveTo', label: 'Gave to', description: 'How many of an item the player has handed the resident this session.' },
@@ -38,4 +38,4 @@ export const EVERYWHERE_CONDITION_TYPES = CONDITION_TYPES.filter((candidate) => 
 export const OFFER_WHEN_CONDITION_TYPES = ALL_CONDITION_TYPES.filter((type) => !['beat', 'question'].includes(type));
 
 /** The kinds of condition an activity's responses accept: what the session holds, and the object's own state. */
-export const ACTIVITY_CONDITION_TYPES = ['has', 'credits', 'knows', 'acknowledged', 'flag', 'feeling', 'questState', 'declinedTimes', 'gaveTo', 'spentWith', 'objectState', 'narrator'];
+export const ACTIVITY_CONDITION_TYPES = ['has', 'credits', 'knows', 'acknowledged', 'flag', 'sentiment', 'questState', 'declinedTimes', 'gaveTo', 'spentWith', 'objectState', 'narrator'];

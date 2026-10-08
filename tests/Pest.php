@@ -316,3 +316,15 @@ function worldQuest(World $world, array $definition = [], array $attributes = []
 {
     return Quest::factory()->create(['world_id' => $world->id, 'definition' => [...QuestFactory::defaultDefinition(), ...$definition], ...$attributes]);
 }
+
+/**
+ * Gives the world sentiments named as given, each with a short scale.
+ *
+ * @param  array<int, string>  $names
+ */
+function worldSentiments(World $world, array $names = ['romance', 'trust', 'liking']): World
+{
+    $world->update(['sentiments' => World::factory()->withSentiments($names)->raw()['sentiments']]);
+
+    return $world;
+}
