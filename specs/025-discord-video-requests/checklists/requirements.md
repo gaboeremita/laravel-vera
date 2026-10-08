@@ -31,4 +31,4 @@
 
 ## Notes
 
-- The Discord bridge, ffmpeg and the 480p step are named because they are part of the agreed scope and run in a separate repository; how the app calls the bridge is left to the plan.
+- Checked against the current spec: all items pass.
