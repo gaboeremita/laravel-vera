@@ -1395,7 +1395,7 @@ Video generation copies the image-generation layering (`VideoGenProvider` contra
 - **Mode is per-assistant, not per-message** — there's no way to run a single one-off tool-using turn with an otherwise plain assistant, or vice versa; switching modes means editing the assistant.
 - **Progress reporting is coarse** — `AgentProgressIndicator` polls a single cached status string every 2s; it shows *that* a tool is running, not intermediate output from a long-running tool call.
 - **Image-gen catalog is user-CRUD, unlike voice** — deliberately mirrors the LLM provider pattern (`AiProvider`/`AiModel`) rather than the seeded `VoiceProvider` pattern; no `ImageGenProviderSeeder` exists. The video-gen catalog follows the same pattern.
-- **Video input images need a tunnel** — OpenRouter only fetches first-frame images from public HTTPS URLs, so `PUBLIC_TUNNEL_URL` must point at a running tunnel when a video from an image starts.
+- **Video input images need a tunnel** — OpenRouter only fetches first-frame images from public HTTPS URLs, so `PUBLIC_TUNNEL_URL` must point at a running tunnel when a video from an image starts. `VideoGenerationService::firstFrameUrl()` hands the provider a 30-minute signed `/video-frames/{image}` link, signed on the path only because the tunnel rewrites the host header; `ngrok-policy.yml` limits the tunnel to that path.
 - **Video generation is web chat and Discord only** — `/create-video` works in the web chat and in Discord (see [Discord Integration → Video Requests](#video-requests)). The `generate_video` agent tool exists only in the web chat, because Discord turns don't run the agent loop. Telegram offers neither.
 
 ---

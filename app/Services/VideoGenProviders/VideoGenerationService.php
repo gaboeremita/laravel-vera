@@ -10,6 +10,7 @@ use App\Models\Image;
 use App\Models\Message;
 use App\Models\Video;
 use App\Models\VideoGenModel;
+use Illuminate\Support\Facades\URL;
 
 class VideoGenerationService
 {
@@ -88,7 +89,7 @@ class VideoGenerationService
     }
 
     /**
-     * The address the provider fetches an attached image from, through the public tunnel.
+     * A short-lived signed address the provider fetches an attached image from, through the public tunnel.
      *
      * @throws \InvalidArgumentException when no public address is configured
      */
@@ -100,7 +101,9 @@ class VideoGenerationService
             throw new \InvalidArgumentException(self::missingPublicUrlMessage());
         }
 
-        return rtrim($publicUrl, '/').'/storage/'.$image->path;
+        $signedPath = URL::temporarySignedRoute('video-frames.show', now()->plus(minutes: 30), ['image' => $image->id], absolute: false);
+
+        return rtrim($publicUrl, '/').$signedPath;
     }
 
     public static function hasPublicUrl(): bool
