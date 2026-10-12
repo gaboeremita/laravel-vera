@@ -8,6 +8,7 @@ import EmotionGrid from '../components/EmotionGrid.jsx';
 import PosturePoseSections from '../components/PosturePoseSections.jsx';
 import ModelVoiceFields from '../components/ModelVoiceFields.jsx';
 import TermRuleSettings from '../components/TermRuleSettings.jsx';
+import SentimentsEditor, { toSentimentRows, toSentimentPayload } from '../components/SentimentsEditor.jsx';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
@@ -49,6 +50,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 	const [promptJson, setPromptJson] = useState('');
 	const [promptJsonError, setPromptJsonError] = useState(null);
 	const [termRules, setTermRules] = useState({ section: null, markTerms: false, swapInvariant: false, highlightMissing: false });
+	const [sentimentDefinitions, setSentimentDefinitions] = useState([]);
 
 	const prompt = usePrompt(Number(id), addToast);
 
@@ -110,6 +112,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				setSelectedArchiveId(data.archive_id ? String(data.archive_id) : '');
 				setMode(data.mode || 'assistant');
 				if (data.agent_config?.termRules) setTermRules(data.agent_config.termRules);
+				setSentimentDefinitions(toSentimentRows(data.sentimentDefinitions));
 				setPortraitType(data.portrait_type || 'image');
 				setVrmFilename(data.vrm_url ? (data.vrm_original_name || 'avatar.vrm') : null);
 				setHasLod(Boolean(data.vrm_lod_url));
@@ -146,7 +149,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				archive_id: selectedArchiveId ? Number(selectedArchiveId) : null,
 				mode,
 				portrait_type: portraitType,
-				...(isNpc ? {} : { agent_config: { termRules } }),
+				...(isNpc ? {} : { agent_config: { termRules }, sentimentDefinitions: toSentimentPayload(sentimentDefinitions) }),
 			});
 
 			if (!res.ok) {
@@ -154,6 +157,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				throw new Error(validationMessages(error) || 'Save failed');
 			}
 
+			if (!isNpc) setSentimentDefinitions(toSentimentRows(toSentimentPayload(sentimentDefinitions)));
 			addToast(`${isNpc ? 'NPC' : 'Assistant'} saved`, 'success');
 		} catch (e) {
 			addToast(e.message || 'Failed to save assistant', 'error');
@@ -617,6 +621,15 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 					</div>
 
 					{!isNpc && <TermRuleSettings sections={prompt.sections} value={termRules} onChange={setTermRules} />}
+
+					{!isNpc && (
+						<div className="space-y-2">
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+								Sentiments
+							</label>
+							<SentimentsEditor value={sentimentDefinitions} onChange={setSentimentDefinitions} hint="How the assistant feels about you outside any world, each from -10 to 10 per conversation, starting at 0." />
+						</div>
+					)}
 
 					<div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">

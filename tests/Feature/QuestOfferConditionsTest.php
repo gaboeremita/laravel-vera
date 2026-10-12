@@ -17,7 +17,7 @@ use App\Models\Conversation;
 use App\Models\Quest;
 use App\Models\QuestEvent;
 use App\Models\QuestOffer;
-use App\Models\ResidentSentiment;
+use App\Models\Sentiment;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Models\WorldSessionQuest;
@@ -121,7 +121,7 @@ it('answers a check with the value now and what the quest asks, and refuses a pa
     $scenario = offerConditionScenario(trustAtLeast(3));
     [, , , , $resident, $session] = $scenario;
     worldSentiments($resident->world);
-    ResidentSentiment::of($session, $resident)->adjust(['trust' => 2]);
+    Sentiment::inSession($session, $resident)->adjust(['trust' => 2]);
     fakeTurn(
         toolCallResponse('check_1', 'check_offer_condition', ['quest' => 'The Ledger', 'part' => 'your trust toward the user is at least 3']),
         toolCallResponse('check_2', 'check_offer_condition', ['quest' => 'The Ledger', 'part' => 'the moon is full']),
@@ -138,7 +138,7 @@ it('lets the giver offer while the quest\'s condition doesn\'t hold, recording w
     $scenario = offerConditionScenario(trustAtLeast(3));
     [, , , , $resident, $session] = $scenario;
     worldSentiments($resident->world);
-    ResidentSentiment::of($session, $resident)->adjust(['trust' => 1]);
+    Sentiment::inSession($session, $resident)->adjust(['trust' => 1]);
     fakeTurn(
         toolCallResponse('check_1', 'check_offer_condition', ['quest' => 'The Ledger', 'part' => 'your trust toward the user is at least 3']),
         toolCallResponse('offer_1', 'offer_quest', ['quest' => 'The Ledger']),

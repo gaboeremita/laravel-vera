@@ -35,24 +35,25 @@ class UpdateWorldRequest extends FormRequest
             'spawnPassageId' => ['nullable', 'string', 'required_with:spawnRegionId'],
             'reviewReveals' => ['sometimes', 'boolean'],
             'narratorModelId' => ['nullable', 'integer', Rule::exists('ai_models', 'id')->whereIn('provider_id', AiProvider::where('user_id', $this->user()->id)->pluck('id')->all())],
-            ...self::sentimentRules(),
-            'sentiments.*.renamedFrom' => ['nullable', 'string'],
+            ...self::sentimentDefinitionRules(),
         ];
     }
 
     /**
-     * A world's sentiments: each name becomes a key in the tool calls that
-     * change it, so it is a plain word that never collides with the reason.
+     * The sentiment definitions of a world or an assistant: each name becomes
+     * a key in the tool calls that change it, so it is a plain word that never
+     * collides with the reason. renamedFrom names the sentiment it was before.
      *
      * @return array<string, array<int, mixed>>
      */
-    public static function sentimentRules(): array
+    public static function sentimentDefinitionRules(): array
     {
         return [
-            'sentiments' => ['sometimes', 'array', 'list', 'max:12'],
-            'sentiments.*' => ['array'],
-            'sentiments.*.name' => ['required', 'string', 'max:40', 'regex:/^[A-Za-z][A-Za-z0-9 _-]*$/', 'distinct:ignore_case', Rule::notIn(['reason'])],
-            'sentiments.*.description' => ['required', 'string', 'max:500'],
+            'sentimentDefinitions' => ['sometimes', 'array', 'list', 'max:12'],
+            'sentimentDefinitions.*' => ['array'],
+            'sentimentDefinitions.*.name' => ['required', 'string', 'max:40', 'regex:/^[A-Za-z][A-Za-z0-9 _-]*$/', 'distinct:ignore_case', Rule::notIn(['reason'])],
+            'sentimentDefinitions.*.description' => ['required', 'string', 'max:500'],
+            'sentimentDefinitions.*.renamedFrom' => ['nullable', 'string'],
         ];
     }
 

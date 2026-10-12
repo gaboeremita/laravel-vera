@@ -17,7 +17,7 @@ use App\Models\FactAcknowledgement;
 use App\Models\Inventory;
 use App\Models\QuestEvent;
 use App\Models\QuestOffer;
-use App\Models\ResidentSentiment;
+use App\Models\Sentiment;
 use App\Models\WorldSession;
 use App\Models\WorldSessionQuest;
 use Database\Factories\QuestFactory;
@@ -213,7 +213,7 @@ it('finishes a beat the moment a resident\'s trust reaches what it asks, with th
     ]]);
     syncQuests($session);
     worldSentiments($region->world);
-    $sentiment = ResidentSentiment::of($session, $resident);
+    $sentiment = Sentiment::inSession($session, $resident);
 
     $sentiment->adjust(['trust' => 2]);
     expect(runOf($session)->finishedBeats())->toBe([]);
@@ -237,7 +237,7 @@ it('reads a sentiment bound from above, and a sentiment that never moved as 0', 
     $run->save();
 
     worldSentiments($region->world);
-    ResidentSentiment::of($session, $resident)->adjust(['romance' => -2]);
+    Sentiment::inSession($session, $resident)->adjust(['romance' => -2]);
 
     expect(runOf($session)->finishedBeats())->toEqualCanonicalizing(['cold', 'neutral']);
 });
@@ -296,7 +296,7 @@ it('reads a quest as active once its offer is accepted, and starts a quest on a 
     $run = runOf($session);
 
     worldSentiments($region->world);
-    ResidentSentiment::of($session, $resident)->adjust(['liking' => 4]);
+    Sentiment::inSession($session, $resident)->adjust(['liking' => 4]);
 
     expect($run->fresh()->status)->toBe(QuestStatus::Active)
         ->and(QuestSessionState::for($session->fresh())->questState('fond'))->toBe('active');

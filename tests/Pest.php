@@ -356,7 +356,7 @@ function worldQuest(World $world, array $definition = [], array $attributes = []
  */
 function worldSentiments(World $world, array $names = ['romance', 'trust', 'liking']): World
 {
-    $world->update(['sentiments' => World::factory()->withSentiments($names)->raw()['sentiments']]);
+    $world->update(['sentiment_definitions' => World::factory()->withSentiments($names)->raw()['sentiment_definitions']]);
 
     return $world;
 }

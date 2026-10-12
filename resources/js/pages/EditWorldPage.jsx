@@ -18,7 +18,7 @@ import useCampaigns from '../hooks/useCampaigns.js';
 const TABS = [{ id: 'world', label: 'WORLD' }, { id: 'regions', label: 'REGIONS' }];
 
 function toValue(world) {
-	return { ...world, spawnRegionId: world.spawnRegionId ?? null, spawnPassageId: world.spawnPassageId ?? null, regions: world.regions ?? [], residents: world.residents ?? [], sentiments: toSentimentRows(world.sentiments) };
+	return { ...world, spawnRegionId: world.spawnRegionId ?? null, spawnPassageId: world.spawnPassageId ?? null, regions: world.regions ?? [], residents: world.residents ?? [], sentimentDefinitions: toSentimentRows(world.sentimentDefinitions) };
 }
 
 export default function EditWorldPage() {
@@ -69,7 +69,7 @@ export default function EditWorldPage() {
 				name: value.name, slug: value.slug, description: value.description,
 				assistantContextPrompt: value.assistantContextPrompt, npcContextPrompt: value.npcContextPrompt,
 				spawnRegionId: value.spawnRegionId, spawnPassageId: value.spawnPassageId, narratorModelId: value.narratorModelId ?? null, reviewReveals: value.reviewReveals ?? true,
-				sentiments: toSentimentPayload(value.sentiments),
+				sentimentDefinitions: toSentimentPayload(value.sentimentDefinitions),
 			});
 			const saved = await response.json();
 			if (!response.ok) throw new Error(saved.message);

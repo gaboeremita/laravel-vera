@@ -3,22 +3,22 @@
 namespace App\Actions;
 
 use App\Enums\TurnMode;
-use App\Models\ResidentSentiment;
+use App\Models\Sentiment;
 
 /**
- * How a resident feels about the user, for their own prompt while they talk
- * with the user: each of the world's sentiments with its scale and score. In
- * character the numbers shape the resident quietly; out of character and in
- * creator mode the resident can state and change them.
+ * How the assistant feels about the user, for their own prompt while they
+ * talk with the user: each defined sentiment with its scale and score. In
+ * character the numbers shape them quietly; out of character and in creator
+ * mode they can state and change them.
  */
 class BuildSentimentsPrompt
 {
     /**
      * @param  bool  $canUseTools  whether their model can call tools; changing sentiments needs them
      */
-    public function handle(ResidentSentiment $sentiment, TurnMode $mode, bool $canUseTools = true): ?string
+    public function handle(Sentiment $sentiment, TurnMode $mode, bool $canUseTools = true): ?string
     {
-        $sentiments = $sentiment->worldResident->world->sentiments ?? [];
+        $sentiments = $sentiment->definitions();
         if (! $mode->withUser() || $sentiments === []) {
             return null;
         }

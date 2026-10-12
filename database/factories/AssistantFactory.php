@@ -51,4 +51,14 @@ class AssistantFactory extends Factory
             ],
         ]);
     }
+
+    /**
+     * @param  array<int, string>  $names
+     */
+    public function withSentiments(array $names = ['romance', 'trust', 'liking']): static
+    {
+        return $this->state(fn () => [
+            'sentiment_definitions' => collect($names)->map(fn (string $name) => ['name' => $name, 'description' => "-10 is no {$name} at all; 10 is all the {$name} there is."])->all(),
+        ]);
+    }
 }

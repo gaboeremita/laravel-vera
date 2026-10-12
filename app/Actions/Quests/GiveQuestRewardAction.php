@@ -14,11 +14,12 @@ use App\Directors\PromptDirector;
 use App\Enums\QuestEventType;
 use App\Enums\QuestStatus;
 use App\Models\AssistantUser;
+use App\Models\Conversation;
 use App\Models\Inventory;
 use App\Models\InventoryItem;
 use App\Models\Item;
 use App\Models\Region;
-use App\Models\ResidentSentiment;
+use App\Models\Sentiment;
 use App\Models\WorldResident;
 use App\Models\WorldSessionQuest;
 use App\Services\AgentLoop\Tools\World\GiveRewardTool;
@@ -59,7 +60,7 @@ class GiveQuestRewardAction
             : $this->resolveInventory->forObject($session, $region, $reward['from']['object']['object']);
         $giverName = $resident?->assistant->name ?? ($region->layoutObject($reward['from']['object']['object'])['name'] ?? $reward['from']['object']['object']);
 
-        $sentiment = $resident !== null && $world->sentimentNames() !== [] ? ResidentSentiment::of($session, $resident) : null;
+        $sentiment = $resident !== null && $world->sentimentNames() !== [] ? Sentiment::inSession($session, $resident) : null;
         $tool = new GiveRewardTool($this->held($giver), $giver->holder->countsCredits() ? $giver->credits : null, sentiments: $sentiment?->names() ?? []);
         [$provider, $system] = $resident !== null
             ? $this->asResident($run, $resident)
@@ -133,7 +134,7 @@ class GiveQuestRewardAction
         return [app(ResolveNarratorModel::class)->handle($world), $system];
     }
 
-    private function situation(WorldSessionQuest $run, string $prose, Inventory $giver, ?ResidentSentiment $sentiment): string
+    private function situation(WorldSessionQuest $run, string $prose, Inventory $giver, ?Sentiment $sentiment): string
     {
         $ending = $run->ending ?? [];
         $scores = collect($ending['scores'] ?? []);
@@ -166,10 +167,6 @@ class GiveQuestRewardAction
      */
     private function tellInConversation(WorldSessionQuest $run, WorldResident $resident, string $line): void
     {
-        $session = $run->worldSession;
-        $assistantUser = AssistantUser::where('assistant_id', $resident->assistant_id)->where('user_id', $session->worldUser->user_id)->firstOrFail();
-        $conversation = $assistantUser->conversations()->where('world_session_id', $session->id)->first()
-            ?? $assistantUser->conversations()->create(['title' => 'New conversation', 'world_session_id' => $session->id]);
-        $conversation->messages()->create(['role' => 'assistant', 'content' => $line]);
+        Conversation::withResident($run->worldSession, $resident)->messages()->create(['role' => 'assistant', 'content' => $line]);
     }
 }

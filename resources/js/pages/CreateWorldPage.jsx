@@ -9,13 +9,13 @@ import { toSentimentPayload } from '../components/SentimentsEditor.jsx';
 export default function CreateWorldPage() {
 	const navigate = useNavigate();
 	const { addToast } = useOutletContext();
-	const [value, setValue] = useState({ name: '', slug: '', description: '', assistantContextPrompt: '', npcContextPrompt: '', sentiments: [] });
+	const [value, setValue] = useState({ name: '', slug: '', description: '', assistantContextPrompt: '', npcContextPrompt: '', sentimentDefinitions: [] });
 	const [isSaving, setIsSaving] = useState(false);
 
 	const save = async () => {
 		setIsSaving(true);
 		try {
-			const response = await api.post(route('worlds.store'), { ...value, sentiments: toSentimentPayload(value.sentiments) });
+			const response = await api.post(route('worlds.store'), { ...value, sentimentDefinitions: toSentimentPayload(value.sentimentDefinitions) });
 			const world = await response.json();
 			if (!response.ok) throw new Error(world.message);
 			navigate(`/worlds/${world.id}/edit`);

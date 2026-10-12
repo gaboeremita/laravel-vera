@@ -144,7 +144,8 @@ test('a grid without any ground is neither kept nor restored', async () => {
 	const restored = createNavigationGrid({}, options);
 	assert.equal(restored.restore(empty.snapshot()), false);
 	const ground = empty.snapshot();
-	ground.heights[0] = 0;
+	ground.heights = Float32Array.of(0);
+	ground.columnStart.fill(1, 1);
 	assert.equal(restored.restore(ground), true);
 	assert.equal(restored.hasGround, true);
 });

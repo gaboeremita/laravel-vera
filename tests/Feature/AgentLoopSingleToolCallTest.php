@@ -1,6 +1,10 @@
 <?php
 
+use App\Contracts\LlmProvider;
+use App\DTOs\LlmResponse;
 use App\Models\AiModel;
+use App\Services\AgentLoop\AgentLoopRunner;
+use App\Services\AgentLoop\Tools\BasicCalculatorTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -134,4 +138,14 @@ test('the tool calls of a reply are saved on it and come back when the conversat
 
     expect($reply['tool_calls'])->toHaveCount(1);
     expect($reply['tool_calls'][0]['name'])->toBe('get_current_datetime');
+});
+
+test('every request of the loop carries the options it is given', function () {
+    [, $assistant, $conversation] = setUpAgentAssistant();
+    $provider = Mockery::mock(LlmProvider::class);
+    $provider->shouldReceive('chat')->once()->withArgs(fn (array $messages, array $options) => $options === ['voice' => 'calm'])->andReturn(new LlmResponse(content: 'Hello.'));
+
+    $result = (new AgentLoopRunner($provider, [new BasicCalculatorTool]))->run($assistant, [['role' => 'user', 'content' => 'Hi']], $conversation, options: ['voice' => 'calm']);
+
+    expect($result->content)->toBe('Hello.');
 });

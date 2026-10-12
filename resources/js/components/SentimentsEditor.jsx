@@ -5,7 +5,7 @@ const ICON_BUTTON = 'text-fg-3 text-xs px-1 cursor-pointer transition-colors dis
 
 let nextKey = 0;
 
-/** A world's sentiments as the editor holds them: renamedFrom is the name last saved, so a rename carries over to scores and conditions. */
+/** Sentiment definitions as the editor holds them: renamedFrom is the name last saved, so a rename carries over to scores and conditions. */
 export function toSentimentRows(sentiments = []) {
 	return sentiments.map((sentiment) => ({ key: nextKey++, name: sentiment.name, description: sentiment.description, renamedFrom: sentiment.name }));
 }
@@ -14,7 +14,7 @@ export function toSentimentPayload(rows = []) {
 	return rows.map((row) => ({ name: row.name, description: row.description, renamedFrom: row.renamedFrom ?? null }));
 }
 
-export default function SentimentsEditor({ value, onChange }) {
+export default function SentimentsEditor({ value, onChange, hint }) {
 	const update = (key, field, fieldValue) => onChange(value.map((row) => (row.key === key ? { ...row, [field]: fieldValue } : row)));
 	const move = (index, offset) => {
 		const next = [...value];
@@ -24,7 +24,7 @@ export default function SentimentsEditor({ value, onChange }) {
 
 	return (
 		<div className="space-y-4">
-			<p className="text-fg-3 text-xs">How residents feel about the player, each from -10 to 10 per session, starting at 0.</p>
+			<p className="text-fg-3 text-xs">{hint}</p>
 			{value.map((row, index) => (
 				<div key={row.key} className="border-l-2 border-accent/40 pl-3 space-y-2">
 					<div className="flex items-end gap-2">

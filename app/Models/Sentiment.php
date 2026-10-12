@@ -3,20 +3,22 @@
 namespace App\Models;
 
 use App\Events\Quests\ResidentSentimentsChanged;
-use Database\Factories\ResidentSentimentFactory;
+use Database\Factories\SentimentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * How a resident feels about the player in one session: a score from -10 to
- * 10 for each of the world's sentiments, starting at 0.
+ * How the assistant feels about the user in one conversation: a score from
+ * -10 to 10 for each sentiment defined for it, starting at 0. A conversation
+ * in a world session uses the world's sentiment definitions; any other uses
+ * the assistant's.
  */
-#[Fillable(['world_session_id', 'world_resident_id', 'values'])]
-class ResidentSentiment extends Model
+#[Fillable(['conversation_id', 'values'])]
+class Sentiment extends Model
 {
-    /** @use HasFactory<ResidentSentimentFactory> */
+    /** @use HasFactory<SentimentFactory> */
     use HasFactory;
 
     public const LIMIT = 10;
@@ -26,9 +28,27 @@ class ResidentSentiment extends Model
         return ['values' => 'array'];
     }
 
-    public static function of(WorldSession $session, WorldResident $resident): self
+    public static function of(Conversation $conversation): self
     {
-        return self::firstOrCreate(['world_session_id' => $session->id, 'world_resident_id' => $resident->id]);
+        return self::firstOrCreate(['conversation_id' => $conversation->id]);
+    }
+
+    public static function inSession(WorldSession $session, WorldResident $resident): self
+    {
+        return self::of(Conversation::withResident($session, $resident));
+    }
+
+    /**
+     * @return array<int, array{name: string, description: string}>
+     */
+    public function definitions(): array
+    {
+        $conversation = $this->conversation;
+        $holder = $conversation->world_session_id !== null
+            ? $conversation->worldSession->worldUser->world
+            : $conversation->assistantUser()?->assistant;
+
+        return $holder?->sentiment_definitions ?? [];
     }
 
     /**
@@ -36,12 +56,12 @@ class ResidentSentiment extends Model
      */
     public function names(): array
     {
-        return $this->worldResident->world->sentimentNames();
+        return array_column($this->definitions(), 'name');
     }
 
     /**
      * Adds each change to its sentiment, keeping every sentiment within the
-     * limit; names the world doesn't have are ignored.
+     * limit; names without a definition are ignored.
      *
      * @param  array<string, float|int>  $changes  by sentiment name
      */
@@ -67,14 +87,19 @@ class ResidentSentiment extends Model
         $this->values = [...($this->values ?? []), ...$values];
         $this->save();
 
-        $residentName = $this->worldResident->assistant->name;
-        ResidentSentimentsChanged::dispatch($this->world_session_id, collect($changed)
+        $sessionId = $this->conversation->world_session_id;
+        if ($sessionId === null) {
+            return;
+        }
+
+        $residentName = $this->conversation->assistantUser()->assistant->name;
+        ResidentSentimentsChanged::dispatch($sessionId, collect($changed)
             ->map(fn (string $name) => "{$residentName}'s {$name} is now ".number_format($values[$name], 1))
             ->implode('; '));
     }
 
     /**
-     * Every sentiment of the world with its score; one never moved is 0.
+     * Every defined sentiment with its score; one never moved is 0.
      *
      * @return array<string, float>
      */
@@ -85,13 +110,8 @@ class ResidentSentiment extends Model
         return collect($this->names())->mapWithKeys(fn (string $name) => [$name => (float) ($stored[$name] ?? 0)])->all();
     }
 
-    public function worldSession(): BelongsTo
+    public function conversation(): BelongsTo
     {
-        return $this->belongsTo(WorldSession::class);
-    }
-
-    public function worldResident(): BelongsTo
-    {
-        return $this->belongsTo(WorldResident::class);
+        return $this->belongsTo(Conversation::class);
     }
 }

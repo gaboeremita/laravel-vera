@@ -8,6 +8,7 @@ import EmotionGrid from '../components/EmotionGrid.jsx';
 import PosturePoseSections from '../components/PosturePoseSections.jsx';
 import ModelVoiceFields from '../components/ModelVoiceFields.jsx';
 import TermRuleSettings from '../components/TermRuleSettings.jsx';
+import SentimentsEditor, { toSentimentPayload } from '../components/SentimentsEditor.jsx';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
 export default function CreateAssistantPage({ kind = 'assistant' }) {
@@ -59,6 +60,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 	const [promptJson, setPromptJson] = useState('');
 	const [promptJsonError, setPromptJsonError] = useState(null);
 	const [termRules, setTermRules] = useState({ section: null, markTerms: false, swapInvariant: false, highlightMissing: false });
+	const [sentimentDefinitions, setSentimentDefinitions] = useState([]);
 
 	// Prompt tree — local state, no API
 	const prompt = useLocalPrompt();
@@ -248,6 +250,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 
 			if (!isNpc) {
 				formData.append('agent_config', JSON.stringify({ termRules }));
+				formData.append('sentimentDefinitions', JSON.stringify(toSentimentPayload(sentimentDefinitions)));
 			}
 
 			if (portraitType === 'image') {
@@ -427,6 +430,15 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 					</div>}
 
 					{!isNpc && <TermRuleSettings sections={promptSectionsForTermRules} value={termRules} onChange={setTermRules} />}
+
+					{!isNpc && (
+						<div className="space-y-2">
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">
+								Sentiments
+							</label>
+							<SentimentsEditor value={sentimentDefinitions} onChange={setSentimentDefinitions} hint="How the assistant feels about you outside any world, each from -10 to 10 per conversation, starting at 0." />
+						</div>
+					)}
 
 					{!isNpc && <div>
 						<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block mb-1">

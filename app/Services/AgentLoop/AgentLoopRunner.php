@@ -24,8 +24,9 @@ class AgentLoopRunner
 
     /**
      * @param  array<int, array<string, mixed>>  $messages
+     * @param  array<string, mixed>  $options  passed to every request, such as what the voice provider needs
      */
-    public function run(Assistant $assistant, array $messages, Conversation $conversation, ?string $conversationKey = null): AgentRunResult
+    public function run(Assistant $assistant, array $messages, Conversation $conversation, ?string $conversationKey = null, array $options = []): AgentRunResult
     {
         $messages = $this->withToolUsageInstructions($messages);
         $stepLimit = data_get($assistant->agent_config, 'step_limit', config('agent.step_limit'));
@@ -40,7 +41,7 @@ class AgentLoopRunner
 
         try {
             while ($step < $stepLimit) {
-                $response = $this->provider->chat($messages, tools: $toolDefinitions, conversationKey: $conversationKey);
+                $response = $this->provider->chat($messages, $options, tools: $toolDefinitions, conversationKey: $conversationKey);
 
                 if ($response->usage !== null) {
                     $usage[] = $response->usage;
@@ -111,7 +112,7 @@ class AgentLoopRunner
                 }
             }
 
-            $summary = $this->requestFinalSummary($messages, $conversationKey);
+            $summary = $this->requestFinalSummary($messages, $conversationKey, $options);
 
             if ($summary->usage !== null) {
                 $usage[] = $summary->usage;
@@ -225,15 +226,16 @@ class AgentLoopRunner
 
     /**
      * @param  array<int, array<string, mixed>>  $messages
+     * @param  array<string, mixed>  $options
      */
-    private function requestFinalSummary(array $messages, ?string $conversationKey): LlmResponse
+    private function requestFinalSummary(array $messages, ?string $conversationKey, array $options): LlmResponse
     {
         $messages[] = [
             'role' => 'user',
             'content' => "You've reached the maximum number of steps allowed for this task. Summarize what you've found or accomplished so far, and explain what's left undone.",
         ];
 
-        return $this->provider->chat($messages, conversationKey: $conversationKey);
+        return $this->provider->chat($messages, $options, conversationKey: $conversationKey);
     }
 
     /**
