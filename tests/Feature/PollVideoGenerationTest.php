@@ -168,7 +168,7 @@ test('two videos in one conversation are tracked separately', function () {
     Event::assertDispatchedTimes(VideoGenerationFinished::class, 1);
 });
 
-test('an attached image is sent as the first frame through the public address', function () {
+test('an attached image is sent as the first frame through a signed public address', function () {
     config(['ai.video_gen.public_url' => 'https://tunnel.test/']);
     $video = videoInConversation();
     $image = Image::storeFromBase64(base64_encode("\x89PNG fake"), $video->videoable, 'messages/1/1');
@@ -177,7 +177,8 @@ test('an attached image is sent as the first frame through the public address', 
 
     runVideoJob($video->fresh());
 
-    Http::assertSent(fn (Request $request) => $request['frame_images'][0]['image_url']['url'] === "https://tunnel.test/storage/{$image->path}"
+    Http::assertSent(fn (Request $request) => str_starts_with($request['frame_images'][0]['image_url']['url'], "https://tunnel.test/video-frames/{$image->id}?expires=")
+        && str_contains($request['frame_images'][0]['image_url']['url'], '&signature=')
         && $request['frame_images'][0]['frame_type'] === 'first_frame');
 });
 

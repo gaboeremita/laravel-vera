@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\VadAssetController;
+use App\Http\Controllers\VideoFrameController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -12,6 +13,8 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout']);
 
 Route::get('/vendor/vad/{file}', VadAssetController::class)->where('file', '.*\.mjs$');
+
+Route::get('/video-frames/{image}', VideoFrameController::class)->middleware('signed:relative')->name('video-frames.show');
 
 Route::get('/{any}', function () {
     return view('welcome');

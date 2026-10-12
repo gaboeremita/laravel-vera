@@ -226,7 +226,11 @@ Two ways to generate a video:
 - **Manual** — type `/create-video <description>` in the web chat; the assistant writes a detailed video description, replies in character, and the video appears in that message when it is ready. A length, shape or sound you ask for ("a vertical 10 second clip") replaces the model's defaults, adjusted to the closest value the model supports.
 - **Agent tool** — an agent-mode assistant can call the `generate_video` tool when you ask for a video, clip or animation.
 
-An image attached to the request becomes the video's first frame. The provider fetches it through `PUBLIC_TUNNEL_URL`, so the tunnel must be running when the video starts.
+An image attached to the request becomes the video's first frame. The provider fetches it from a signed `/video-frames/{image}` link on `PUBLIC_TUNNEL_URL` that expires after 30 minutes, so the tunnel must be running when the video starts. With ngrok, start the tunnel with the policy in [`ngrok-policy.yml`](./ngrok-policy.yml), which refuses every path except `/video-frames/` so the rest of the app stays off the internet:
+
+```bash
+ngrok http https://laravel-vera.test --host-header=laravel-vera.test --url=<your-ngrok-domain> --traffic-policy-file ngrok-policy.yml
+```
 
 Videos are generated in the background by a queued job, so the queue worker and Reverb must be running (`composer run dev` starts both). The message shows the video's status and turns into a player when it is ready, and a notice appears on any page of the app when it finishes or fails. See [ARCHITECTURE.md → Video Generation](./ARCHITECTURE.md#video-generation).
 
