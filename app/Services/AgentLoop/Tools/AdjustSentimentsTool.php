@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Services\AgentLoop\Tools\World;
+namespace App\Services\AgentLoop\Tools;
 
 use App\Contracts\AgentTool;
 use App\Enums\TurnMode;
-use App\Models\ResidentSentiment;
+use App\Models\Sentiment;
 
 /**
- * Changes how the resident feels about the user, one amount per sentiment of
- * the world. In character each change is at most 3 points; out of character
+ * Changes how the assistant feels about the user, one amount per defined
+ * sentiment. In character each change is at most 3 points; out of character
  * and in creator mode the user may set any value, so the change can reach
  * across the whole range.
  */
@@ -17,7 +17,7 @@ class AdjustSentimentsTool implements AgentTool
     private const IN_CHARACTER_STEP = 3;
 
     public function __construct(
-        private readonly ResidentSentiment $sentiment,
+        private readonly Sentiment $sentiment,
         private readonly TurnMode $mode,
     ) {}
 
@@ -77,6 +77,6 @@ class AdjustSentimentsTool implements AgentTool
 
     private function step(): int
     {
-        return $this->mode === TurnMode::InCharacter ? self::IN_CHARACTER_STEP : 2 * ResidentSentiment::LIMIT;
+        return $this->mode === TurnMode::InCharacter ? self::IN_CHARACTER_STEP : 2 * Sentiment::LIMIT;
     }
 }

@@ -176,3 +176,16 @@ test('no standing point is found where nothing within reach leads anywhere', (co
 	const grid = navigate(context, [box(1, 0.5, 1, 0, 0.25, 0)], { withFloor: false });
 	assert.equal(grid.standingPointNear({ x: 0, y: 0.5, z: 0 }), null);
 });
+
+test('the ground floor stays walkable under four floors stacked above it', (context) => {
+	const slabs = [3, 6, 9, 12].map((y) => box(12, 0.1, 12, 0, y - 0.05, 0));
+	const grid = navigate(context, slabs, { maxY: 13 });
+	const ground = grid.findPath({ x: -4, y: 0, z: -4 }, { x: 4, y: 0, z: 4 });
+	assert.ok(ground);
+	assert.ok(ground.every((point) => Math.abs(point.y) < 0.05));
+	for (const y of [3, 6, 9, 12]) {
+		const node = grid.nearestNode({ x: 0, y, z: 0 });
+		assert.notEqual(node, -1);
+		assert.ok(Math.abs(grid.nodePosition(node).y - y) < 0.05, `no floor found at ${y}`);
+	}
+});

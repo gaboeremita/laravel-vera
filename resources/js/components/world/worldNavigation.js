@@ -3,8 +3,6 @@ import { CHARACTER_RADIUS, MAX_DROP_HEIGHT, MAX_STEP_HEIGHT } from './collisionC
 import { getGroundHeight } from './groundHeight.js';
 
 const CELL_SIZE = 0.4;
-const LEVELS = 3;
-const MAX_SURFACES = 8;
 const MIN_WALKABLE_NORMAL_Y = Math.cos(Math.PI / 4);
 const SURFACE_MERGE_DISTANCE = 0.05;
 const NEAREST_SEARCH_RINGS = 3;
@@ -42,14 +40,10 @@ class NavigationGrid {
 		this.maxY = maxY;
 		this.columns = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) / cellSize) + 1);
 		this.rows = Math.max(1, Math.ceil((bounds.maxZ - bounds.minZ) / cellSize) + 1);
-		const nodeCount = this.columns * this.rows * LEVELS;
-		this.heights = new Float32Array(nodeCount).fill(Number.NaN);
-		this.edges = new Uint8Array(nodeCount * DIRECTIONS.length);
+		this.columnStart = new Int32Array(this.columns * this.rows + 1);
+		this.probedHeights = [];
+		this.heights = new Float32Array(0);
 		this.failedNodes = new Set();
-		this.wallPenalty = new Float32Array(nodeCount).fill(Number.NaN);
-		this.cost = new Float32Array(nodeCount).fill(Number.POSITIVE_INFINITY);
-		this.cameFrom = new Int32Array(nodeCount).fill(-1);
-		this.closed = new Uint8Array(nodeCount);
 		this.touched = [];
 		this.heapNodes = [];
 		this.heapScores = [];
@@ -70,12 +64,12 @@ class NavigationGrid {
 
 	/** Whether any column found ground to stand on; a grid probed against emptied collision has none. */
 	get hasGround() {
-		return this.heights.some((height) => !Number.isNaN(height));
+		return this.columnStart[this.columns * this.rows] > 0;
 	}
 
 	/** The probed heights, for keeping between visits. */
 	snapshot() {
-		return { columns: this.columns, rows: this.rows, heights: this.heights.slice() };
+		return { columns: this.columns, rows: this.rows, columnStart: this.columnStart.slice(), heights: this.heights.slice() };
 	}
 
 	/**
@@ -83,11 +77,33 @@ class NavigationGrid {
 	 * false, and nothing changed, when they were probed for a different grid.
 	 */
 	restore(snapshot) {
-		if (!snapshot || snapshot.columns !== this.columns || snapshot.rows !== this.rows || snapshot.heights?.length !== this.heights.length) return false;
-		if (!snapshot.heights.some((height) => !Number.isNaN(height))) return false;
-		this.heights.set(snapshot.heights);
-		this.nextColumn = this.columns * this.rows;
+		const total = this.columns * this.rows;
+		if (!snapshot || snapshot.columns !== this.columns || snapshot.rows !== this.rows) return false;
+		if (snapshot.columnStart?.length !== total + 1 || snapshot.heights?.length !== snapshot.columnStart[total]) return false;
+		if (snapshot.heights.length === 0) return false;
+		this.columnStart.set(snapshot.columnStart);
+		this.nextColumn = total;
+		this.finish(Float32Array.from(snapshot.heights));
 		return true;
+	}
+
+	/**
+	 * Lays the probed heights out as nodes: each column's walkable surfaces,
+	 * top first, are the nodes from columnStart[column] up to the next column's start.
+	 */
+	finish(heights) {
+		this.heights = heights;
+		const nodeCount = heights.length;
+		this.nodeColumn = new Int32Array(nodeCount);
+		for (let column = 0; column < this.columns * this.rows; column++) {
+			this.nodeColumn.fill(column, this.columnStart[column], this.columnStart[column + 1]);
+		}
+		this.edges = new Uint8Array(nodeCount * DIRECTIONS.length);
+		this.wallPenalty = new Float32Array(nodeCount).fill(Number.NaN);
+		this.cost = new Float32Array(nodeCount).fill(Number.POSITIVE_INFINITY);
+		this.cameFrom = new Int32Array(nodeCount).fill(-1);
+		this.closed = new Uint8Array(nodeCount);
+		this.probedHeights = [];
 	}
 
 	/** Probes columns until the time budget runs out; returns true once every column is done. */
@@ -97,6 +113,8 @@ class NavigationGrid {
 		while (this.nextColumn < total) {
 			this.probeColumn(this.nextColumn);
 			this.nextColumn++;
+			this.columnStart[this.nextColumn] = this.probedHeights.length;
+			if (this.nextColumn === total) this.finish(Float32Array.from(this.probedHeights));
 			if ((this.nextColumn & 31) === 0 && performance.now() >= deadline) break;
 		}
 		return this.isComplete;
@@ -121,21 +139,19 @@ class NavigationGrid {
 		this.triangles.length = 0;
 		surfaces.sort((a, b) => b - a);
 
-		let level = 0;
 		let previous = Number.POSITIVE_INFINITY;
-		for (let index = 0; index < surfaces.length && index < MAX_SURFACES && level < LEVELS; index++) {
+		for (let index = 0; index < surfaces.length; index++) {
 			const y = surfaces[index];
 			if (previous - y < SURFACE_MERGE_DISTANCE) continue;
 			previous = y;
 			this.probe.set(x, y, z);
 			if (this.collisionWorld.isBodyBlocked(this.probe)) continue;
-			this.heights[column * LEVELS + level] = y;
-			level++;
+			this.probedHeights.push(y);
 		}
 	}
 
 	nodePosition(node, target = { x: 0, y: 0, z: 0 }) {
-		const column = Math.floor(node / LEVELS);
+		const column = this.nodeColumn[node];
 		target.x = this.minX + (column % this.columns) * this.cellSize;
 		target.y = this.heights[node];
 		target.z = this.minZ + Math.floor(column / this.columns) * this.cellSize;
@@ -152,10 +168,9 @@ class NavigationGrid {
 				for (let i = centerI - ring; i <= centerI + ring; i++) {
 					if (Math.max(Math.abs(i - centerI), Math.abs(j - centerJ)) !== ring) continue;
 					if (i < 0 || j < 0 || i >= this.columns || j >= this.rows) continue;
-					for (let level = 0; level < LEVELS; level++) {
-						const node = (j * this.columns + i) * LEVELS + level;
+					const column = j * this.columns + i;
+					for (let node = this.columnStart[column]; node < this.columnStart[column + 1]; node++) {
 						const height = this.heights[node];
-						if (Number.isNaN(height)) break;
 						const dy = Math.abs(height - point.y);
 						if (dy > NEAREST_MAX_HEIGHT_DIFFERENCE) continue;
 						const dx = this.minX + i * this.cellSize - point.x;
@@ -222,10 +237,9 @@ class NavigationGrid {
 				if (i < 0 || j < 0 || i >= this.columns || j >= this.rows) continue;
 				const distance = Math.hypot(this.minX + i * this.cellSize - point.x, this.minZ + j * this.cellSize - point.z);
 				if (distance > radius) continue;
-				for (let level = 0; level < LEVELS; level++) {
-					const node = (j * this.columns + i) * LEVELS + level;
+				const column = j * this.columns + i;
+				for (let node = this.columnStart[column]; node < this.columnStart[column + 1]; node++) {
 					const height = this.heights[node];
-					if (Number.isNaN(height)) break;
 					const rise = Math.abs(height - point.y);
 					if (rise <= NEAREST_MAX_HEIGHT_DIFFERENCE) candidates.push({ node, score: distance + rise * 0.5 });
 				}
@@ -244,18 +258,16 @@ class NavigationGrid {
 
 	/** Neighbour node in a direction, choosing the level reachable by a step or small drop. */
 	neighbour(node, direction) {
-		const column = Math.floor(node / LEVELS);
+		const column = this.nodeColumn[node];
 		const i = (column % this.columns) + DIRECTIONS[direction][0];
 		const j = Math.floor(column / this.columns) + DIRECTIONS[direction][1];
 		if (i < 0 || j < 0 || i >= this.columns || j >= this.rows) return -1;
 		const height = this.heights[node];
 		let best = -1;
 		let bestDifference = Number.POSITIVE_INFINITY;
-		for (let level = 0; level < LEVELS; level++) {
-			const candidate = (j * this.columns + i) * LEVELS + level;
-			const candidateHeight = this.heights[candidate];
-			if (Number.isNaN(candidateHeight)) break;
-			const rise = candidateHeight - height;
+		const targetColumn = j * this.columns + i;
+		for (let candidate = this.columnStart[targetColumn]; candidate < this.columnStart[targetColumn + 1]; candidate++) {
+			const rise = this.heights[candidate] - height;
 			if (rise > MAX_STEP_HEIGHT || -rise > MAX_DROP_HEIGHT) continue;
 			if (Math.abs(rise) < bestDifference) {
 				bestDifference = Math.abs(rise);
@@ -392,8 +404,8 @@ class NavigationGrid {
 	}
 
 	heuristic(node, goal) {
-		const a = Math.floor(node / LEVELS);
-		const b = Math.floor(goal / LEVELS);
+		const a = this.nodeColumn[node];
+		const b = this.nodeColumn[goal];
 		const dx = Math.abs((a % this.columns) - (b % this.columns));
 		const dz = Math.abs(Math.floor(a / this.columns) - Math.floor(b / this.columns));
 		return (Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz)) * this.cellSize;
@@ -523,12 +535,11 @@ class NavigationGrid {
 			const column = this.columnNear(x, z);
 			if (column === -1) return false;
 			let height = Number.NaN;
-			for (let level = 0; level < LEVELS; level++) {
-				const candidate = this.heights[column * LEVELS + level];
-				if (Number.isNaN(candidate)) break;
+			for (let node = this.columnStart[column]; node < this.columnStart[column + 1]; node++) {
+				const candidate = this.heights[node];
 				const rise = candidate - previous.y;
 				if (rise <= MAX_STEP_HEIGHT && -rise <= MAX_DROP_HEIGHT) {
-					if (this.failedNodes.has(column * LEVELS + level)) return false;
+					if (this.failedNodes.has(node)) return false;
 					height = candidate;
 					break;
 				}
@@ -599,7 +610,7 @@ class NavigationGrid {
 }
 
 /** Raised whenever probing changes, so grids kept from an earlier version are probed again. */
-export const NAVIGATION_VERSION = 2;
+export const NAVIGATION_VERSION = 3;
 
 export function createNavigationGrid(collisionWorld, options) {
 	return new NavigationGrid(collisionWorld, options);

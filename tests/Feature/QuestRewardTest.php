@@ -12,7 +12,7 @@ use App\Models\AiModel;
 use App\Models\Inventory;
 use App\Models\InventoryItem;
 use App\Models\QuestEvent;
-use App\Models\ResidentSentiment;
+use App\Models\Sentiment;
 use App\Models\WorldSessionQuest;
 use Database\Factories\QuestFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -124,7 +124,7 @@ it('lets the resident decide the reward in their own voice from the score and wh
         ->and(heldQuantity($residentInventory, $plating))->toBeNull()
         ->and($player->fresh()->credits)->toBe(25)
         ->and(array_keys($request['tools'][0]['function']['parameters']['properties']['sentiments']['properties']))->toBe(['romance', 'trust', 'liking'])
-        ->and(ResidentSentiment::of($session, $resident)->scores())->toBe(['romance' => 0.0, 'trust' => 3.0, 'liking' => -1.0])
+        ->and(Sentiment::inSession($session, $resident)->scores())->toBe(['romance' => 0.0, 'trust' => 3.0, 'liking' => -1.0])
         ->and($run->fresh()->state['reward'])->toMatchArray(['line' => 'Thanks for the broth. Take this.', 'credits' => 15, 'items' => [['name' => 'Compliance Unit plating', 'quantity' => 1]]])
         ->and(QuestEvent::where('type', QuestEventType::RewardGiven)->first()->payload)->toMatchArray(['prose' => REWARD_PROSE, 'credits' => 15])
         ->and($conversation->messages()->latest('id')->first())->role->toBe('assistant')->content->toBe('Thanks for the broth. Take this.');

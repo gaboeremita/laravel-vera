@@ -42,13 +42,14 @@ use App\Models\Inventory;
 use App\Models\KnownFact;
 use App\Models\Message;
 use App\Models\Region;
-use App\Models\ResidentSentiment;
+use App\Models\Sentiment;
 use App\Models\Settings;
 use App\Models\World;
 use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Models\WorldUser;
 use App\Services\AgentLoop\AgentLoopRunner;
+use App\Services\AgentLoop\Tools\AdjustSentimentsTool;
 use App\Services\AgentLoop\Tools\BasicCalculatorTool;
 use App\Services\AgentLoop\Tools\ChangeBackgroundTool;
 use App\Services\AgentLoop\Tools\GetCurrentDatetimeTool;
@@ -56,7 +57,6 @@ use App\Services\AgentLoop\Tools\ImageGenerationTool;
 use App\Services\AgentLoop\Tools\VideoGenerationTool;
 use App\Services\AgentLoop\Tools\World\AcknowledgeTool;
 use App\Services\AgentLoop\Tools\World\ActivityGate;
-use App\Services\AgentLoop\Tools\World\AdjustSentimentsTool;
 use App\Services\AgentLoop\Tools\World\AskForTool;
 use App\Services\AgentLoop\Tools\World\AssessQuestTool;
 use App\Services\AgentLoop\Tools\World\CheckHoldsTool;
@@ -485,8 +485,14 @@ class ConversationController extends Controller
             if ($questsPrompt !== null) {
                 $director->addToTurn(TurnSection::RecentActivity, 'quests', $questsPrompt);
             }
-            $residentSentiment = ResidentSentiment::of($worldSession, $questsResident);
-            $sentimentsPrompt = app(BuildSentimentsPrompt::class)->handle($residentSentiment, $turnMode, (bool) $aiModel?->supports_tools);
+        }
+        $sentiment = match (true) {
+            $questsResident !== null && $world->sentimentNames() !== [] => Sentiment::inSession($worldSession, $questsResident),
+            $world === null && $assistantModel->sentimentNames() !== [] => Sentiment::of($conversation),
+            default => null,
+        };
+        if ($sentiment !== null) {
+            $sentimentsPrompt = app(BuildSentimentsPrompt::class)->handle($sentiment, $turnMode, (bool) $aiModel?->supports_tools);
             if ($sentimentsPrompt !== null) {
                 $director->addToTurn(TurnSection::RelationshipState, 'sentiments', $sentimentsPrompt);
             }
@@ -572,10 +578,10 @@ class ConversationController extends Controller
                 $factTools = $this->factTools($worldSession, $conversation, $factsResident, $turnMode, $region, $validated['positions']['residents'][$factsResident->id] ?? null);
                 $questTools = $this->questTools($worldSession, $conversation, $factsResident, $turnMode, new OfferMoment($worldSession, $factsResident, $region, $validated['positions'] ?? null));
                 $tools = [...$tools, ...array_values($factTools), ...array_values($questTools)];
-                $residentSentiment = ResidentSentiment::of($worldSession, $factsResident);
-                if ($residentSentiment->names() !== []) {
-                    $tools[] = new AdjustSentimentsTool($residentSentiment, $turnMode);
-                }
+            }
+
+            if ($sentiment !== null && $aiModel?->supports_tools) {
+                $tools[] = new AdjustSentimentsTool($sentiment, $turnMode);
             }
 
             if ($tools !== []) {
@@ -586,6 +592,7 @@ class ConversationController extends Controller
                     messages: $requestMessages,
                     conversation: $conversation,
                     conversationKey: $conversationKey,
+                    options: $tts?->llmOptions() ?? [],
                 );
 
                 $agentToolCalls = $agentResult->toolCalls;
@@ -1292,6 +1299,15 @@ class ConversationController extends Controller
         $director->withLongTermMemory($conversation);
         $director->withDiscordEnvironment($conversation, $assistantUser);
 
+        $llmManager = new LlmManager;
+        $supportsTools = (bool) $llmManager->resolveModelForAssistantUser($assistantUser)?->supports_tools;
+        $sentiment = $assistantModel->sentimentNames() !== [] ? Sentiment::of($conversation) : null;
+        $turnMode = app(LlmResponseTagParser::class)->hasOutOfCharacter(substr($content, strlen($authorPrefix))) ? TurnMode::OocTurn : TurnMode::InCharacter;
+        $sentimentsPrompt = $sentiment !== null ? app(BuildSentimentsPrompt::class)->handle($sentiment, $turnMode, $supportsTools) : null;
+        if ($sentimentsPrompt !== null) {
+            $director->addToTurn(TurnSection::RelationshipState, 'sentiments', $sentimentsPrompt);
+        }
+
         $markedMessage = app(MarkTermRules::class)->forAssistant($assistantModel, substr($content, strlen($authorPrefix)));
         $currentMessage = [
             'role' => 'user',
@@ -1304,9 +1320,21 @@ class ConversationController extends Controller
             $currentMessage,
         );
 
+        $agentToolCalls = null;
         try {
-            $llm = (new LlmManager)->forAssistantUser($assistantUser);
-            $response = $llm->chat(messages: $requestMessages, conversationKey: $conversation->providerSessionKey());
+            $llm = $llmManager->forAssistantUser($assistantUser);
+            if ($sentiment !== null && $supportsTools) {
+                $agentResult = (new AgentLoopRunner($llm, [new AdjustSentimentsTool($sentiment, $turnMode)]))->run(
+                    assistant: $assistantModel,
+                    messages: $requestMessages,
+                    conversation: $conversation,
+                    conversationKey: $conversation->providerSessionKey(),
+                );
+                $agentToolCalls = $agentResult->toolCalls;
+                $response = new LlmResponse(content: $agentResult->content, thinking: $agentResult->thinking);
+            } else {
+                $response = $llm->chat(messages: $requestMessages, conversationKey: $conversation->providerSessionKey());
+            }
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 502);
         }
@@ -1317,6 +1345,7 @@ class ConversationController extends Controller
             'role' => 'assistant',
             'content' => $parsed['content'],
             'thinking' => $response->thinking,
+            'tool_calls' => $agentToolCalls,
             'expression' => Message::expressionFrom(['emotion' => 'neutral', ...array_filter($parsed, fn (mixed $value) => $value !== null)]),
         ]);
 

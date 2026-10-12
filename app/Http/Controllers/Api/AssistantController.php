@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\DeleteAssistantAssets;
+use App\Actions\RenameSentiment;
 use App\Actions\StorePoseAnimation;
 use App\Enums\AssistantKind;
 use App\Enums\AssistantMode;
 use App\Enums\AssistantPortraitType;
 use App\Enums\Posture;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdateWorldRequest;
 use App\Models\Assistant;
 use App\Models\Emotion;
 use App\Models\Image;
@@ -131,6 +133,7 @@ class AssistantController extends Controller
             'emotions' => $emotions,
             'restricted_emotions' => $restrictedEmotions,
             'poses' => $poses,
+            'sentimentDefinitions' => $assistant->sentiment_definitions ?? [],
         ]);
     }
 
@@ -141,6 +144,9 @@ class AssistantController extends Controller
         }
         if (is_string($request->input('agent_config'))) {
             $request->merge(['agent_config' => json_decode($request->input('agent_config'), true)]);
+        }
+        if (is_string($request->input('sentimentDefinitions'))) {
+            $request->merge(['sentimentDefinitions' => json_decode($request->input('sentimentDefinitions'), true)]);
         }
 
         $isAvatarMode = $request->input('portrait_type') === AssistantPortraitType::Avatar3D->value;
@@ -173,6 +179,7 @@ class AssistantController extends Controller
             'poses.*.vrm_blendshapes.*.weight' => ['required', 'numeric', 'min:0', 'max:100'],
             'poses.*.animation' => ['sometimes', 'file', 'extensions:vrma,fbx', 'max:10240'],
             ...$this->termRuleValidation($request, $request->input('prompt') ?? []),
+            ...UpdateWorldRequest::sentimentDefinitionRules(),
         ]);
 
         $duplicatePose = collect($validated['poses'] ?? [])
@@ -223,6 +230,7 @@ class AssistantController extends Controller
                 'mode' => $validated['mode'] ?? AssistantMode::Assistant->value,
                 'portrait_type' => $validated['portrait_type'] ?? AssistantPortraitType::Image->value,
                 'kind' => $kind,
+                'sentiment_definitions' => $this->sentimentDefinitions($validated['sentimentDefinitions'] ?? []),
             ]);
 
             $request->user()->assistants()->attach($assistant->id);
@@ -303,7 +311,14 @@ class AssistantController extends Controller
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
             'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
             ...$this->termRuleValidation($request, $request->input('prompt') ?? $assistant->prompt ?? []),
+            ...UpdateWorldRequest::sentimentDefinitionRules(),
         ]);
+
+        $sentimentDefinitions = $validated['sentimentDefinitions'] ?? null;
+        unset($validated['sentimentDefinitions']);
+        if ($sentimentDefinitions !== null) {
+            $validated['sentiment_definitions'] = $this->sentimentDefinitions($sentimentDefinitions);
+        }
 
         $termRules = $validated['agent_config']['termRules'] ?? null;
         unset($validated['agent_config']);
@@ -314,9 +329,23 @@ class AssistantController extends Controller
             ];
         }
 
-        $assistant->update($validated);
+        DB::transaction(function () use ($assistant, $validated, $sentimentDefinitions) {
+            if ($sentimentDefinitions !== null) {
+                app(RenameSentiment::class)->handle($assistant, $sentimentDefinitions);
+            }
+            $assistant->update($validated);
+        });
 
         return response()->json($assistant);
+    }
+
+    /**
+     * @param  array<int, array{name: string, description: string}>  $definitions
+     * @return array<int, array{name: string, description: string}>
+     */
+    private function sentimentDefinitions(array $definitions): array
+    {
+        return collect($definitions)->map(fn (array $definition) => ['name' => trim($definition['name']), 'description' => trim($definition['description'])])->values()->all();
     }
 
     /**

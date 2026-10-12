@@ -47,7 +47,7 @@ export default function WorldForm({ value, onChange, regions = null, imagesEdito
 				)}
 			</Accordion>
 			<Accordion label="SENTIMENTS" collapsed={sections.sentiments} onToggle={() => toggle('sentiments')}>
-				<SentimentsEditor value={value.sentiments ?? []} onChange={(sentiments) => update('sentiments', sentiments)} />
+				<SentimentsEditor value={value.sentimentDefinitions ?? []} onChange={(definitions) => update('sentimentDefinitions', definitions)} hint="How residents feel about the player, each from -10 to 10 per session, starting at 0." />
 			</Accordion>
 			{itemsEditor}
 			{regions && (

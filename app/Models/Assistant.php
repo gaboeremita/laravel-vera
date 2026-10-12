@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Collection;
 
-#[Fillable(['name', 'slug', 'description', 'prompt', 'opening_message', 'archive_id', 'mode', 'agent_config', 'portrait_type', 'kind'])]
+#[Fillable(['name', 'slug', 'description', 'prompt', 'opening_message', 'archive_id', 'mode', 'agent_config', 'portrait_type', 'kind', 'sentiment_definitions'])]
 class Assistant extends Model
 {
     /** @use HasFactory<AssistantFactory> */
@@ -31,7 +31,20 @@ class Assistant extends Model
             'agent_config' => 'array',
             'portrait_type' => AssistantPortraitType::class,
             'kind' => AssistantKind::class,
+            'sentiment_definitions' => 'array',
         ];
+    }
+
+    /**
+     * The names of the sentiments the assistant holds about the user in a
+     * chat outside any world; sentiment_definitions is a list of
+     * {name, description}.
+     *
+     * @return array<int, string>
+     */
+    public function sentimentNames(): array
+    {
+        return array_column($this->sentiment_definitions ?? [], 'name');
     }
 
     public function archive(): BelongsTo

@@ -7,11 +7,13 @@ use App\Enums\EndingStatus;
 use App\Enums\InventoryHolder;
 use App\Enums\QuestOfferStatus;
 use App\Enums\QuestStatus;
+use App\Models\Assistant;
 use App\Models\CreditTransaction;
 use App\Models\ItemTransfer;
 use App\Models\Quest;
 use App\Models\QuestOffer;
-use App\Models\ResidentSentiment;
+use App\Models\Sentiment;
+use App\Models\User;
 use App\Models\WorldSession;
 use App\Models\WorldSessionCampaign;
 use App\Models\WorldSessionQuest;
@@ -68,9 +70,7 @@ class QuestSessionState
             $session->factAcknowledgements()->get(['fact_id', 'world_resident_id'])->map(fn ($row) => "{$row->fact_id}:{$row->world_resident_id}")->all(),
             $latestRuns,
             $session->campaignEndings()->with('campaign')->get()->keyBy(fn (WorldSessionCampaign $ending) => $ending->campaign->key),
-            ResidentSentiment::where('world_session_id', $session->id)->get()
-                ->mapWithKeys(fn (ResidentSentiment $sentiment) => [$sentiment->world_resident_id => $sentiment->values ?? []])
-                ->all(),
+            self::sentiments($session),
             $handedOver(ItemTransfer::class)
                 ->selectRaw('to_inventory_id, item_id, sum(quantity) as total')->groupBy('to_inventory_id', 'item_id')->get()
                 ->mapWithKeys(fn ($row) => [$residentByInventory[$row->to_inventory_id].':'.$row->item_id => (int) $row->total])
@@ -81,6 +81,27 @@ class QuestSessionState
                 ->all(),
             self::offerHistory($session, $latestRuns),
         );
+    }
+
+    /**
+     * The scores of the user's chats in the session, by the resident they
+     * talk to.
+     *
+     * @return array<int, array<string, float>>
+     */
+    private static function sentiments(WorldSession $session): array
+    {
+        $residentByAssistant = $session->worldUser->world->residents()->pluck('id', 'assistant_id')->all();
+
+        return Sentiment::query()
+            ->join('conversations', 'conversations.id', '=', 'sentiments.conversation_id')
+            ->where('conversations.world_session_id', $session->id)
+            ->where('conversations.owner_type', (new User)->getMorphClass())
+            ->where('conversations.counterpart_type', (new Assistant)->getMorphClass())
+            ->get(['sentiments.values', 'conversations.counterpart_id'])
+            ->filter(fn (Sentiment $sentiment) => isset($residentByAssistant[$sentiment->counterpart_id]))
+            ->mapWithKeys(fn (Sentiment $sentiment) => [$residentByAssistant[$sentiment->counterpart_id] => $sentiment->values ?? []])
+            ->all();
     }
 
     /**

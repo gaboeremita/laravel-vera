@@ -81,6 +81,18 @@ class Conversation extends Model
         return $user === null ? null : AssistantUser::where('user_id', $user)->where('assistant_id', $assistant)->first();
     }
 
+    /**
+     * The user's chat with a resident in a world session, started when there
+     * is none yet.
+     */
+    public static function withResident(WorldSession $session, WorldResident $resident): self
+    {
+        $assistantUser = AssistantUser::where('assistant_id', $resident->assistant_id)->where('user_id', $session->worldUser->user_id)->firstOrFail();
+
+        return $assistantUser->conversations()->where('world_session_id', $session->id)->first()
+            ?? $assistantUser->conversations()->create(['title' => 'New conversation', 'world_session_id' => $session->id]);
+    }
+
     public function involves(Model $party): bool
     {
         return ($this->owner_type === $party->getMorphClass() && $this->owner_id === $party->getKey())
