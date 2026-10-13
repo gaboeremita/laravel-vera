@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { floorBounds, floorForHeight, floorGroundHeight, labelledZones, projectToMap, spreadLabels, spreadWideLabels } from '../../resources/js/components/world/worldMapProjection.js';
+import { floorBounds, floorForHeight, floorGroundHeight, labelledZones, minimapWindow, projectToMap, spreadLabels, spreadWideLabels } from '../../resources/js/components/world/worldMapProjection.js';
+import { mapScale } from '../../resources/js/components/world/floorMaps.js';
 
 const layout = {
 	floors: [
@@ -72,4 +73,23 @@ test('wide labels side by side are pushed apart, and labels clear of each other 
 	assert.deepEqual([left.labelX, left.labelY], [100, 50]);
 	assert.deepEqual([right.labelX, right.labelY], [150, 70]);
 	assert.deepEqual([far.labelX, far.labelY], [400, 50]);
+});
+
+test('the corner map shows 50 m around the user, kept inside the floor', () => {
+	const district = { minX: -50, maxX: 46, minZ: -86, maxZ: 80 };
+	assert.deepEqual(minimapWindow(district, { x: 0, z: 0 }), { minX: -25, maxX: 25, minZ: -25, maxZ: 25 });
+	assert.deepEqual(minimapWindow(district, { x: 40, z: -84 }), { minX: -4, maxX: 46, minZ: -86, maxZ: -36 });
+	assert.deepEqual(minimapWindow(district, null), { minX: -27, maxX: 23, minZ: -28, maxZ: 22 });
+});
+
+test('a floor narrower than the corner map is centred across it, and a small floor is shown whole', () => {
+	assert.deepEqual(minimapWindow({ minX: 0, maxX: 20, minZ: 0, maxZ: 120 }, { x: 5, z: 100 }), { minX: -15, maxX: 35, minZ: 70, maxZ: 120 });
+	const room = { minX: -6, maxX: 6, minZ: -4, maxZ: 4 };
+	assert.equal(minimapWindow(room, { x: 1, z: 1 }), room);
+});
+
+test('floor maps keep 8 px per metre, 640 px on a small floor, within what the GPU can draw', () => {
+	assert.equal(mapScale(144, 96, 16384), 8);
+	assert.equal(mapScale(20, 10, 16384), 32);
+	assert.equal(mapScale(4000, 100, 16384), 4.096);
 });

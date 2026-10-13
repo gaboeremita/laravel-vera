@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { floorForHeight, labelledZones, projectToMap, spreadLabels, spreadWideLabels } from './worldMapProjection.js';
+import { floorForHeight, labelledZones, minimapWindow, projectToMap, spreadLabels, spreadWideLabels } from './worldMapProjection.js';
 
 const SNAPSHOT_INTERVAL_MS = 100;
 const MINIMAP_WIDTH = 220;
@@ -7,6 +7,9 @@ const LABEL_SPACING = 14;
 const ZONE_LABEL_HEIGHT = 22;
 const ZONE_LABEL_CHARACTER_WIDTH = 9;
 const ZONE_LABEL_PADDING = 16;
+const MINIMAP_ZONE_LABEL_HEIGHT = 16;
+const MINIMAP_ZONE_LABEL_CHARACTER_WIDTH = 6;
+const MINIMAP_ZONE_LABEL_PADDING = 10;
 
 function zoneCentroid(outline) {
 	const sum = outline.reduce((total, [x, z]) => ({ x: total.x + x, z: total.z + z }), { x: 0, z: 0 });
@@ -50,10 +53,15 @@ export default function WorldMap({ layout, floorMaps, playerView, residents, res
 
 	const shownFloorId = manualFloorId ?? snapshot.playerFloorId;
 	const map = floorMaps.find((floorMap) => floorMap.floorId === shownFloorId) ?? floorMaps[0];
-	const aspect = (map.bounds.maxZ - map.bounds.minZ) / (map.bounds.maxX - map.bounds.minX);
+	const shown = expanded ? map.bounds : minimapWindow(map.bounds, snapshot.player);
+	const aspect = (shown.maxZ - shown.minZ) / (shown.maxX - shown.minX);
 	const width = expanded ? Math.min(window.innerWidth * 0.8, (window.innerHeight * 0.8) / aspect) : MINIMAP_WIDTH;
 	const size = { width, height: width * aspect };
-	const project = (point) => projectToMap(point, map.bounds, size);
+	const project = (point) => projectToMap(point, shown, size);
+	const imageStart = project({ x: map.bounds.minX, z: map.bounds.minZ });
+	const imageEnd = project({ x: map.bounds.maxX, z: map.bounds.maxZ });
+	const imageBox = { left: imageStart.x, top: imageStart.y, width: imageEnd.x - imageStart.x, height: imageEnd.y - imageStart.y };
+	const inShown = (point) => point.x >= shown.minX && point.x <= shown.maxX && point.z >= shown.minZ && point.z <= shown.maxZ;
 
 	const residentMarkers = spreadLabels(snapshot.residents.map((resident) => {
 		const floor = floors.length ? floorForHeight(layout, resident.y) : null;
@@ -61,13 +69,18 @@ export default function WorldMap({ layout, floorMaps, playerView, residents, res
 		return { ...resident, ...project(resident), floorName: floor?.name ?? null, onShownFloor };
 	}), LABEL_SPACING);
 	const player = snapshot.player && (floors.length === 0 || snapshot.playerFloorId === map.floorId) ? { ...project(snapshot.player), yaw: snapshot.player.yaw } : null;
-	const zoneLabels = expanded ? spreadWideLabels(labelledZones(layout, map.floorId).map((zone) => ({ id: zone.id, name: zone.name, width: zone.name.length * ZONE_LABEL_CHARACTER_WIDTH + ZONE_LABEL_PADDING, ...project(zoneCentroid(zone.outline)) })), ZONE_LABEL_HEIGHT) : [];
+	const characterWidth = expanded ? ZONE_LABEL_CHARACTER_WIDTH : MINIMAP_ZONE_LABEL_CHARACTER_WIDTH;
+	const labelPadding = expanded ? ZONE_LABEL_PADDING : MINIMAP_ZONE_LABEL_PADDING;
+	const zoneLabels = spreadWideLabels(labelledZones(layout, map.floorId)
+		.map((zone) => ({ zone, centroid: zoneCentroid(zone.outline) }))
+		.filter(({ centroid }) => expanded || inShown(centroid))
+		.map(({ zone, centroid }) => ({ id: zone.id, name: zone.name, width: zone.name.length * characterWidth + labelPadding, ...project(centroid) })), expanded ? ZONE_LABEL_HEIGHT : MINIMAP_ZONE_LABEL_HEIGHT);
 
 	const mapView = (
 		<div className="relative overflow-hidden border border-line-1 bg-black" style={size}>
-			<img src={map.url} alt="" className="absolute inset-0 h-full w-full opacity-80" draggable={false} />
+			<img src={map.url} alt="" className="absolute max-w-none opacity-80" style={imageBox} draggable={false} />
 			{zoneLabels.map((zone) => (
-				<span key={zone.id} className="world-hud-panel world-hud-label absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap px-2 py-0.5 text-fg-1 text-[0.7rem]" style={{ left: zone.labelX, top: zone.labelY }}>{zone.name.toUpperCase()}</span>
+				<span key={zone.id} className={`world-hud-panel world-hud-label absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-fg-1 ${expanded ? 'px-2 py-0.5 text-[0.7rem]' : 'px-1 text-[0.5rem]'}`} style={{ left: zone.labelX, top: zone.labelY }}>{zone.name.toUpperCase()}</span>
 			))}
 			{residentMarkers.map((marker) => {
 				const active = marker.id === activeResidentId;

@@ -3,6 +3,7 @@ import { useThree } from '@react-three/fiber';
 import { Vector3 } from 'three';
 import { VRMUtils } from '@pixiv/three-vrm';
 import { WorldCollision } from './collisionCheck.js';
+import { prepareDrawDistance } from './drawDistance.js';
 import { createGltfLoader } from '../../utils/vrmLoader.js';
 
 export default function WorldEnvironment({ url, blockingObjectIds, onReady, onError }) {
@@ -18,12 +19,13 @@ export default function WorldEnvironment({ url, blockingObjectIds, onReady, onEr
 			if (disposed) { VRMUtils.deepDispose(gltf.scene); return; }
 			loadedAsset = gltf.scene;
 			try {
+				const detail = prepareDrawDistance(loadedAsset);
 				collisionWorld = new WorldCollision(loadedAsset, { blockingObjectIds });
 				const center = collisionWorld.bounds.getCenter(new Vector3()).setY(0);
 				const spawnPosition = collisionWorld.findSpawn(center);
 				if (!spawnPosition) throw new Error('No walkable spawn with enough headroom was found in this environment.');
 				scene.add(loadedAsset);
-				onReady({ collisionWorld, spawnPosition, root: loadedAsset });
+				onReady({ collisionWorld, spawnPosition, root: loadedAsset, detail });
 			} catch (error) {
 				onError(error);
 			}

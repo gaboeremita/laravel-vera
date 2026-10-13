@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, PlaneGeometry } from 'three';
+import { BoxGeometry, Group, Mesh, MeshBasicMaterial, PlaneGeometry, Vector3 } from 'three';
 import { WorldCollision } from '../../resources/js/components/world/collisionCheck.js';
 import { buildNavigationGrid } from '../../resources/js/components/world/worldNavigation.js';
 
@@ -188,4 +188,19 @@ test('the ground floor stays walkable under four floors stacked above it', (cont
 		assert.notEqual(node, -1);
 		assert.ok(Math.abs(grid.nodePosition(node).y - y) < 0.05, `no floor found at ${y}`);
 	}
+});
+
+test('a body pressed into the wall of a sealed room is freed back to where it stood, outside', (context) => {
+	const room = [
+		box(0.3, 3, 4.6, 1, 1.5, 0),
+		box(0.3, 3, 4.6, 5, 1.5, 0),
+		box(4.3, 3, 0.3, 3, 1.5, -2.15),
+		box(4.3, 3, 0.3, 3, 1.5, 2.15),
+		box(4.3, 0.2, 4.6, 3, 3.1, 0),
+	];
+	const grid = navigate(context, room);
+	const lastClear = new Vector3(0.3, 0, 0);
+	const free = grid.collisionWorld.freeBodyPosition(new Vector3(1.25, 0, 0), grid, lastClear);
+	assert.ok(free);
+	assert.ok(free.x < 0.85, `freed at x=${free.x}, inside the room`);
 });

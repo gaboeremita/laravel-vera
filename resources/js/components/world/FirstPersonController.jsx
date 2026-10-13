@@ -58,7 +58,7 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 	const jumpRequested = useRef(false);
 	const dip = useRef(0);
 	const dragging = useRef(false);
-	const embedded = useRef({ since: null, checkAt: 0 });
+	const embedded = useRef({ since: null, checkAt: 0, lastClear: null });
 	const blockingObjectId = useRef(null);
 	const callbacks = useRef({});
 
@@ -249,6 +249,7 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 				activeCamera.rotation.set(0, spawnYaw, 0, 'YXZ');
 			}
 			lastReportedFoot.current.copy(footPosition.current);
+			embedded.current.lastClear = null;
 			callbacks.current.onPositionChange?.([spawnPosition.x, spawnPosition.y, spawnPosition.z]);
 		}
 
@@ -340,11 +341,13 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 		if (airborne.current || mode.current === 'swimming') embedded.current.since = null;
 		else if (elapsed.current >= embedded.current.checkAt) {
 			embedded.current.checkAt = elapsed.current + EMBEDDED_CHECK_SECONDS;
-			if (!collisionWorld.isBodyBlocked(foot)) embedded.current.since = null;
-			else if (embedded.current.since === null) embedded.current.since = elapsed.current;
+			if (!collisionWorld.isBodyBlocked(foot)) {
+				embedded.current.since = null;
+				embedded.current.lastClear = (embedded.current.lastClear ?? new Vector3()).copy(foot);
+			} else if (embedded.current.since === null) embedded.current.since = elapsed.current;
 			else if (elapsed.current - embedded.current.since >= EMBEDDED_SECONDS) {
 				embedded.current.since = null;
-				const free = collisionWorld.freeBodyPosition(foot, navigation?.current);
+				const free = collisionWorld.freeBodyPosition(foot, navigation?.current, embedded.current.lastClear);
 				if (free) foot.copy(free);
 			}
 		}
