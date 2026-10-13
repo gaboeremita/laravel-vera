@@ -37,6 +37,7 @@ class AgentLoopRunner
         $step = 0;
         $toolCallsSummary = [];
         $thinkingSteps = [];
+        $earlierReplies = [];
         $usage = [];
 
         try {
@@ -52,12 +53,17 @@ class AgentLoopRunner
                 }
 
                 if ($response->isFinal()) {
-                    return new AgentRunResult($response->content, $toolCallsSummary, $this->joinThinking($thinkingSteps), $usage);
+                    return new AgentRunResult($this->joinReply($earlierReplies, $response->content), $toolCallsSummary, $this->joinThinking($thinkingSteps), $usage);
+                }
+
+                if (filled($response->content)) {
+                    $earlierReplies[] = $response->content;
                 }
 
                 $messages[] = [
                     'role' => 'assistant',
                     'content' => $response->content !== '' ? $response->content : null,
+                    'thinking' => $response->thinking,
                     'tool_calls' => array_map(fn (ToolCallRequest $call) => [
                         'id' => $call->id,
                         'name' => $call->name,
@@ -118,7 +124,7 @@ class AgentLoopRunner
                 $usage[] = $summary->usage;
             }
 
-            return new AgentRunResult($summary->content, $toolCallsSummary, $this->joinThinking($thinkingSteps), $usage);
+            return new AgentRunResult($this->joinReply($earlierReplies, $summary->content), $toolCallsSummary, $this->joinThinking($thinkingSteps), $usage);
         } finally {
             $this->clearProgress($conversation->id);
         }
@@ -222,6 +228,14 @@ class AgentLoopRunner
     private function joinThinking(array $thinkingSteps): ?string
     {
         return $thinkingSteps === [] ? null : implode("\n\n", $thinkingSteps);
+    }
+
+    /**
+     * @param  array<int, string>  $earlierReplies
+     */
+    private function joinReply(array $earlierReplies, string $finalContent): string
+    {
+        return implode("\n\n", array_filter([...$earlierReplies, $finalContent], 'filled'));
     }
 
     /**

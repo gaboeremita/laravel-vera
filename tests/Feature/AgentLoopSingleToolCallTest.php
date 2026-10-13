@@ -149,3 +149,44 @@ test('every request of the loop carries the options it is given', function () {
 
     expect($result->content)->toBe('Hello.');
 });
+
+test('the reasoning before a tool call is sent back on the request after the tool result', function () {
+    [$user, $assistant, $conversation] = setUpAgentAssistant();
+    AiModel::query()->update(['thinking_key' => 'reasoning_content']);
+
+    $toolStep = toolCallResponse('call_1', 'get_current_datetime', []);
+    $toolStep['choices'][0]['message']['reasoning_content'] = 'Draft: tell them the date warmly.';
+
+    Http::fake([
+        'fake-llm.test/*' => Http::sequence()->push($toolStep)->push(finalAnswerResponse('Today is a great day.')),
+    ]);
+
+    $this->actingAs($user)->postJson(
+        route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
+        ['message' => ['content' => 'What is today\'s date?']],
+    )->assertSuccessful();
+
+    $secondRequest = Http::recorded()[1][0];
+    $toolCallTurn = collect($secondRequest['messages'])->first(fn (array $message) => ! empty($message['tool_calls']));
+
+    expect($toolCallTurn['reasoning_content'])->toBe('Draft: tell them the date warmly.');
+});
+
+test('text written alongside a tool call is kept in the final reply', function () {
+    [$user, $assistant, $conversation] = setUpAgentAssistant();
+
+    $toolStep = toolCallResponse('call_1', 'get_current_datetime', []);
+    $toolStep['choices'][0]['message']['content'] = '*glances at the clock*';
+
+    Http::fake([
+        'fake-llm.test/*' => Http::sequence()->push($toolStep)->push(finalAnswerResponse('Today is a great day.')),
+    ]);
+
+    $response = $this->actingAs($user)->postJson(
+        route('conversations.sendMessage', ['assistant' => $assistant->id, 'id' => $conversation->id]),
+        ['message' => ['content' => 'What is today\'s date?']],
+    );
+
+    $response->assertSuccessful();
+    expect($response->json('content'))->toBe("*glances at the clock*\n\nToday is a great day.");
+});
