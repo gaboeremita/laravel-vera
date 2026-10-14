@@ -3,15 +3,17 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { PLAYER_EYE_HEIGHT } from './collisionCheck.js';
 import { floorAt } from './worldLocation.js';
 import { LIGHT_BUDGET, nearestLights, visibleFromFloor } from './worldLighting.js';
+import { updateDrawDistance } from './drawDistance.js';
 
 const UPDATE_SECONDS = 0.3;
 
 /**
  * Keeps the environment cheap to draw: only the lights nearest the user are
- * lit, and groups the world file tags with the floors they can be seen from
- * are hidden from every other floor.
+ * lit, groups the world file tags with the floors they can be seen from
+ * are hidden from every other floor, and chunks are drawn in full only
+ * within the draw distance.
  */
-export default function EnvironmentDetail({ root, layout, playerState }) {
+export default function EnvironmentDetail({ root, detail, layout, playerState }) {
 	const { camera } = useThree();
 	const parts = useRef({ lights: [], positions: [], tagged: [], elapsed: UPDATE_SECONDS });
 
@@ -30,6 +32,7 @@ export default function EnvironmentDetail({ root, layout, playerState }) {
 	}, [root]);
 
 	useFrame((_, delta) => {
+		updateDrawDistance(detail, camera.position);
 		const current = parts.current;
 		current.elapsed += delta;
 		if (current.elapsed < UPDATE_SECONDS) return;

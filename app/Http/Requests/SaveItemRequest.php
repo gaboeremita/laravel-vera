@@ -25,7 +25,7 @@ class SaveItemRequest extends FormRequest
         $item = $this->route('item');
 
         return [
-            'name' => ['required', 'string', 'max:255', Rule::unique('items', 'name')->where('world_id', $world->id)->ignore($item instanceof Item ? $item->id : null)],
+            'name' => ['required', 'string', 'max:255', Rule::unique('items', 'name')->where('world_id', $world->id)->whereNull('world_session_id')->ignore($item instanceof Item ? $item->id : null)],
             'description' => ['required', 'string'],
             'basePrice' => ['nullable', 'integer', 'min:0'],
             'contents' => ['nullable', 'string'],

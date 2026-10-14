@@ -94,6 +94,8 @@ class GenericProvider implements LlmProvider
 
         $data = $response->json();
 
+        Log::debug('[GenericProvider] raw response', ['model' => $this->model, 'data' => $data]);
+
         if (isset($data['error'])) {
             Log::error('[GenericProvider] LLM error', ['error' => $data['error']]);
             throw new \RuntimeException('LLM error: '.($data['error']['message'] ?? 'Unknown error'));
@@ -138,9 +140,16 @@ class GenericProvider implements LlmProvider
         }
 
         if (! empty($message['tool_calls'])) {
+            /**
+             * Reasoning models (e.g. DeepSeek) plan the reply in their reasoning before a tool call;
+             * without it sent back, the request after the tool result loses that plan.
+             */
+            $reasoning = $this->thinkingKey && filled($message['thinking'] ?? null) ? [$this->thinkingKey => $message['thinking']] : [];
+
             return [
                 'role' => 'assistant',
                 'content' => is_array($message['content'] ?? null) ? PromptParts::join($message['content']) : ($message['content'] ?? null),
+                ...$reasoning,
                 'tool_calls' => array_map(fn (array $toolCall) => [
                     'id' => $toolCall['id'],
                     'type' => 'function',

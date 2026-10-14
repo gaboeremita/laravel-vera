@@ -55,7 +55,7 @@ class Inventory extends Model
      */
     public function summary(bool $forSaleOnly = false): array
     {
-        $items = $this->items()->with(['item.cardImage', 'item.sound'])->when($forSaleOnly, fn ($query) => $query->where('for_sale', true))->get();
+        $items = $this->items()->with(['item.cardImage', 'item.sound', 'item.madeBy.assistant'])->when($forSaleOnly, fn ($query) => $query->where('for_sale', true))->get();
 
         return [
             'credits' => $this->credits,
@@ -66,6 +66,7 @@ class Inventory extends Model
                 'quantity' => $held->quantity,
                 'basePrice' => $held->item->base_price,
                 'cardImageUrl' => $held->item->cardImage?->url,
+                'madeBy' => $held->item->madeBy?->assistant->name,
                 'soundUrl' => $held->item->sound?->url(),
                 'soundHash' => $held->item->sound?->hash,
                 'canExamine' => filled($held->item->contents),

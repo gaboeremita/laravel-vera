@@ -59,6 +59,16 @@ class WorldResident extends Model
     }
 
     /**
+     * The activities, by id, during which they make items; empty when they make none.
+     *
+     * @return array<int, string>
+     */
+    public function makesItemsAt(): array
+    {
+        return array_values($this->behavior_settings['makesItemsAt'] ?? []);
+    }
+
+    /**
      * An NPC that stays put or walks its route keeps to it when someone talks
      * to her, so she is given no tools that move her.
      */

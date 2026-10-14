@@ -61,7 +61,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 			.catch(() => {});
 	}, []);
 
-	const [modelVoice, setModelVoice] = useState({ aiModelId: null, ttsModelId: null, ttsVoice: null });
+	const [modelVoice, setModelVoice] = useState({ aiModelId: null, imageGenModelId: null, ttsModelId: null, ttsVoice: null });
 
 	useEffect(() => {
 		if (!isNpc) return;
@@ -70,7 +70,7 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				if (!res.ok) throw new Error(`HTTP ${res.status}`);
 				return res.json();
 			})
-			.then((settings) => setModelVoice({ aiModelId: settings.ai_model_id ?? null, ttsModelId: settings.tts_model_id ?? null, ttsVoice: settings.tts_voice ?? null }))
+			.then((settings) => setModelVoice({ aiModelId: settings.ai_model_id ?? null, imageGenModelId: settings.image_gen_model_id ?? null, ttsModelId: settings.tts_model_id ?? null, ttsVoice: settings.tts_voice ?? null }))
 			.catch((error) => addToast(`Failed to load the model and voice (${error.message})`, 'error'));
 	}, [id, isNpc, addToast]);
 
@@ -79,6 +79,10 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 			if ('aiModelId' in changes) {
 				const res = await api.put(route('settings.selectModel', { assistant: id }), { ai_model_id: changes.aiModelId });
 				if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to save the LLM model');
+			}
+			if ('imageGenModelId' in changes) {
+				const res = await api.put(route('settings.selectImageGenModel', { assistant: id }), { image_gen_model_id: changes.imageGenModelId });
+				if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to save the image model');
 			}
 			if ('ttsModelId' in changes) {
 				const res = await api.put(route('settings.selectVoiceModel', { assistant: id }), { tts_model_id: changes.ttsModelId });

@@ -1,8 +1,16 @@
 import { Box3, OrthographicCamera, SRGBColorSpace, Vector3, WebGLRenderTarget } from 'three';
 import { PLAN_CUT_HEIGHT, floorBounds, floorGroundHeight } from './worldMapProjection.js';
+import { isWorldGeometry, showFullDetail } from './drawDistance.js';
 
-const MAP_RESOLUTION = 640;
+const MIN_MAP_SIDE = 640;
+const PIXELS_PER_METRE = 8;
 const MAX_ENVIRONMENT_SPAN = 150;
+
+/** Pixels per metre of a floor's map: 8, or more on a small floor so its longest side keeps 640 px, within what the GPU can draw. */
+export function mapScale(width, depth, maxSide) {
+	const longest = Math.max(width, depth);
+	return Math.min(Math.max(PIXELS_PER_METRE, MIN_MAP_SIDE / longest), maxSide / longest);
+}
 
 /**
  * Bounds of the environment's own geometry for worlds without zones. Very
@@ -13,7 +21,7 @@ export function environmentBounds(root) {
 	const meshBounds = new Box3();
 	const size = new Vector3();
 	root.traverse((node) => {
-		if (!node.isMesh) return;
+		if (!node.isMesh || !isWorldGeometry(node)) return;
 		meshBounds.setFromObject(node);
 		meshBounds.getSize(size);
 		if (Math.max(size.x, size.z) > MAX_ENVIRONMENT_SPAN) return;
@@ -23,10 +31,10 @@ export function environmentBounds(root) {
 	return { minX: bounds.min.x, maxX: bounds.max.x, minZ: bounds.min.z, maxZ: bounds.max.z };
 }
 
-function renderPlan(renderer, scene, bounds, cutHeight) {
+function renderPlan(renderer, scene, detail, bounds, cutHeight) {
 	const width = bounds.maxX - bounds.minX;
 	const depth = bounds.maxZ - bounds.minZ;
-	const scale = MAP_RESOLUTION / Math.max(width, depth);
+	const scale = mapScale(width, depth, renderer.capabilities.maxTextureSize);
 	const pixelWidth = Math.max(1, Math.round(width * scale));
 	const pixelHeight = Math.max(1, Math.round(depth * scale));
 
@@ -42,6 +50,8 @@ function renderPlan(renderer, scene, bounds, cutHeight) {
 	target.texture.colorSpace = SRGBColorSpace;
 	const previousTarget = renderer.getRenderTarget();
 	renderer.setRenderTarget(target);
+	renderer.clear();
+	if (detail) showFullDetail(detail);
 	renderer.render(scene, camera);
 	const pixels = new Uint8Array(pixelWidth * pixelHeight * 4);
 	renderer.readRenderTargetPixels(target, 0, 0, pixelWidth, pixelHeight, pixels);
@@ -65,7 +75,7 @@ function renderPlan(renderer, scene, bounds, cutHeight) {
  * One top-down image per floor, cut just above head height so walls read
  * like a floor plan and the floors above are removed.
  */
-export async function renderFloorMaps({ renderer, scene, layout, environmentRoot, fallbackGroundY }) {
+export async function renderFloorMaps({ renderer, scene, layout, environmentRoot, detail = null, fallbackGroundY }) {
 	const floors = layout?.floors?.length ? layout.floors : [{ id: null, name: null }];
 	const fallback = floors.some((floor) => !floorBounds(layout, floor.id)) && environmentRoot ? environmentBounds(environmentRoot) : null;
 	const maps = [];
@@ -74,7 +84,7 @@ export async function renderFloorMaps({ renderer, scene, layout, environmentRoot
 		const bounds = floorBounds(layout, floor.id) ?? fallback;
 		if (!bounds) continue;
 		const cutHeight = floorGroundHeight(layout, floor.id, fallbackGroundY) + PLAN_CUT_HEIGHT;
-		const blob = await renderPlan(renderer, scene, bounds, cutHeight);
+		const blob = await renderPlan(renderer, scene, detail, bounds, cutHeight);
 		if (blob) maps.push({ floorId: floor.id, name: floor.name, bounds, blob });
 	}
 

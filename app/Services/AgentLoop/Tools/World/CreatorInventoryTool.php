@@ -35,7 +35,7 @@ abstract class CreatorInventoryTool implements AgentTool
                     'items' => [
                         'type' => 'object',
                         'properties' => [
-                            'item' => ['type' => 'string', 'enum' => Item::where('world_id', $worldId)->orderBy('name')->pluck('name')->all()],
+                            'item' => ['type' => 'string', 'enum' => Item::availableIn($this->session)->orderBy('name')->pluck('name')->all()],
                             'quantity' => ['type' => 'integer', 'minimum' => 1],
                         ],
                         'required' => ['item', 'quantity'],
@@ -77,10 +77,9 @@ abstract class CreatorInventoryTool implements AgentTool
      */
     protected function amounts(array $arguments, Inventory $holder): array
     {
-        $worldId = $this->session->worldUser->world_id;
         $items = [];
         foreach ($arguments['items'] ?? [] as $entry) {
-            $item = Item::where('world_id', $worldId)->whereRaw('lower(name) = ?', [mb_strtolower(trim((string) ($entry['item'] ?? '')))])->first()
+            $item = Item::availableIn($this->session)->whereRaw('lower(name) = ?', [mb_strtolower(trim((string) ($entry['item'] ?? '')))])->first()
                 ?? throw new RuntimeException(sprintf('There is no item called "%s" in this world.', $entry['item'] ?? ''));
             $items[$item->id] = ($items[$item->id] ?? 0) + max(1, (int) ($entry['quantity'] ?? 1));
         }

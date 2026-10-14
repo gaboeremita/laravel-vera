@@ -334,6 +334,21 @@ test('a stuck body prefers the nearest walkable navigation point', (context) => 
 	assert.equal(free, walkable);
 });
 
+test('a navigation point the body cannot walk to from where it last stood clear is passed over for that spot', (context) => {
+	const world = createWorld(context, slab(10, 1));
+	const lastClear = new Vector3(2, 0, -2);
+	const free = world.freeBodyPosition(new Vector3(0, 0, 0.1), { nearestPoint: () => ({ x: 1, y: 0, z: 2 }), findPath: () => null }, lastClear);
+	assert.deepEqual(free.toArray(), lastClear.toArray());
+	assert.notEqual(free, lastClear);
+});
+
+test('a navigation point walkable from where the body last stood clear is taken', (context) => {
+	const world = createWorld(context, slab(10, 1));
+	const walkable = { x: 1, y: 0, z: -2 };
+	const free = world.freeBodyPosition(new Vector3(0, 0, 0.1), { nearestPoint: () => walkable, findPath: () => [walkable] }, new Vector3(2, 0, -2));
+	assert.equal(free, walkable);
+});
+
 test('a navigation point that is itself blocked falls back to open floor', (context) => {
 	const world = createWorld(context, slab(10, 1));
 	const free = world.freeBodyPosition(new Vector3(0, 0, 0.1), { nearestPoint: () => ({ x: 0, y: 0, z: 0 }) });
@@ -484,4 +499,13 @@ test('a blocking object with no meshes seals a gap in a thin fence it stands jus
 	world.move(player, 0, -4, { withBlockers: true });
 	assert.ok(player.z >= 0.25);
 	assert.equal(world.blockedBy, 'orphanage-door');
+});
+
+test('a low-detail version collides with nothing', (context) => {
+	const crude = wall();
+	crude.userData.lowDetail = true;
+	const world = createWorld(context, crude);
+	const position = new Vector3(0, 0, 2);
+	world.move(position, 0, -4);
+	assert.ok(position.z < 0);
 });

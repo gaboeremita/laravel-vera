@@ -35,6 +35,29 @@ export function floorGroundHeight(layout, floorId, fallback = 0) {
 	return heights[Math.floor(heights.length / 2)];
 }
 
+/** Metres the corner map shows across, around the user. */
+export const MINIMAP_SPAN = 50;
+
+function windowAxis(min, max, center, span) {
+	if (max - min <= span) {
+		const middle = (min + max) / 2;
+		return [middle - span / 2, middle + span / 2];
+	}
+	const start = Math.min(Math.max(center - span / 2, min), max - span);
+	return [start, start + span];
+}
+
+/**
+ * The part of a floor the corner map shows: a square around the point, kept
+ * inside the floor, or the whole floor when it fits in that square.
+ */
+export function minimapWindow(bounds, point, span = MINIMAP_SPAN) {
+	if (bounds.maxX - bounds.minX <= span && bounds.maxZ - bounds.minZ <= span) return bounds;
+	const [minX, maxX] = windowAxis(bounds.minX, bounds.maxX, point?.x ?? (bounds.minX + bounds.maxX) / 2, span);
+	const [minZ, maxZ] = windowAxis(bounds.minZ, bounds.maxZ, point?.z ?? (bounds.minZ + bounds.maxZ) / 2, span);
+	return { minX, maxX, minZ, maxZ };
+}
+
 export function projectToMap(point, bounds, size) {
 	return {
 		x: ((point.x - bounds.minX) / (bounds.maxX - bounds.minX)) * size.width,

@@ -48,6 +48,8 @@ export class WorldCollision {
 		const instanceMatrix = new Matrix4();
 		const worldMatrix = new Matrix4();
 		const collect = (node, parentVisible, parentCollider, parentPassable, parentBlocker) => {
+			// A low-detail version stands in for geometry that already collides.
+			if (node.userData.lowDetail === true) return;
 			const collider = parentCollider || COLLISION_NAME.test(node.name);
 			const visible = parentVisible && node.visible;
 			const passable = parentPassable || node.userData.passable === true;
@@ -317,12 +319,17 @@ export class WorldCollision {
 	/**
 	 * Where a body stuck inside geometry can stand instead: the nearest
 	 * walkable navigation point, or the nearest open ground inside the bounds.
+	 * Given where the body last stood clear, the navigation point must be
+	 * walkable from there, and that last spot is the fallback: the nearest
+	 * point to a body pressed into a wall can lie in a room sealed behind it.
 	 * Null when the body is already clear or there is nowhere to go.
 	 */
-	freeBodyPosition(position, navigation = null) {
+	freeBodyPosition(position, navigation = null, lastClear = null) {
 		if (!this.isBodyStuck(position)) return null;
 		const walkable = navigation?.nearestPoint(position);
-		if (walkable && this.bounds.containsPoint(walkable) && !this.isBodyStuck(walkable)) return walkable;
+		const reachable = (point) => lastClear === null || navigation.findPath(point, lastClear) !== null;
+		if (walkable && this.bounds.containsPoint(walkable) && !this.isBodyStuck(walkable) && reachable(walkable)) return walkable;
+		if (lastClear !== null && !this.isBodyStuck(lastClear)) return lastClear.clone();
 		return this.findSpawn(position);
 	}
 

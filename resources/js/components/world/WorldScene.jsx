@@ -22,6 +22,8 @@ import { blockingObjectIds } from '../../utils/activityResponses.js';
 import { homeState } from './residentHome.js';
 import PerformanceProbe from './PerformanceProbe.jsx';
 import EnvironmentDetail from './EnvironmentDetail.jsx';
+import BackdropRenderer from './BackdropRenderer.jsx';
+import { DEFAULT_CAMERA_FAR } from './drawDistance.js';
 
 /**
  * Pausing freezes the scene clock, which freezes everything the frame loop
@@ -65,6 +67,22 @@ function CameraAudioListener({ listenerRef }) {
 	return null;
 }
 
+function CameraReach({ far }) {
+	const get = useThree((state) => state.get);
+
+	useEffect(() => {
+		const { camera } = get();
+		camera.far = far;
+		camera.updateProjectionMatrix();
+		return () => {
+			camera.far = DEFAULT_CAMERA_FAR;
+			camera.updateProjectionMatrix();
+		};
+	}, [get, far]);
+
+	return null;
+}
+
 function PlayerViewTracker({ viewRef, playerState }) {
 	const { camera } = useThree();
 
@@ -78,7 +96,7 @@ function PlayerViewTracker({ viewRef, playerState }) {
 	return null;
 }
 
-const FLOOR_MAP_VERSION = 2;
+const FLOOR_MAP_VERSION = 3;
 
 /** Renders each floor's map once per world file; later visits read the kept images. */
 function FloorMapRenderer({ layout, environment, fileUrl, onRendered }) {
@@ -96,7 +114,7 @@ function FloorMapRenderer({ layout, environment, fileUrl, onRendered }) {
 			else onRendered(shown);
 		};
 		const render = async () => {
-			const maps = await renderFloorMaps({ renderer: gl, scene, layout, environmentRoot: environment.root, fallbackGroundY: environment.spawnPosition.y });
+			const maps = await renderFloorMaps({ renderer: gl, scene, layout, environmentRoot: environment.root, detail: environment.detail, fallbackGroundY: environment.spawnPosition.y });
 			if (key && maps.length > 0 && !cancelled && !environment.collisionWorld.disposed) void writeCached(STORES.floorMaps, key, maps);
 			show(maps);
 		};
@@ -204,7 +222,7 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 	}, [environment, initialPosition]);
 
 	return (
-		<Canvas camera={{ position: [0, 1.6, 4], fov: 70, near: 0.01, far: 100 }} className="h-full w-full bg-black">
+		<Canvas camera={{ position: [0, 1.6, 4], fov: 70, near: 0.01, far: DEFAULT_CAMERA_FAR }} className="h-full w-full bg-black">
 			<color attach="background" args={['#050913']} />
 			<ambientLight intensity={0.7} />
 			<directionalLight position={[4, 8, 4]} intensity={2} />
@@ -216,7 +234,9 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 					<FirstPersonController collisionWorld={environment.collisionWorld} navigation={navigation} spawnPosition={spawnPosition} spawnYaw={initialFacing === null ? null : initialFacing + Math.PI} enabled={explorationEnabled} onPositionChange={handlePositionChange} playerState={playerState} playerCommands={playerCommands} onMovementChange={onMovementChange} onGetUpIntent={onGetUpIntent} onMoveIntent={onMoveIntent} onBlockedByObject={onBlockedByObject} />
 					{world.residents.map((resident) => <ResidentController key={resident.id} resident={resident} layout={world.layout} onVoice={onResidentVoice} savedState={residentStates[resident.id] ?? homeStates.get(resident.id) ?? null} occupiedSpots={occupiedSpots} playerPosition={playerPosition} paused={!explorationEnabled} activePose={activePose} interaction={interaction} collisionWorld={environment.collisionWorld} residentPositions={residentPositions} residentVoices={residentVoices} audioListener={audioListener} inConversation={resident.id === activeResidentId} navigation={navigation} residentCommands={residentCommands} residentDetails={residentDetails} />)}
 					<PlayerViewTracker viewRef={playerView} playerState={playerState} />
-					<EnvironmentDetail root={environment.root} layout={world.layout} playerState={playerState} />
+					<CameraReach far={environment.detail.cameraFar} />
+					{environment.detail.backdropFar !== null && <BackdropRenderer far={environment.detail.backdropFar} />}
+					<EnvironmentDetail root={environment.root} detail={environment.detail} layout={world.layout} playerState={playerState} />
 					{statsRef && residentDetails && <PerformanceProbe statsRef={statsRef} residentDetails={residentDetails} />}
 					<LocationTracker layout={world.layout} playerState={playerState} onLocationChange={onLocationChange} />
 					<PassageTracker passages={world.layout?.passages ?? NO_PASSAGES} linkedPassageIds={linkedPassageIds} playerState={playerState} enabled={explorationEnabled} onEnter={onEnterPassage} />

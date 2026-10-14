@@ -39,7 +39,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 	// Archive
 	const [archives, setArchives] = useState([]);
 	const [selectedArchiveId, setSelectedArchiveId] = useState('');
-	const [modelVoice, setModelVoice] = useState({ aiModelId: null, ttsModelId: null, ttsVoice: null });
+	const [modelVoice, setModelVoice] = useState({ aiModelId: null, imageGenModelId: null, ttsModelId: null, ttsVoice: null });
 
 	// Agent mode
 	const [assistantMode, setAssistantMode] = useState('assistant');
@@ -307,6 +307,7 @@ export default function CreateAssistantPage({ kind = 'assistant' }) {
 			if (isNpc && created.id) {
 				const settingsRequests = [
 					modelVoice.aiModelId && ['settings.selectModel', { ai_model_id: modelVoice.aiModelId }, 'LLM model'],
+					modelVoice.imageGenModelId && ['settings.selectImageGenModel', { image_gen_model_id: modelVoice.imageGenModelId }, 'image model'],
 					modelVoice.ttsModelId && ['settings.selectVoiceModel', { tts_model_id: modelVoice.ttsModelId }, 'voice model'],
 					modelVoice.ttsVoice && ['settings.updateVoice', { tts_voice: modelVoice.ttsVoice }, 'voice'],
 				].filter(Boolean);

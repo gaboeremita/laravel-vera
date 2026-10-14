@@ -149,3 +149,72 @@ test('a grid without any ground is neither kept nor restored', async () => {
 	assert.equal(restored.restore(ground), true);
 	assert.equal(restored.hasGround, true);
 });
+
+test('a chunk shows in full up close, dissolves over the last 6 m, and is gone past its draw distance or 60 m', async () => {
+	const { fullDetailShare, isWithinDrawDistance } = await import('../../resources/js/components/world/drawDistance.js');
+	assert.equal(fullDetailShare(10), 1);
+	assert.equal(fullDetailShare(54), 1);
+	assert.equal(fullDetailShare(57), 0.5);
+	assert.equal(fullDetailShare(60), 0);
+	assert.equal(fullDetailShare(12, 15), 0.5);
+	assert.equal(fullDetailShare(57, 500), 0.5);
+	assert.equal(isWithinDrawDistance(60), true);
+	assert.equal(isWithinDrawDistance(61), false);
+});
+
+test('chunks swap to their low-detail version with distance and back to full for the floor maps', async () => {
+	const { BoxGeometry, Group, Mesh, MeshBasicMaterial, Vector3 } = await import('three');
+	const { BACKDROP_LAYER, DEFAULT_CAMERA_FAR, prepareDrawDistance, showFullDetail, updateDrawDistance } = await import('../../resources/js/components/world/drawDistance.js');
+	const shared = new MeshBasicMaterial();
+	const root = new Group();
+	const block = new Group();
+	block.userData.drawDistance = 40;
+	const building = new Mesh(new BoxGeometry(10, 10, 10), shared);
+	const crude = new Mesh(new BoxGeometry(10, 10, 10), shared);
+	crude.userData.lowDetail = true;
+	block.add(building, crude);
+	const interior = new Group();
+	interior.userData.drawDistance = 15;
+	interior.position.x = 200;
+	const counter = new Mesh(new BoxGeometry(2, 1, 1), shared);
+	interior.add(counter);
+	const sky = new Mesh(new BoxGeometry(400, 100, 400), new MeshBasicMaterial());
+	sky.userData.backdrop = true;
+	root.add(block, interior, sky);
+
+	const detail = prepareDrawDistance(root);
+	assert.equal(detail.chunks.length, 2);
+	assert.notEqual(building.material, shared);
+	assert.notEqual(counter.material, building.material);
+	assert.equal(sky.layers.isEnabled(BACKDROP_LAYER), true);
+	assert.equal(sky.layers.isEnabled(0), false);
+	assert.ok(detail.cameraFar > DEFAULT_CAMERA_FAR);
+	assert.ok(detail.backdropFar >= 400);
+
+	updateDrawDistance(detail, new Vector3(0, 0, 10));
+	assert.deepEqual([building.visible, crude.visible, counter.visible], [true, false, false]);
+	updateDrawDistance(detail, new Vector3(0, 0, 42));
+	assert.deepEqual([building.visible, crude.visible], [true, true]);
+	assert.ok(detail.chunks[0].share.value > 0 && detail.chunks[0].share.value < 1);
+	updateDrawDistance(detail, new Vector3(0, 0, 80));
+	assert.deepEqual([building.visible, crude.visible], [false, true]);
+	updateDrawDistance(detail, new Vector3(200, 0, 5));
+	assert.equal(counter.visible, true);
+
+	showFullDetail(detail);
+	assert.deepEqual([building.visible, crude.visible, counter.visible], [true, false, true]);
+});
+
+test('a world file without draw distance marks keeps the camera reach it always had', async () => {
+	const { BoxGeometry, Group, Mesh, MeshBasicMaterial } = await import('three');
+	const { DEFAULT_CAMERA_FAR, prepareDrawDistance } = await import('../../resources/js/components/world/drawDistance.js');
+	const root = new Group();
+	const material = new MeshBasicMaterial();
+	const ground = new Mesh(new BoxGeometry(300, 1, 300), material);
+	root.add(ground);
+	const detail = prepareDrawDistance(root);
+	assert.deepEqual(detail.chunks, []);
+	assert.equal(detail.cameraFar, DEFAULT_CAMERA_FAR);
+	assert.equal(detail.backdropFar, null);
+	assert.equal(ground.material, material);
+});

@@ -33,7 +33,9 @@ use App\Models\WorldResident;
 use App\Models\WorldSession;
 use App\Services\AgentLoop\AgentLoopRunner;
 use App\Services\AgentLoop\Tools\World\ActivityGate;
+use App\Services\AgentLoop\Tools\World\MakeItemTool;
 use App\Services\AgentLoop\Tools\World\WorldToolbox;
+use App\Services\ImageGenProviders\ImageGenerationService;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\LlmResponseTagParser;
 use App\Traits\ResolvesWorldUser;
@@ -135,11 +137,17 @@ class ResidentDecisionController extends Controller
 
         $toolbox = new WorldToolbox($residentRegion, $location['zoneChain'], $occupiedSpots, $assistant->posturesByPoseName(), $companions, userAvailable: $busyWith === null, userInSight: $userInSight, residentPoint: $residentPoint, recall: fn () => app(RecallResidentMemory::class)->handle($assistant, $request->user()));
         $residentIdsInRoom = $residentPoint !== null ? $resolveWorldState->residentIdsInRoom($region->layout ?? [], $residentPoint, $positions['residents'] ?? []) : [];
-        $toolbox->withActivityGate(new ActivityGate($region, app(ResolveInventory::class)->forResident($worldSession, $worldResident), $residentIdsInRoom));
+        $residentInventory = app(ResolveInventory::class)->forResident($worldSession, $worldResident);
+        $toolbox->withActivityGate(new ActivityGate($region, $residentInventory, $residentIdsInRoom));
+        $tools = $toolbox->idleTools();
+        $imageGenerationService = new ImageGenerationService;
+        if (in_array($residentActivity['activity']['id'] ?? null, $worldResident->makesItemsAt(), true) && $imageGenerationService->isAvailableFor($assistantUser)) {
+            $tools[] = new MakeItemTool($imageGenerationService, $assistantUser, $conversation, $residentInventory);
+        }
 
         try {
             $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
-            $result = (new AgentLoopRunner($llm, $toolbox->idleTools()))->run(
+            $result = (new AgentLoopRunner($llm, $tools))->run(
                 assistant: $assistant,
                 messages: app(ComposeChatRequest::class)->handle($director->build(), [], ['role' => 'user', 'content' => '[A moment passes in the world.]']),
                 conversation: $conversation,

@@ -9,6 +9,7 @@ import { defaultPoseFor, findWorldMotionPose, resolvePose } from './worldMotionP
 import { inTalkingReach } from './talkingReach.js';
 import { STACK_HEIGHT, claimSpot, releaseSpot, stackTier } from './spotOccupancy.js';
 import { shouldLoad, shouldUnload, updateVrm, visualDetail, wantsLod } from './residentDetail.js';
+import { isWithinDrawDistance } from './drawDistance.js';
 import { createVrmLoader } from '../../utils/vrmLoader.js';
 
 const WALK_SPEED = 0.3;
@@ -112,7 +113,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 	const postureRef = useRef('standing');
 	const spotRef = useRef(null);
 	const placementRef = useRef(null);
-	const embeddedRef = useRef({ since: null, checkAt: 0 });
+	const embeddedRef = useRef({ since: null, checkAt: 0, lastClear: null });
 	const faceUserRequested = useRef(false);
 	const faceTargetRef = useRef(null);
 
@@ -909,12 +910,14 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 		if (placementRef.current || swimming || restingPosture) embedded.since = null;
 		else if (elapsed >= embedded.checkAt) {
 			embedded.checkAt = elapsed + EMBEDDED_CHECK_SECONDS;
-			if (!collisionWorld.isBodyBlocked(currentPosition)) embedded.since = null;
-			else if (embedded.since === null) embedded.since = elapsed;
+			if (!collisionWorld.isBodyBlocked(currentPosition)) {
+				embedded.since = null;
+				embedded.lastClear = (embedded.lastClear ?? new Vector3()).copy(currentPosition);
+			} else if (embedded.since === null) embedded.since = elapsed;
 			else if (elapsed - embedded.since >= EMBEDDED_SECONDS) {
 				embedded.since = null;
 				const grid = navigation?.current;
-				const free = collisionWorld.freeBodyPosition(currentPosition, grid);
+				const free = collisionWorld.freeBodyPosition(currentPosition, grid, embedded.lastClear);
 				if (free) {
 					currentPosition.set(free.x, free.y, free.z);
 					if (spotRef.current) {
@@ -1185,7 +1188,8 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 		view.matrix.multiplyMatrices(state.camera.projectionMatrix, state.camera.matrixWorldInverse);
 		view.frustum.setFromProjectionMatrix(view.matrix);
 		view.sphere.center.set(currentPosition.x, currentPosition.y + 0.9, currentPosition.z);
-		const detail = visualDetail({ distance: currentDistance, visible: view.frustum.intersectsSphere(view.sphere) });
+		bodyRef.current.visible = isWithinDrawDistance(currentDistance);
+		const detail = visualDetail({ distance: currentDistance, visible: bodyRef.current.visible && view.frustum.intersectsSphere(view.sphere) });
 		residentDetails?.current.set(resident.id, detail);
 		view.pendingDelta = Math.min(view.pendingDelta + delta, MAX_VISUAL_DELTA);
 		view.frame += 1;
