@@ -14,6 +14,7 @@ const RECHECK_MS = 5000;
 const RATE_LIMITED_WAIT_MS = 8000;
 const USER_AWAY_MS = 5 * 60 * 1000;
 const USER_INPUT_EVENTS = ['keydown', 'mousedown', 'mousemove', 'wheel', 'touchstart'];
+const NO_FROZEN = [];
 
 /**
  * Runs the self-chosen activities of the world's autonomous residents while
@@ -24,13 +25,13 @@ const USER_INPUT_EVENTS = ['keydown', 'mousedown', 'mousemove', 'wheel', 'touchs
  * on another floor from the user, while the world is paused or the page is
  * hidden, and after five minutes with no input from the user.
  */
-export function useResidentAgency({ enabled, worldId, sessionId, residents, regionId, layout, chatResidentId, residentCommands, occupiedSpots, getPositions, getFollowTarget, getResidentPosition, getUserState, getUserBusyWith, getBusyResidents, claimTarget, releaseTarget, isBusy, isPaused, onSpeak, onThought, addToast }) {
+export function useResidentAgency({ enabled, worldId, sessionId, residents, regionId, layout, chatResidentId, residentCommands, occupiedSpots, getPositions, getFollowTarget, getResidentPosition, getUserState, getUserBusyWith, getBusyResidents, claimTarget, releaseTarget, isBusy, isPaused, onSpeak, onThought, addToast, frozenResidentIds = NO_FROZEN }) {
 	const chatResidentRef = useRef(chatResidentId);
 	const runningRef = useRef(new Map());
 	const latestRef = useRef(null);
 
 	useEffect(() => {
-		latestRef.current = { residents, regionId, layout, getPositions, getFollowTarget, getResidentPosition, getUserState, getUserBusyWith, getBusyResidents, claimTarget, releaseTarget, isBusy, isPaused, onSpeak, onThought, addToast };
+		latestRef.current = { frozenResidentIds, residents, regionId, layout, getPositions, getFollowTarget, getResidentPosition, getUserState, getUserBusyWith, getBusyResidents, claimTarget, releaseTarget, isBusy, isPaused, onSpeak, onThought, addToast };
 	});
 
 	useEffect(() => {
@@ -39,6 +40,13 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, regi
 			void residentCommands.current.get(chatResidentId)?.stop();
 		}
 	}, [chatResidentId, residentCommands]);
+
+	const frozenKey = frozenResidentIds.join(',');
+	useEffect(() => {
+		for (const residentId of frozenKey === '' ? [] : frozenKey.split(',').map(Number)) {
+			if (runningRef.current.has(residentId)) void residentCommands.current.get(residentId)?.stop();
+		}
+	}, [frozenKey, residentCommands]);
 
 	const autonomousIds = (residents ?? []).filter((resident) => resident.behavior === 'autonomous').map((resident) => resident.id).join(',');
 
@@ -99,6 +107,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, regi
 				userState: latest().getUserState?.() ?? null,
 			});
 			if (response.status === 429) return { retryIn: RATE_LIMITED_WAIT_MS };
+			if (response.status === 409) return { retryIn: RECHECK_MS };
 			if (!response.ok) {
 				const error = await response.json().catch(() => ({}));
 				throw new Error(error.message || `HTTP ${response.status}`);
@@ -120,7 +129,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, regi
 				const userAway = Date.now() - lastInputAt > USER_AWAY_MS;
 				const positions = latest().getPositions();
 				const otherFloor = !onSameFloor(latest().layout, positions.user, positions.residents?.[resident.id]);
-				if (!commands || userAway || otherFloor || document.visibilityState === 'hidden' || chatResidentRef.current === resident.id || latest().isBusy?.(resident.id) || latest().isPaused?.()) {
+				if (!commands || userAway || otherFloor || document.visibilityState === 'hidden' || chatResidentRef.current === resident.id || latest().frozenResidentIds.includes(resident.id) || latest().isBusy?.(resident.id) || latest().isPaused?.()) {
 					wait = RECHECK_MS;
 					continue;
 				}

@@ -35,8 +35,8 @@ function EndingSummary({ run, onRetry, onShowEnding }) {
 	if (run.endingStatus === 'failed') {
 		return (
 			<div className="flex items-center gap-3">
-				<p className="text-danger text-[0.7rem] tracking-[0.14em]">THE ENDING COULDN'T BE WRITTEN</p>
-				<button type="button" onClick={() => onRetry(run.id)} className="world-hud-panel px-3 py-1 text-fg-1 text-[0.65rem] tracking-[0.14em] hover:text-accent cursor-pointer">WRITE IT AGAIN</button>
+				<p className="text-danger text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.875)]">THE ENDING COULDN'T BE WRITTEN</p>
+				<button type="button" onClick={() => onRetry(run.id)} className="world-hud-panel px-3 py-1 text-fg-1 text-[0.65rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.875)] hover:text-accent cursor-pointer">WRITE IT AGAIN</button>
 			</div>
 		);
 	}
@@ -92,7 +92,7 @@ export default function QuestLogPanel({ runs, campaigns, onAbandon, onRetry, onS
 					<span className="world-hud-label">QUESTS</span>
 					<span className="world-hud-key">K</span>
 				</div>
-				<span className="hud-enter-rule my-4 block h-px w-full origin-left bg-gradient-to-r from-accent via-accent/40 to-transparent" />
+				<span className="hud-enter-rule my-4 hud-rule w-full origin-left" />
 
 				<div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar pr-1">
 					{entries.length === 0 ? (
@@ -122,7 +122,7 @@ export default function QuestLogPanel({ runs, campaigns, onAbandon, onRetry, onS
 													onMouseEnter={() => select(entry)}
 													onClick={() => select(entry)}
 													className={`hud-enter-rise flex flex-col items-start gap-0.5 border px-3 py-2 text-left transition-colors cursor-pointer ${active ? 'world-hud-shimmer border-accent/60 bg-accent/10' : 'border-line-1 hover:border-accent/40'} ${group.campaign ? 'ml-3' : ''}`}
-													style={{ borderRadius: 0 }}
+													style={{ borderRadius: 'calc(var(--hud-radius) / 2)' }}
 												>
 													<span className={`w-full truncate text-sm ${active ? 'text-fg-1' : 'text-fg-2'}`}>{run.title}</span>
 													{run.status !== 'active' && <span className={`world-hud-label ${run.status === 'completed' ? 'text-accent' : 'text-fg-3'}`}>{ENDED_LABELS[run.status]}</span>}
@@ -144,11 +144,11 @@ export default function QuestLogPanel({ runs, campaigns, onAbandon, onRetry, onS
 										confirmingAbandon ? (
 											<div className="flex items-center gap-3 border border-danger/40 bg-danger/5 px-3 py-2">
 												<span className="flex-1 text-fg-1 text-xs">Abandon this quest?</span>
-												<button type="button" onClick={() => { setConfirmingAbandon(false); void onAbandon(selected.latest.id); }} className="text-danger text-[0.65rem] tracking-[0.14em] cursor-pointer">ABANDON</button>
-												<button type="button" onClick={() => setConfirmingAbandon(false)} className="text-fg-3 text-[0.65rem] tracking-[0.14em] hover:text-fg-1 cursor-pointer">CANCEL</button>
+												<button type="button" onClick={() => { setConfirmingAbandon(false); void onAbandon(selected.latest.id); }} className="text-danger text-[0.65rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.875)] cursor-pointer">ABANDON</button>
+												<button type="button" onClick={() => setConfirmingAbandon(false)} className="text-fg-3 text-[0.65rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.875)] hover:text-fg-1 cursor-pointer">CANCEL</button>
 											</div>
 										) : (
-											<button type="button" onClick={() => setConfirmingAbandon(true)} className="self-start text-fg-3 text-[0.65rem] tracking-[0.14em] hover:text-danger cursor-pointer">ABANDON</button>
+											<button type="button" onClick={() => setConfirmingAbandon(true)} className="self-start text-fg-3 text-[0.65rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.875)] hover:text-danger cursor-pointer">ABANDON</button>
 										)
 									) : (
 										<EndingSummary run={selected.latest} onRetry={onRetry} onShowEnding={onShowEnding} />

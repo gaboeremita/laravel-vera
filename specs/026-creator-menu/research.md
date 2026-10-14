@@ -86,4 +86,48 @@ A resident moved while in a conversation with another resident has that conversa
 **Decision**:
 - T toggles the menu (`KeyT`) through the page's capture listener, ignored while an input, textarea or contenteditable has focus.
 - The menu is `hud/CreatorMenu.jsx` with five tabs, Go to, Residents, Quests, Items and World, each its own component. The page counts the open menu as paused, as it does for inventory.
+- 1–5 switch tabs, ↑↓ move the selection as in `QuestLogPanel`, and T or Escape closes.
 - Data comes from one `GET .../creator` overview: regions with zones, passages, objects and activities; residents with region, zone, frozen state, sentiments and recent activities; quests with their latest run; facts with known state; items. It is refetched after each change and on quest broadcasts.
+
+## R12. Visual design
+
+**Decision**:
+- **Classes**: the menu uses the HUD's shared classes (`world-hud-panel`, `world-hud-glow`, `world-hud-label`, `world-hud-key`, `world-hud-shimmer`, `world-pause-backdrop`, the `hud-enter-*` and `hud-exit-*` animations) and the theme's `--accent`, `--danger` and other tokens. It has no styling of its own.
+- **New shared HUD classes**: what the HUD lacks is added to `resources/css/app.css` beside the `world-hud-*` classes, built only on theme tokens and on the HUD theme values of R13, so every theme styles them:
+  - `hud-meter`, `hud-chip`, `hud-switch`, `hud-cell` and `hud-caret`
+  - the control states `hud-busy`, `hud-success` and `hud-fail`
+  - the animations `hud-shake`, `hud-pop`, `hud-flip`, `hud-fill`, `hud-pulse-ring` and `hud-flash`
+- **Look**: the approved mockup. Lock screen with password cells; header, tab rail with switches, list and detail columns, creator log; a map in Go to; meters for sentiments; diamond beats; two-column item transfer; chips for states. In each theme it looks as that theme's HUD does.
+- **Motion**: the table in [plan.md](plan.md#motion). The existing `prefers-reduced-motion` block is extended to the new animations.
+- **Feedback before the server answers**: a clicked control enters its busy state at once (SC-006). Success and failure states play when the request settles.
+
+**Rationale**: One set of HUD classes styled by each theme keeps the creator menu consistent with the rest of the HUD in every theme, and the new pieces are reusable by any later HUD panel.
+
+## R13. HUD theme values
+
+**Decision**: Each theme file in `resources/css/themes/` sets these values on its theme selector (and Default again under `[data-mode="dark"]`). The `world-hud-*` classes and the new shared classes of R12 read them in place of today's fixed values.
+
+| Value | What it controls |
+|-------|------------------|
+| `--hud-radius` | panel and control corners (controls use a fraction of it) |
+| `--hud-chip-radius` | chips, switches |
+| `--hud-corner-marks` | opacity of the bracket corner marks (0 or 1) |
+| `--hud-scanlines` | opacity of the scanline overlay (0 to 1) |
+| `--hud-glow` | glow strength, multiplying every glow's size and mix (0 to 1) |
+| `--hud-shadow` | the panel's drop shadow |
+| `--hud-border-style` | panel border width and style |
+| `--hud-panel-opacity` | how opaque the panel background is |
+| `--hud-label-transform`, `--hud-label-tracking`, `--hud-label-variant`, `--hud-label-size` | label case, spacing, small capitals and size |
+| `--hud-title-tracking`, `--hud-title-weight` | display title spacing and weight |
+| `--hud-primary-fill` | 1 fills primary buttons with the accent, 0 keeps them outlined and tinted |
+| `--hud-avatar-radius` | portrait corners |
+| `--hud-caret-width`, `--hud-caret-radius`, `--hud-caret-blink` | caret shape and blink animation |
+
+Values per theme are the table in [plan.md § HUD theme table](plan.md#hud-theme-table), taken from the approved mockup. Terminal's reproduce today's fixed values.
+
+**Hard-coded styling in components**: 26 HUD components fix part of their look themselves: 16 `shadow-[0_0_Npx_var(--accent)]` glows, 57 `tracking-[…]` label spacings and 6 `borderRadius: 0` styles. They move to shared classes:
+- `hud-glow-sm`, `hud-glow-md` and `hud-glow-lg`, which scale with `--hud-glow`
+- `hud-text` (label case and small capitals) with spacing scaled by `--hud-label-tracking` for the letter-spacing
+- `--hud-radius` for the corners
+
+**Rationale**: One set of values per theme covers every HUD piece, so no component needs to know which theme is active.

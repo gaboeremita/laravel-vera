@@ -25,5 +25,6 @@ node --test tests/Unit/ZoneLanding.test.js tests/Unit/PlayerMotion.test.js
 6. **Quests** (US5): Start a quest, finish beat 2, undo beat 1 (beat 2 undoes too), fail it, reopen it. The quest log shows each change as CREATOR.
 7. **Credits and items** (US6): Add 100 credits; take 1000 (balance 0). Grab 3 of an item. Open a chest in another region and take an item. Give a resident an item from nothing.
 8. **World state** (US7): Unlock a blocking door and walk through; lock it. Reveal a fact and forget it. Use the paid activity from far away: effects apply, no credits taken. Turn on the zone overlay.
+9. **HUD per theme** (US8): In each theme (and Default in dark mode), open the inventory, the quest log and the pause screen, walk into a new zone and open the Creator menu. Each matches the theme's row of [plan.md § HUD theme table](plan.md#hud-theme-table). In Terminal, nothing differs from before.
 
 See [contracts/api.md](contracts/api.md) for request and response shapes and [data-model.md](data-model.md) for stored state.

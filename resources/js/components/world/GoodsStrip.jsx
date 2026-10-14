@@ -19,7 +19,7 @@ export default function GoodsStrip({ goods, onPick }) {
 					>
 						<ItemThumb item={item} size="md" className="transition-transform group-hover:scale-105" />
 						<span className="line-clamp-2 min-h-[2lh] w-full text-center text-[0.7rem] leading-tight text-fg-1">{item.name}</span>
-						<span className="flex w-full items-center justify-between text-[0.6rem] tracking-[0.08em]">
+						<span className="flex w-full items-center justify-between text-[0.6rem] tracking-[calc(var(--hud-label-tracking)*0.5)]">
 							<span className="text-fg-3">×{formatAmount(item.quantity)}</span>
 							{item.basePrice !== null && <span className="text-accent">{item.basePrice} CR</span>}
 						</span>

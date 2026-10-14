@@ -17,9 +17,9 @@ function Entry({ entry, onExpire }) {
 			onAnimationEnd={(event) => { if (leaving && event.target === event.currentTarget) onExpire(entry.id); }}
 		>
 			{notice ? (
-				<span className="text-warning text-[0.68rem] uppercase tracking-[0.14em]">{entry.text}</span>
+				<span className="text-warning text-[0.68rem] uppercase hud-text tracking-[calc(var(--hud-label-tracking)*0.875)]">{entry.text}</span>
 			) : (
-				<span className="hud-enter-type world-hud-glow inline-block text-base italic tracking-[0.02em]">{entry.text}</span>
+				<span className="hud-enter-type world-hud-glow inline-block text-base italic tracking-[calc(var(--hud-label-tracking)*0.125)]">{entry.text}</span>
 			)}
 		</div>
 	);

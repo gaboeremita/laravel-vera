@@ -10,7 +10,7 @@ export default function QuestTracker({ runs }) {
 		<div className="world-hud-panel pointer-events-none flex w-72 flex-col gap-3 px-4 py-3 hud-enter-fade">
 			{shown.map((run) => (
 				<div key={run.id} className="flex flex-col gap-1.5">
-					<span className="world-hud-glow truncate text-[0.8rem] tracking-[0.08em]">{run.title}</span>
+					<span className="world-hud-glow truncate text-[0.8rem] tracking-[calc(var(--hud-label-tracking)*0.5)]">{run.title}</span>
 					{run.beats.filter((beat) => beat.current).map((beat) => (
 						<span key={beat.id} className="flex items-start gap-2 text-fg-2 text-xs leading-snug">
 							<span className="mt-[0.3rem] h-1.5 w-1.5 shrink-0 rotate-45 border border-accent" />

@@ -12,7 +12,7 @@ function Scores({ scores }) {
 						<span className="world-hud-label">{score.dimension.toUpperCase()}</span>
 						<span className="world-hud-glow font-display text-lg tabular-nums">{score.score}<span className="text-fg-3 text-xs">/10</span></span>
 					</div>
-					<div className="mt-1 h-0.5 w-full bg-line-1"><div className="h-full bg-accent shadow-[0_0_8px_var(--accent)]" style={{ width: `${score.score * 10}%` }} /></div>
+					<div className="mt-1 h-0.5 w-full bg-line-1"><div className="h-full bg-accent hud-glow-sm" style={{ width: `${score.score * 10}%` }} /></div>
 					<p className="mt-1.5 text-fg-2 text-xs leading-relaxed">{score.reason}</p>
 				</div>
 			))}
@@ -53,19 +53,19 @@ export default function EndingCard({ ending, reward, onRetry, onClose }) {
 				{written ? (
 					<>
 						<h2 className="hud-enter-wipe world-hud-glow mt-4 font-display text-3xl font-semibold uppercase" style={{ letterSpacing: '0.12em' }}>{ending.ending.title}</h2>
-						{ending.ending.tier && <span className="hud-enter-rise mt-3 border border-accent/50 bg-accent/10 px-3 py-1 text-accent text-[0.7rem] tracking-[0.18em]" style={{ animationDelay: '120ms' }}>{ending.ending.tier.toUpperCase()}</span>}
+						{ending.ending.tier && <span className="hud-enter-rise mt-3 border border-accent/50 bg-accent/10 px-3 py-1 text-accent text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*1.125)]" style={{ animationDelay: '120ms' }}>{ending.ending.tier.toUpperCase()}</span>}
 						{total !== null && (
 							<div className="hud-enter-rise mt-3 flex flex-col items-center gap-1" style={{ animationDelay: '160ms' }}>
 								<span className="flex items-baseline gap-2">
 									<span className="world-hud-label">SCORE</span>
 									<span className="world-hud-glow font-display text-2xl tabular-nums">{total}<span className="text-fg-3 text-xs">/10</span></span>
 								</span>
-								<span className="flex flex-wrap justify-center gap-x-3 text-fg-3 text-[0.65rem] tracking-[0.12em]">
+								<span className="flex flex-wrap justify-center gap-x-3 text-fg-3 text-[0.65rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.75)]">
 									{ending.ending.scores.map((score) => <span key={score.dimension}>{score.dimension.toUpperCase()} <span className="tabular-nums text-fg-2">{score.score}</span></span>)}
 								</span>
 							</div>
 						)}
-						<span className="hud-enter-rule mt-5 block h-px w-80 origin-center bg-gradient-to-r from-transparent via-accent to-transparent shadow-[0_0_12px_var(--accent)]" />
+						<span className="hud-enter-rule mt-5 hud-rule hud-rule-center w-80 origin-center hud-glow-lg" />
 						<div className="hud-enter-rise mt-5 space-y-3 text-left text-fg-1 text-sm leading-relaxed" style={{ animationDelay: '200ms' }}>
 							{ending.ending.epilogue.split(/\n\s*\n/).map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
 						</div>
@@ -77,7 +77,7 @@ export default function EndingCard({ ending, reward, onRetry, onClose }) {
 							</div>
 						)}
 						{ending.ending.scores.length > 0 && (
-							<button type="button" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails} className="world-hud-panel hud-enter-rise mt-6 flex items-center gap-2 px-4 py-1.5 text-fg-2 text-[0.7rem] tracking-[0.16em] hover:text-accent cursor-pointer" style={{ animationDelay: '260ms' }}>
+							<button type="button" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails} className="world-hud-panel hud-enter-rise mt-6 flex items-center gap-2 px-4 py-1.5 text-fg-2 text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*1)] hover:text-accent cursor-pointer" style={{ animationDelay: '260ms' }}>
 								<span className={`text-[0.55rem] transition-transform ${showDetails ? 'rotate-90' : ''}`}>▶</span>
 								DETAILS
 							</button>
@@ -86,9 +86,9 @@ export default function EndingCard({ ending, reward, onRetry, onClose }) {
 					</>
 				) : (
 					<>
-						<p className="hud-enter-rise mt-5 text-danger text-[0.75rem] tracking-[0.16em]">THE ENDING COULDN'T BE WRITTEN</p>
+						<p className="hud-enter-rise mt-5 text-danger text-[0.75rem] hud-text tracking-[calc(var(--hud-label-tracking)*1)]">THE ENDING COULDN'T BE WRITTEN</p>
 						{onRetry && (
-							<button type="button" onClick={onRetry} className="world-hud-panel hud-enter-rise mt-5 px-5 py-2 text-fg-1 text-[0.7rem] tracking-[0.16em] hover:text-accent cursor-pointer" style={{ animationDelay: '120ms' }}>
+							<button type="button" onClick={onRetry} className="world-hud-panel hud-enter-rise mt-5 px-5 py-2 text-fg-1 text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*1)] hover:text-accent cursor-pointer" style={{ animationDelay: '120ms' }}>
 								WRITE IT AGAIN
 							</button>
 						)}

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['title', 'region_id', 'position', 'arrival_facing'])]
+#[Fillable(['title', 'region_id', 'position', 'arrival_facing', 'creator_mode_at', 'frozen_resident_ids'])]
 class WorldSession extends Model
 {
     /** @use HasFactory<WorldSessionFactory> */
@@ -17,7 +17,17 @@ class WorldSession extends Model
 
     protected function casts(): array
     {
-        return ['position' => 'array', 'arrival_facing' => 'float'];
+        return ['position' => 'array', 'arrival_facing' => 'float', 'creator_mode_at' => 'datetime', 'frozen_resident_ids' => 'array'];
+    }
+
+    public function latestRunOf(Quest $quest): ?WorldSessionQuest
+    {
+        return $this->questRuns()->where('quest_id', $quest->id)->latest('run')->first()?->setRelation('quest', $quest);
+    }
+
+    public function isFrozen(WorldResident $resident): bool
+    {
+        return in_array($resident->id, $this->frozen_resident_ids ?? [], true);
     }
 
     public function worldUser(): BelongsTo

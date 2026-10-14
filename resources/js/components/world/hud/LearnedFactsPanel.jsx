@@ -29,7 +29,7 @@ export default function LearnedFactsPanel({ knownFacts, onClose }) {
 					<span className="world-hud-label">LEARNED</span>
 					<span className="world-hud-label text-fg-3">{knownFacts.length} {knownFacts.length === 1 ? 'THING' : 'THINGS'}</span>
 				</div>
-				<span className="hud-enter-rule my-4 block h-px w-full origin-left bg-gradient-to-r from-accent via-accent/40 to-transparent" />
+				<span className="hud-enter-rule my-4 hud-rule w-full origin-left" />
 
 				<div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar pr-1">
 					{knownFacts.length === 0 ? (
@@ -51,7 +51,7 @@ export default function LearnedFactsPanel({ knownFacts, onClose }) {
 											onMouseEnter={() => setHighlighted(factIndex)}
 											onClick={() => setHighlighted(factIndex)}
 											className={`hud-enter-rise flex flex-col items-start gap-0.5 border px-3 py-2 text-left transition-colors cursor-pointer ${active ? 'world-hud-shimmer border-accent/60 bg-accent/10' : 'border-line-1 hover:border-accent/40'}`}
-											style={{ animationDelay: `${Math.min(factIndex, 12) * 25}ms`, borderRadius: 0 }}
+											style={{ animationDelay: `${Math.min(factIndex, 12) * 25}ms`, borderRadius: 'calc(var(--hud-radius) / 2)' }}
 										>
 											<span className={`w-full truncate text-sm ${active ? 'text-fg-1' : 'text-fg-2'}`}>{fact.topic}</span>
 											<span className="world-hud-label w-full truncate text-fg-3">FROM {fact.sourceName.toUpperCase()}</span>
@@ -61,7 +61,7 @@ export default function LearnedFactsPanel({ knownFacts, onClose }) {
 							</div>
 							{selected && (
 								<div key={selected.factId} className="hud-enter-fade flex flex-col border-l border-accent/20 pl-5">
-									<h3 className="world-hud-glow font-display text-xl font-semibold uppercase tracking-[0.08em]">{selected.topic}</h3>
+									<h3 className="world-hud-glow font-display text-xl font-semibold uppercase tracking-[calc(var(--hud-label-tracking)*0.5)]">{selected.topic}</h3>
 									<span className="world-hud-label mt-1 text-fg-3">FROM {selected.sourceName.toUpperCase()}</span>
 									<p className="mt-3 text-sm leading-relaxed text-fg-1/85">{selected.summary}</p>
 								</div>

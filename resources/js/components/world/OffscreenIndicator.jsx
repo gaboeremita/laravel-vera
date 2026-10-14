@@ -58,7 +58,7 @@ export default function OffscreenIndicator({ ref, name }) {
 			<div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-fg shadow-lg">
 				<ChevronRight size={20} />
 			</div>
-			<span className="bg-bg-0/90 px-2 py-0.5 text-accent text-[0.6rem] tracking-[0.1em]">{name.toUpperCase()}</span>
+			<span className="bg-bg-0/90 px-2 py-0.5 text-accent text-[0.6rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.625)]">{name.toUpperCase()}</span>
 		</div>
 	);
 }

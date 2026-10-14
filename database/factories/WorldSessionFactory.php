@@ -24,4 +24,9 @@ class WorldSessionFactory extends Factory
             'position' => null,
         ];
     }
+
+    public function unlocked(): static
+    {
+        return $this->state(fn (array $attributes) => ['creator_mode_at' => now()]);
+    }
 }

@@ -392,6 +392,17 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			});
 		};
 		const commands = {
+			teleport: (position, facing = 0) => {
+				settle('interrupted', 'the creator moved them');
+				const spot = spotRef.current;
+				spotRef.current = null;
+				postureRef.current = 'standing';
+				heldPoseRef.current = null;
+				spot?.onLeave?.();
+				placementRef.current = null;
+				bodyRef.current.position.set(position.x, position.y + floatOffsetRef.current, position.z);
+				bodyRef.current.rotation.y = facing;
+			},
 			goTo: async (target, { near = false, towardUser = false } = {}) => {
 				settle('interrupted', 'a new action replaced it');
 				restAtEdgeRef.current = towardUser && swimmingRef.current;

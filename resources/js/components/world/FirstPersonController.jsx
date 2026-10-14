@@ -4,7 +4,7 @@ import { Vector3 } from 'three';
 import { MAX_MOVEMENT_DELTA, PLAYER_EYE_HEIGHT } from './collisionCheck.js';
 import { isTypingTarget } from './keyboardFocus.js';
 import { getGroundHeight } from './groundHeight.js';
-import { GRAVITY, canJump, eyeHeightFor, jumpVelocity, landingDip, movementSpeed, nextMovementMode, swimEyeY, targetFov } from './playerMotion.js';
+import { GRAVITY, canJump, eyeHeightFor, flyingStep, jumpVelocity, landingDip, movementSpeed, nextMovementMode, swimEyeY, targetFov } from './playerMotion.js';
 import { playJump, playLanding } from './worldSounds.js';
 import { MAX_PITCH, clampLook, postureView, yawForDirection } from './playerPostures.js';
 
@@ -61,6 +61,10 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 	const embedded = useRef({ since: null, checkAt: 0, lastClear: null });
 	const blockingObjectId = useRef(null);
 	const callbacks = useRef({});
+	const flying = useRef(false);
+	const fastWalk = useRef(false);
+	const rising = useRef(false);
+	const descending = useRef(false);
 
 	useEffect(() => {
 		callbacks.current = { onPositionChange, onMovementChange, onGetUpIntent, onMoveIntent, onBlockedByObject };
@@ -129,6 +133,27 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 			setActivity: ({ spotId = null, activityId = null } = {}) => {
 				activity.current = { spotId, activityId };
 			},
+			setFlying: (on) => {
+				if (on === flying.current) return;
+				flying.current = on;
+				rising.current = false;
+				descending.current = false;
+				crouchToggled.current = false;
+				airborne.current = on ? null : { velocityY: 0 };
+			},
+			setFastWalk: (on) => {
+				fastWalk.current = on;
+			},
+			teleport: (position, facing = null) => {
+				keys.current.clear();
+				glide.current = null;
+				seat.current = null;
+				activity.current = { spotId: null, activityId: null };
+				airborne.current = flying.current ? null : { velocityY: 0 };
+				embedded.current = { since: null, checkAt: 0, lastClear: null };
+				footPosition.current.set(position.x, position.y, position.z);
+				if (facing !== null) yaw.current = facing + Math.PI;
+			},
 		};
 		return () => { playerCommandsRef.current = null; };
 	}, [camera, collisionWorld, playerCommandsRef]);
@@ -152,6 +177,12 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 				if (activity.current.activityId) callbacks.current.onMoveIntent?.();
 			}
 			if (isRun) runHeld.current = true;
+			if (flying.current && (event.code === 'Space' || event.code === 'KeyQ')) {
+				event.preventDefault();
+				if (event.code === 'Space') rising.current = true;
+				else descending.current = true;
+				return;
+			}
 			if (event.code === 'Space') {
 				event.preventDefault();
 				if (!event.repeat) {
@@ -163,6 +194,8 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 		};
 		const keyUp = (event) => {
 			pressedKeys.delete(event.code);
+			if (event.code === 'Space') rising.current = false;
+			if (event.code === 'KeyQ') descending.current = false;
 			if (RUN_KEYS.includes(event.code)) runHeld.current = false;
 		};
 		const pointerDown = (event) => {
@@ -293,62 +326,76 @@ export default function FirstPersonController({ collisionWorld, navigation, spaw
 			mode.current = nextMode;
 			callbacks.current.onMovementChange?.(nextMode);
 		};
-		if (!airborne.current) {
+		if (flying.current) {
+			setMode('walking');
+			direction.current.set(0, 0, 0);
+			if (keys.current.has('KeyW')) direction.current.z -= 1;
+			if (keys.current.has('KeyS')) direction.current.z += 1;
+			if (keys.current.has('KeyA')) direction.current.x -= 1;
+			if (keys.current.has('KeyD')) direction.current.x += 1;
+			if (direction.current.lengthSq() > 0) direction.current.normalize().applyAxisAngle(UP, yaw.current).multiplyScalar(movementSpeed(runHeld.current ? 'running' : 'walking', fastWalk.current));
+			const next = flyingStep(foot, direction.current, rising.current, descending.current, step);
+			foot.set(next.x, next.y, next.z);
+			jumpRequested.current = false;
+			embedded.current.since = null;
+		} else if (!airborne.current) {
 			const nextMode = nextMovementMode({ current: mode.current, runHeld: runHeld.current, crouchToggled: crouchToggled.current, waterDepth, moving: keys.current.size > 0 });
 			if (nextMode === 'swimming') crouchToggled.current = false;
 			setMode(nextMode);
 		}
 
-		if (jumpRequested.current) {
-			jumpRequested.current = false;
-			if (canJump({ mode: mode.current, seated: false, airborne: Boolean(airborne.current) })) {
-				crouchToggled.current = false;
-				if (mode.current === 'crouching') setMode('walking');
-				airborne.current = { velocityY: jumpVelocity() };
-				playSound(playJump);
+		if (!flying.current) {
+			if (jumpRequested.current) {
+				jumpRequested.current = false;
+				if (canJump({ mode: mode.current, seated: false, airborne: Boolean(airborne.current) })) {
+					crouchToggled.current = false;
+					if (mode.current === 'crouching') setMode('walking');
+					airborne.current = { velocityY: jumpVelocity() };
+					playSound(playJump);
+				}
 			}
-		}
 
-		direction.current.set(0, 0, 0);
-		if (keys.current.has('KeyW')) direction.current.z -= 1;
-		if (keys.current.has('KeyS')) direction.current.z += 1;
-		if (keys.current.has('KeyA')) direction.current.x -= 1;
-		if (keys.current.has('KeyD')) direction.current.x += 1;
-		if (direction.current.lengthSq() > 0) direction.current.normalize().applyAxisAngle(UP, yaw.current).multiplyScalar(movementSpeed(mode.current));
+			direction.current.set(0, 0, 0);
+			if (keys.current.has('KeyW')) direction.current.z -= 1;
+			if (keys.current.has('KeyS')) direction.current.z += 1;
+			if (keys.current.has('KeyA')) direction.current.x -= 1;
+			if (keys.current.has('KeyD')) direction.current.x += 1;
+			if (direction.current.lengthSq() > 0) direction.current.normalize().applyAxisAngle(UP, yaw.current).multiplyScalar(movementSpeed(mode.current, fastWalk.current));
 
-		if (airborne.current) {
-			airborne.current.velocityY -= GRAVITY * step;
-			const velocity = { x: direction.current.x, y: airborne.current.velocityY, z: direction.current.z };
-			const { landed } = collisionWorld.airStep(foot, velocity, step, true);
-			airborne.current.velocityY = velocity.y;
-			if (landed) {
-				const fallSpeed = airborne.current.velocityY;
-				airborne.current = null;
-				dip.current = landingDip(fallSpeed, reducedMotion.current);
-				playSound(playLanding, fallSpeed);
+			if (airborne.current) {
+				airborne.current.velocityY -= GRAVITY * step;
+				const velocity = { x: direction.current.x, y: airborne.current.velocityY, z: direction.current.z };
+				const { landed } = collisionWorld.airStep(foot, velocity, step, true);
+				airborne.current.velocityY = velocity.y;
+				if (landed) {
+					const fallSpeed = airborne.current.velocityY;
+					airborne.current = null;
+					dip.current = landingDip(fallSpeed, reducedMotion.current);
+					playSound(playLanding, fallSpeed);
+				}
+			} else if (direction.current.lengthSq() > 0) {
+				const result = collisionWorld.move(foot, direction.current.x * step, direction.current.z * step, { canFall: mode.current !== 'swimming', withBlockers: true });
+				if (result === 'falling') airborne.current = { velocityY: 0 };
+				if (collisionWorld.blockedBy !== blockingObjectId.current) {
+					blockingObjectId.current = collisionWorld.blockedBy;
+					if (blockingObjectId.current) callbacks.current.onBlockedByObject?.(blockingObjectId.current);
+				}
+			} else {
+				blockingObjectId.current = null;
 			}
-		} else if (direction.current.lengthSq() > 0) {
-			const result = collisionWorld.move(foot, direction.current.x * step, direction.current.z * step, { canFall: mode.current !== 'swimming', withBlockers: true });
-			if (result === 'falling') airborne.current = { velocityY: 0 };
-			if (collisionWorld.blockedBy !== blockingObjectId.current) {
-				blockingObjectId.current = collisionWorld.blockedBy;
-				if (blockingObjectId.current) callbacks.current.onBlockedByObject?.(blockingObjectId.current);
-			}
-		} else {
-			blockingObjectId.current = null;
-		}
 
-		if (airborne.current || mode.current === 'swimming') embedded.current.since = null;
-		else if (elapsed.current >= embedded.current.checkAt) {
-			embedded.current.checkAt = elapsed.current + EMBEDDED_CHECK_SECONDS;
-			if (!collisionWorld.isBodyBlocked(foot)) {
-				embedded.current.since = null;
-				embedded.current.lastClear = (embedded.current.lastClear ?? new Vector3()).copy(foot);
-			} else if (embedded.current.since === null) embedded.current.since = elapsed.current;
-			else if (elapsed.current - embedded.current.since >= EMBEDDED_SECONDS) {
-				embedded.current.since = null;
-				const free = collisionWorld.freeBodyPosition(foot, navigation?.current, embedded.current.lastClear);
-				if (free) foot.copy(free);
+			if (airborne.current || mode.current === 'swimming') embedded.current.since = null;
+			else if (elapsed.current >= embedded.current.checkAt) {
+				embedded.current.checkAt = elapsed.current + EMBEDDED_CHECK_SECONDS;
+				if (!collisionWorld.isBodyBlocked(foot)) {
+					embedded.current.since = null;
+					embedded.current.lastClear = (embedded.current.lastClear ?? new Vector3()).copy(foot);
+				} else if (embedded.current.since === null) embedded.current.since = elapsed.current;
+				else if (elapsed.current - embedded.current.since >= EMBEDDED_SECONDS) {
+					embedded.current.since = null;
+					const free = collisionWorld.freeBodyPosition(foot, navigation?.current, embedded.current.lastClear);
+					if (free) foot.copy(free);
+				}
 			}
 		}
 

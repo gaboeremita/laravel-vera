@@ -25,7 +25,7 @@ export default function ZoneTitleCard({ zoneName, contextLine, onDone }) {
 				>
 					{zoneName}
 				</h2>
-				<span className="hud-enter-rule mt-3 block h-px w-72 origin-center bg-gradient-to-r from-transparent via-accent to-transparent shadow-[0_0_12px_var(--accent)]" />
+				<span className="hud-enter-rule mt-3 hud-rule hud-rule-center w-72 origin-center hud-glow-lg" />
 				{contextLine && (
 					<span className="hud-enter-fade world-hud-label mt-2" style={{ animationDelay: '150ms' }}>{contextLine}</span>
 				)}

@@ -15,7 +15,7 @@ export default function ActivityProgress({ activityName, durationMs, cancelled =
 				className={leaving ? (filled ? 'hud-exit-burst' : 'hud-exit-fade') : 'hud-enter-scale'}
 				onAnimationEnd={(event) => { if (leaving && event.target === event.currentTarget) onFinished(); }}
 			>
-				<svg viewBox="0 0 100 100" className="h-24 w-24 overflow-visible drop-shadow-[0_0_10px_var(--accent)]">
+				<svg viewBox="0 0 100 100" className="h-24 w-24 overflow-visible drop-hud-glow-md">
 					<circle cx="50" cy="50" r="40" fill="none" stroke="color-mix(in oklab, var(--accent) 18%, transparent)" strokeWidth="4" />
 					<circle cx="50" cy="50" r="46" fill="none" stroke="color-mix(in oklab, var(--accent) 10%, transparent)" strokeWidth="1" />
 					<circle
@@ -43,7 +43,7 @@ export default function ActivityProgress({ activityName, durationMs, cancelled =
 					</g>
 				</svg>
 			</div>
-			<span className={`world-hud-glow mt-3 text-[0.7rem] uppercase tracking-[0.18em] ${leaving ? 'hud-exit-fade' : 'hud-enter-fade'}`}>{activityName}</span>
+			<span className={`world-hud-glow mt-3 text-[0.7rem] uppercase hud-text tracking-[calc(var(--hud-label-tracking)*1.125)] ${leaving ? 'hud-exit-fade' : 'hud-enter-fade'}`}>{activityName}</span>
 		</div>
 	);
 }

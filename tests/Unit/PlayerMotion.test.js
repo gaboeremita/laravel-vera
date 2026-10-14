@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { LEAVE_WATER_DEPTH, SWIM_DEPTH } from '../../resources/js/components/world/collisionCheck.js';
-import { GRAVITY, JUMP_HEIGHT, canJump, eyeHeightFor, jumpVelocity, landingDip, movementSpeed, nextMovementMode, swimEyeY, targetFov } from '../../resources/js/components/world/playerMotion.js';
+import { FAST_WALK_MULTIPLIER, FLY_VERTICAL_SPEED, GRAVITY, JUMP_HEIGHT, canJump, eyeHeightFor, flyingStep, jumpVelocity, landingDip, movementSpeed, nextMovementMode, swimEyeY, targetFov } from '../../resources/js/components/world/playerMotion.js';
 
 const dry = { runHeld: false, crouchToggled: false, waterDepth: 0 };
 
@@ -73,4 +73,17 @@ test('landing dips the view more after a longer fall, up to a limit', () => {
 	assert.ok(landingDip(-8, false) > landingDip(-3, false));
 	assert.ok(landingDip(-100, false) <= 0.14);
 	assert.equal(landingDip(-8, true), 0);
+});
+
+test('fast walking multiplies every pace', () => {
+	assert.equal(movementSpeed('walking', true), movementSpeed('walking') * FAST_WALK_MULTIPLIER);
+	assert.equal(movementSpeed('running', true), movementSpeed('running') * FAST_WALK_MULTIPLIER);
+});
+
+test('flying moves across freely and rises or descends while held', () => {
+	const start = { x: 0, y: 2, z: 0 };
+	assert.deepEqual(flyingStep(start, { x: 1, z: -2 }, false, false, 0.5), { x: 0.5, y: 2, z: -1 });
+	assert.deepEqual(flyingStep(start, { x: 0, z: 0 }, true, false, 0.5), { x: 0, y: 2 + FLY_VERTICAL_SPEED * 0.5, z: 0 });
+	assert.deepEqual(flyingStep(start, { x: 0, z: 0 }, false, true, 0.5), { x: 0, y: 2 - FLY_VERTICAL_SPEED * 0.5, z: 0 });
+	assert.deepEqual(flyingStep(start, { x: 0, z: 0 }, true, true, 0.5), start);
 });

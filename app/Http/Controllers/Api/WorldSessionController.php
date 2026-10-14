@@ -35,7 +35,7 @@ class WorldSessionController extends Controller
             ->with(['residentStates', 'objectStates'])
             ->withCount('conversations')
             ->orderByDesc('updated_at')
-            ->get(['id', 'title', 'region_id', 'position', 'arrival_facing', 'updated_at'])
+            ->get(['id', 'title', 'region_id', 'position', 'arrival_facing', 'creator_mode_at', 'frozen_resident_ids', 'updated_at'])
             ->map(fn (WorldSession $session) => [
                 'id' => $session->id,
                 'title' => $session->title,
@@ -43,6 +43,8 @@ class WorldSessionController extends Controller
                 'position' => $session->position,
                 'arrivalFacing' => $session->arrival_facing,
                 'hasConversations' => $session->conversations_count > 0,
+                'creatorUnlocked' => $session->creator_mode_at !== null,
+                'frozenResidentIds' => $session->frozen_resident_ids ?? [],
                 'updated_at' => $session->updated_at,
                 'residentStates' => $session->residentStates->mapWithKeys(fn (WorldSessionResident $state) => [$state->world_resident_id => [
                     'regionId' => $state->region_id,

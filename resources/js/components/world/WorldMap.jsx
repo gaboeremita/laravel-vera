@@ -102,7 +102,7 @@ export default function WorldMap({ layout, floorMaps, playerView, residents, res
 	const floorButtons = floors.length > 1 && (
 		<div className="flex gap-1">
 			{floors.map((floor) => (
-				<button key={floor.id} type="button" onClick={() => setManualFloorId(floor.id)} className={`border px-2 py-1 text-[0.6rem] tracking-[0.1em] cursor-pointer ${floor.id === map.floorId ? 'border-accent text-accent' : 'border-line-1 text-fg-3 hover:text-fg-1'}`}>
+				<button key={floor.id} type="button" onClick={() => setManualFloorId(floor.id)} className={`border px-2 py-1 text-[0.6rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.625)] cursor-pointer ${floor.id === map.floorId ? 'border-accent text-accent' : 'border-line-1 text-fg-3 hover:text-fg-1'}`}>
 					{floor.name.toUpperCase()}
 				</button>
 			))}
@@ -115,7 +115,7 @@ export default function WorldMap({ layout, floorMaps, playerView, residents, res
 				{header}
 				{floorButtons}
 				{mapView}
-				<span className="text-fg-3 text-[0.55rem] tracking-[0.1em]">M — FULL MAP</span>
+				<span className="text-fg-3 text-[0.55rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.625)]">M — FULL MAP</span>
 			</div>
 		);
 	}
@@ -125,7 +125,7 @@ export default function WorldMap({ layout, floorMaps, playerView, residents, res
 			<div className="flex flex-col items-center gap-3" onClick={(event) => event.stopPropagation()}>
 				{floorButtons}
 				{mapView}
-				<span className="text-fg-3 text-[0.6rem] tracking-[0.1em]">M OR CLICK OUTSIDE TO CLOSE</span>
+				<span className="text-fg-3 text-[0.6rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.625)]">M OR CLICK OUTSIDE TO CLOSE</span>
 			</div>
 		</div>
 	);

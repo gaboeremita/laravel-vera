@@ -124,7 +124,7 @@ export default function WorldTrackPlayer({ trackUrl, isActive, voiceUntil = 0 })
 				<button
 					type="button"
 					onClick={() => setIsMuted((wasMuted) => !wasMuted)}
-					className="text-fg-2 text-[0.7rem] tracking-[0.1em] hover:text-fg-1"
+					className="text-fg-2 text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.625)] hover:text-fg-1"
 					title="Toggle mute (N)"
 				>
 					{isMuted ? 'UNMUTE' : 'MUTE'}

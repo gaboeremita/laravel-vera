@@ -44,7 +44,7 @@ abstract class CreatorQuestTool implements AgentTool
 
     protected function latestRun(Quest $quest): ?WorldSessionQuest
     {
-        return $this->session->questRuns()->where('quest_id', $quest->id)->latest('run')->first()?->setRelation('quest', $quest);
+        return $this->session->latestRunOf($quest);
     }
 
     protected function broadcast(WorldSessionQuest $run): void

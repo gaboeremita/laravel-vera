@@ -32,7 +32,7 @@ export default function BeatNotice({ notice, onDone }) {
 			onAnimationEnd={(event) => { if (leaving && event.target === event.currentTarget) onDone(); }}
 		>
 			<span className={`world-hud-label ${failed ? 'text-danger' : 'text-accent'}`}>{headline}</span>
-			<span className="world-hud-glow truncate text-[0.8rem] tracking-[0.08em]">{notice.questTitle}</span>
+			<span className="world-hud-glow truncate text-[0.8rem] tracking-[calc(var(--hud-label-tracking)*0.5)]">{notice.questTitle}</span>
 			{notice.type === 'beatFinished' && <span className="text-fg-2 text-xs leading-snug">{notice.text}</span>}
 			{notice.type === 'rewardGiven' && (
 				<>
@@ -40,7 +40,7 @@ export default function BeatNotice({ notice, onDone }) {
 					{notice.text && <span className="text-fg-2 text-xs leading-snug">{notice.fromResident ? `${notice.giverName}: "${notice.text}"` : notice.text}</span>}
 				</>
 			)}
-			<span className="hud-enter-rule mt-1 block h-px w-full origin-left bg-gradient-to-r from-accent via-accent/40 to-transparent" />
+			<span className="hud-enter-rule mt-1 hud-rule w-full origin-left" />
 		</div>
 	);
 }

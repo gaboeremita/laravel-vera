@@ -49,10 +49,17 @@ import EndingCard from '../components/world/hud/EndingCard.jsx';
 import QuestOfferCard from '../components/world/hud/QuestOfferCard.jsx';
 import QuestLogPanel from '../components/world/hud/QuestLogPanel.jsx';
 import { areaIn } from '../components/world/zoneAccess.js';
+import useCreatorMenu from '../hooks/useCreatorMenu.js';
+import CreatorMenu from '../components/world/hud/CreatorMenu.jsx';
+import CreatorArrivalFlash from '../components/world/hud/CreatorArrivalFlash.jsx';
+import { zoneLanding } from '../components/world/zoneLanding.js';
+import { homeState } from '../components/world/residentHome.js';
 
 const INVITE_MS = 30000;
 const LISTEN_DISTANCE = 12;
 const NEARBY_CONVERSATION_CHECK_MS = 500;
+const LANDING_POLL_MS = 200;
+const SUMMON_SIDE_METERS = 1;
 
 export default function WorldPage() {
 	const { worldId } = useParams();
@@ -94,9 +101,19 @@ export default function WorldPage() {
 	const [busyItemId, setBusyItemId] = useState(null);
 	const [chatOpeningLine, setChatOpeningLine] = useState(null);
 	const { inventory, applyInventory, receivedMadeItem, dismissReceivedMadeItem } = useInventory(worldId, sessionId, addToast);
-	const { knownFacts, applyLearnedFacts } = useKnownFacts(worldId, sessionId, addToast);
+	const { knownFacts, applyLearnedFacts, forgetFact } = useKnownFacts(worldId, sessionId, addToast);
 	const quests = useQuests(worldId, sessionId, addToast, applyInventory);
 	const applyQuestRun = quests.applyRun;
+	const creator = useCreatorMenu({ worldId, sessionId, initiallyUnlocked: Boolean(session?.creatorUnlocked), addToast });
+	const creatorOpenRef = useRef(false);
+	const creatorKeyHandler = useRef(null);
+	const toggleCreator = creator.toggle;
+	const [flying, setFlying] = useState(false);
+	const [fastWalk, setFastWalk] = useState(false);
+	const [showZones, setShowZones] = useState(false);
+	const [arrivals, setArrivals] = useState([]);
+	const [flashKey, setFlashKey] = useState(null);
+	const pendingLanding = useRef(null);
 	const pendingPassageRef = useRef(null);
 	const passageActionsRef = useRef({ confirm: () => {}, cancel: () => {} });
 	const chatResidentRef = useRef(null);
@@ -238,6 +255,9 @@ export default function WorldPage() {
 		pausedRef.current = paused;
 		if (paused && document.activeElement instanceof HTMLElement) document.activeElement.blur();
 	}, [paused]);
+	useEffect(() => {
+		creatorOpenRef.current = creator.open;
+	}, [creator.open]);
 
 	// Registered before any other world key handler, so while paused P is
 	// the only world key that does anything.
@@ -251,6 +271,16 @@ export default function WorldPage() {
 				else if (event.code === 'Escape') passageActionsRef.current.cancel();
 				return;
 			}
+			if (event.code === 'KeyT' && sessionId && !pausedRef.current) {
+				event.stopImmediatePropagation();
+				if (!event.repeat) toggleCreator();
+				return;
+			}
+			if (creatorOpenRef.current) {
+				event.stopImmediatePropagation();
+				if (creatorKeyHandler.current?.(event)) event.preventDefault();
+				return;
+			}
 			if (event.code === 'KeyP') {
 				event.stopImmediatePropagation();
 				if (!event.repeat) setPaused((current) => !current);
@@ -260,7 +290,7 @@ export default function WorldPage() {
 		};
 		window.addEventListener('keydown', keyDown, true);
 		return () => window.removeEventListener('keydown', keyDown, true);
-	}, []);
+	}, [sessionId, toggleCreator]);
 
 	useEffect(() => {
 		chatResidentRef.current = chatResident;
@@ -404,6 +434,22 @@ export default function WorldPage() {
 		}
 	}, [worldId, sessionId, applyQuestRun, addToast]);
 
+	const enterRegion = useCallback(async (arrival) => {
+		const [regionResponse, sessionsResponse] = await Promise.all([
+			api.get(route('worlds.regions.show', { world: worldId, region: arrival.regionId })),
+			api.get(route('worlds.sessions.index', { world: worldId })),
+		]);
+		if (!regionResponse.ok || !sessionsResponse.ok) throw new Error('Region unavailable');
+		const [nextRegion, sessions] = await Promise.all([regionResponse.json(), sessionsResponse.json()]);
+		releaseAllSpots(occupiedSpots.current, 'user');
+		residentPositions.current.clear();
+		occupiedSpots.current.clear();
+		setSession(sessions.find((item) => String(item.id) === String(sessionId)) ?? null);
+		setArrivalFacing(arrival.facing);
+		setLocation(null);
+		setRegion(nextRegion);
+		setStatus('entering');
+	}, [worldId, sessionId]);
 	const travel = useCallback(async (passage) => {
 		if (travelingRef.current || !sessionId || !region) return;
 		travelingRef.current = true;
@@ -415,22 +461,9 @@ export default function WorldPage() {
 			const response = await api.post(route('worlds.sessions.travel', { world: worldId, session: sessionId }), { regionId: region.id, passageId: passage.id, followerIds });
 			const arrival = await response.json();
 			if (!response.ok) throw new Error(arrival.message || 'Unable to go through this passage');
-			const [regionResponse, sessionsResponse] = await Promise.all([
-				api.get(route('worlds.regions.show', { world: worldId, region: arrival.regionId })),
-				api.get(route('worlds.sessions.index', { world: worldId })),
-			]);
-			if (!regionResponse.ok || !sessionsResponse.ok) throw new Error('Region unavailable');
-			const [nextRegion, sessions] = await Promise.all([regionResponse.json(), sessionsResponse.json()]);
-			releaseAllSpots(occupiedSpots.current, 'user');
-			residentPositions.current.clear();
-			occupiedSpots.current.clear();
-			setSession(sessions.find((item) => String(item.id) === String(sessionId)) ?? null);
-			setArrivalFacing(arrival.facing);
-			setLocation(null);
-			setRegion(nextRegion);
-			setStatus('entering');
+			await enterRegion(arrival);
 		} catch (error) { addToast(error.message || 'Unable to go through this passage', 'error'); } finally { travelingRef.current = false; }
-	}, [addToast, persistResidentStates, region, sessionId, worldId]);
+	}, [addToast, persistResidentStates, region, sessionId, worldId, enterRegion]);
 	const requestPassage = useCallback((passage) => {
 		const link = (region?.links ?? []).find((item) => item.passageId === passage.id);
 		if (!link || travelingRef.current) return;
@@ -765,10 +798,11 @@ export default function WorldPage() {
 		claimTarget,
 		releaseTarget,
 		isBusy: isResidentBusy,
-		isPaused: () => pausedRef.current,
+		isPaused: () => pausedRef.current || creatorOpenRef.current,
 		onSpeak: handleSpeak,
 		onThought: handleThought,
 		addToast,
+		frozenResidentIds: activeSession?.frozenResidentIds,
 	});
 
 	useResidentRoutes({
@@ -780,7 +814,7 @@ export default function WorldPage() {
 		residentCommands,
 		occupiedSpots,
 		isBusy: isResidentBusy,
-		isPaused: () => pausedRef.current,
+		isPaused: () => pausedRef.current || creatorOpenRef.current,
 	});
 
 	useEffect(() => {
@@ -827,6 +861,147 @@ export default function WorldPage() {
 		return () => window.removeEventListener('keydown', keyDown);
 	}, [observed, nearbyConversation, chatResident]);
 
+	const creatorRoute = useCallback((name, params = {}) => route(`worlds.sessions.creator.${name}`, { world: worldId, session: sessionId, ...params }), [worldId, sessionId]);
+	const flashArrival = useCallback(() => setFlashKey(Date.now()), []);
+	const landPlayer = useCallback((position, facing = null) => {
+		playerCommands.current?.teleport(position, facing);
+		latestPosition.current = [position.x, position.y, position.z];
+		void persistPosition();
+		flashArrival();
+	}, [persistPosition, flashArrival]);
+	const landInZone = useCallback((zoneId) => {
+		const point = zoneLanding(world?.layout, zoneId, navigation.current);
+		if (!point) {
+			addToast('This zone has nowhere to stand', 'error');
+			return false;
+		}
+		landPlayer(point);
+		return true;
+	}, [world?.layout, landPlayer, addToast]);
+
+	useEffect(() => {
+		if (status !== 'ready' || !pendingLanding.current) return undefined;
+		const interval = setInterval(() => {
+			if (!navigation.current?.isComplete) return;
+			clearInterval(interval);
+			const zoneId = pendingLanding.current;
+			pendingLanding.current = null;
+			landInZone(zoneId);
+		}, LANDING_POLL_MS);
+		return () => clearInterval(interval);
+	}, [status, landInZone]);
+
+	useEffect(() => {
+		if (status !== 'ready') return;
+		playerCommands.current?.setFlying(flying);
+	}, [status, flying]);
+	useEffect(() => {
+		if (status !== 'ready') return;
+		playerCommands.current?.setFastWalk(fastWalk);
+	}, [status, fastWalk]);
+
+	const creatorGoTo = useCallback(async ({ regionId, zoneId = null, passageId = null, spawn = false }) => {
+		if (!sessionId || travelingRef.current) return false;
+		if (!spawn && regionId === region?.id) {
+			if (zoneId) {
+				if (!landInZone(zoneId)) return false;
+			} else {
+				const passage = (world?.layout?.passages ?? []).find((candidate) => candidate.id === passageId);
+				if (!passage) return false;
+				landPlayer(passage.arrival, passage.facing);
+			}
+			creator.addLogLine(`went to ${zoneId ? (world.layout.zones ?? []).find((zone) => zone.id === zoneId)?.name ?? zoneId : 'a passage'}`);
+			creator.close();
+			return true;
+		}
+		travelingRef.current = true;
+		setChatResident(null);
+		const followerIds = [...residentCommands.current].filter(([, commands]) => commands.isFollowing?.()).map(([residentId]) => residentId);
+		try {
+			await persistResidentStates();
+			latestPosition.current = null;
+			const arrival = await creator.run(spawn ? 'went to the world spawn' : 'went to another region', () => api.post(creatorRoute('travel'), spawn ? { spawn: true, followerIds } : { regionId, zoneId, passageId, followerIds }));
+			if (!arrival) return false;
+			pendingLanding.current = arrival.landInZone;
+			creator.close();
+			await enterRegion(arrival);
+			if (!arrival.landInZone) flashArrival();
+			return true;
+		} catch (error) {
+			addToast(error.message || 'Unable to go there', 'error');
+			return false;
+		} finally {
+			travelingRef.current = false;
+		}
+	}, [sessionId, region?.id, world, landInZone, landPlayer, creator, persistResidentStates, creatorRoute, enterRegion, flashArrival, addToast]);
+
+	const updateResidentState = useCallback((residentId, state) => setSession((current) => {
+		if (!current) return current;
+		const residentStates = { ...(current.residentStates ?? {}) };
+		if (state === null) delete residentStates[residentId];
+		else residentStates[residentId] = state;
+		return { ...current, residentStates };
+	}), []);
+	const moveResidentHere = useCallback((resident, position, facing) => {
+		const commands = residentCommands.current.get(resident.id);
+		if (commands) commands.teleport(position, facing);
+		setArrivals((current) => [...current, { key: `${resident.id}-${Date.now()}`, residentId: resident.id }]);
+	}, []);
+	const releaseResident = useCallback((resident) => {
+		if (chatResidentRef.current?.id === resident.id) closeChat();
+		const conversation = residentConversationOf(resident.id);
+		if (conversation) void stopResidentConversation(conversation.id);
+	}, [closeChat, residentConversationOf, stopResidentConversation]);
+
+	const creatorSummon = useCallback(async (resident) => {
+		const view = playerView.current;
+		const foot = playerState.current?.footPosition;
+		if (!view || !foot) return false;
+		const side = { x: foot.x + Math.cos(view.yaw) * SUMMON_SIDE_METERS, y: foot.y, z: foot.z - Math.sin(view.yaw) * SUMMON_SIDE_METERS };
+		const position = navigation.current?.standingPointNear(side) ?? side;
+		const facing = Math.atan2(foot.x - position.x, foot.z - position.z);
+		releaseResident(resident);
+		const done = await creator.run(`summoned ${resident.assistant.name}`, () => api.post(creatorRoute('residents.summon', { resident: resident.id }), { position: { x: position.x, y: position.y, z: position.z }, facing }));
+		if (!done) return false;
+		updateResidentState(resident.id, { regionId: region.id, position: { x: position.x, y: position.y, z: position.z }, rotation: { y: facing }, spotId: null, activityId: null, posture: 'standing', exitPosition: null });
+		moveResidentHere(resident, position, facing);
+		return true;
+	}, [creator, creatorRoute, region?.id, releaseResident, updateResidentState, moveResidentHere]);
+
+	const creatorSend = useCallback(async (resident, regionId, zoneId) => {
+		const here = regionId === region?.id;
+		const point = here ? zoneLanding(world?.layout, zoneId, navigation.current) : null;
+		if (here && !point) {
+			addToast('This zone has nowhere to stand', 'error');
+			return false;
+		}
+		releaseResident(resident);
+		const body = await creator.run(`sent ${resident.assistant.name} to another zone`, () => api.post(creatorRoute('residents.send', { resident: resident.id }), { regionId, zoneId, position: point }));
+		if (!body) return false;
+		updateResidentState(resident.id, { regionId: body.regionId, position: body.position, rotation: { y: 0 }, spotId: null, activityId: null, posture: 'standing', exitPosition: null });
+		if (here) moveResidentHere(resident, body.position, 0);
+		return true;
+	}, [region?.id, world?.layout, releaseResident, creator, creatorRoute, updateResidentState, moveResidentHere, addToast]);
+
+	const creatorSendHome = useCallback(async (resident) => {
+		releaseResident(resident);
+		const done = await creator.run(`sent ${resident.assistant.name} home`, () => api.delete(creatorRoute('residents.state.destroy', { resident: resident.id })));
+		if (!done) return false;
+		updateResidentState(resident.id, null);
+		if (resident.regionId === region?.id) {
+			const home = homeState(resident, world?.layout) ?? (resident.position ? { position: resident.position, rotation: resident.rotation } : null);
+			if (home) moveResidentHere(resident, home.position, home.rotation?.y ?? 0);
+		}
+		return true;
+	}, [releaseResident, creator, creatorRoute, updateResidentState, region?.id, world?.layout, moveResidentHere]);
+
+	const creatorFreeze = useCallback(async (resident, frozen) => {
+		const done = await creator.run(`${frozen ? 'froze' : 'unfroze'} ${resident.assistant.name}`, () => api.put(creatorRoute('residents.frozen.update', { resident: resident.id }), { frozen }));
+		if (!done) return false;
+		setSession((current) => current && ({ ...current, frozenResidentIds: frozen ? [...new Set([...(current.frozenResidentIds ?? []), resident.id])] : (current.frozenResidentIds ?? []).filter((id) => id !== resident.id) }));
+		return true;
+	}, [creator, creatorRoute]);
+
 	const observedConversation = observed ? residentConversations.conversations.find((conversation) => conversation.id === observed.id) ?? null : null;
 	const residentNames = new Map((world?.residents ?? []).map((resident) => [resident.id, resident.assistant.name]));
 	const isRequestedSessionLoaded = sessionId ? activeSession !== null : session === null;
@@ -854,6 +1029,25 @@ export default function WorldPage() {
 		onObjectState: applyObjectState,
 	});
 	const openBlockingObject = player.cardView ? null : player.bumpInto;
+	const creatorContext = {
+		worldId,
+		sessionId,
+		regionId: region?.id ?? null,
+		residents: worldData?.residents ?? [],
+		thoughts,
+		getPlayerPosition: () => playerState.current?.footPosition ?? null,
+		flying, setFlying, fastWalk, setFastWalk, showZones, setShowZones,
+		route: creatorRoute,
+		goTo: creatorGoTo,
+		summon: creatorSummon,
+		send: creatorSend,
+		sendHome: creatorSendHome,
+		freeze: creatorFreeze,
+		applyInventory,
+		applyLearnedFacts,
+		forgetFact,
+		applyObjectState,
+	};
 	const hasZones = (world?.layout?.zones?.length ?? 0) > 0;
 	const readoutText = location?.zone
 		? [world?.name, location.zone.name, hasMultipleFloors ? location.floor?.name : null].filter(Boolean).join(' · ')
@@ -889,7 +1083,7 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready' && !paused} voiceUntil={voiceUntil} />
-				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !learnedOpen && !questLogOpen && !handoverRequest && !player.purchase && !quests.ending && !questOfferOpen && !receivedMadeItem} paused={paused} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} onBlockedByObject={openBlockingObject} />
+				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !learnedOpen && !questLogOpen && !handoverRequest && !player.purchase && !quests.ending && !questOfferOpen && !receivedMadeItem && !creator.open} paused={paused || creator.open} showZones={showZones} arrivals={arrivals} onArrivalDone={(key) => setArrivals((current) => current.filter((arrival) => arrival.key !== key))} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} onBlockedByObject={openBlockingObject} />
 				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} hasInventory={!!sessionId} />{hasZones && readoutText && <LocationReadout text={readoutText} />}{sessionId && <CreditsReadout credits={inventory?.credits} />}{sessionId && <QuestTracker runs={quests.runs} />}{quests.notice && <BeatNotice key={quests.notice.key} notice={quests.notice} onDone={quests.dismissNotice} />}</div>} />}
 				{status === 'ready' && (
 					<>
@@ -918,6 +1112,8 @@ export default function WorldPage() {
 				{handoverRequest && <HandoverRequestConfirm request={handoverRequest} isAnswering={isAnsweringRequest} onAccept={() => void answerHandoverRequest(true)} onDecline={() => void answerHandoverRequest(false)} />}
 				{pendingPassage && <PassageConfirm fromRegionName={region.name} toRegionName={pendingPassage.toRegionName} onConfirm={() => passageActionsRef.current.confirm()} onCancel={() => passageActionsRef.current.cancel()} />}
 				<PauseOverlay paused={paused} onResume={() => setPaused(false)} onExit={exit} />
+				<CreatorArrivalFlash flashKey={flashKey} />
+				{sessionId && <CreatorMenu creator={creator} sessionTitle={activeSession?.title ?? ''} context={creatorContext} keyHandlerRef={creatorKeyHandler} />}
 				<div className={`absolute inset-0 z-10 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${status !== 'ready' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
 					{world.cardImageUrl && (
 						<img src={world.cardImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover object-top scale-105 blur-sm brightness-[0.35]" />

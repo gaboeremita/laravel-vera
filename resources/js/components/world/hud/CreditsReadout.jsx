@@ -28,12 +28,12 @@ export default function CreditsReadout({ credits }) {
 	return (
 		<div className="world-hud-panel pointer-events-none relative flex items-center gap-2 px-3 py-1.5">
 			<CoinGlyph />
-			<span key={pulse?.key ?? 'initial'} className={`world-hud-glow text-[0.8rem] tracking-[0.12em] tabular-nums ${pulse ? 'hud-enter-scale' : ''}`}>{formatAmount(credits)}</span>
+			<span key={pulse?.key ?? 'initial'} className={`world-hud-glow text-[0.8rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.75)] tabular-nums ${pulse ? 'hud-enter-scale' : ''}`}>{formatAmount(credits)}</span>
 			<span className="world-hud-label text-fg-3">CR</span>
 			{pulse && pulse.delta !== 0 && (
 				<span
 					key={`delta-${pulse.key}`}
-					className={`absolute -bottom-5 right-2 text-[0.7rem] tracking-[0.1em] tabular-nums ${pulse.delta > 0 ? 'text-accent' : 'text-danger'}`}
+					className={`absolute -bottom-5 right-2 text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.625)] tabular-nums ${pulse.delta > 0 ? 'text-accent' : 'text-danger'}`}
 					style={{ animation: 'hud-rise-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both, hud-fade-out 0.6s ease-in 1.8s forwards' }}
 				>
 					{pulse.delta > 0 ? `+${pulse.delta}` : pulse.delta}

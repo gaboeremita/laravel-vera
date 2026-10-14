@@ -30,11 +30,11 @@ export default function MadeItemCard({ item, onKeep, captureKeys = true }) {
 						<img src={item.cardImageUrl} alt={item.name} className="block max-h-[62vh] max-w-full object-contain" />
 					</div>
 				)}
-				<h3 className="world-hud-glow hud-enter-rise mt-5 font-display text-2xl font-semibold uppercase tracking-[0.08em]" style={{ animationDelay: '80ms' }}>{item.name}</h3>
+				<h3 className="world-hud-glow hud-enter-rise mt-5 font-display text-2xl font-semibold uppercase tracking-[calc(var(--hud-label-tracking)*0.5)]" style={{ animationDelay: '80ms' }}>{item.name}</h3>
 				{item.madeBy && <span className="world-hud-label hud-enter-rise mt-1" style={{ animationDelay: '120ms' }}>by {item.madeBy}</span>}
-				<span className="hud-enter-rule mt-4 block h-px w-80 origin-center bg-gradient-to-r from-transparent via-accent to-transparent shadow-[0_0_12px_var(--accent)]" />
+				<span className="hud-enter-rule mt-4 hud-rule hud-rule-center w-80 origin-center hud-glow-lg" />
 				<p className="hud-enter-rise mt-4 max-w-xl text-fg-2 text-sm italic leading-relaxed" style={{ animationDelay: '160ms' }}>{item.description}</p>
-				<button type="button" onClick={onKeep} className="world-hud-panel hud-enter-rise mt-6 flex items-center gap-3 px-5 py-2 text-fg-1 text-[0.7rem] tracking-[0.16em] hover:text-accent cursor-pointer" style={{ animationDelay: '200ms' }}>
+				<button type="button" onClick={onKeep} className="world-hud-panel hud-enter-rise mt-6 flex items-center gap-3 px-5 py-2 text-fg-1 text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*1)] hover:text-accent cursor-pointer" style={{ animationDelay: '200ms' }}>
 					<span className="world-hud-key">ENTER</span>
 					<span>KEEP</span>
 				</button>

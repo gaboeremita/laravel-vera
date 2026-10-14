@@ -105,3 +105,26 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+
+[data-theme="terminal"] {
+  --hud-radius: 0px;
+  --hud-chip-radius: 0px;
+  --hud-corner-marks: 1;
+  --hud-scanlines: 0.55;
+  --hud-glow: 1;
+  --hud-shadow: 0 0 0 transparent;
+  --hud-border-style: 1px solid;
+  --hud-panel-opacity: 78%;
+  --hud-label-transform: uppercase;
+  --hud-label-tracking: 0.16em;
+  --hud-label-variant: normal;
+  --hud-label-size: 0.62rem;
+  --hud-title-tracking: 0.24em;
+  --hud-title-weight: 600;
+  --hud-primary-fill: 0;
+  --hud-avatar-radius: 0px;
+  --hud-rule-lines: 1;
+  --hud-caret-width: 0.45em;
+  --hud-caret-radius: 0px;
+  --hud-caret-blink: hud-caret-hard 1s steps(2, jump-none) infinite;
+}

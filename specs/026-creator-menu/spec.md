@@ -1,4 +1,4 @@
-# Feature Specification: Creator Menu
+# Feature Specification: Creator Menu and HUD Theming
 
 **Feature Branch**: `181-creator-menu`
 
@@ -13,6 +13,7 @@
 ### Session 2026-10-14
 
 - Q: What does grabbing any object give the player? → A: Both: any item of the world goes into the player's inventory, and any object's inventory can be opened from any distance to take what's inside. Placed objects themselves never become items.
+- Q: Is making the existing HUD follow the theme part of this feature? → A: Yes. The whole HUD (inventory, quest log, pause screen, zone title card, location readout, passage confirmation, control hints and the Creator menu) uses shared classes that each theme styles, all in this feature.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -148,6 +149,26 @@ The player can unlock a zone by making any blocking object passable for the sess
 
 ---
 
+### User Story 8 - The HUD follows the theme (Priority: P1)
+
+The player picks a theme in Settings and enters a world. Every piece of interface drawn over the world (inventory, quest log, pause screen, zone title card, location readout, passage confirmation, control hints, the Creator menu) takes that theme's look: Terminal keeps today's cyberpunk frame; Default is soft and rounded with a quiet shadow, and a soft glow only in dark mode; Grimoire is rounded parchment with a double border and small capitals; Slate is flat and crisp.
+
+**Why this priority**: The HUD is the face of the game in every theme, and the Creator menu is built on the same shared classes, so it can't look right in a theme until the HUD does.
+
+**Independent Test**: In each theme, open the inventory, the quest log and the pause screen, and walk into a new zone. Confirm each matches the theme's row in the plan's HUD theme table; in Terminal, confirm nothing changed from today.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Terminal theme, **When** any HUD piece shows, **Then** it looks exactly as it does today: square corners with corner marks, scanlines, glow, uppercase spaced labels, block caret.
+2. **Given** the Default theme in light mode, **When** any HUD piece shows, **Then** it has rounded corners, no corner marks, no scanlines and no glow, a soft drop shadow, and filled primary buttons.
+3. **Given** the Default theme in dark mode, **When** any HUD piece shows, **Then** it looks as in light mode with a soft glow and a darker shadow.
+4. **Given** the Grimoire theme, **When** any HUD piece shows, **Then** it has rounded corners, a double border, a warm shadow, small-capital labels, no scanlines and no glow.
+5. **Given** the Slate theme, **When** any HUD piece shows, **Then** it has slightly rounded corners, a crisp shadow, small uppercase labels, no scanlines and no glow.
+6. **Given** any theme, **When** a text caret shows in the HUD, **Then** it has that theme's shape and blink.
+7. **Given** the player switches theme in Settings, **When** they return to the world, **Then** the HUD shows the new theme's look.
+
+---
+
 ### Edge Cases
 
 - A zone has no walkable ground inside its outline: the jump is refused with a message saying the zone has nowhere to stand.
@@ -213,6 +234,25 @@ The player can unlock a zone by making any blocking object passable for the sess
 - **FR-029**: The player MUST be able to use any activity of any object from the menu, with its effects applied and its costs and terms skipped.
 - **FR-030**: The player MUST be able to toggle an overlay that draws every zone's outline and name on the ground of the current region.
 
+**Look and feel**
+
+- **FR-031**: The menu MUST be built only from the HUD's shared classes and the theme's tokens, so it takes each theme's HUD look and accent color; pieces the HUD doesn't have yet (meter, chip, switch, password cell, caret, control states, animations) MUST be added as shared HUD classes that every theme styles.
+- **FR-032**: The locked state MUST show a "Creator" title, one cell per typed password character with a blinking caret cell, and "Authenticate" and "Cancel" buttons.
+- **FR-033**: The unlocked menu MUST show a header with the session name, "World paused" and key hints; a rail with the five tabs numbered 1 to 5 and the Fly, Fast walk and Show zones switches; and a creator log listing the latest changes made from the menu, newest first.
+- **FR-034**: Keys 1 to 5 MUST switch tabs, the up and down arrows MUST move the selection in a tab's list, and T or Escape MUST close the menu.
+- **FR-035**: The Go to tab MUST show the chosen region's zones both as a nested list and as a top-down map of their outlines with the player's position and residents marked; hovering a zone in either MUST highlight it in both, and clicking a zone on the map MUST go there.
+- **FR-036**: The Residents tab MUST show each resident with a portrait, their region and zone, and chips for frozen and for being near the player; the selected resident's detail MUST show the live thought, each sentiment as a meter of 20 cells centred on 0 that is set by clicking a cell, the resident's actions, and their recent activities.
+- **FR-037**: The Quests tab MUST show beats as the quest log's diamond markers, set and undone by clicking them; the Items tab MUST show a holder and the player side by side with items moved between them; the World tab MUST show blocking objects with locked or open chips and secrets with hidden or revealed chips.
+- **FR-038**: Every interactive element MUST have distinct hover, pressed, busy, success and failure states, and every change of state the menu shows MUST animate, as listed in the plan's motion table. With reduced motion requested by the system, animations MUST shorten to plain fades.
+- **FR-039**: Going somewhere MUST end with a short accent-coloured flash over the view, and a summoned or sent resident MUST arrive with a brief glowing ring at their feet.
+
+**HUD theming**
+
+- **FR-040**: The HUD's shared classes MUST take these from the active theme: corner radius, chip radius, whether corner marks show, scanline strength, glow strength, shadow, border style, panel opacity, label case, spacing, small capitals and size, title spacing and weight, primary button fill, avatar shape, and caret width, corners and blink.
+- **FR-041**: Each of the four themes, and Default in both light and dark mode, MUST set every value of FR-040 as listed in the plan's HUD theme table; Terminal's values MUST reproduce today's HUD exactly.
+- **FR-042**: No HUD component MAY fix any FR-040 value itself (corner radius, glow shadows, label spacing); every one MUST come from the shared classes.
+- **FR-043**: The HUD's reduced-motion behaviour MUST stay as it is in every theme.
+
 ### Key Entities
 
 - **World session**: gains the moment it was unlocked for the Creator menu (unlocked when set) and which residents are frozen.
@@ -229,9 +269,13 @@ The player can unlock a zone by making any blocking object passable for the sess
 - **SC-003**: Every one of the 23 powers can be used without leaving the world page or opening the world editor.
 - **SC-004**: 100% of changes made from the menu to quests, credits, items and facts show as made by the creator wherever those changes are logged.
 - **SC-005**: No creator power takes effect in a session that wasn't unlocked with the right password.
+- **SC-006**: Every action in the menu shows visible feedback within 100 ms of the click, before the request returns.
+- **SC-007**: In the Terminal theme, every HUD piece is visually unchanged from before this feature.
+- **SC-008**: In Default, Grimoire and Slate, no HUD piece shows scanlines or corner marks, and none shows glow except Default in dark mode.
 
 ## Assumptions
 
+- Theme selection already exists in Settings; this feature adds no new theme and no theme setting.
 - The creator password is the one already set in Settings for creator mode in conversations; no second password is introduced.
 - The menu is available only on the world page, in a world session; the world editor is unchanged.
 - The world's own setup (regions, zones, objects, residents' configuration, quests' definitions) is never changed by the menu; every power changes this session only.

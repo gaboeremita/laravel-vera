@@ -20,14 +20,14 @@ Request: `{"password": "string"}`
 {
   "regions": [{
     "id": 1, "name": "Undercroft",
-    "zones": [{"id": "z1", "name": "Market", "parentId": null}],
+    "zones": [{"id": "z1", "name": "Market", "parentId": null, "outline": [[0,0],[10,0],[10,8],[0,8]]}],
     "passages": [{"id": "p1", "name": "North gate"}],
     "objects": [{"id": "o1", "name": "Door", "blocks": true, "passable": false,
                  "activities": [{"id": "a1", "name": "Open", "responses": [{"index": 0, "summary": "The door opens..."}]}]}]
   }],
   "spawn": {"regionId": 1, "passageId": "p1"},
   "residents": [{
-    "id": 4, "name": "Rin", "regionId": 1, "zoneName": "Market", "frozen": false,
+    "id": 4, "name": "Rin", "portraitUrl": null, "regionId": 1, "position": {"x":2,"y":0,"z":3}, "zoneName": "Market", "frozen": false,
     "sentiments": {"trust": 2, "liking": 0},
     "recentActivities": [{"verb": "go", "target": "stall", "reason": "...", "outcome": "completed", "at": "..."}]
   }],
