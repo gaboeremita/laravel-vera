@@ -215,8 +215,8 @@ The player can unlock a zone by making any blocking object passable for the sess
 
 ### Key Entities
 
-- **World session**: gains the moment it was unlocked for the Creator menu; unlocked when set.
-- **Session resident state**: gains whether the resident is frozen.
+- **World session**: gains the moment it was unlocked for the Creator menu (unlocked when set) and which residents are frozen.
+- **Session resident state**: the existing record of where a resident is in the session, which summoning, sending and sending home write or clear.
 - **Sentiment, quest event, credit transaction, item transfer, revealed fact**: existing records, written with their existing "made by the creator" marking.
 - **Object state**: the existing per-session state of an object, whose passable value the menu sets and clears.
 
