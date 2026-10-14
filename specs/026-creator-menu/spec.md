@@ -8,6 +8,12 @@
 
 **Input**: User description: "A creator mode for the world: a menu the player opens with T inside a world session to do creator things. Move around: go to any zone in any region (followers come along), go to any passage or the world spawn, fly through walls, walk faster. Residents: summon any resident to where the player is, send a resident to any zone in any region, set their sentiments toward the player, freeze or unfreeze them, send them back to their home spot, see what they are thinking and planning. Quests: start any quest, finish it as completed or failed, reopen it, finish or undo any beat, set or clear any flag. Items and credits: add or take credits, grab any item of the world into the inventory, open any object's inventory from any distance and take or put items, give items to or take items from any resident. World state: unlock a zone by making any blocking object passable and lock it again, reveal or forget any fact, use any object activity from anywhere without its costs or terms, show zone outlines and names on the ground. The menu is unlocked with the creator password set in Settings, asked once per world session."
 
+## Clarifications
+
+### Session 2026-10-14
+
+- Q: What does grabbing any object give the player? → A: Both: any item of the world goes into the player's inventory, and any object's inventory can be opened from any distance to take what's inside. Placed objects themselves never become items.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Open and unlock the Creator menu (Priority: P1)
