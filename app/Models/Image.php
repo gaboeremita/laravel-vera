@@ -34,7 +34,7 @@ class Image extends Model
     /**
      * Decode a base64 image, save to storage, and attach to a model.
      */
-    public static function storeFromBase64(string $base64, Model $imageable, string $storagePath): static
+    public static function storeFromBase64(string $base64, Model $imageable, string $storagePath, ?string $role = null): static
     {
         $imageData = base64_decode($base64);
         $mimeType = self::detectMimeType($imageData);
@@ -44,11 +44,14 @@ class Image extends Model
 
         Storage::disk('public')->put($path, $imageData);
 
-        return $imageable->image()->create([
+        $relation = $role === 'card' ? $imageable->cardImage() : $imageable->image();
+
+        return $relation->create([
             'path' => $path,
             'disk' => 'public',
             'mime_type' => $mimeType,
             'size' => strlen($imageData),
+            'role' => $role,
         ]);
     }
 

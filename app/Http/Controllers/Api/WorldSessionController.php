@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\DeleteItem;
 use App\Actions\Quests\AnnounceZonesEntered;
 use App\Actions\Quests\SyncSessionQuests;
 use App\Actions\Quests\WithdrawQuestOffers;
@@ -11,6 +12,7 @@ use App\Enums\HandoverRequestStatus;
 use App\Events\Quests\PlayerEnteredRegion;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TravelRequest;
+use App\Models\Item;
 use App\Models\World;
 use App\Models\WorldSession;
 use App\Models\WorldSessionObject;
@@ -147,11 +149,12 @@ class WorldSessionController extends Controller
         return response()->json($worldSession);
     }
 
-    public function destroy(Request $request, int $world, int $session): JsonResponse
+    public function destroy(Request $request, int $world, int $session, DeleteItem $deleteItem): JsonResponse
     {
         $worldUser = $this->resolveWorldUser($request, $world);
 
         $worldSession = $worldUser->sessions()->findOrFail($session);
+        Item::where('world_session_id', $worldSession->id)->get()->each(fn (Item $item) => $deleteItem->handle($item));
         $worldSession->delete();
 
         return response()->json(status: 204);

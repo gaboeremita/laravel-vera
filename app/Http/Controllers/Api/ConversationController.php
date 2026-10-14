@@ -66,6 +66,7 @@ use App\Services\AgentLoop\Tools\World\EndQuestTool;
 use App\Services\AgentLoop\Tools\World\GiveTool;
 use App\Services\AgentLoop\Tools\World\GrantFlagTool;
 use App\Services\AgentLoop\Tools\World\GrantTool;
+use App\Services\AgentLoop\Tools\World\MakeItemTool;
 use App\Services\AgentLoop\Tools\World\OfferQuestTool;
 use App\Services\AgentLoop\Tools\World\RemoveTool;
 use App\Services\AgentLoop\Tools\World\ResetQuestTool;
@@ -572,6 +573,10 @@ class ConversationController extends Controller
             if ($residentInventory !== null && $aiModel?->supports_tools) {
                 $askForTool = new AskForTool($residentInventory, $conversation);
                 $tools = [...$tools, new GiveTool($residentInventory, $playerInventory, 'the user'), $askForTool, new CheckHoldsTool($playerInventory)];
+                $itemImageService = new ImageGenerationService;
+                if (! $creatorTurn && $inventoryResident->makesItemsAt() !== [] && $itemImageService->isAvailableFor($assistantUser)) {
+                    $tools[] = new MakeItemTool($itemImageService, $assistantUser, $conversation, $residentInventory);
+                }
             }
 
             if ($factsResident !== null) {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatAmount, inventoryChanges } from '../../resources/js/components/world/inventoryChanges.js';
+import { formatAmount, inventoryChangeEntries, inventoryChanges, isReceivedMadeItem } from '../../resources/js/components/world/inventoryChanges.js';
 
 const inventory = (credits, items) => ({ credits, items: items.map(([itemId, name, quantity]) => ({ itemId, name, quantity })) });
 
@@ -31,11 +31,21 @@ test('carries each changed item\'s image and sound', async () => {
 	const { inventoryChangeEntries } = await import('../../resources/js/components/world/inventoryChanges.js');
 	const tacos = { itemId: 7, name: 'Order of tacos al pastor', quantity: 1, cardImageUrl: '/tacos.png', soundUrl: '/sounds/abc.wav', soundHash: 'abc' };
 	const [entry] = inventoryChangeEntries({ credits: 0, items: [] }, { credits: 0, items: [tacos] });
-	assert.deepEqual(entry, { text: '+1 Order of tacos al pastor', delta: 1, imageUrl: '/tacos.png', sound: { url: '/sounds/abc.wav', hash: 'abc' } });
+	assert.deepEqual(entry, { text: '+1 Order of tacos al pastor', delta: 1, imageUrl: '/tacos.png', sound: { url: '/sounds/abc.wav', hash: 'abc' }, item: tacos });
 });
 
 test('picking a vendor\'s item asks for one of it', async () => {
 	const { askForLine } = await import('../../resources/js/components/world/inventoryChanges.js');
 	assert.equal(askForLine({ name: 'Order of tacos al pastor' }), '*asks for an order of tacos al pastor*');
 	assert.equal(askForLine({ name: 'Canned coffee' }), '*asks for a canned coffee*');
+});
+
+test('only receiving something a resident made opens its card', () => {
+	const painting = { itemId: 3, name: 'Harbour at Dusk', quantity: 1, madeBy: 'Dither', cardImageUrl: '/harbour.png' };
+	const bread = { itemId: 2, name: 'Bread', quantity: 1, madeBy: null };
+	const received = inventoryChangeEntries({ credits: 0, items: [] }, { credits: 5, items: [painting, bread] });
+	assert.deepEqual(received.filter(isReceivedMadeItem).map((entry) => entry.item), [painting]);
+
+	const givenAway = inventoryChangeEntries({ credits: 0, items: [painting] }, { credits: 0, items: [] });
+	assert.equal(givenAway.some(isReceivedMadeItem), false);
 });

@@ -1,4 +1,4 @@
-const KEYS = ['radius', 'homeSpot', 'route', 'area', 'decisionSeconds', 'greetOnArrival'];
+const KEYS = ['radius', 'homeSpot', 'route', 'area', 'decisionSeconds', 'greetOnArrival', 'makesItemsAt'];
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const isName = (value) => typeof value === 'string' && value.trim() !== '';
@@ -41,6 +41,9 @@ export function parseBehaviorSettings(text) {
 	}
 	if (value.greetOnArrival !== undefined && typeof value.greetOnArrival !== 'boolean') {
 		return { behaviorSettings: null, error: '"greetOnArrival" must be true or false' };
+	}
+	if (value.makesItemsAt !== undefined && !(Array.isArray(value.makesItemsAt) && value.makesItemsAt.every(isName))) {
+		return { behaviorSettings: null, error: '"makesItemsAt" must be a list of activity ids' };
 	}
 	return { behaviorSettings: value, error: null };
 }

@@ -185,7 +185,7 @@ function ResidentRow({ worldId, candidate, resident, otherResidents, regionId, r
 					</select>
 				</div>
 				<div>
-					<label className={FIELD_LABEL}>Behavior Settings <span className="normal-case text-fg-3">(JSON: homeSpot, route stops, the area they keep to, decisionSeconds)</span></label>
+					<label className={FIELD_LABEL}>Behavior Settings <span className="normal-case text-fg-3">(JSON: homeSpot, route stops, the area they keep to, decisionSeconds, makesItemsAt: the activities during which they make items)</span></label>
 					<textarea
 						value={draft.behaviorSettings}
 						onChange={(event) => setDraft((current) => ({ ...current, behaviorSettings: event.target.value }))}

@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Database\Factories\ItemFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['world_id', 'name', 'description', 'base_price', 'contents', 'use_requirement', 'consumed_on_use', 'releases_credits', 'releases_items', 'sound_id', 'reveals_fact_id'])]
+#[Fillable(['world_id', 'world_session_id', 'made_by_resident_id', 'name', 'description', 'base_price', 'contents', 'use_requirement', 'consumed_on_use', 'releases_credits', 'releases_items', 'sound_id', 'reveals_fact_id'])]
 class Item extends Model
 {
     /** @use HasFactory<ItemFactory> */
@@ -25,6 +26,16 @@ class Item extends Model
         return $this->belongsTo(World::class);
     }
 
+    public function worldSession(): BelongsTo
+    {
+        return $this->belongsTo(WorldSession::class);
+    }
+
+    public function madeBy(): BelongsTo
+    {
+        return $this->belongsTo(WorldResident::class, 'made_by_resident_id');
+    }
+
     public function sound(): BelongsTo
     {
         return $this->belongsTo(Sound::class);
@@ -38,5 +49,16 @@ class Item extends Model
     public function cardImage(): MorphOne
     {
         return $this->morphOne(Image::class, 'imageable')->where('role', 'card');
+    }
+
+    /**
+     * The world's own items and the items made during this session.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeAvailableIn(Builder $query, WorldSession $session): void
+    {
+        $query->where('world_id', $session->worldUser->world_id)
+            ->where(fn (Builder $query) => $query->whereNull('world_session_id')->orWhere('world_session_id', $session->id));
     }
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { route } from 'ziggy-js';
 import { api } from '../../../utils/api.js';
 import ItemThumb from '../../ItemThumb.jsx';
+import MadeItemCard from './MadeItemCard.jsx';
 import { formatAmount } from '../inventoryChanges.js';
 import { isTypingTarget } from '../keyboardFocus.js';
 
@@ -62,6 +63,7 @@ export default function InventoryPanel({ worldId, sessionId, inventory, busyItem
 	const [highlighted, setHighlighted] = useState(0);
 	const [attempt, setAttempt] = useState('');
 	const [attempting, setAttempting] = useState(false);
+	const [viewing, setViewing] = useState(null);
 	const attemptRef = useRef(null);
 	const items = inventory?.items ?? [];
 	const index = Math.min(highlighted, Math.max(0, items.length - 1));
@@ -82,6 +84,10 @@ export default function InventoryPanel({ worldId, sessionId, inventory, busyItem
 				return;
 			}
 			event.stopImmediatePropagation();
+			if (viewing) {
+				if (!event.repeat && ['Enter', 'NumpadEnter', 'Escape'].includes(event.code)) { event.preventDefault(); setViewing(null); }
+				return;
+			}
 			if (event.code === 'Tab' || event.code === 'Escape') { event.preventDefault(); if (!event.repeat) onClose(); return; }
 			if (tab !== 'items' || items.length === 0) return;
 			const moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -COLUMNS, ArrowDown: COLUMNS };
@@ -98,7 +104,7 @@ export default function InventoryPanel({ worldId, sessionId, inventory, busyItem
 		};
 		window.addEventListener('keydown', keyDown, true);
 		return () => window.removeEventListener('keydown', keyDown, true);
-	}, [tab, items.length, index, selected, onClose, onExamine]);
+	}, [tab, items.length, index, selected, viewing, onClose, onExamine]);
 
 	return (
 		<div className="world-pause-backdrop hud-enter-fade absolute inset-0 z-30 flex items-center justify-center p-8" onClick={onClose}>
@@ -160,8 +166,15 @@ export default function InventoryPanel({ worldId, sessionId, inventory, busyItem
 							</div>
 							{selected && (
 								<div key={selected.itemId} className="hud-enter-fade flex flex-col border-l border-accent/20 pl-5">
-									<ItemThumb item={selected} size="lg" className="!h-24 !w-24" />
+									{selected.madeBy && selected.cardImageUrl ? (
+										<button type="button" onClick={() => setViewing(selected)} className="group block w-full border border-line-1 hover:border-accent/60 transition-colors cursor-zoom-in" style={{ borderRadius: 0 }}>
+											<img src={selected.cardImageUrl} alt={selected.name} className="block max-h-56 w-full object-contain" />
+										</button>
+									) : (
+										<ItemThumb item={selected} size="lg" className="!h-24 !w-24" />
+									)}
 									<h3 className="world-hud-glow mt-3 font-display text-xl font-semibold uppercase tracking-[0.08em]">{selected.name}</h3>
+									{selected.madeBy && <span className="world-hud-label mt-1">by {selected.madeBy}</span>}
 									<span className="world-hud-label mt-1 text-fg-3">×{formatAmount(selected.quantity)}{selected.basePrice !== null ? ` · WORTH ABOUT ${selected.basePrice} CR` : ''}</span>
 									<p className="mt-3 text-sm leading-relaxed text-fg-1/85">{selected.description}</p>
 									<div className="mt-auto space-y-2 pt-5">
@@ -200,6 +213,7 @@ export default function InventoryPanel({ worldId, sessionId, inventory, busyItem
 					<span className="flex items-center gap-1"><span className="world-hud-key">TAB</span><span className="world-hud-label">CLOSE</span></span>
 				</div>
 			</div>
+			{viewing && <MadeItemCard item={viewing} onKeep={() => setViewing(null)} captureKeys={false} />}
 		</div>
 	);
 }

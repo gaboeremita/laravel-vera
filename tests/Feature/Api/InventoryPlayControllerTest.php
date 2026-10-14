@@ -24,6 +24,19 @@ it('shows the player\'s credits and items', function () {
         ->assertJsonPath('items.0.description', 'Still warm.');
 });
 
+it('names the resident who made an item the player holds', function () {
+    [$user, $assistant, , $region, $resident, $session, $player] = inventoryScenario();
+    $painting = worldItem($region, ['name' => 'Harbour at Dusk', 'world_session_id' => $session->id, 'made_by_resident_id' => $resident->id]);
+    InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => $painting->id, 'quantity' => 1]);
+    InventoryItem::factory()->create(['inventory_id' => $player->id, 'item_id' => worldItem($region, ['name' => 'Bread'])->id, 'quantity' => 1]);
+
+    $this->actingAs($user)->getJson(route('worlds.sessions.inventory.show', [$region->world_id, $session->id]))
+        ->assertOk()
+        ->assertJsonPath('items.0.name', 'Bread')
+        ->assertJsonPath('items.0.madeBy', null)
+        ->assertJsonPath('items.1.madeBy', $assistant->name);
+});
+
 it('gives credits and items to a resident and returns the line they hear, the credits leaving only the player', function () {
     [$user, $assistant, , $region, $resident, $session, $player, $residentInventory] = inventoryScenario(playerCredits: 100);
     $lantern = worldItem($region, ['name' => 'Lantern']);

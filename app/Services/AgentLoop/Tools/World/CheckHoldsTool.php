@@ -26,7 +26,7 @@ class CheckHoldsTool implements AgentTool
 
     public function parameters(): array
     {
-        $names = Item::where('world_id', $this->worldId())->orderBy('name')->pluck('name')->all();
+        $names = Item::availableIn($this->player->worldSession)->orderBy('name')->pluck('name')->all();
 
         return [
             'type' => 'object',
@@ -39,7 +39,7 @@ class CheckHoldsTool implements AgentTool
 
     public function handle(array $arguments): array
     {
-        $item = Item::where('world_id', $this->worldId())->whereRaw('lower(name) = ?', [mb_strtolower(trim((string) ($arguments['item'] ?? '')))])->first()
+        $item = Item::availableIn($this->player->worldSession)->whereRaw('lower(name) = ?', [mb_strtolower(trim((string) ($arguments['item'] ?? '')))])->first()
             ?? throw new RuntimeException(sprintf('There is no item called "%s" in this world.', $arguments['item'] ?? ''));
         $held = $this->player->items()->where('item_id', $item->id)->first();
         $holds = $held !== null && ($held->quantity === null || $held->quantity > 0);
@@ -55,10 +55,5 @@ class CheckHoldsTool implements AgentTool
     public function retryAttempts(): int
     {
         return 1;
-    }
-
-    private function worldId(): int
-    {
-        return $this->player->worldSession->worldUser->world_id;
     }
 }

@@ -30,7 +30,7 @@ class AskForTool implements AgentTool
 
     public function parameters(): array
     {
-        $names = Item::where('world_id', $this->asker->worldSession->worldUser->world_id)->orderBy('name')->pluck('name')->all();
+        $names = Item::availableIn($this->asker->worldSession)->orderBy('name')->pluck('name')->all();
 
         return [
             'type' => 'object',
@@ -59,9 +59,8 @@ class AskForTool implements AgentTool
             throw new RuntimeException('You already asked for something this turn; wait for the answer.');
         }
 
-        $worldId = $this->asker->worldSession->worldUser->world_id;
-        $items = collect($arguments['items'] ?? [])->map(function (array $entry) use ($worldId): array {
-            $item = Item::where('world_id', $worldId)->whereRaw('lower(name) = ?', [mb_strtolower(trim((string) ($entry['item'] ?? '')))])->first()
+        $items = collect($arguments['items'] ?? [])->map(function (array $entry): array {
+            $item = Item::availableIn($this->asker->worldSession)->whereRaw('lower(name) = ?', [mb_strtolower(trim((string) ($entry['item'] ?? '')))])->first()
                 ?? throw new RuntimeException(sprintf('There is no item called "%s" in this world.', $entry['item'] ?? ''));
 
             return ['itemId' => $item->id, 'quantity' => max(1, (int) ($entry['quantity'] ?? 1))];

@@ -56,9 +56,12 @@ class World extends Model
         return $this->hasMany(WorldResident::class);
     }
 
+    /**
+     * The world's own items; items residents make belong to the session they were made in.
+     */
     public function items(): HasMany
     {
-        return $this->hasMany(Item::class);
+        return $this->hasMany(Item::class)->whereNull('world_session_id');
     }
 
     public function startingInventories(): HasMany

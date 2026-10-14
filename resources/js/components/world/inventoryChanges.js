@@ -9,7 +9,7 @@ export function inventoryChangeEntries(before, after) {
 	if (!before || !after) return [];
 	const entries = [];
 	const creditDelta = (after.credits ?? 0) - (before.credits ?? 0);
-	if (creditDelta !== 0) entries.push({ text: `${signed(creditDelta)} credits`, delta: creditDelta, imageUrl: null, sound: null });
+	if (creditDelta !== 0) entries.push({ text: `${signed(creditDelta)} credits`, delta: creditDelta, imageUrl: null, sound: null, item: null });
 
 	const was = byId(before);
 	const now = byId(after);
@@ -26,8 +26,14 @@ export function inventoryChangeEntries(before, after) {
 			delta,
 			imageUrl: item.cardImageUrl ?? null,
 			sound: item.soundUrl && item.soundHash ? { url: item.soundUrl, hash: item.soundHash } : null,
+			item,
 		}));
 	return entries;
+}
+
+/** Whether a change is the player receiving something a resident made, which opens its own card instead of a toast. */
+export function isReceivedMadeItem(entry) {
+	return entry.delta > 0 && !!entry.item?.madeBy;
 }
 
 /** The toast lines for what changed between two player inventories. */
