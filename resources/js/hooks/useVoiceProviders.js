@@ -30,14 +30,14 @@ export default function useVoiceProviders(addToast, assistantId) {
 				})));
 				setActiveModelId(settings.tts_model_id ?? null);
 				setActiveVoice(settings.tts_voice ?? null);
-			} catch (e) {
+			} catch {
 				addToast('Failed to load voice providers', 'error');
 			} finally {
 				setIsLoading(false);
 			}
 		};
 		void load();
-	}, [assistantId]);
+	}, [assistantId, addToast]);
 
 	const toggleProvider = (index) => {
 		setProviders((prev) =>
@@ -127,7 +127,7 @@ export default function useVoiceProviders(addToast, assistantId) {
 			}
 			setProviders((prev) => prev.filter((_, i) => i !== providerIndex));
 			addToast('Provider deleted', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to delete provider', 'error');
 		} finally {
 			setDeleteTarget(null);
@@ -241,7 +241,7 @@ export default function useVoiceProviders(addToast, assistantId) {
 				)
 			);
 			addToast('Model deleted', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to delete model', 'error');
 		} finally {
 			setDeleteTarget(null);
@@ -265,7 +265,7 @@ export default function useVoiceProviders(addToast, assistantId) {
 			setActiveVoice(voice);
 
 			addToast('Voice selected', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to select voice', 'error');
 		}
 	};
@@ -281,7 +281,7 @@ export default function useVoiceProviders(addToast, assistantId) {
 			setActiveModelId(null);
 			setActiveVoice(null);
 			addToast('Voice model deselected', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to deselect voice model', 'error');
 		}
 	};

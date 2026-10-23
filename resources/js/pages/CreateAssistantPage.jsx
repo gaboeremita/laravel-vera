@@ -8,7 +8,8 @@ import EmotionGrid from '../components/EmotionGrid.jsx';
 import PosturePoseSections from '../components/PosturePoseSections.jsx';
 import ModelVoiceFields from '../components/ModelVoiceFields.jsx';
 import TermRuleSettings from '../components/TermRuleSettings.jsx';
-import SentimentsEditor, { toSentimentPayload } from '../components/SentimentsEditor.jsx';
+import SentimentsEditor from '../components/SentimentsEditor.jsx';
+import { toSentimentPayload } from '../utils/sentiments.js';
 import useLocalPrompt from '../hooks/useLocalPrompt.js';
 
 export default function CreateAssistantPage({ kind = 'assistant' }) {

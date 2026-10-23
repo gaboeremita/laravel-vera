@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { route } from 'ziggy-js';
-import { useTheme } from '../contexts/ThemeContext.jsx';
+import { useTheme } from '../hooks/useTheme.js';
 import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import { getAssistantMenuItems } from '../utils/assistantMenu.jsx';

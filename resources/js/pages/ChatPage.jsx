@@ -163,7 +163,7 @@ export default function ChatPage() {
 	useEffect(() => {
 		setActiveConversationId(Number(id));
 		return () => setActiveConversationId(null);
-	}, [id]);
+	}, [id, setActiveConversationId]);
 
 	useEffect(() => {
 		if (scrollRef.current) {
@@ -234,7 +234,7 @@ export default function ChatPage() {
 
 	useEffect(() => {
 		if (voiceError) addToast(voiceError, 'error');
-	}, [voiceError]);
+	}, [voiceError, addToast]);
 
 	useEffect(() => {
 		return () => {

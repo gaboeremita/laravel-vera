@@ -50,14 +50,14 @@ export default function useVideoGenProviders(addToast, assistantId) {
 				})));
 
 				setActiveModelId(settings.video_gen_model_id ?? null);
-			} catch (e) {
+			} catch {
 				addToast('Failed to load video generation providers', 'error');
 			} finally {
 				setIsLoading(false);
 			}
 		};
 		void load();
-	}, []);
+	}, [addToast, assistantId]);
 
 	/* ── Provider operations ── */
 
@@ -157,7 +157,7 @@ export default function useVideoGenProviders(addToast, assistantId) {
 			}
 			setProviders((prev) => prev.filter((_, i) => i !== providerIndex));
 			addToast('Provider deleted', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to delete provider', 'error');
 		} finally {
 			setDeleteTarget(null);
@@ -279,7 +279,7 @@ export default function useVideoGenProviders(addToast, assistantId) {
 				)
 			);
 			addToast('Model deleted', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to delete model', 'error');
 		} finally {
 			setDeleteTarget(null);
@@ -293,7 +293,7 @@ export default function useVideoGenProviders(addToast, assistantId) {
 			});
 			setActiveModelId(modelId);
 			addToast('Model selected', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to select model', 'error');
 		}
 	};

@@ -27,14 +27,14 @@ export default function useDiscordSettings(addToast, assistantId) {
 				setDms(discoveryData.dms ?? []);
 				setDiscoveryError(discoveryData.guilds?.length ? null : (discoveryData.message ?? null));
 				setVoiceResponseMode(settingsData.discordVoiceResponseMode ?? 'both');
-			} catch (e) {
+			} catch {
 				addToast('Failed to load Discord settings', 'error');
 			} finally {
 				setIsLoading(false);
 			}
 		};
 		void load();
-	}, [assistantId]);
+	}, [assistantId, addToast]);
 
 	const setChannelTrigger = async (guild, channel, triggerMode) => {
 		const configuredChannels = guilds

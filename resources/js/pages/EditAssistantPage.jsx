@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useEffectEvent, useRef } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { route } from 'ziggy-js';
 import { api, validationMessages } from '../utils/api.js';
@@ -8,7 +8,8 @@ import EmotionGrid from '../components/EmotionGrid.jsx';
 import PosturePoseSections from '../components/PosturePoseSections.jsx';
 import ModelVoiceFields from '../components/ModelVoiceFields.jsx';
 import TermRuleSettings from '../components/TermRuleSettings.jsx';
-import SentimentsEditor, { toSentimentRows, toSentimentPayload } from '../components/SentimentsEditor.jsx';
+import SentimentsEditor from '../components/SentimentsEditor.jsx';
+import { toSentimentRows, toSentimentPayload } from '../utils/sentiments.js';
 import ConfirmationModal from '../components/common/ConfirmationModal.jsx';
 import usePrompt from '../hooks/usePrompt.js';
 
@@ -99,13 +100,15 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 		}
 	};
 
+	const leaveToCollection = useEffectEvent(() => navigate(collectionPath, { replace: true }));
+
 	// Load assistant data
 	useEffect(() => {
 		const load = async () => {
 			try {
 				const res = await api.get(route('assistants.show', { id }));
 				if (!res.ok) {
-					navigate(collectionPath, { replace: true });
+					leaveToCollection();
 					return;
 				}
 				const data = await res.json();
@@ -129,13 +132,13 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				if (defaultEmo?.image_url) setDefaultPreview(defaultEmo.image_url);
 			} catch {
 				addToast('Failed to load assistant', 'error');
-				navigate(collectionPath, { replace: true });
+				leaveToCollection();
 			} finally {
 				setIsLoading(false);
 			}
 		};
 		void load();
-	}, [id]);
+	}, [id, addToast]);
 
 	const handleSave = async () => {
 		if (!name.trim() || !slug.trim()) {

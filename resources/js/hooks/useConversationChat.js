@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useState } from 'react';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import { parseEmotionFromResponse, parsePoseFromResponse } from '../utils/parsers.js';
@@ -52,6 +52,24 @@ export function useConversationChat({
 	}, []);
 	useConversationVideos(conversationId, applyVideoUpdate);
 
+	const showLoadedMessages = useEffectEvent((data) => {
+		let lastEmotion = null;
+
+		// Poses are one-off triggers, not an ongoing state, so history
+		// isn't replayed into the current pose the way the last emotion
+		// is — reopening a conversation just starts the avatar idle.
+		const mapped = data.messages.map((msg) => {
+			const result = mapMessage(msg, portraitType, poseNames, emotionNames);
+			if (msg.role === 'assistant' && portraitType !== 'avatar3d') lastEmotion = result.emotion;
+			return result;
+		});
+
+		setMessages(mapped);
+		setHasMore(data.has_more);
+		if (lastEmotion) onEmotionChange?.(lastEmotion);
+	});
+	const reportLoadError = useEffectEvent((error) => onLoadError?.(error));
+
 	useEffect(() => {
 		if (!assistantId || !conversationId) return;
 		let cancelled = false;
@@ -62,23 +80,10 @@ export function useConversationChat({
 				if (!res.ok) throw new Error('Conversation unavailable');
 
 				const data = await res.json();
-				let lastEmotion = null;
-
-				// Poses are one-off triggers, not an ongoing state, so history
-				// isn't replayed into the current pose the way the last emotion
-				// is — reopening a conversation just starts the avatar idle.
-				const mapped = data.messages.map((msg) => {
-					const result = mapMessage(msg, portraitType, poseNames, emotionNames);
-					if (msg.role === 'assistant' && portraitType !== 'avatar3d') lastEmotion = result.emotion;
-					return result;
-				});
-
 				if (cancelled) return;
-				setMessages(mapped);
-				setHasMore(data.has_more);
-				if (lastEmotion) onEmotionChange?.(lastEmotion);
+				showLoadedMessages(data);
 			} catch (error) {
-				if (!cancelled) onLoadError?.(error);
+				if (!cancelled) reportLoadError(error);
 			}
 		};
 

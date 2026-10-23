@@ -1,6 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-
-const ThemeContext = createContext();
+import { useState, useEffect, useCallback } from 'react';
+import { ThemeContext } from './theme.js';
 
 export function ThemeProvider({ children }) {
 	const [theme, setThemeState] = useState('default');
@@ -10,18 +9,14 @@ export function ThemeProvider({ children }) {
 		document.documentElement.setAttribute('data-theme', 'default');
 	}, []);
 
-	const setTheme = (newTheme) => {
+	const setTheme = useCallback((newTheme) => {
 		setThemeState(newTheme);
 		document.documentElement.setAttribute('data-theme', newTheme);
-	};
+	}, []);
 
 	return (
 		<ThemeContext.Provider value={{ theme, setTheme, availableThemes, setAvailableThemes }}>
 			{children}
 		</ThemeContext.Provider>
 	);
-}
-
-export function useTheme() {
-	return useContext(ThemeContext);
 }

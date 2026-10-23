@@ -8,9 +8,8 @@ import ConfirmationModal from './common/ConfirmationModal.jsx';
  * @param {function} onAdd - (name, file) => void
  * @param {function} onDelete - (emotion) => void
  * @param {function} onUpdateImage - (emotion, file) => void
- * @param {boolean} isSaving
  */
-export default function EmotionGrid({ emotions, onAdd, onDelete, onUpdateImage, isSaving = false, label = 'Emotions' }) {
+export default function EmotionGrid({ emotions, onAdd, onDelete, onUpdateImage, label = 'Emotions' }) {
 	const [isAdding, setIsAdding] = useState(false);
 	const [newName, setNewName] = useState('');
 	const [newFile, setNewFile] = useState(null);

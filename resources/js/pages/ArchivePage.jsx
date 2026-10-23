@@ -114,7 +114,7 @@ export default function ArchivePage() {
 			}
 		};
 		load();
-	}, [archiveId]);
+	}, [archiveId, addToast]);
 
 	const addEntry = () => {
 		setEntries((prev) => [

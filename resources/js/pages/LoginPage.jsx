@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useEffectEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
@@ -13,10 +13,11 @@ export default function LoginPage() {
 	const [error, setError] = useState('');
 	const emailRef = useRef(null);
 	const navigate = useNavigate();
+	const redirectHome = useEffectEvent(() => navigate('/', { replace: true }));
 
 	useEffect(() => {
 		api.get(route('user.show')).then((res) => {
-			if (res.ok) navigate('/', { replace: true });
+			if (res.ok) redirectHome();
 		}).catch(() => {});
 	}, []);
 

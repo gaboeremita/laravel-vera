@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useEffectEvent } from 'react';
 import { Outlet, useParams, useOutletContext } from 'react-router-dom';
 import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
-import { useTheme } from '../contexts/ThemeContext.jsx';
+import { useTheme } from '../hooks/useTheme.js';
 
 export default function AssistantLayout() {
 	const { assistantId } = useParams();
@@ -22,19 +22,22 @@ export default function AssistantLayout() {
 		}
 	};
 
+	const { setActiveAssistantId, addToast } = parentContext;
+	const loadEmotions = useEffectEvent((id) => parentContext.fetchEmotions(id));
+
 	useEffect(() => {
-		parentContext.setActiveAssistantId(Number(assistantId));
+		setActiveAssistantId(Number(assistantId));
 		const loadInitialConversations = async () => {
 			try {
 				const res = await api.get(route('conversations.index', { assistant: assistantId }));
 				const data = await res.json();
 				setConversations(data);
 			} catch {
-				parentContext.addToast('Failed to load conversations', 'error');
+				addToast('Failed to load conversations', 'error');
 			}
 		};
 		void loadInitialConversations();
-		parentContext.fetchEmotions(Number(assistantId));
+		loadEmotions(Number(assistantId));
 
 
 		api.get(route('assistants.show', { id: assistantId }))
@@ -54,10 +57,10 @@ export default function AssistantLayout() {
 			.catch(() => {});
 
 		return () => {
-			parentContext.setActiveAssistantId(null);
+			setActiveAssistantId(null);
 			setTheme('default');
 		};
-	}, [assistantId]);
+	}, [assistantId, setActiveAssistantId, addToast, setAvailableThemes, setTheme]);
 
 	return (
 		<Outlet

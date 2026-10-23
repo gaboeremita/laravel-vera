@@ -21,7 +21,7 @@ export default function useAssistants(addToast) {
 			}
 		};
 		void load();
-	}, []);
+	}, [addToast]);
 
 	const deleteAssistant = async (id) => {
 		try {

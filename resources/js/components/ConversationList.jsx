@@ -15,15 +15,6 @@ function timeAgo(dateString) {
 	return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-// Animated underline indicator
-function ActiveUnderline({ color = "accent" }) {
-	return (
-		<span
-			className={`absolute bottom-0 left-0 right-0 h-[1px] bg-${color} animate-underline-in`}
-		/>
-	);
-}
-
 export default function ConversationList({ assistantId, conversations, onSelect, onNew, onDelete, onRename }) {
 	const [activeRow, setActiveRow] = useState(0);
 	const [activeColumn, setActiveColumn] = useState("select");

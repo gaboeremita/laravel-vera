@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { AnimationMixer, Frustum, Group, LoopOnce, LoopRepeat, Matrix4, PositionalAudio, Sphere, Vector3 } from 'three';
 import { VRMUtils } from '@pixiv/three-vrm';
-import { applyBoneQuaternions, captureBoneQuaternions, loadPoseClip } from '../VrmAvatar.jsx';
+import { applyBoneQuaternions, captureBoneQuaternions } from '../../utils/boneQuaternions.js';
+import { loadPoseClip } from '../../utils/poseClipCache.js';
 import { CHARACTER_RADIUS, LEAVE_WATER_DEPTH, MAX_MOVEMENT_DELTA, SWIM_DEPTH } from './collisionCheck.js';
 import { facingAngleForMovement, fadesIdleForPose, headingToward, makeClipInPlace, modelYaw, shouldFaceUser, turnTowardsAngle } from './residentMotion.js';
 import { defaultPoseFor, findWorldMotionPose, resolvePose } from './worldMotionPoses.js';
@@ -589,7 +590,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			registry.delete(resident.id);
 			settle('interrupted', 'the user left');
 		};
-	}, [loaded, navigation, resident.id, residentCommands, collisionWorld]);
+	}, [loaded, navigation, resident.id, residentCommands, collisionWorld, occupiedSpots]);
 
 	useEffect(() => () => {
 		residentPositions.current.delete(resident.id);
