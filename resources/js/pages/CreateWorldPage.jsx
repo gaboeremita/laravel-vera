@@ -4,7 +4,7 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import Header from '../components/Header.jsx';
 import WorldForm from '../components/WorldForm.jsx';
-import { toSentimentPayload } from '../components/SentimentsEditor.jsx';
+import { toSentimentPayload } from '../utils/sentiments.js';
 
 export default function CreateWorldPage() {
 	const navigate = useNavigate();

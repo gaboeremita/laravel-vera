@@ -40,14 +40,14 @@ export default function useProviders(addToast, assistantId) {
 				})));
 
 				setActiveModelId(settings.ai_model_id ?? null);
-			} catch (e) {
+			} catch {
 				addToast('Failed to load providers', 'error');
 			} finally {
 				setIsLoading(false);
 			}
 		};
 		void load();
-	}, []);
+	}, [addToast, assistantId]);
 
 	/* ── Provider operations ── */
 
@@ -147,7 +147,7 @@ export default function useProviders(addToast, assistantId) {
 			}
 			setProviders((prev) => prev.filter((_, i) => i !== providerIndex));
 			addToast('Provider deleted', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to delete provider', 'error');
 		} finally {
 			setDeleteTarget(null);
@@ -275,7 +275,7 @@ export default function useProviders(addToast, assistantId) {
 				)
 			);
 			addToast('Model deleted', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to delete model', 'error');
 		} finally {
 			setDeleteTarget(null);
@@ -289,7 +289,7 @@ export default function useProviders(addToast, assistantId) {
 			});
 			setActiveModelId(modelId);
 			addToast('Model selected', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to select model', 'error');
 		}
 	};

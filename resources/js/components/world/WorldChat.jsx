@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Gift, Mic, MicOff } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { api } from '../../utils/api.js';
@@ -8,7 +8,7 @@ import { useVoiceMode } from '../../hooks/useVoiceMode.js';
 import { spokenWords, stripForSpeech } from '../../utils/parsers.js';
 import { isTypingTarget } from './keyboardFocus.js';
 import { joinLines } from './activityLines.js';
-import { useTheme } from '../../contexts/ThemeContext.jsx';
+import { useTheme } from '../../hooks/useTheme.js';
 import ChatMessage from '../ChatMessage.jsx';
 import GivePanel from './GivePanel.jsx';
 import GoodsStrip from './GoodsStrip.jsx';
@@ -88,20 +88,29 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		}
 	};
 
+	const readTheme = useEffectEvent(() => theme);
+
 	useEffect(() => {
 		const worldTheme = world.settings?.theme;
-		if (!worldTheme || worldTheme === theme) return;
-		const previousTheme = theme;
+		const previousTheme = readTheme();
+		if (!worldTheme || worldTheme === previousTheme) return;
 		setTheme(worldTheme);
 		return () => setTheme(previousTheme);
-	}, [world.settings?.theme]);
+	}, [world.settings?.theme, setTheme]);
+
+	const fetchResidentEmotions = useEffectEvent((assistantId) => fetchEmotions(assistantId));
+	const createConversation = useEffectEvent((assistantId) => api.post(route('conversations.store', { assistant: assistantId }), { worldId: world.id, regionId: world.regionId, worldSessionId }));
+	const closeAfterError = useEffectEvent((error) => {
+		addToast(error.message || 'Unable to start a conversation', 'error');
+		onClose();
+	});
 
 	useEffect(() => {
 		let active = true;
 
 		const resolveConversation = async () => {
 			try {
-				fetchEmotions(resident.assistant.id);
+				fetchResidentEmotions(resident.assistant.id);
 
 				const existing = await api.get(route('conversations.index', { assistant: resident.assistant.id, worldSessionId }));
 				if (existing.ok) {
@@ -112,13 +121,12 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 					}
 				}
 
-				const created = await api.post(route('conversations.store', { assistant: resident.assistant.id }), { worldId: world.id, regionId: world.regionId, worldSessionId });
+				const created = await createConversation(resident.assistant.id);
 				if (!created.ok) throw new Error('Unable to start a conversation');
 				const conversation = await created.json();
 				if (active) setConversationId(conversation.id);
 			} catch (error) {
-				addToast(error.message || 'Unable to start a conversation', 'error');
-				onClose();
+				closeAfterError(error);
 			}
 		};
 

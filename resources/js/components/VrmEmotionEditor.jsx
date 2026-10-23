@@ -1,7 +1,6 @@
 import { useId, useState } from 'react';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
-
-export const EXPRESSION_SUGGESTIONS = ['happy', 'sad', 'angry', 'relaxed', 'surprised', 'neutral', 'blink'];
+import { EXPRESSION_SUGGESTIONS } from '../utils/vrmExpressions.js';
 
 function toPercentDisplay(blendshapes) {
 	return blendshapes.map((b) => (b.weight <= 1 ? { ...b, weight: Math.round(b.weight * 100) } : b));

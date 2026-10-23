@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
-import { BlendshapeRows, EXPRESSION_SUGGESTIONS } from './VrmEmotionEditor.jsx';
+import { BlendshapeRows } from './VrmEmotionEditor.jsx';
+import { EXPRESSION_SUGGESTIONS } from '../utils/vrmExpressions.js';
 import { POSTURES } from './world/worldMotionPoses.js';
 
 export function AnimationFileControl({ pose, onUploadAnimation, onDeleteAnimation }) {

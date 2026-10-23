@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { AnimationFileControl } from './PoseEditor.jsx';
-import { BlendshapeRows, EXPRESSION_SUGGESTIONS } from './VrmEmotionEditor.jsx';
+import { BlendshapeRows } from './VrmEmotionEditor.jsx';
+import { EXPRESSION_SUGGESTIONS } from '../utils/vrmExpressions.js';
 import { findWorldMotionPose, WORLD_MOTION_POSES } from './world/worldMotionPoses.js';
 
 function MotionPoseCard({ definition, pose, onAdd, onUpdateBlendshapes, onUploadAnimation, onDeleteAnimation, datalistId }) {

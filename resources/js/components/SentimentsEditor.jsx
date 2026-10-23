@@ -1,18 +1,8 @@
 import { FIELD_LABEL, FIELD_INPUT } from '../utils/formFieldStyles.js';
+import { emptySentimentRow } from '../utils/sentiments.js';
 
 const SMALL_BUTTON = 'text-[0.65rem] tracking-[0.1em] px-2 py-1 border border-dashed border-line-1 text-fg-3 hover:text-accent hover:border-accent/50 transition-colors cursor-pointer';
 const ICON_BUTTON = 'text-fg-3 text-xs px-1 cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-default';
-
-let nextKey = 0;
-
-/** Sentiment definitions as the editor holds them: renamedFrom is the name last saved, so a rename carries over to scores and conditions. */
-export function toSentimentRows(sentiments = []) {
-	return sentiments.map((sentiment) => ({ key: nextKey++, name: sentiment.name, description: sentiment.description, renamedFrom: sentiment.name }));
-}
-
-export function toSentimentPayload(rows = []) {
-	return rows.map((row) => ({ name: row.name, description: row.description, renamedFrom: row.renamedFrom ?? null }));
-}
 
 export default function SentimentsEditor({ value, onChange, hint }) {
 	const update = (key, field, fieldValue) => onChange(value.map((row) => (row.key === key ? { ...row, [field]: fieldValue } : row)));
@@ -42,7 +32,7 @@ export default function SentimentsEditor({ value, onChange, hint }) {
 					</div>
 				</div>
 			))}
-			<button type="button" onClick={() => onChange([...value, { key: nextKey++, name: '', description: '', renamedFrom: null }])} className={SMALL_BUTTON}>+ ADD SENTIMENT</button>
+			<button type="button" onClick={() => onChange([...value, emptySentimentRow()])} className={SMALL_BUTTON}>+ ADD SENTIMENT</button>
 		</div>
 	);
 }

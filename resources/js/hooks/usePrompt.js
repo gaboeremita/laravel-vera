@@ -22,7 +22,7 @@ export default function usePrompt(assistantId, addToast) {
 			}
 		};
 		void load();
-	}, [assistantId]);
+	}, [assistantId, addToast]);
 
 	/**
 	 * Set a value at a given path in the tree.

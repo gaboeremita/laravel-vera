@@ -3,7 +3,8 @@ import { route } from 'ziggy-js';
 import { api } from '../utils/api.js';
 import Accordion from './common/Accordion.jsx';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
-import PassageSelect, { passageKey, passageLabel, partnersByPassage } from './PassageSelect.jsx';
+import PassageSelect from './PassageSelect.jsx';
+import { passageKey, passageLabel, partnersByPassage } from '../utils/passages.js';
 
 export default function RegionPassagesEditor({ worldId, region, regions, spawn, onLinksChange, addToast }) {
 	const [collapsed, setCollapsed] = useState(false);

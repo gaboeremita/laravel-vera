@@ -3,29 +3,13 @@
 
 # Laravel Boost Guidelines
 
-The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to ensure the best experience when building Laravel applications.
-
 ## Foundational Context
 
-This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
+This application is a Laravel application running on PHP 8.4. Always use the APIs that match the installed major version of each package — do not assume a version.
 
-- php - 8.4
-- laravel/framework (LARAVEL) - v13
-- laravel/prompts (PROMPTS) - v0
-- laravel/reverb (REVERB) - v1
-- laravel/sanctum (SANCTUM) - v4
-- tightenco/ziggy (ZIGGY) - v2
-- laravel/boost (BOOST) - v2
-- laravel/mcp (MCP) - v0
-- laravel/pail (PAIL) - v1
-- laravel/pint (PINT) - v1
-- pestphp/pest (PEST) - v4
-- phpunit/phpunit (PHPUNIT) - v12
-- laravel-echo (ECHO) - v2
-- react (REACT) - v19
-- eslint (ESLINT) - v10
-- prettier (PRETTIER) - v3
-- tailwindcss (TAILWINDCSS) - v4
+Before relying on a package's API, confirm its installed version:
+- PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
+- JS packages: check `package.json` for the installed versions.
 
 ## Skills Activation
 
@@ -48,15 +32,11 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Frontend Bundling
 
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+- If a frontend change doesn't show in the UI or you get a "Unable to locate file in Vite manifest" error, run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
 
 ## Documentation Files
 
 - You must only create documentation files if explicitly requested by the user.
-
-## Replies
-
-- Be concise in your explanations - focus on what's important rather than explaining obvious details.
 
 === boost rules ===
 
@@ -72,7 +52,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Searching Documentation (IMPORTANT)
 
-- Always use `search-docs` before making code changes. Do not skip this step. It returns version-specific docs based on installed packages automatically.
+- Use `search-docs` before changes that depend on Laravel ecosystem APIs, behavior, configuration, or version-specific syntax. Skip it for copy-only edits and other changes where package documentation is irrelevant. Reuse sufficient results already in context instead of searching again.
 - Pass a `packages` array to scope results when you know which packages are relevant.
 - Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
 - Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
@@ -83,6 +63,10 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 2. Use `"quoted phrases"` for exact position matching: `"infinite scroll"` requires adjacent words in order.
 3. Combine words and phrases for mixed queries: `middleware "rate limit"`.
 4. Use multiple queries for OR logic: `queries=["authentication", "middleware"]`.
+
+## Project Rules
+
+- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists, including path-scoped framework guidelines under `.ai/rules/boost`. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
 
 ## Artisan
 
@@ -124,8 +108,11 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 # Test Enforcement
 
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
+- Add or update tests for behavior and logic changes when a test provides meaningful regression coverage.
+- Pure copy, styling, and layout-only changes do not require new or updated tests.
+- When test coverage applies, run the affected tests and ensure they pass.
+- Test the changed behavior and its important failure modes, but do not add tests beyond them.
+- Read the `testing-best-practices` skill before writing tests.
 
 === laravel/core rules ===
 
@@ -153,10 +140,6 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
 - When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
 
-## Vite Error
-
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
-
 === pint/core rules ===
 
 # Laravel Pint Code Formatter
@@ -166,22 +149,25 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 === pest/core rules ===
 
-## Pest
+# Pest
 
-- This project uses Pest for testing. Create tests: `php artisan make:test --pest {name}`.
-- The `{name}` argument should not include the test suite directory. Use `php artisan make:test --pest SomeFeatureTest` instead of `php artisan make:test --pest Feature/SomeFeatureTest`.
-- Run tests: `php artisan test --compact` or filter: `php artisan test --compact --filter=testName`.
-- Do NOT delete tests without approval.
+- This project uses Pest. Create tests with `php artisan make:test --pest {name}`.
+- Do not include the test suite directory in `{name}`. Use `SomeFeatureTest`, not `Feature/SomeFeatureTest`.
+- Read the `testing-best-practices` skill for guidance on coverage, naming, structure, dependency isolation, and review.
+- Do not delete tests or test files without approval. They are part of the application.
+
+## Running Tests
+
+- Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
+- Rerun a test after each change to it.
+- Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
+- After the feature tests pass, ask the user to run the complete suite with `php artisan test --compact`.
 
 </laravel-boost-guidelines>
 
 ## Project Constitution
 
 - Product, architecture, and quality principles for this repo (code style gates, data isolation, testing approach, and more) live in `.specify/memory/constitution.md` — consult it for anything not covered by the operational rules below.
-
-## Migration Rules
-
-- NEVER edit existing migration files. Always create a new migration to modify the database schema.
 
 ## Commit Authorship
 
@@ -198,10 +184,6 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - A request to commit, push, open a PR, or open an issue ships EVERYTHING: every modified and untracked file in the tree, every fix proposed or offered earlier in the conversation, and every fix the gates (Pint, ESLint, Pest) surface, including failures that predate the change or sit in unrelated code.
 - Never ask whether something goes in, goes in a separate PR, or is left out, and never leave anything out on your own judgement. "A PR and an issue" means exactly one PR and one issue containing all of it.
 
-## Naming Convention
-
-- camelCase everywhere: PHP variables, JS/JSX variables, JSON/API keys, JS object properties. The one exception is database columns and Eloquent model attributes, which stay snake_case per Laravel convention (and PHP arrays mapping directly to those columns).
-
 ## Linting and Test Verification Cadence
 
 - PHP code must be Pint-compliant and frontend code must be ESLint-compliant, and any Pest-covered behavior touched must have passing tests — verified exactly once, right before pushing or opening a PR. NON-NEGOTIABLE: "the task" is the entire implementation effort, start to finish — every file touched, every fix, every round of the user testing and reporting something still broken, all of it is the same single task. None of that is itself a reason to run any code-checking command. This is not limited to Pint/ESLint/Pest by name — it covers every form of verification, including `php -l`, `node --check`, type checkers, or any other syntax/style/test/correctness check, in any invocation. Do not rationalize a tool as "just a sanity check" or "fundamentally different from what was asked" to justify running it anyway — that reasoning is exactly what's forbidden. Do not run anything in this category until the user says the implementation is done and it's time to push/PR. At that point, run the real gates once — `vendor/bin/pint`, `npm run lint`, `php artisan test` — and fix whatever surfaces in that single pass.
@@ -217,19 +199,11 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - Never introduce a new name on your own: UI labels, button text, terms for concepts, or names in specs and docs. Suggest the name, explain what it refers to, and use it only after the user approves it. Until then, describe the thing plainly.
 
-## Comments
+## Written Communication (commit messages, PRs, issues)
 
-- Default to zero comments. Only comment when the WHY is non-obvious (a hidden constraint, workaround, or gotcha).
-- Never write comments that narrate WHAT the code does — if the code needs that, the names are wrong.
-- Never write decision journals, design rationale essays, or development-context narration inline. That belongs in commit messages or PR descriptions — and even there, follow the rules below, not free-form narration.
-- Comments above code, never on the side.
-
-## Written Communication (commit messages, PRs, issues, and ALL spec-kit docs)
-
-This applies everywhere text is written for someone (including future-you) to read later — commit messages, PR descriptions, issue text, and every spec-kit artifact (spec.md, plan.md, research.md, data-model.md, tasks.md, quickstart.md, contracts/). There is no exception for "research.md has an Alternatives-considered section, so narration belongs there" — it doesn't.
+This applies everywhere text is written for someone (including future-you) to read later — commit messages, PR descriptions and issue text. Spec-kit docs follow `.ai/rules/specs.md`.
 
 - No journal comments: don't narrate the path you took to get somewhere ("X, not Y", "instead of doing A we did B", "an earlier version of this did X, which was rejected") when the reader has no context for A or Y. A reader who never saw the abandoned approach just sees a random, unexplained contrast — it reads as confused or self-congratulatory, not informative.
 - State the current fact plainly. If something used to work a different way and this change fixes/replaces it, say that explicitly as a fix ("fixes X", "was previously Y, now Z because—"), not as a bare "not Y" aside dropped with no setup.
 - Don't justify implementation details that no reader asked about (e.g. why a file lives in one directory over another) unless it's the actual point of the change.
-- "Alternatives considered" sections in spec-kit docs mean genuine upfront design tradeoffs weighed before committing to an approach — not a record of what got tried, argued about, or reverted during the conversation that produced the document. If a decision was corrected mid-conversation, the document should read as though that was always the decision.
 - This is the same rule as the "not just X" / "X not Y" filler rule above — it is not scoped to commit messages, it is scoped to every piece of writing meant to outlive this conversation.

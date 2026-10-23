@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useEffectEvent, useRef } from 'react';
 import { api } from '../utils/api.js';
 import { route } from 'ziggy-js';
 
@@ -24,11 +24,11 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 		return !!data.is_summarizing;
 	};
 
-	const fetchStatus = async () => {
+	const fetchStatus = useEffectEvent(async () => {
 		const res = await api.get(route('memory.show', { assistant: assistantId, id: conversationId }));
 		if (!res.ok) throw new Error('Failed to load memory');
 		return await res.json();
-	};
+	});
 
 	useEffect(() => {
 		let cancelled = false;
@@ -40,7 +40,7 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 			try {
 				const data = await fetchStatus();
 				if (!cancelled) applyShowData(data);
-			} catch (e) {
+			} catch {
 				if (!cancelled) addToast('Failed to load memory', 'error');
 			} finally {
 				if (!cancelled) setIsLoading(false);
@@ -52,7 +52,7 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 			cancelled = true;
 			if (pollRef.current) clearInterval(pollRef.current);
 		};
-	}, [assistantId, conversationId]);
+	}, [assistantId, conversationId, addToast]);
 
 	// Poll while a background summarization is in progress, since it can be
 	// triggered automatically (not just from this page) and may still be
@@ -73,13 +73,13 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 				if (!stillLocked) {
 					addToast('Memory summarized', 'success');
 				}
-			} catch (e) {
+			} catch {
 				// Keep polling silently — a transient failure shouldn't spam the user.
 			}
 		}, POLL_INTERVAL_MS);
 
 		return () => clearInterval(pollRef.current);
-	}, [isLocked]);
+	}, [isLocked, addToast]);
 
 	const save = async () => {
 		setIsSaving(true);
@@ -99,7 +99,7 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 			const data = await res.json();
 			setMemory(data.long_term_memory ?? '');
 			addToast('Memory saved', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to save memory', 'error');
 		} finally {
 			setIsSaving(false);
@@ -122,7 +122,7 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 			} else {
 				addToast('Nothing new to summarize', 'success');
 			}
-		} catch (e) {
+		} catch {
 			addToast('Failed to queue summarization', 'error');
 		} finally {
 			setIsSummarizing(false);
@@ -141,7 +141,7 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 			setMemory(data.long_term_memory ?? '');
 			setIsLocked(false);
 			addToast('Lock cleared', 'success');
-		} catch (e) {
+		} catch {
 			addToast('Failed to clear lock', 'error');
 		} finally {
 			setIsUnlocking(false);
@@ -166,7 +166,7 @@ export default function useConversationMemory(addToast, assistantId, conversatio
 
 			const data = await res.json();
 			setAutoSummarizeEnabled(!!data.auto_summarize_enabled);
-		} catch (e) {
+		} catch {
 			addToast('Failed to update setting', 'error');
 		} finally {
 			setIsTogglingAutoSummarize(false);

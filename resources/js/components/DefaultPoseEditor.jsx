@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
-import { BlendshapeRows, EXPRESSION_SUGGESTIONS } from './VrmEmotionEditor.jsx';
+import { BlendshapeRows } from './VrmEmotionEditor.jsx';
+import { EXPRESSION_SUGGESTIONS } from '../utils/vrmExpressions.js';
 import { AnimationFileControl } from './PoseEditor.jsx';
 
 /**

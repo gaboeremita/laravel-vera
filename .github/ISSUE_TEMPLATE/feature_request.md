@@ -4,14 +4,14 @@ about: Suggest a new feature or improvement
 labels: enhancement
 ---
 
-**Problem or motivation**
-What problem does this feature solve? Who is affected?
+As a [kind of user],
+I want [what they want to do],
+so that [the outcome they get].
 
-**Proposed solution**
-Describe what you want to happen.
+**Context**
+How it works today and what is missing, stated as facts.
 
-**Alternatives considered**
-Any other approaches you've thought about.
+**Acceptance Criteria**
 
-**Additional context**
-Mockups, examples, or related issues.
+- A concrete, testable outcome the user can see or do.
+- One outcome per line.

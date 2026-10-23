@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useEffectEvent, useCallback, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { AnimationMixer, Box3, BackSide, LoopOnce, LoopRepeat, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3 } from 'three';
 import { VRMUtils } from '@pixiv/three-vrm';
@@ -7,6 +7,7 @@ import defaultFloor from '../../images/avatar-background-default-floor.png';
 import defaultSurroundings from '../../images/avatar-background-default-surroundings.png';
 import useAvatarBackground from '../hooks/useAvatarBackground.js';
 import { loadPoseClip } from '../utils/poseClipCache.js';
+import { applyBoneQuaternions, captureBoneQuaternions } from '../utils/boneQuaternions.js';
 import { createVrmLoader } from '../utils/vrmLoader.js';
 
 const EXPRESSION_HOLD_SECONDS = 3.5;
@@ -21,34 +22,6 @@ const POSE_BLEND_SECONDS = 0.25;
 // and (if it has one) facial expression revert together.
 const POSE_STATIC_CLIP_SECONDS = 0.5;
 const EYE_LINE_FROM_TOP = 0.28;
-
-// vrm.humanoid.humanBones returns the *raw* bones — a different node than
-// the *normalized* ones AnimationMixer clips actually target (built via
-// getNormalizedBoneNode() in both createVRMAnimationClip and
-// mixamoRetargeting.js) and that vrm.update() re-derives raw bones from
-// every frame. Reading/writing the raw set here would silently do nothing
-// (or get immediately overwritten) — every bone lookup in this file must go
-// through getNormalizedBoneNode() to touch the nodes actually being driven.
-export function captureBoneQuaternions(vrm) {
-	const map = new Map();
-	for (const name of Object.keys(vrm.humanoid.humanBones)) {
-		const node = vrm.humanoid.getNormalizedBoneNode(name);
-		if (node) map.set(name, node.quaternion.clone());
-	}
-	return map;
-}
-
-export function applyBoneQuaternions(vrm, quatMap) {
-	for (const [name, quat] of quatMap) {
-		const node = vrm.humanoid.getNormalizedBoneNode(name);
-		if (node) node.quaternion.copy(quat);
-	}
-}
-
-// Shared by the one-shot triggered-pose loader and the looping default-pose
-// loader — parses a .vrma or .fbx animation URL into a THREE.AnimationClip
-// targeting this vrm's normalized bones.
-export { loadPoseClip };
 
 // The backdrop is a *partial* cylinder arc, not a full 360° wrap — wrapping a
 // single non-tileable image around a full circumference stretches it by
@@ -222,6 +195,11 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 		[ensureMixer]
 	);
 
+	const notifyLoaded = useEffectEvent(() => onLoaded());
+	const notifyError = useEffectEvent(() => onError());
+	const startDefaultLoopOnLoad = useEffectEvent((vrm, url) => startDefaultLoop(vrm, url));
+	const readPoseAnimationUrl = useEffectEvent(() => poseAnimationUrl);
+
 	useEffect(() => {
 		let cancelled = false;
 		const loader = createVrmLoader(gl);
@@ -251,7 +229,7 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 				restPoseRef.current = captureBoneQuaternions(vrm);
 
 				if (defaultPoseAnimationUrlRef.current) {
-					void startDefaultLoop(vrm, defaultPoseAnimationUrlRef.current);
+					void startDefaultLoopOnLoad(vrm, defaultPoseAnimationUrlRef.current);
 				}
 
 				// Crop at the tops of the legs with the eyes EYE_LINE_FROM_TOP down
@@ -274,13 +252,13 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 				camera.position.set(center.x, frameCenterY, center.z + distance);
 				camera.lookAt(center.x, frameCenterY, center.z);
 
-				onLoaded();
+				notifyLoaded();
 			},
 			undefined,
 			(error) => {
 				if (!cancelled) {
 					console.error('VRM load error:', error);
-					onError();
+					notifyError();
 				}
 			}
 		);
@@ -316,7 +294,7 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 				vrmRef.current = null;
 			}
 		};
-	}, [vrmUrl]);
+	}, [vrmUrl, gl, scene, camera]);
 
 	// Picks up a default-pose animation that starts existing, or changes,
 	// after the VRM has already loaded (the initial-load case is handled
@@ -355,7 +333,8 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 	// with a locally-scoped closure rather than the render-time-derivation
 	// pattern used elsewhere in this file.
 	useEffect(() => {
-		if (!poseTriggerId || !poseAnimationUrl || !vrmRef.current) return;
+		const poseUrl = readPoseAnimationUrl();
+		if (!poseTriggerId || !poseUrl || !vrmRef.current) return;
 		if (loadedPoseTriggerRef.current === poseTriggerId) return;
 		loadedPoseTriggerRef.current = poseTriggerId;
 
@@ -376,7 +355,7 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 
 			let clip = null;
 			try {
-				clip = await loadPoseClip(poseAnimationUrl, vrm);
+				clip = await loadPoseClip(poseUrl, vrm);
 			} catch (error) {
 				console.error('[VrmAvatar] pose animation load error:', error);
 			}

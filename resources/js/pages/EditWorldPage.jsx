@@ -12,7 +12,7 @@ import StartingInventoryEditor from '../components/StartingInventoryEditor.jsx';
 import useWorldInventoryConfig from '../hooks/useWorldInventoryConfig.js';
 import QuestsEditor from '../components/QuestsEditor.jsx';
 import CampaignsEditor from '../components/CampaignsEditor.jsx';
-import { toSentimentRows, toSentimentPayload } from '../components/SentimentsEditor.jsx';
+import { toSentimentRows, toSentimentPayload } from '../utils/sentiments.js';
 import useCampaigns from '../hooks/useCampaigns.js';
 
 const TABS = [{ id: 'world', label: 'WORLD' }, { id: 'regions', label: 'REGIONS' }];

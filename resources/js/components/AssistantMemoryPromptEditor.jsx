@@ -37,7 +37,7 @@ export default function AssistantMemoryPromptEditor({ assistantId, addToast }) {
 				if (!res.ok) throw new Error('Failed to load memory prompt');
 				const data = await res.json();
 				if (!cancelled) setInitialValue(data);
-			} catch (e) {
+			} catch {
 				if (!cancelled) addToast('Failed to load memory prompt', 'error');
 			} finally {
 				if (!cancelled) setIsLoading(false);
@@ -48,7 +48,7 @@ export default function AssistantMemoryPromptEditor({ assistantId, addToast }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [assistantId]);
+	}, [assistantId, addToast]);
 
 	if (isLoading) {
 		return <span className="text-fg-3 text-sm cursor-effect">Loading...</span>;
