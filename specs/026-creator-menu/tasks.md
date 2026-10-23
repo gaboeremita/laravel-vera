@@ -104,7 +104,7 @@ description: "Task list for the Creator Menu"
 
 **Independent Test**: [quickstart.md](quickstart.md) scenario 1; spec US1's independent test.
 
-- [X] T020 [US1] Create `app/Http/Controllers/Api/CreatorUnlockController.php` with `store()` (research R1): resolve the session through `ResolvesWorldSession`, validate `password` as a required string, 422 "Set a creator password in Settings first." with no password, 422 "That password is wrong." on a failed `Hash::check`, otherwise set `creator_mode_at` when null and answer 204
+- [X] T020 [US1] Create `app/Http/Controllers/Api/CreatorUnlockController.php` with `store()` (research R1): resolve the session through `ResolvesWorldSession`, validate `password` as a required string, 422 "Set a creator password for this world first." when the world has none, 422 "That password is wrong." on a failed `Hash::check`, otherwise set `creator_mode_at` when null and answer 204
 - [X] T021 [P] [US1] Add unlock cases to `tests/Feature/Api/CreatorUnlockTest.php`: correct password unlocks and is kept on a second unlock, wrong password and no password stay locked with their messages, unlocking leaves `conversations.creator_mode_at` of the session's conversations null, and a conversation in creator mode leaves the session locked
 - [X] T022 [US1] Create `resources/js/hooks/useCreatorMenu.js`:
   - state: `open`, `toggle()`, `close()`, `unlocked` (seeded from the session's `creatorUnlocked`), `unlock(password)`, and `refresh()`

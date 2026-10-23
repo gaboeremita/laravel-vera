@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- A creator password set in Settings.
+- A creator password set on the world's edit page.
 - A world with at least two linked regions, nested zones, a resident with a home spot, a blocking object with a passable effect, a paid activity, a quest with two beats, a fact, and an object with a starting inventory.
 
 ## Automated checks

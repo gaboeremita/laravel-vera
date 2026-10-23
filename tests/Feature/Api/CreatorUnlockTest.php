@@ -10,7 +10,7 @@ uses(RefreshDatabase::class);
 
 it('unlocks the session with the creator password and keeps the first unlock time', function () {
     [$user, , , $region, , $session] = worldStateScenario(fakeReply: false);
-    $user->update(['creator_password' => 'open sesame']);
+    $region->world->update(['creator_password' => 'open sesame']);
 
     $this->actingAs($user)->postJson(route('worlds.sessions.creator.unlock', [$region->world_id, $session->id]), ['password' => 'open sesame'])->assertNoContent();
     $unlockedAt = $session->fresh()->creator_mode_at;
@@ -25,7 +25,7 @@ it('unlocks the session with the creator password and keeps the first unlock tim
 
 it('stays locked with a wrong password', function () {
     [$user, , , $region, , $session] = worldStateScenario(fakeReply: false);
-    $user->update(['creator_password' => 'open sesame']);
+    $region->world->update(['creator_password' => 'open sesame']);
 
     $this->actingAs($user)->postJson(route('worlds.sessions.creator.unlock', [$region->world_id, $session->id]), ['password' => 'guess'])
         ->assertUnprocessable()
@@ -34,17 +34,17 @@ it('stays locked with a wrong password', function () {
     expect($session->fresh()->creator_mode_at)->toBeNull();
 });
 
-it('asks for a creator password in Settings when none is set', function () {
+it('asks for a creator password on the world when it has none', function () {
     [$user, , , $region, , $session] = worldStateScenario(fakeReply: false);
 
     $this->actingAs($user)->postJson(route('worlds.sessions.creator.unlock', [$region->world_id, $session->id]), ['password' => 'anything'])
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'Set a creator password in Settings first.');
+        ->assertJsonPath('message', 'Set a creator password for this world first.');
 });
 
 it('keeps conversation creator mode and the menu apart', function () {
     [$user, , $conversation, $region, , $session] = worldStateScenario(fakeReply: false);
-    $user->update(['creator_password' => 'open sesame']);
+    $region->world->update(['creator_password' => 'open sesame']);
     $conversation->update(['world_session_id' => $session->id]);
 
     $this->actingAs($user)->postJson(route('worlds.sessions.creator.unlock', [$region->world_id, $session->id]), ['password' => 'open sesame'])->assertNoContent();

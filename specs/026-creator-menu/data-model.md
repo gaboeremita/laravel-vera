@@ -11,6 +11,16 @@
 
 The session payload of `GET /worlds/{world}/sessions` gains `creatorUnlocked` (bool) and `frozenResidentIds` (int[]).
 
+## worlds (changed)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `creator_password` | string, nullable, hashed | The world's creator password; hidden from every payload, which carries `creatorPasswordSet` instead. Saved with the world (`creatorPassword`, `clearCreatorPassword`). |
+
+## users (changed)
+
+`creator_password` is removed. The migration copies each user's hash onto the worlds they belong to before dropping it.
+
 ## Existing records the menu writes
 
 | Record | Written by | Creator marking |

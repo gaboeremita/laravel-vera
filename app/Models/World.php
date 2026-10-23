@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AssistantKind;
 use Database\Factories\WorldFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['name', 'slug', 'description', 'assistant_context_prompt', 'npc_context_prompt', 'spawn_region_id', 'spawn_passage_id', 'narrator_model_id', 'review_reveals', 'sentiment_definitions'])]
+#[Fillable(['name', 'slug', 'description', 'assistant_context_prompt', 'npc_context_prompt', 'spawn_region_id', 'spawn_passage_id', 'narrator_model_id', 'review_reveals', 'sentiment_definitions', 'creator_password'])]
+#[Hidden(['creator_password'])]
 class World extends Model
 {
     /** @use HasFactory<WorldFactory> */
@@ -20,7 +22,7 @@ class World extends Model
 
     protected function casts(): array
     {
-        return ['review_reveals' => 'boolean', 'sentiment_definitions' => 'array'];
+        return ['review_reveals' => 'boolean', 'sentiment_definitions' => 'array', 'creator_password' => 'hashed'];
     }
 
     /**

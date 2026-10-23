@@ -276,13 +276,17 @@ class ConversationController extends Controller
 
         $creatorModeTags = app(CreatorModeTags::class);
         $creatorNotice = null;
-        $password = $creatorModeTags->password($lastUserMessage['content'] ?? '');
+        $creatorWorld = isset($validated['worldId']) ? $request->user()->worlds()->findOrFail($validated['worldId']) : null;
+        $inWorld = $creatorWorld !== null;
+        $password = $inWorld ? $creatorModeTags->password($lastUserMessage['content'] ?? '') : null;
         if ($password !== null) {
-            $creatorNotice = $this->activateCreatorMode($request, $conversation, $password);
+            $creatorNotice = $this->activateCreatorMode($creatorWorld, $conversation, $password);
         }
-        $creatorTurn = $conversation->creator_mode_at !== null && $creatorModeTags->hasCommand($lastUserMessage['content'] ?? '');
-        $lastUserMessage['content'] = $creatorModeTags->withoutActivations($lastUserMessage['content'] ?? '', $creatorNotice === self::CREATOR_MODE_ON);
-        $creatorMode = ['active' => $conversation->creator_mode_at !== null, 'notice' => $creatorNotice];
+        $creatorTurn = $inWorld && $conversation->creator_mode_at !== null && $creatorModeTags->hasCommand($lastUserMessage['content'] ?? '');
+        if ($inWorld) {
+            $lastUserMessage['content'] = $creatorModeTags->withoutActivations($lastUserMessage['content'] ?? '', $creatorNotice === self::CREATOR_MODE_ON);
+        }
+        $creatorMode = ['active' => $inWorld && $conversation->creator_mode_at !== null, 'notice' => $creatorNotice];
 
         if ($password !== null && $creatorNotice !== self::CREATOR_MODE_ON && trim($lastUserMessage['content'] ?? '') === '' && empty($lastUserMessage['images'][0])) {
             return response()->json(['conversation_id' => $conversation->id, 'content' => null, 'userContent' => '', 'creatorMode' => $creatorMode]);
@@ -402,7 +406,7 @@ class ConversationController extends Controller
 
         $archive = $assistantModel->archive;
 
-        $excludedSections = ['opening_message', ...$this->creatorSectionsExcluded($conversation)];
+        $excludedSections = ['opening_message', ...$this->creatorSectionsExcluded($conversation, $inWorld)];
 
         if (! empty($validated['voice_mode'])) {
             $excludedSections[] = 'style rules';
@@ -689,11 +693,11 @@ class ConversationController extends Controller
      *
      * @return string the notice the player sees
      */
-    private function activateCreatorMode(Request $request, Conversation $conversation, string $password): string
+    private function activateCreatorMode(World $world, Conversation $conversation, string $password): string
     {
-        $hash = $request->user()->creator_password;
+        $hash = $world->creator_password;
         if ($hash === null) {
-            return 'Set a creator password in Settings first.';
+            return 'Set a creator password for this world first.';
         }
         if (! Hash::check($password, $hash)) {
             return 'Creator mode didn\'t activate.';
@@ -705,14 +709,19 @@ class ConversationController extends Controller
     }
 
     /**
-     * The server checks the creator password itself, so the character never
-     * gets the section that used to hold it, and gets the creator mode
-     * section only while creator mode is on in this conversation.
+     * In a world the server checks the world's creator password, so the
+     * character never gets the section that used to hold it, and gets the
+     * creator mode section only while creator mode is on in the conversation.
+     * Outside any world the character gets both and judges the trigger itself.
      *
      * @return array<int, string>
      */
-    private function creatorSectionsExcluded(Conversation $conversation): array
+    private function creatorSectionsExcluded(Conversation $conversation, bool $inWorld): array
     {
+        if (! $inWorld) {
+            return [];
+        }
+
         return $conversation->creator_mode_at === null ? ['secret trigger', 'creator mode'] : ['secret trigger'];
     }
 
@@ -1032,7 +1041,7 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation)];
+        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation, $conversation->world_session_id !== null)];
 
         if ($conversation->discord_channel_id) {
             // Discord has no UI to render an emotion/pose tag against — same reasoning as the normal Discord reply flow.
@@ -1071,7 +1080,7 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation)];
+        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation, $conversation->world_session_id !== null)];
 
         if ($conversation->discord_channel_id) {
             // Discord has no UI to render an emotion/pose tag against — same reasoning as the normal Discord reply flow.
@@ -1111,7 +1120,7 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation)];
+        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation, $conversation->world_session_id !== null)];
 
         if ($conversation->discord_channel_id) {
             $excludedSections[] = 'emotion tags';

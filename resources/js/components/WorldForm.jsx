@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import Accordion from './common/Accordion.jsx';
 import PassageSelect from './PassageSelect.jsx';
 import NarratorModelSelect from './NarratorModelSelect.jsx';
@@ -8,7 +9,10 @@ import { FIELD_LABEL, FIELD_INPUT } from '../utils/formFieldStyles.js';
 
 export default function WorldForm({ value, onChange, regions = null, imagesEditor = null, itemsEditor = null, playerInventoryEditor = null, isSaving, onSubmit }) {
 	const update = (field, fieldValue) => onChange({ ...value, [field]: fieldValue });
-	const [sections, setSections] = useState({ details: false, prompts: false, sentiments: true, start: false });
+	const [sections, setSections] = useState({ details: false, prompts: false, sentiments: true, creator: true, start: false });
+	const [passwordRevealed, setPasswordRevealed] = useState(false);
+	const creatorPassword = value.creatorPassword ?? '';
+	const passwordTooShort = creatorPassword.length > 0 && creatorPassword.length < 8;
 	const toggle = (section) => setSections((current) => ({ ...current, [section]: !current[section] }));
 	const spawn = value.spawnRegionId ? { regionId: value.spawnRegionId, passageId: value.spawnPassageId } : null;
 
@@ -48,6 +52,47 @@ export default function WorldForm({ value, onChange, regions = null, imagesEdito
 			</Accordion>
 			<Accordion label="SENTIMENTS" collapsed={sections.sentiments} onToggle={() => toggle('sentiments')}>
 				<SentimentsEditor value={value.sentimentDefinitions ?? []} onChange={(definitions) => update('sentimentDefinitions', definitions)} hint="How residents feel about the player, each from -10 to 10 per session, starting at 0." />
+			</Accordion>
+			<Accordion label="CREATOR MODE" collapsed={sections.creator} onToggle={() => toggle('creator')}>
+				<div className="flex items-center justify-between gap-4">
+					<p className="text-fg-3 text-xs">
+						The password that unlocks the Creator menu (T) in this world's sessions, and <span className="text-fg-2 font-mono">[creator mode: "password"]</span> in conversations here. It's never shown or sent to a character.
+					</p>
+					{value.creatorPasswordSet !== undefined && (
+						<span className={`shrink-0 text-[0.65rem] tracking-[0.1em] ${value.creatorPasswordSet && !value.clearCreatorPassword ? 'text-success' : 'text-fg-3'}`}>
+							{value.clearCreatorPassword ? 'CLEARED ON SAVE' : value.creatorPasswordSet ? 'PASSWORD SET' : 'NO PASSWORD'}
+						</span>
+					)}
+				</div>
+				<div>
+					<label className={FIELD_LABEL}>{value.creatorPasswordSet ? 'New creator password' : 'Creator password'}</label>
+					<div className="relative">
+						<input
+							type={passwordRevealed ? 'text' : 'password'}
+							value={creatorPassword}
+							onChange={(event) => onChange({ ...value, creatorPassword: event.target.value, clearCreatorPassword: false })}
+							autoComplete="new-password"
+							aria-label="Creator password"
+							className={`${FIELD_INPUT} pr-10`}
+						/>
+						<button
+							type="button"
+							onClick={() => setPasswordRevealed((current) => !current)}
+							aria-label={passwordRevealed ? 'Hide password' : 'Show password'}
+							aria-pressed={passwordRevealed}
+							className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-accent transition-colors cursor-pointer"
+						>
+							{passwordRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
+						</button>
+					</div>
+					{passwordTooShort && <p className="text-fg-3 text-xs mt-2">At least 8 characters.</p>}
+					{!passwordTooShort && creatorPassword.length > 0 && <p className="text-fg-3 text-xs mt-2">Saved with the world.</p>}
+				</div>
+				{value.creatorPasswordSet && (
+					<button type="button" onClick={() => onChange({ ...value, creatorPassword: '', clearCreatorPassword: !value.clearCreatorPassword })} className="text-danger text-[0.7rem] tracking-[0.1em] cursor-pointer hover:text-fg-1 transition-colors">
+						{value.clearCreatorPassword ? 'KEEP PASSWORD' : 'CLEAR PASSWORD'}
+					</button>
+				)}
 			</Accordion>
 			{itemsEditor}
 			{regions && (

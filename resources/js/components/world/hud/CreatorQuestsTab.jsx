@@ -27,7 +27,7 @@ function BeatRow({ beat, emptying, onToggle }) {
 }
 
 /** Every quest of the world with its state here; the creator starts, ends, reopens and rewrites any of them. */
-export default function CreatorQuestsTab({ overview, creator, context, arrowHandler }) {
+export default function CreatorQuestsTab({ overview, creator, context, arrowHandlerRef }) {
 	const [selectedId, setSelectedId] = useState(overview.quests[0]?.id ?? null);
 	const [newFlag, setNewFlag] = useState('');
 	const [emptying, setEmptying] = useState([]);
@@ -35,12 +35,12 @@ export default function CreatorQuestsTab({ overview, creator, context, arrowHand
 	const selected = overview.quests[index] ?? null;
 
 	useEffect(() => {
-		arrowHandler.current = (step) => {
+		arrowHandlerRef.current = (step) => {
 			const next = overview.quests[Math.min(overview.quests.length - 1, Math.max(0, index + step))];
 			if (next) setSelectedId(next.id);
 		};
-		return () => { arrowHandler.current = null; };
-	}, [arrowHandler, overview.quests, index]);
+		return () => { arrowHandlerRef.current = null; };
+	}, [arrowHandlerRef, overview.quests, index]);
 
 	if (!selected) return <p className="text-fg-3 text-sm">This world has no quests yet.</p>;
 

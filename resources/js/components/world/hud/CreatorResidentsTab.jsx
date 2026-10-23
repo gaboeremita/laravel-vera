@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Search, X } from 'lucide-react';
 import { api } from '../../../utils/api.js';
 import { HudButton, HudChip, HudMeter } from './HudControls.jsx';
 
@@ -36,34 +37,55 @@ function SendPicker({ regions, onSend, onCancel }) {
 }
 
 /** Every resident of the world: where they are, what they think and feel, and the creator's commands over them. */
-export default function CreatorResidentsTab({ overview, creator, context, arrowHandler, openItems }) {
+export default function CreatorResidentsTab({ overview, creator, context, arrowHandlerRef, openItems }) {
 	const [selectedId, setSelectedId] = useState(overview.residents[0]?.id ?? null);
 	const [sending, setSending] = useState(false);
-	const index = Math.max(0, overview.residents.findIndex((resident) => resident.id === selectedId));
-	const selected = overview.residents[index] ?? null;
-	const worldResident = context.residents.find((resident) => resident.id === selected?.id) ?? null;
+	const [query, setQuery] = useState('');
 	const regionName = (regionId) => overview.regions.find((region) => region.id === regionId)?.name ?? '';
+	const needle = query.trim().toLowerCase();
+	const shown = needle === '' ? overview.residents : overview.residents.filter((resident) => [resident.name, regionName(resident.regionId), resident.zoneName ?? ''].some((text) => text.toLowerCase().includes(needle)));
+	const index = Math.max(0, shown.findIndex((resident) => resident.id === selectedId));
+	const selected = shown[index] ?? overview.residents.find((resident) => resident.id === selectedId) ?? null;
+	const worldResident = context.residents.find((resident) => resident.id === selected?.id) ?? null;
 
 	useEffect(() => {
-		arrowHandler.current = (step) => {
-			const next = overview.residents[Math.min(overview.residents.length - 1, Math.max(0, index + step))];
+		arrowHandlerRef.current = (step) => {
+			const next = shown[Math.min(shown.length - 1, Math.max(0, index + step))];
 			if (next) setSelectedId(next.id);
 		};
-		return () => { arrowHandler.current = null; };
-	}, [arrowHandler, overview.residents, index]);
+		return () => { arrowHandlerRef.current = null; };
+	}, [arrowHandlerRef, shown, index]);
 
 	if (!selected || !worldResident) return <p className="text-fg-3 text-sm">This world has no residents yet.</p>;
 
 	const player = context.getPlayerPosition();
 	const distance = (resident) => (player && resident.position && resident.regionId === context.regionId ? Math.hypot(resident.position.x - player.x, resident.position.z - player.z) : null);
 	const thought = context.thoughts[selected.id] ?? null;
+	const from = { regionId: selected.regionId, zoneName: selected.zoneName };
 	const setSentiment = (name, value) => creator.run(`set ${selected.name}'s ${name} to ${value > 0 ? '+' : ''}${value}`, () => api.put(context.route('residents.sentiments.update', { resident: selected.id }), { values: { [name]: value } }));
 
 	return (
 		<div className="grid grid-cols-[17rem_1fr] gap-5">
 			<div className="flex min-w-0 flex-col gap-1.5">
-				<span className="world-hud-label mb-1">{overview.residents.length} residents · {overview.regions.length} regions</span>
-				{overview.residents.map((resident, rowIndex) => {
+				<div className="relative mb-1">
+					<Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" aria-hidden="true" />
+					<input
+						value={query}
+						onChange={(event) => setQuery(event.target.value)}
+						placeholder="Name, region or zone"
+						aria-label="Search residents"
+						className="w-full border border-line-2 bg-bg-1 py-1.5 pl-8 pr-8 text-fg-1 text-sm outline-none transition-colors focus:border-accent/60"
+						style={{ borderRadius: 'calc(var(--hud-radius) / 2)' }}
+					/>
+					{query && (
+						<button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-fg-3 transition-colors hover:text-accent">
+							<X size={14} />
+						</button>
+					)}
+				</div>
+				<span className="world-hud-label mb-1">{needle === '' ? `${overview.residents.length} residents · ${overview.regions.length} regions` : `${shown.length} of ${overview.residents.length} residents`}</span>
+				{shown.length === 0 && <span className="text-fg-3 text-xs">No resident matches “{query.trim()}”.</span>}
+				{shown.map((resident, rowIndex) => {
 					const active = resident.id === selected.id;
 					const near = distance(resident);
 					return (
@@ -112,13 +134,13 @@ export default function CreatorResidentsTab({ overview, creator, context, arrowH
 				</div>
 
 				<div className="flex flex-wrap gap-2">
-					<HudButton variant="primary" onClick={() => context.summon(worldResident)}>Summon</HudButton>
+					<HudButton variant="primary" onClick={() => context.summon(worldResident, from)}>Summon</HudButton>
 					<HudButton onClick={() => setSending((current) => !current)}>Send to…</HudButton>
-					<HudButton onClick={() => context.sendHome(worldResident)}>Send home</HudButton>
+					<HudButton onClick={() => context.sendHome(worldResident, from)}>Send home</HudButton>
 					<HudButton onClick={() => context.freeze(worldResident, !selected.frozen)}>{selected.frozen ? 'Unfreeze' : 'Freeze'}</HudButton>
 					<HudButton onClick={() => openItems({ type: 'resident', residentId: selected.id })}>Inventory</HudButton>
 				</div>
-				{sending && <SendPicker regions={overview.regions} onCancel={() => setSending(false)} onSend={async (regionId, zoneId) => { const done = await context.send(worldResident, regionId, zoneId); if (done) setSending(false); return done; }} />}
+				{sending && <SendPicker regions={overview.regions} onCancel={() => setSending(false)} onSend={async (regionId, zoneId) => { const done = await context.send(worldResident, regionId, zoneId, from); if (done) setSending(false); return done; }} />}
 
 				<div className="flex flex-col gap-1">
 					<span className="world-hud-label">Recent</span>

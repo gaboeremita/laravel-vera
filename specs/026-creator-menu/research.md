@@ -2,7 +2,7 @@
 
 ## R1. Unlocking
 
-**Decision**: `POST /worlds/{world}/sessions/{session}/creator/unlock` checks the password with `Hash::check` against `users.creator_password`, as `ConversationController::activateCreatorMode` does, and sets a new `world_sessions.creator_mode_at`. Every other creator endpoint resolves the session through a new `ResolvesCreatorSession` trait, beside `ResolvesWorldUser`, which returns 403 while `creator_mode_at` is null. The session payload of `WorldSessionController::index` carries `creatorUnlocked`.
+**Decision**: `POST /worlds/{world}/sessions/{session}/creator/unlock` checks the password with `Hash::check` against the world's `worlds.creator_password`, as `ConversationController::activateCreatorMode` does for that world's conversations, and sets a new `world_sessions.creator_mode_at`. Every other creator endpoint resolves the session through a new `ResolvesCreatorSession` trait, beside `ResolvesWorldUser`, which returns 403 while `creator_mode_at` is null. The session payload of `WorldSessionController::index` carries `creatorUnlocked`.
 
 **Rationale**: Same password, same hashing and same "unlocked from this moment" timestamp as conversations, kept on the session so the two never affect each other (FR-004). A trait mirrors how every session controller already resolves its session.
 

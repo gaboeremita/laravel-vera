@@ -18,9 +18,9 @@ class CreatorUnlockController extends Controller
         $worldSession = $this->resolveWorldSession($request, $world, $session);
         $validated = $request->validate(['password' => ['required', 'string']]);
 
-        $hash = $request->user()->creator_password;
+        $hash = $worldSession->worldUser->world->creator_password;
         if ($hash === null) {
-            return response()->json(['message' => 'Set a creator password in Settings first.'], 422);
+            return response()->json(['message' => 'Set a creator password for this world first.'], 422);
         }
         if (! Hash::check($validated['password'], $hash)) {
             return response()->json(['message' => 'That password is wrong.'], 422);

@@ -24,7 +24,6 @@ use App\Http\Controllers\Api\CreatorFactController;
 use App\Http\Controllers\Api\CreatorInventoryController;
 use App\Http\Controllers\Api\CreatorObjectController;
 use App\Http\Controllers\Api\CreatorOverviewController;
-use App\Http\Controllers\Api\CreatorPasswordController;
 use App\Http\Controllers\Api\CreatorQuestController;
 use App\Http\Controllers\Api\CreatorResidentController;
 use App\Http\Controllers\Api\CreatorTravelController;
@@ -179,6 +178,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/worlds/{world}/sessions/{session}/creator/residents/{resident}/state', [CreatorResidentController::class, 'destroyState'])->name('worlds.sessions.creator.residents.state.destroy');
     Route::put('/worlds/{world}/sessions/{session}/creator/residents/{resident}/frozen', [CreatorResidentController::class, 'updateFrozen'])->name('worlds.sessions.creator.residents.frozen.update');
     Route::put('/worlds/{world}/sessions/{session}/creator/residents/{resident}/sentiments', [CreatorResidentController::class, 'updateSentiments'])->name('worlds.sessions.creator.residents.sentiments.update');
+    Route::post('/worlds/{world}/sessions/{session}/creator/residents/{resident}/reaction', [CreatorResidentController::class, 'react'])->name('worlds.sessions.creator.residents.reaction');
     Route::post('/worlds/{world}/sessions/{session}/creator/quests/{quest}/start', [CreatorQuestController::class, 'start'])->name('worlds.sessions.creator.quests.start');
     Route::post('/worlds/{world}/sessions/{session}/creator/quests/{quest}/end', [CreatorQuestController::class, 'end'])->name('worlds.sessions.creator.quests.end');
     Route::post('/worlds/{world}/sessions/{session}/creator/quests/{quest}/reset', [CreatorQuestController::class, 'reset'])->name('worlds.sessions.creator.quests.reset');
@@ -191,8 +191,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/worlds/{world}/sessions/{session}/creator/inventories/move', [CreatorInventoryController::class, 'move'])->name('worlds.sessions.creator.inventories.move');
     Route::put('/worlds/{world}/sessions/{session}/creator/objects/passable', [CreatorObjectController::class, 'updatePassable'])->name('worlds.sessions.creator.objects.passable.update');
     Route::post('/worlds/{world}/sessions/{session}/creator/activity-uses', [CreatorObjectController::class, 'storeActivityUse'])->name('worlds.sessions.creator.activity-uses.store');
-    Route::get('/creator-password', [CreatorPasswordController::class, 'show'])->name('creator-password.show');
-    Route::put('/creator-password', [CreatorPasswordController::class, 'update'])->name('creator-password.update');
     Route::get('/conversations', [ConversationBrowserController::class, 'index'])->name('conversation-browser.index');
     Route::get('/conversations/{conversation}', [ConversationBrowserController::class, 'show'])->name('conversation-browser.show');
     Route::apiResource('npcs', NpcController::class);

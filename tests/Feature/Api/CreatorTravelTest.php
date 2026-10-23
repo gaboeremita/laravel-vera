@@ -31,7 +31,7 @@ it('moves the session and its followers to a zone in another region', function (
     ])->assertSuccessful()
         ->assertJsonPath('regionId', $docks->id)
         ->assertJsonPath('landInZone', 'vocal-booth')
-        ->assertJsonPath('position', ['x' => -2.0, 'y' => -2.0, 'z' => 8.0]);
+        ->assertJsonPath('position', ['x' => -2, 'y' => -2, 'z' => 8]);
 
     expect($session->fresh()->region_id)->toBe($docks->id)
         ->and(WorldSessionResident::where('world_resident_id', $resident->id)->value('region_id'))->toBe($docks->id);

@@ -12,9 +12,10 @@ use Illuminate\Support\Facades\Log;
 class VideoGenPromptEnhancer
 {
     private const TASK_INSTRUCTION = <<<'PROMPT'
-        Your task right now is different from a normal in-character reply: using everything above about who you are, the current scene, and the recent conversation, translate the request below into a single detailed, concrete prompt for a video generation model.
+        #INSTRUCTIONS:
+        Your task right now is different from a normal in-character reply: using everything before about who you are, the current scene, and the recent conversation, translate the request into a single detailed, concrete prompt for a video generation model.
         Describe subject, appearance, setting, motion, camera movement, lighting, and style concretely, staying consistent with the established persona and what is actually happening in the conversation right now.
-        A request to depict "you", "yourself", or addressed to you with a nickname or term of endearment means: generate a video of yourself, as described above. Terms of endearment in the request refer to you, and the subject is what the request asks to see.
+        A request to depict "you", "yourself", or addressed to you: generate a video of yourself, as described before. The subject is what the request asks to see.
         Reply with exactly one JSON object and nothing else, in this shape: {"description": string, "duration": integer or null, "aspect_ratio": string or null, "generate_audio": boolean or null}.
         "description" holds the video prompt. "duration" holds the length in seconds the request asks for, "aspect_ratio" the shape it asks for (for example "9:16" for vertical, "16:9" for widescreen, "1:1" for square), and "generate_audio" whether it asks for sound. Each of these three is null when the request leaves it open.
         PROMPT;
@@ -33,11 +34,13 @@ class VideoGenPromptEnhancer
         $systemPrompt = $this->buildSystemPrompt($assistantUser, $conversation, $rawPrompt, $videoGenModel);
         $history = $this->recentHistory($conversation);
 
-        $response = $llm->chat(messages: [
+        $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
             ...$history,
             ['role' => 'user', 'content' => $rawPrompt],
-        ]);
+        ];
+
+        $response = $llm->chat(messages: $messages);
 
         return $this->parse(trim($response->content), $rawPrompt);
     }

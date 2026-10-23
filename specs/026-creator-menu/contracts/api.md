@@ -9,7 +9,7 @@ All routes are under `/api/worlds/{world}/sessions/{session}/creator` and the `a
 Request: `{"password": "string"}`
 
 - **204**: correct password; `creator_mode_at` set.
-- **422** `{"message": "Set a creator password in Settings first."}`: no password set.
+- **422** `{"message": "Set a creator password for this world first."}`: no password set.
 - **422** `{"message": "That password is wrong."}`: wrong password.
 
 ## Overview
@@ -60,6 +60,7 @@ Request: `{"regionId": 2, "zoneId": "z5"}`, `{"regionId": 2, "passageId": "p3"}`
 | DELETE | `/residents/{resident}/state` | `...creator.residents.state.destroy` | — | 204 |
 | PUT | `/residents/{resident}/frozen` | `...creator.residents.frozen.update` | `{"frozen": true}` | 204 |
 | PUT | `/residents/{resident}/sentiments` | `...creator.residents.sentiments.update` | `{"values": {"trust": 5}}` | 200 `{"sentiments": {...}}` |
+| POST | `/residents/{resident}/reaction` | `...creator.residents.reaction` | `{"kind": "summoned"\|"followed"\|"sent"\|"sent_home", "fromRegionId": 1, "fromZoneName": "Market"?}` | 200 `{"messageId": 12, "line": "...", "expression": {...}}`; 502 when the model fails |
 
 `send` without `position` uses the zone's centroid at its `minY`.
 

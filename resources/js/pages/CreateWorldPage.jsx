@@ -15,7 +15,7 @@ export default function CreateWorldPage() {
 	const save = async () => {
 		setIsSaving(true);
 		try {
-			const response = await api.post(route('worlds.store'), { ...value, sentimentDefinitions: toSentimentPayload(value.sentimentDefinitions) });
+			const response = await api.post(route('worlds.store'), { ...value, creatorPassword: value.creatorPassword || null, sentimentDefinitions: toSentimentPayload(value.sentimentDefinitions) });
 			const world = await response.json();
 			if (!response.ok) throw new Error(world.message);
 			navigate(`/worlds/${world.id}/edit`);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Creator\ReactToCreatorMove;
 use App\Actions\Creator\TravelAsCreator;
 use App\Enums\ConversationStatus;
 use App\Enums\Posture;
@@ -95,6 +96,25 @@ class CreatorResidentController extends Controller
         $sentiment->adjust(collect($validated['values'])->map(fn (int $value, string $name) => $value - $scores[$name])->all());
 
         return response()->json(['sentiments' => $sentiment->scores()]);
+    }
+
+    public function react(Request $request, int $world, int $session, int $resident, ReactToCreatorMove $reactToCreatorMove): JsonResponse
+    {
+        [$worldSession, $worldResident] = $this->resolve($request, $world, $session, $resident);
+        $validated = $request->validate([
+            'kind' => ['required', 'in:'.implode(',', ReactToCreatorMove::KINDS)],
+            'fromRegionId' => ['required', 'integer'],
+            'fromZoneName' => ['nullable', 'string', 'max:255'],
+        ]);
+        $fromRegion = $worldSession->worldUser->world->regions()->findOrFail($validated['fromRegionId']);
+
+        try {
+            $message = $reactToCreatorMove->handle($worldSession, $worldResident, $validated['kind'], $fromRegion, $validated['fromZoneName'] ?? null);
+        } catch (\RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 502);
+        }
+
+        return response()->json(['messageId' => $message->id, 'line' => $message->content, 'expression' => $message->expression]);
     }
 
     /**

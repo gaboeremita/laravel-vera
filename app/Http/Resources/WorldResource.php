@@ -28,6 +28,7 @@ class WorldResource extends JsonResource
             'hasSpawn' => $this->spawnPassage() !== null,
             'narratorModelId' => $this->narrator_model_id,
             'reviewReveals' => $this->review_reveals ?? true,
+            'creatorPasswordSet' => $this->creator_password !== null,
             'sentimentDefinitions' => $this->sentiment_definitions ?? [],
             'cardImageUrl' => $this->whenLoaded('cardImage', fn () => $this->cardImage?->url),
             'portraitImageUrl' => $this->whenLoaded('portraitImage', fn () => $this->portraitImage?->url),

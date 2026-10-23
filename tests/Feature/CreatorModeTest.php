@@ -20,15 +20,29 @@ uses(RefreshDatabase::class);
 const CREATOR_PASSWORD = 'lighthouse keeper';
 
 /**
+ * A chat with an assistant outside any world, whose prompt has the creator sections.
+ *
  * @return array{0: User, 1: Assistant, 2: Conversation}
  */
 function creatorChat(): array
 {
     [$user, $assistant, $conversation] = setUpAgentAssistant('assistant');
     $assistant->update(['prompt' => ['identity' => 'You are Ines.', 'creator mode' => 'CREATOR SECTION', 'secret trigger' => 'OLD TRIGGER SECTION']]);
-    $user->update(['creator_password' => CREATOR_PASSWORD]);
 
     return [$user, $assistant, $conversation];
+}
+
+/**
+ * A world conversation whose world has the creator password and whose assistant has the creator sections.
+ */
+function creatorWorldChat(): array
+{
+    $scenario = worldStateScenario(fakeReply: false);
+    [, $assistant, , $region] = $scenario;
+    $assistant->update(['prompt' => ['identity' => 'You are Ines.', 'creator mode' => 'CREATOR SECTION', 'secret trigger' => 'OLD TRIGGER SECTION']]);
+    $region->world->update(['creator_password' => CREATOR_PASSWORD]);
+
+    return $scenario;
 }
 
 function sendChat($test, array $chat, string $content, array $history = []): TestResponse
@@ -43,6 +57,13 @@ function sendChat($test, array $chat, string $content, array $history = []): Tes
     ]);
 }
 
+function sendCreatorWorldChat($test, array $scenario, string $content): TestResponse
+{
+    [, , , , $resident] = $scenario;
+
+    return sendWorldMessage($test, $scenario, ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]]], ['message' => ['content' => $content]]);
+}
+
 /**
  * Every message sent to any model during the test, as one string.
  */
@@ -51,64 +72,82 @@ function everythingSentToModels(): string
     return collect(Http::recorded())->map(fn (array $pair) => json_encode($pair[0]['messages'] ?? []))->implode("\n");
 }
 
-it('activates creator mode with the right password and keeps it on in that conversation', function () {
+it('leaves creator mode to the character outside any world: both sections go out and the tag stays as typed', function () {
     $chat = creatorChat();
+    Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Prove it.'))]);
+
+    sendChat($this, $chat, '[creator mode: "tsuru tuneado"] hello')
+        ->assertOk()
+        ->assertJsonPath('creatorMode.active', false)
+        ->assertJsonPath('creatorMode.notice', null);
+
+    expect($chat[2]->fresh()->creator_mode_at)->toBeNull()
+        ->and($chat[2]->messages()->where('role', 'user')->value('content'))->toBe('[creator mode: "tsuru tuneado"] hello')
+        ->and(systemPromptOfRequestIn(0))->toContain('CREATOR SECTION')->toContain('OLD TRIGGER SECTION');
+});
+
+it('activates creator mode in a world with the world\'s password and keeps it on in that conversation', function () {
+    $scenario = creatorWorldChat();
+    [, , $conversation] = $scenario;
     Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Welcome back, creator.'))]);
 
-    sendChat($this, $chat, '[creator mode: "'.CREATOR_PASSWORD.'"] hello')
+    sendCreatorWorldChat($this, $scenario, '[creator mode: "'.CREATOR_PASSWORD.'"] hello')
         ->assertOk()
         ->assertJsonPath('creatorMode.active', true)
         ->assertJsonPath('creatorMode.notice', 'Creator mode is on.')
         ->assertJsonPath('userContent', '[creator mode] hello');
 
-    expect($chat[2]->fresh()->creator_mode_at)->not->toBeNull()
-        ->and($chat[2]->messages()->where('role', 'user')->value('content'))->toBe('[creator mode] hello')
+    expect($conversation->fresh()->creator_mode_at)->not->toBeNull()
+        ->and($conversation->messages()->where('role', 'user')->value('content'))->toBe('[creator mode] hello')
         ->and(systemPromptOfRequestIn(0))->toContain('CREATOR SECTION')->not->toContain('OLD TRIGGER SECTION')
         ->and(everythingSentToModels())->not->toContain(CREATOR_PASSWORD);
 
-    sendChat($this, $chat, 'still there?')->assertJsonPath('creatorMode.active', true);
+    sendCreatorWorldChat($this, $scenario, 'still there?')->assertJsonPath('creatorMode.active', true);
 });
 
-it('stays off with a wrong password, and the password goes nowhere', function () {
-    $chat = creatorChat();
+it('stays off in a world with a wrong password, and the password goes nowhere', function () {
+    $scenario = creatorWorldChat();
+    [, , $conversation] = $scenario;
     Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Hm?'))]);
 
-    sendChat($this, $chat, '[creator mode: "wrong guess"] hi', [['role' => 'user', 'content' => 'earlier'], ['role' => 'assistant', 'content' => 'Yes?']])
+    sendCreatorWorldChat($this, $scenario, '[creator mode: "wrong guess"] hi')
         ->assertOk()
         ->assertJsonPath('creatorMode.active', false)
         ->assertJsonPath('creatorMode.notice', 'Creator mode didn\'t activate.')
         ->assertJsonPath('userContent', 'hi');
 
-    expect($chat[2]->fresh()->creator_mode_at)->toBeNull()
+    expect($conversation->fresh()->creator_mode_at)->toBeNull()
         ->and(systemPromptOfRequestIn(0))->not->toContain('CREATOR SECTION')->not->toContain('OLD TRIGGER SECTION')
         ->and(everythingSentToModels())->not->toContain('wrong guess');
 });
 
 it('answers a failed activation with nothing else in it without a reply', function () {
-    $chat = creatorChat();
+    $scenario = creatorWorldChat();
+    [, , $conversation] = $scenario;
     Http::fake();
 
-    sendChat($this, $chat, '[creator mode: "wrong guess"]')->assertOk()->assertJsonPath('content', null)->assertJsonPath('creatorMode.active', false);
+    sendCreatorWorldChat($this, $scenario, '[creator mode: "wrong guess"]')->assertOk()->assertJsonPath('content', null)->assertJsonPath('creatorMode.active', false);
 
     Http::assertNothingSent();
-    expect($chat[2]->messages()->count())->toBe(0);
+    expect($conversation->messages()->count())->toBe(0);
 });
 
-it('asks for a creator password in Settings when none is set', function () {
-    $chat = creatorChat();
-    $chat[0]->update(['creator_password' => null]);
+it('asks for a creator password on the world when it has none', function () {
+    $scenario = creatorWorldChat();
+    $scenario[3]->world->update(['creator_password' => null]);
     Http::fake();
 
-    sendChat($this, $chat, '[creator mode: "anything"]')->assertJsonPath('creatorMode.notice', 'Set a creator password in Settings first.');
+    sendCreatorWorldChat($this, $scenario, '[creator mode: "anything"]')->assertJsonPath('creatorMode.notice', 'Set a creator password for this world first.');
 });
 
 it('keeps creator mode to the conversation it was activated in', function () {
-    $chat = creatorChat();
-    $chat[2]->update(['creator_mode_at' => now()]);
-    $other = Conversation::factory()->forAssistantUser(AssistantUser::where('assistant_id', $chat[1]->id)->first())->create();
+    $scenario = creatorWorldChat();
+    [$user, $assistant, $conversation] = $scenario;
+    $conversation->update(['creator_mode_at' => now()]);
+    $other = Conversation::factory()->forAssistantUser(AssistantUser::where('assistant_id', $assistant->id)->first())->create();
     Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Hello.'))]);
 
-    sendChat($this, [$chat[0], $chat[1], $other], 'hello')->assertJsonPath('creatorMode.active', false);
+    sendCreatorWorldChat($this, [$user, $assistant, $other, ...array_slice($scenario, 3)], 'hello')->assertJsonPath('creatorMode.active', false);
 
     expect(systemPromptOfRequestIn(0))->not->toContain('CREATOR SECTION');
 });
@@ -116,7 +155,7 @@ it('keeps creator mode to the conversation it was activated in', function () {
 it('lets the creator reveal any fact and grant credits, recorded as the creator\'s', function () {
     $scenario = inventoryScenario(playerCredits: 10);
     [$user, $assistant, $conversation, $region, $resident, $session, $player] = $scenario;
-    $user->update(['creator_password' => CREATOR_PASSWORD]);
+    $region->world->update(['creator_password' => CREATOR_PASSWORD]);
     $conversation->update(['creator_mode_at' => now()]);
     $region->world->update(['narrator_model_id' => AiModel::first()->id]);
     $other = WorldResident::factory()->create(['region_id' => $region->id]);
@@ -190,8 +229,8 @@ it('gives no creator tools to a command while creator mode is off', function () 
 
 it('applies an activation and a command in one message on the same turn', function () {
     $scenario = inventoryScenario(playerCredits: 0);
-    [$user, , , , $resident, , $player] = $scenario;
-    $user->update(['creator_password' => CREATOR_PASSWORD]);
+    [, , , $region, $resident, , $player] = $scenario;
+    $region->world->update(['creator_password' => CREATOR_PASSWORD]);
     fakeTurn(toolCallResponse('call_1', 'grant', ['holder' => 'the user', 'credits' => 5]), finalAnswerResponse('There.'));
 
     sendWorldMessage($this, $scenario, ['user' => ['x' => 8, 'y' => 0, 'z' => -8], 'residents' => [$resident->id => ['x' => 5, 'y' => 0, 'z' => -3]]], [

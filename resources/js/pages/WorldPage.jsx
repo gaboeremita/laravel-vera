@@ -54,6 +54,7 @@ import CreatorMenu from '../components/world/hud/CreatorMenu.jsx';
 import CreatorArrivalFlash from '../components/world/hud/CreatorArrivalFlash.jsx';
 import { zoneLanding } from '../components/world/zoneLanding.js';
 import { homeState } from '../components/world/residentHome.js';
+import { zoneAt } from '../components/world/worldLocation.js';
 
 const INVITE_MS = 30000;
 const LISTEN_DISTANCE = 12;
@@ -269,6 +270,11 @@ export default function WorldPage() {
 				if (event.repeat) return;
 				if (event.code === 'Enter' || event.code === 'NumpadEnter') passageActionsRef.current.confirm();
 				else if (event.code === 'Escape') passageActionsRef.current.cancel();
+				return;
+			}
+			if (creatorOpenRef.current && creatorKeyHandler.current?.locked) {
+				event.stopImmediatePropagation();
+				if (creatorKeyHandler.current(event)) event.preventDefault();
 				return;
 			}
 			if (event.code === 'KeyT' && sessionId && !pausedRef.current) {
@@ -900,6 +906,25 @@ export default function WorldPage() {
 		playerCommands.current?.setFastWalk(fastWalk);
 	}, [status, fastWalk]);
 
+	const placeOf = useCallback((resident) => {
+		const position = residentPositions.current.get(resident.id);
+		return { regionId: region?.id ?? null, zoneName: position && world?.layout ? zoneAt(world?.layout, position)?.name ?? null : null };
+	}, [region?.id, world?.layout]);
+	const reactToMove = useCallback(async (resident, kind, from) => {
+		if (!from?.regionId) return;
+		try {
+			const response = await api.post(creatorRoute('residents.reaction', { resident: resident.id }), { kind, fromRegionId: from.regionId, fromZoneName: from.zoneName ?? null });
+			const body = await response.json();
+			if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
+			if (!body.line || !residentCommands.current.has(resident.id)) return;
+			if (kind !== 'sent' && kind !== 'sent_home') setInvite({ residentId: resident.id, name: resident.assistant.name, key: Date.now() });
+			await speakAloud(resident.id, body.line, body.expression?.pose ?? null, { toUser: true });
+		} catch (error) {
+			console.error(`[WorldPage] ${resident.assistant.name} could not react to being moved`, error);
+			addToast(`${resident.assistant.name} couldn't react to being moved (${error.message})`, 'error');
+		}
+	}, [creatorRoute, speakAloud, addToast]);
+
 	const creatorGoTo = useCallback(async ({ regionId, zoneId = null, passageId = null, spawn = false }) => {
 		if (!sessionId || travelingRef.current) return false;
 		if (!spawn && regionId === region?.id) {
@@ -917,6 +942,7 @@ export default function WorldPage() {
 		travelingRef.current = true;
 		setChatResident(null);
 		const followerIds = [...residentCommands.current].filter(([, commands]) => commands.isFollowing?.()).map(([residentId]) => residentId);
+		const followers = followerIds.map((residentId) => worldData?.residents?.find((resident) => resident.id === residentId)).filter(Boolean).map((resident) => ({ resident, from: placeOf(resident) }));
 		try {
 			await persistResidentStates();
 			latestPosition.current = null;
@@ -926,6 +952,7 @@ export default function WorldPage() {
 			creator.close();
 			await enterRegion(arrival);
 			if (!arrival.landInZone) flashArrival();
+			followers.forEach(({ resident, from }) => void reactToMove(resident, 'followed', from));
 			return true;
 		} catch (error) {
 			addToast(error.message || 'Unable to go there', 'error');
@@ -933,7 +960,7 @@ export default function WorldPage() {
 		} finally {
 			travelingRef.current = false;
 		}
-	}, [sessionId, region?.id, world, landInZone, landPlayer, creator, persistResidentStates, creatorRoute, enterRegion, flashArrival, addToast]);
+	}, [sessionId, region?.id, world, worldData?.residents, landInZone, landPlayer, creator, persistResidentStates, creatorRoute, enterRegion, flashArrival, addToast, placeOf, reactToMove]);
 
 	const updateResidentState = useCallback((residentId, state) => setSession((current) => {
 		if (!current) return current;
@@ -953,7 +980,7 @@ export default function WorldPage() {
 		if (conversation) void stopResidentConversation(conversation.id);
 	}, [closeChat, residentConversationOf, stopResidentConversation]);
 
-	const creatorSummon = useCallback(async (resident) => {
+	const creatorSummon = useCallback(async (resident, from = null) => {
 		const view = playerView.current;
 		const foot = playerState.current?.footPosition;
 		if (!view || !foot) return false;
@@ -963,12 +990,15 @@ export default function WorldPage() {
 		releaseResident(resident);
 		const done = await creator.run(`summoned ${resident.assistant.name}`, () => api.post(creatorRoute('residents.summon', { resident: resident.id }), { position: { x: position.x, y: position.y, z: position.z }, facing }));
 		if (!done) return false;
-		updateResidentState(resident.id, { regionId: region.id, position: { x: position.x, y: position.y, z: position.z }, rotation: { y: facing }, spotId: null, activityId: null, posture: 'standing', exitPosition: null });
+		const origin = from ?? placeOf(resident);
+		updateResidentState(resident.id, { regionId: region?.id, position: { x: position.x, y: position.y, z: position.z }, rotation: { y: facing }, spotId: null, activityId: null, posture: 'standing', exitPosition: null });
 		moveResidentHere(resident, position, facing);
+		void reactToMove(resident, 'summoned', origin);
 		return true;
-	}, [creator, creatorRoute, region?.id, releaseResident, updateResidentState, moveResidentHere]);
+	}, [creator, creatorRoute, region?.id, releaseResident, updateResidentState, moveResidentHere, placeOf, reactToMove]);
 
-	const creatorSend = useCallback(async (resident, regionId, zoneId) => {
+	const creatorSend = useCallback(async (resident, regionId, zoneId, from = null) => {
+		const origin = from ?? placeOf(resident);
 		const here = regionId === region?.id;
 		const point = here ? zoneLanding(world?.layout, zoneId, navigation.current) : null;
 		if (here && !point) {
@@ -980,10 +1010,12 @@ export default function WorldPage() {
 		if (!body) return false;
 		updateResidentState(resident.id, { regionId: body.regionId, position: body.position, rotation: { y: 0 }, spotId: null, activityId: null, posture: 'standing', exitPosition: null });
 		if (here) moveResidentHere(resident, body.position, 0);
+		void reactToMove(resident, 'sent', origin);
 		return true;
-	}, [region?.id, world?.layout, releaseResident, creator, creatorRoute, updateResidentState, moveResidentHere, addToast]);
+	}, [region?.id, world?.layout, releaseResident, creator, creatorRoute, updateResidentState, moveResidentHere, addToast, placeOf, reactToMove]);
 
-	const creatorSendHome = useCallback(async (resident) => {
+	const creatorSendHome = useCallback(async (resident, from = null) => {
+		const origin = from ?? placeOf(resident);
 		releaseResident(resident);
 		const done = await creator.run(`sent ${resident.assistant.name} home`, () => api.delete(creatorRoute('residents.state.destroy', { resident: resident.id })));
 		if (!done) return false;
@@ -992,8 +1024,9 @@ export default function WorldPage() {
 			const home = homeState(resident, world?.layout) ?? (resident.position ? { position: resident.position, rotation: resident.rotation } : null);
 			if (home) moveResidentHere(resident, home.position, home.rotation?.y ?? 0);
 		}
+		void reactToMove(resident, 'sent_home', origin);
 		return true;
-	}, [releaseResident, creator, creatorRoute, updateResidentState, region?.id, world?.layout, moveResidentHere]);
+	}, [releaseResident, creator, creatorRoute, updateResidentState, region?.id, world?.layout, moveResidentHere, placeOf, reactToMove]);
 
 	const creatorFreeze = useCallback(async (resident, frozen) => {
 		const done = await creator.run(`${frozen ? 'froze' : 'unfroze'} ${resident.assistant.name}`, () => api.put(creatorRoute('residents.frozen.update', { resident: resident.id }), { frozen }));

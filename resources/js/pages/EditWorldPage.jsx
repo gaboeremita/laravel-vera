@@ -70,6 +70,8 @@ export default function EditWorldPage() {
 				assistantContextPrompt: value.assistantContextPrompt, npcContextPrompt: value.npcContextPrompt,
 				spawnRegionId: value.spawnRegionId, spawnPassageId: value.spawnPassageId, narratorModelId: value.narratorModelId ?? null, reviewReveals: value.reviewReveals ?? true,
 				sentimentDefinitions: toSentimentPayload(value.sentimentDefinitions),
+				creatorPassword: value.creatorPassword || null,
+				clearCreatorPassword: value.clearCreatorPassword ?? false,
 			});
 			const saved = await response.json();
 			if (!response.ok) throw new Error(saved.message);

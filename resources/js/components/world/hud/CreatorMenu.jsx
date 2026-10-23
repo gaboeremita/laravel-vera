@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { HudSwitch } from './HudControls.jsx';
 import CreatorLog from './CreatorLog.jsx';
 import CreatorGoToTab from './CreatorGoToTab.jsx';
@@ -18,16 +19,16 @@ const PASSWORD_CELLS = 8;
 const LIGHT_STEP_MS = 30;
 const WRONG_MS = 500;
 
-function LockPanel({ onUnlock, onCancel }) {
+function LockPanel({ onUnlock, onCancel, inputRef }) {
 	const [password, setPassword] = useState('');
 	const [error, setError] = useState(null);
 	const [state, setState] = useState('typing');
 	const [litCount, setLitCount] = useState(0);
-	const inputRef = useRef(null);
+	const [revealed, setRevealed] = useState(false);
 
 	useEffect(() => {
 		inputRef.current?.focus();
-	}, []);
+	}, [inputRef]);
 
 	useEffect(() => {
 		if (state !== 'lighting') return undefined;
@@ -70,12 +71,23 @@ function LockPanel({ onUnlock, onCancel }) {
 			<span className="hud-rule hud-rule-center hud-enter-rule w-64 origin-center" />
 			<p className="text-center text-fg-2 text-sm leading-relaxed">Enter your creator password to take control of this session.</p>
 			<input ref={inputRef} type="password" value={password} onChange={(event) => { setError(null); setPassword(event.target.value); }} disabled={state !== 'typing'} onKeyDown={(event) => { if (event.key === 'Escape') onCancel(); }} aria-label="Creator password" autoComplete="off" className="absolute h-px w-px opacity-0" />
-			<div className="flex flex-wrap justify-center gap-1.5" aria-hidden="true">
-				{Array.from({ length: cellCount }, (_, index) => (
-					<span key={index} className="hud-cell" data-state={cellState(index)}>
-						{index < password.length ? '•' : index === password.length && state === 'typing' ? <span className="hud-caret" /> : null}
-					</span>
-				))}
+			<div className="flex items-center gap-3">
+				<div className="flex flex-wrap justify-center gap-1.5" aria-hidden="true">
+					{Array.from({ length: cellCount }, (_, index) => (
+						<span key={index} className="hud-cell" data-state={cellState(index)}>
+							{index < password.length ? (revealed ? password[index] : '•') : index === password.length && state === 'typing' ? <span className="hud-caret" /> : null}
+						</span>
+					))}
+				</div>
+				<button
+					type="button"
+					onClick={() => setRevealed((current) => !current)}
+					aria-label={revealed ? 'Hide password' : 'Show password'}
+					aria-pressed={revealed}
+					className="shrink-0 p-1 text-fg-3 transition-colors duration-150 hover:text-accent"
+				>
+					{revealed ? <EyeOff size={18} /> : <Eye size={18} />}
+				</button>
 			</div>
 			{error && <p className="hud-enter-type text-danger text-xs">{error}</p>}
 			<div className="mt-1 flex gap-2">
@@ -101,9 +113,18 @@ export default function CreatorMenu({ creator, sessionTitle, context, keyHandler
 	if (!open && unlockedView !== unlocked) setUnlockedView(unlocked);
 	const leaving = shown && !open;
 
-	const arrowHandler = useRef(null);
+	const arrowHandlerRef = useRef(null);
+	const passwordRef = useRef(null);
 	useEffect(() => {
-		keyHandlerRef.current = (event) => {
+		const handle = (event) => {
+			if (!unlockedView) {
+				if (event.code === 'Escape') {
+					close();
+					return true;
+				}
+				passwordRef.current?.focus();
+				return false;
+			}
 			if (event.code === 'Escape') {
 				close();
 				return true;
@@ -113,12 +134,14 @@ export default function CreatorMenu({ creator, sessionTitle, context, keyHandler
 				setTabIndex(Number(digit[1]) - 1);
 				return true;
 			}
-			if ((event.code === 'ArrowUp' || event.code === 'ArrowDown') && arrowHandler.current) {
-				arrowHandler.current(event.code === 'ArrowUp' ? -1 : 1);
+			if ((event.code === 'ArrowUp' || event.code === 'ArrowDown') && arrowHandlerRef.current) {
+				arrowHandlerRef.current(event.code === 'ArrowUp' ? -1 : 1);
 				return true;
 			}
 			return false;
 		};
+		handle.locked = !unlockedView;
+		keyHandlerRef.current = handle;
 		return () => { keyHandlerRef.current = null; };
 	}, [keyHandlerRef, close, unlockedView]);
 
@@ -139,7 +162,7 @@ export default function CreatorMenu({ creator, sessionTitle, context, keyHandler
 		>
 			<div className="contents" onClick={(event) => event.stopPropagation()}>
 				{!unlockedView ? (
-					<LockPanel onUnlock={handleUnlock} onCancel={close} />
+					<LockPanel onUnlock={handleUnlock} onCancel={close} inputRef={passwordRef} />
 				) : (
 					<div className="world-hud-panel hud-enter-scale flex max-h-[88%] w-[min(64rem,96%)] flex-col px-6 py-5">
 						<div className="flex items-end justify-between gap-4">
@@ -156,7 +179,7 @@ export default function CreatorMenu({ creator, sessionTitle, context, keyHandler
 						</div>
 						<span className="hud-rule hud-enter-rule my-4 w-full origin-left" />
 
-						<div className="grid min-h-0 flex-1 grid-cols-[11rem_1fr] gap-5">
+						<div className="grid min-h-0 flex-1 grid-cols-[11rem_1fr] grid-rows-[minmax(0,1fr)] gap-5">
 							<nav className="relative flex flex-col gap-1 border-r border-line-1 pr-4">
 								<span
 									className="pointer-events-none absolute left-0 right-4 border border-accent/60 bg-accent/10 transition-transform duration-[250ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
@@ -182,11 +205,13 @@ export default function CreatorMenu({ creator, sessionTitle, context, keyHandler
 								</div>
 							</nav>
 
-							<div className="custom-scrollbar flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
-								<div key={TABS[tabIndex].id} className="hud-enter-fade min-h-0">
-									{overview ? <Component overview={overview} creator={creator} context={context} arrowHandler={arrowHandler} itemsHolder={itemsHolder} openItems={(holder) => { setItemsHolder(holder); setTabIndex(3); }} /> : <p className="world-hud-label py-10 text-center text-fg-3">Loading…</p>}
+							<div className="flex min-h-0 flex-col gap-4">
+								<div key={TABS[tabIndex].id} className="hud-enter-fade custom-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
+									{overview ? <Component overview={overview} creator={creator} context={context} arrowHandlerRef={arrowHandlerRef} itemsHolder={itemsHolder} openItems={(holder) => { setItemsHolder(holder); setTabIndex(3); }} /> : <p className="world-hud-label py-10 text-center text-fg-3">Loading…</p>}
 								</div>
-								<CreatorLog entries={log} />
+								<div className="shrink-0">
+									<CreatorLog entries={log} />
+								</div>
 							</div>
 						</div>
 					</div>

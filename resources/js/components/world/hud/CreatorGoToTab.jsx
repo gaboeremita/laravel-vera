@@ -86,7 +86,7 @@ export default function CreatorGoToTab({ overview, context }) {
 	const highlightedZone = region.zones.find((zone) => zone.id === highlighted) ?? null;
 	const goToZone = async (zone) => {
 		const middle = outlineCentroid(zone.outline);
-		setPulse({ key: Date.now(), ...middle });
+		setPulse((current) => ({ key: (current?.key ?? 0) + 1, ...middle }));
 		return context.goTo({ regionId: region.id, zoneId: zone.id });
 	};
 

@@ -14,22 +14,24 @@
 
 - Q: What does grabbing any object give the player? → A: Both: any item of the world goes into the player's inventory, and any object's inventory can be opened from any distance to take what's inside. Placed objects themselves never become items.
 - Q: Is making the existing HUD follow the theme part of this feature? → A: Yes. The whole HUD (inventory, quest log, pause screen, zone title card, location readout, passage confirmation, control hints and the Creator menu) uses shared classes that each theme styles, all in this feature.
+- Q: Where does the creator password live? → A: On the world, set on its create and edit page; it unlocks the Creator menu and creator mode in that world's conversations. Outside any world, the character decides from its own prompt sections, which are always sent.
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Open and unlock the Creator menu (Priority: P1)
 
-Inside a world session, the player presses T. The first time in that session, the Creator menu asks for the creator password set in Settings. With the right password the menu opens and stays unlocked for the rest of that session, including after leaving and coming back. While the menu is open the world is paused. Pressing T again, or closing the menu, resumes play.
+Inside a world session, the player presses T. The first time in that session, the Creator menu asks for the world's creator password, set on the world's create or edit page. With the right password the menu opens and stays unlocked for the rest of that session, including after leaving and coming back. While the menu is open the world is paused. Pressing T again, or closing the menu, resumes play.
 
 **Why this priority**: Every other power lives in this menu; nothing else works without it.
 
-**Independent Test**: Set a creator password in Settings, enter a world session, press T, type the password and confirm the menu opens. Close it, press T again and confirm it opens without asking. Reload the page and confirm it still opens without asking. Open a different session and confirm it asks again.
+**Independent Test**: Set a creator password on the world's edit page, enter a world session, press T, type the password and confirm the menu opens. Close it, press T again and confirm it opens without asking. Reload the page and confirm it still opens without asking. Open a different session and confirm it asks again.
 
 **Acceptance Scenarios**:
 
 1. **Given** a session that was never unlocked, **When** the player presses T, **Then** the menu asks for the creator password and shows no powers until it is given.
 2. **Given** the password prompt, **When** the player types a wrong password, **Then** the menu stays locked and says the password is wrong.
-3. **Given** no creator password is set in Settings, **When** the player presses T, **Then** the menu says a creator password must first be set in Settings.
+2a. **Given** the password prompt, **When** the player types a password containing T, **Then** each T goes into the password and the menu stays open.
+3. **Given** the world has no creator password, **When** the player unlocks, **Then** the menu says a creator password must first be set for this world.
 4. **Given** an unlocked session, **When** the player presses T, **Then** the menu opens at once and the world pauses; **When** they press T again, **Then** the menu closes and play resumes.
 5. **Given** the player is typing in a chat or a text field, **When** they type the letter T, **Then** the menu does not open.
 6. **Given** a session unlocked from the world, **When** the player chats with a resident, **Then** creator mode in that conversation is unchanged; unlocking in a conversation likewise leaves the menu locked.
@@ -175,8 +177,8 @@ The player picks a theme in Settings and enters a world. Every piece of interfac
 - The target region has no environment asset: the jump is refused with a message saying so.
 - A resident who is in the middle of a conversation with another resident is summoned or sent away: that conversation ends.
 - The resident the player is chatting with is sent away: the chat closes.
-- The creator password is changed in Settings after a session was unlocked: the session stays unlocked.
-- A session started before the creator password is cleared in Settings: it stays unlocked; new sessions can't be unlocked until a password is set again.
+- The world's creator password is changed after a session was unlocked: the session stays unlocked.
+- The world's creator password is cleared: unlocked sessions stay unlocked; other sessions can't be unlocked until a password is set again.
 - A quest that is already active is started again: it is refused with a message saying it is already active.
 - An item is put into an object that has no inventory yet: the object gets one.
 - Flying is on when the player jumps somewhere: flying stays on at the arrival point.
@@ -188,7 +190,7 @@ The player picks a theme in Settings and enters a world. Every piece of interfac
 
 **Menu and unlocking**
 
-- **FR-001**: Pressing T in a world session MUST toggle the Creator menu, except while the player is typing in a text field or chat.
+- **FR-001**: Pressing T in a world session MUST toggle the Creator menu, except while the player is typing in a text field or chat. While the password prompt shows, every key goes to the password, T included, and only Escape or Cancel closes the menu.
 - **FR-002**: The menu MUST ask for the creator password the first time it is opened in a session and show no powers until the right password is given.
 - **FR-003**: A session unlocked once MUST stay unlocked for its whole life, across reloads.
 - **FR-004**: Unlocking a session MUST NOT change creator mode in any conversation, and turning on creator mode in a conversation MUST NOT unlock the menu.
@@ -253,6 +255,12 @@ The player picks a theme in Settings and enters a world. Every piece of interfac
 - **FR-042**: No HUD component MAY fix any FR-040 value itself (corner radius, glow shadows, label spacing); every one MUST come from the shared classes.
 - **FR-043**: The HUD's reduced-motion behaviour MUST stay as it is in every theme.
 
+**Creator password**
+
+- **FR-044**: Each world MUST have its own creator password, set, changed or cleared on the world's create and edit page with a show-password toggle, stored hashed and never returned.
+- **FR-045**: In a world's conversations, `[creator mode: "password"]` MUST be checked against that world's password. Outside any world the server MUST leave the tag as typed and send the assistant's creator mode and trigger prompt sections, so the character judges it.
+- **FR-046**: Whenever the creator summons a resident, sends them to a zone or home, or carries them along on a jump to another region, the resident MUST react to it through their own model, with their prompt, world context, where they were and where they are now; they learn only that something happened in between, never who moved them or how. The reaction is stored in their conversation with the user, spoken over their head when they're in the player's region, and may change how they feel about the user.
+
 ### Key Entities
 
 - **World session**: gains the moment it was unlocked for the Creator menu (unlocked when set) and which residents are frozen.
@@ -276,7 +284,7 @@ The player picks a theme in Settings and enters a world. Every piece of interfac
 ## Assumptions
 
 - Theme selection already exists in Settings; this feature adds no new theme and no theme setting.
-- The creator password is the one already set in Settings for creator mode in conversations; no second password is introduced.
+- The creator password belongs to the world: it is set on the world's create and edit page, and the same password turns on creator mode in that world's conversations. Outside any world the server checks no password: the assistant's own creator mode and trigger prompt sections are always sent, and the character judges the trigger itself.
 - The menu is available only on the world page, in a world session; the world editor is unchanged.
 - The world's own setup (regions, zones, objects, residents' configuration, quests' definitions) is never changed by the menu; every power changes this session only.
 - Flying, faster walking and the zone overlay belong to the open page and turn off when the page is reloaded.

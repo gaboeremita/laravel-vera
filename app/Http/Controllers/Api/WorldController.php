@@ -30,6 +30,7 @@ class WorldController extends Controller
             'assistant_context_prompt' => $validated['assistantContextPrompt'],
             'npc_context_prompt' => $validated['npcContextPrompt'],
             'sentiment_definitions' => $this->sentimentDefinitions($validated['sentimentDefinitions'] ?? []),
+            'creator_password' => filled($validated['creatorPassword'] ?? null) ? $validated['creatorPassword'] : null,
         ]));
 
         return response()->json((new WorldResource($world))->resolve(), 201);
@@ -71,6 +72,11 @@ class WorldController extends Controller
                 'review_reveals' => $validated['reviewReveals'] ?? $world->review_reveals,
                 'sentiment_definitions' => isset($validated['sentimentDefinitions']) ? $this->sentimentDefinitions($validated['sentimentDefinitions']) : $world->sentiment_definitions,
             ]);
+            if (filled($validated['creatorPassword'] ?? null)) {
+                $world->update(['creator_password' => $validated['creatorPassword']]);
+            } elseif ($validated['clearCreatorPassword'] ?? false) {
+                $world->update(['creator_password' => null]);
+            }
         });
 
         return $this->show($world->fresh());
