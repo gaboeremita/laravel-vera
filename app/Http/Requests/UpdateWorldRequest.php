@@ -34,6 +34,8 @@ class UpdateWorldRequest extends FormRequest
             'spawnRegionId' => ['nullable', 'integer', 'required_with:spawnPassageId'],
             'spawnPassageId' => ['nullable', 'string', 'required_with:spawnRegionId'],
             'reviewReveals' => ['sometimes', 'boolean'],
+            'creatorPassword' => ['nullable', 'string', 'min:8', 'max:200'],
+            'clearCreatorPassword' => ['sometimes', 'boolean'],
             'narratorModelId' => ['nullable', 'integer', Rule::exists('ai_models', 'id')->whereIn('provider_id', AiProvider::where('user_id', $this->user()->id)->pluck('id')->all())],
             ...self::sentimentDefinitionRules(),
         ];

@@ -7,7 +7,8 @@
         "dev": "vite",
         "lint": "eslint .",
         "test:world-collision": "node --test tests/Unit/WorldCollision.test.js",
-        "test:term-highlights": "node --test tests/Unit/TermHighlights.test.js"
+        "test:term-highlights": "node --test tests/Unit/TermHighlights.test.js",
+        "test:zone-landing": "node --test tests/Unit/ZoneLanding.test.js"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

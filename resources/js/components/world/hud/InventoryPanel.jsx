@@ -118,8 +118,8 @@ export default function InventoryPanel({ worldId, sessionId, inventory, busyItem
 									key={item.id}
 									type="button"
 									onClick={() => setTab(item.id)}
-									className={`border-b-2 px-3 py-1 text-[0.65rem] tracking-[0.16em] transition-colors cursor-pointer ${tab === item.id ? 'border-accent text-accent' : 'border-transparent text-fg-3 hover:text-fg-1'}`}
-									style={{ borderRadius: 0 }}
+									className={`border-b-2 px-3 py-1 text-[0.65rem] hud-text tracking-[calc(var(--hud-label-tracking)*1)] transition-colors cursor-pointer ${tab === item.id ? 'border-accent text-accent' : 'border-transparent text-fg-3 hover:text-fg-1'}`}
+									style={{ borderRadius: 'calc(var(--hud-radius) / 2)' }}
 								>
 									{item.label}
 								</button>
@@ -128,10 +128,10 @@ export default function InventoryPanel({ worldId, sessionId, inventory, busyItem
 					</div>
 					<div className="text-right">
 						<span className="world-hud-label">CREDITS</span>
-						<p className="world-hud-glow font-display text-3xl font-semibold tabular-nums tracking-[0.06em]">{formatAmount(inventory?.credits)}</p>
+						<p className="world-hud-glow font-display text-3xl font-semibold tabular-nums tracking-[calc(var(--hud-label-tracking)*0.375)]">{formatAmount(inventory?.credits)}</p>
 					</div>
 				</div>
-				<span className="hud-enter-rule my-4 block h-px w-full origin-left bg-gradient-to-r from-accent via-accent/40 to-transparent" />
+				<span className="hud-enter-rule my-4 hud-rule w-full origin-left" />
 
 				<div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar pr-1">
 					{tab === 'history' ? (
@@ -154,8 +154,8 @@ export default function InventoryPanel({ worldId, sessionId, inventory, busyItem
 											aria-selected={active}
 											onMouseEnter={() => setHighlighted(itemIndex)}
 											onClick={() => setHighlighted(itemIndex)}
-											className={`hud-enter-rise relative flex flex-col items-center gap-2 border px-2 pb-2 pt-3 transition-colors cursor-pointer ${active ? 'world-hud-shimmer border-accent/60 bg-accent/10 shadow-[0_0_16px_color-mix(in_oklab,var(--accent)_25%,transparent)]' : 'border-line-1 hover:border-accent/40'}`}
-											style={{ animationDelay: `${Math.min(itemIndex, 12) * 25}ms`, borderRadius: 0 }}
+											className={`hud-enter-rise relative flex flex-col items-center gap-2 border px-2 pb-2 pt-3 transition-colors cursor-pointer ${active ? 'world-hud-shimmer border-accent/60 bg-accent/10 shadow-[0_0_calc(16px*var(--hud-glow))_color-mix(in_oklab,var(--accent)_calc(25%*var(--hud-glow)),transparent)]' : 'border-line-1 hover:border-accent/40'}`}
+											style={{ animationDelay: `${Math.min(itemIndex, 12) * 25}ms`, borderRadius: 'calc(var(--hud-radius) / 2)' }}
 										>
 											<ItemThumb item={item} size="lg" />
 											<span className={`w-full truncate text-center text-xs ${active ? 'text-fg-1' : 'text-fg-2'}`}>{item.name}</span>
@@ -167,19 +167,19 @@ export default function InventoryPanel({ worldId, sessionId, inventory, busyItem
 							{selected && (
 								<div key={selected.itemId} className="hud-enter-fade flex flex-col border-l border-accent/20 pl-5">
 									{selected.madeBy && selected.cardImageUrl ? (
-										<button type="button" onClick={() => setViewing(selected)} className="group block w-full border border-line-1 hover:border-accent/60 transition-colors cursor-zoom-in" style={{ borderRadius: 0 }}>
+										<button type="button" onClick={() => setViewing(selected)} className="group block w-full border border-line-1 hover:border-accent/60 transition-colors cursor-zoom-in" style={{ borderRadius: 'calc(var(--hud-radius) / 2)' }}>
 											<img src={selected.cardImageUrl} alt={selected.name} className="block max-h-56 w-full object-contain" />
 										</button>
 									) : (
 										<ItemThumb item={selected} size="lg" className="!h-24 !w-24" />
 									)}
-									<h3 className="world-hud-glow mt-3 font-display text-xl font-semibold uppercase tracking-[0.08em]">{selected.name}</h3>
+									<h3 className="world-hud-glow mt-3 font-display text-xl font-semibold uppercase tracking-[calc(var(--hud-label-tracking)*0.5)]">{selected.name}</h3>
 									{selected.madeBy && <span className="world-hud-label mt-1">by {selected.madeBy}</span>}
 									<span className="world-hud-label mt-1 text-fg-3">×{formatAmount(selected.quantity)}{selected.basePrice !== null ? ` · WORTH ABOUT ${selected.basePrice} CR` : ''}</span>
 									<p className="mt-3 text-sm leading-relaxed text-fg-1/85">{selected.description}</p>
 									<div className="mt-auto space-y-2 pt-5">
 										{selected.canExamine && (
-											<button type="button" disabled={busyItemId === selected.itemId} onClick={() => onExamine(selected)} className="world-hud-panel flex w-full items-center gap-3 px-4 py-2 text-left text-[0.7rem] tracking-[0.16em] text-fg-1 hover:text-accent cursor-pointer disabled:opacity-40">
+											<button type="button" disabled={busyItemId === selected.itemId} onClick={() => onExamine(selected)} className="world-hud-panel flex w-full items-center gap-3 px-4 py-2 text-left text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*1)] text-fg-1 hover:text-accent cursor-pointer disabled:opacity-40">
 												<span className="world-hud-key">X</span><span>EXAMINE</span>
 											</button>
 										)}
@@ -192,12 +192,12 @@ export default function InventoryPanel({ worldId, sessionId, inventory, busyItem
 													placeholder="What do you do? (optional)"
 													className="w-full border border-accent/40 bg-bg-0/70 px-3 py-2 text-sm text-fg-1 outline-none focus:border-accent"
 												/>
-												<button type="submit" disabled={busyItemId === selected.itemId} className="world-hud-panel flex w-full items-center gap-3 px-4 py-2 text-left text-[0.7rem] tracking-[0.16em] text-fg-1 hover:text-accent cursor-pointer disabled:opacity-40">
+												<button type="submit" disabled={busyItemId === selected.itemId} className="world-hud-panel flex w-full items-center gap-3 px-4 py-2 text-left text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*1)] text-fg-1 hover:text-accent cursor-pointer disabled:opacity-40">
 													<span className="world-hud-key">ENTER</span><span>{busyItemId === selected.itemId ? 'TRYING...' : 'TRY IT'}</span>
 												</button>
 											</form>
 										) : (
-											<button type="button" disabled={busyItemId === selected.itemId} onClick={() => { setAttempting(true); setTimeout(() => attemptRef.current?.focus(), 0); }} className="world-hud-panel flex w-full items-center gap-3 px-4 py-2 text-left text-[0.7rem] tracking-[0.16em] text-fg-1 hover:text-accent cursor-pointer disabled:opacity-40">
+											<button type="button" disabled={busyItemId === selected.itemId} onClick={() => { setAttempting(true); setTimeout(() => attemptRef.current?.focus(), 0); }} className="world-hud-panel flex w-full items-center gap-3 px-4 py-2 text-left text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*1)] text-fg-1 hover:text-accent cursor-pointer disabled:opacity-40">
 												<span className="world-hud-key">ENTER</span><span>USE</span>
 											</button>
 										))}

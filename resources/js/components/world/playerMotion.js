@@ -18,8 +18,21 @@ export function nextMovementMode({ current, runHeld, crouchToggled, waterDepth, 
 	return runHeld && moving ? 'running' : 'walking';
 }
 
-export function movementSpeed(mode) {
-	return WALK_SPEED * (SPEED_FACTORS[mode] ?? 1);
+export const FAST_WALK_MULTIPLIER = 4;
+export const FLY_VERTICAL_SPEED = 6;
+
+export function movementSpeed(mode, fast = false) {
+	return WALK_SPEED * (SPEED_FACTORS[mode] ?? 1) * (fast ? FAST_WALK_MULTIPLIER : 1);
+}
+
+/** One step of free flight: across along the direction, up or down while rising or descending is held. */
+export function flyingStep(position, direction, rising, descending, step) {
+	const vertical = (rising ? 1 : 0) - (descending ? 1 : 0);
+	return {
+		x: position.x + direction.x * step,
+		y: position.y + vertical * FLY_VERTICAL_SPEED * step,
+		z: position.z + direction.z * step,
+	};
 }
 
 export function eyeHeightFor(mode) {

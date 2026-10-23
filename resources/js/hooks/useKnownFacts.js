@@ -31,5 +31,7 @@ export default function useKnownFacts(worldId, sessionId, addToast) {
 		setKnownFacts((current) => [...learnedFacts, ...current.filter((fact) => !learnedFacts.some((learned) => learned.factId === fact.factId))]);
 	}, [addToast]);
 
-	return { knownFacts, applyLearnedFacts };
+	const forgetFact = useCallback((factId) => setKnownFacts((current) => current.filter((fact) => fact.factId !== factId)), []);
+
+	return { knownFacts, applyLearnedFacts, forgetFact };
 }

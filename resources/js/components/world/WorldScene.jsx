@@ -9,6 +9,8 @@ import { floorBounds } from './worldMapProjection.js';
 import { freezeClock, resumeClock } from './pauseClock.js';
 import FirstPersonController from './FirstPersonController.jsx';
 import NameTags from './NameTags.jsx';
+import ZoneOverlay from './ZoneOverlay.jsx';
+import ArrivalRing from './ArrivalRing.jsx';
 import ThoughtBubble from './ThoughtBubble.jsx';
 import { OffscreenIndicatorTracker } from './OffscreenIndicator.jsx';
 import InteractionSystem from './InteractionSystem.jsx';
@@ -198,8 +200,9 @@ function NavigationBuilder({ layout, environment, fileUrl, navigationRef }) {
 }
 
 const NO_PASSAGES = [];
+const NO_ARRIVALS = [];
 
-export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, initialFacing = null, linkedPassageIds, onEnterPassage, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands, occupiedSpots, residentStates = {}, thoughts = {}, speech = {}, playerState, playerCommands, collisionWorldRef, onMovementChange, onGetUpIntent, onMoveIntent, onLocationChange, focusLabelRef, focusEnabled = true, focusedObjectId = null, nearbyObjectIds = [], onFocusChange, onNearbyChange, watchedObjectId = null, onWatchedOutOfReach, paused = false, onResidentVoice, statsRef = null, residentDetails = null, onBlockedByObject }) {
+export default function WorldScene({ world, explorationEnabled, onReady, onError, onResidentChange, onInteract, activePose, initialPosition, initialFacing = null, linkedPassageIds, onEnterPassage, onPlayerPositionChange, residentPositions, activeResidentId = null, onEndConversation, residentVoices, playerView, offscreenIndicator, onFloorMaps, navigation, residentCommands, occupiedSpots, residentStates = {}, thoughts = {}, speech = {}, playerState, playerCommands, collisionWorldRef, onMovementChange, onGetUpIntent, onMoveIntent, onLocationChange, focusLabelRef, focusEnabled = true, focusedObjectId = null, nearbyObjectIds = [], onFocusChange, onNearbyChange, watchedObjectId = null, onWatchedOutOfReach, paused = false, onResidentVoice, statsRef = null, residentDetails = null, onBlockedByObject, showZones = false, arrivals = NO_ARRIVALS, onArrivalDone }) {
 	const [environment, setEnvironment] = useState(null);
 	const audioListener = useRef(null);
 	const [playerPosition, setPlayerPosition] = useState([0, 1.6, 4]);
@@ -242,6 +245,8 @@ export default function WorldScene({ world, explorationEnabled, onReady, onError
 					<PassageTracker passages={world.layout?.passages ?? NO_PASSAGES} linkedPassageIds={linkedPassageIds} playerState={playerState} enabled={explorationEnabled} onEnter={onEnterPassage} />
 					<FocusTracker layout={world.layout} playerState={playerState} enabled={explorationEnabled && focusEnabled} labelRef={focusLabelRef} onFocusChange={onFocusChange} onNearbyChange={onNearbyChange} watchedObjectId={watchedObjectId} onWatchedOutOfReach={onWatchedOutOfReach} />
 					<SpotBeacons layout={world.layout} focusedObjectId={focusedObjectId} nearbyIds={nearbyObjectIds} occupiedSpots={occupiedSpots} collisionWorld={environment.collisionWorld} />
+					{showZones && <ZoneOverlay layout={world.layout} />}
+					<ArrivalRing arrivals={arrivals} residentPositions={residentPositions} onDone={onArrivalDone} />
 					<NameTags residents={world.residents} residentPositions={residentPositions} activeResidentId={activeResidentId} />
 					<ThoughtBubble thoughts={thoughts} residentPositions={residentPositions} />
 					<ThoughtBubble thoughts={speech} residentPositions={residentPositions} variant="speech" />

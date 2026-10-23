@@ -68,6 +68,10 @@ class ResidentDecisionController extends Controller
         $assistant = $worldResident->assistant;
         $validated = $request->validated();
 
+        if ($worldSession->isFrozen($worldResident)) {
+            return response()->json(['message' => 'This resident is frozen.'], 409);
+        }
+
         if ($worldResident->behavior !== WorldResidentBehavior::Autonomous) {
             return response()->json(['message' => 'Only autonomous residents decide what to do on their own.'], 422);
         }

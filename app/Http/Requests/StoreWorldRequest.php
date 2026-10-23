@@ -28,6 +28,7 @@ class StoreWorldRequest extends FormRequest
             'description' => ['required', 'string'],
             'assistantContextPrompt' => ['required', 'string'],
             'npcContextPrompt' => ['required', 'string'],
+            'creatorPassword' => ['nullable', 'string', 'min:8', 'max:200'],
             ...UpdateWorldRequest::sentimentDefinitionRules(),
         ];
     }

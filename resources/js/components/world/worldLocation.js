@@ -2,7 +2,7 @@ export function floorAt(layout, y) {
 	return layout?.floors?.find((floor) => y >= floor.minY && y < floor.maxY) ?? null;
 }
 
-function insideOutline(outline, x, z) {
+export function insideOutline(outline, x, z) {
 	let inside = false;
 	for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
 		const [xi, zi] = outline[i];

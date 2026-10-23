@@ -57,9 +57,9 @@ export default function InspectCard({ card, highlightedIndex, onHighlight, onCho
 			onAnimationEnd={(event) => { if (closing && event.target === event.currentTarget) setShown(null); }}
 		>
 			<span className="world-hud-label">{kind === 'zone' ? 'LOCATION' : 'OBJECT'}</span>
-			<h3 className="world-hud-glow mt-1 font-display text-2xl font-semibold uppercase tracking-[0.08em]">{title}</h3>
+			<h3 className="world-hud-glow mt-1 font-display text-2xl font-semibold uppercase tracking-[calc(var(--hud-label-tracking)*0.5)]">{title}</h3>
 			{contextLine && <span className="world-hud-label mt-1 text-fg-3">{contextLine}</span>}
-			<span className="hud-enter-rule my-3 block h-px w-full origin-left bg-gradient-to-r from-accent via-accent/40 to-transparent" />
+			<span className="hud-enter-rule my-3 hud-rule w-full origin-left" />
 			<p className="text-fg-1/85 text-sm leading-relaxed">{description}</p>
 
 			<div className="mt-4 min-h-0 overflow-y-auto">
@@ -70,10 +70,10 @@ export default function InspectCard({ card, highlightedIndex, onHighlight, onCho
 				) : (
 					<div role="listbox" className="relative">
 						<div
-							className="world-hud-shimmer pointer-events-none absolute inset-x-0 top-0 border border-accent/40 bg-accent/10 shadow-[0_0_18px_color-mix(in_oklab,var(--accent)_30%,transparent)] transition-transform duration-[120ms] ease-out"
+							className="world-hud-shimmer pointer-events-none absolute inset-x-0 top-0 border border-accent/40 bg-accent/10 shadow-[0_0_calc(18px*var(--hud-glow))_color-mix(in_oklab,var(--accent)_calc(30%*var(--hud-glow)),transparent)] transition-transform duration-[120ms] ease-out"
 							style={{ height: `${ROW_HEIGHT_REM}rem`, transform: `translateY(${highlightedIndex * ROW_HEIGHT_REM}rem)` }}
 						>
-							<span className="absolute inset-y-0 left-0 w-[3px] bg-accent shadow-[0_0_10px_var(--accent)]" />
+							<span className="absolute inset-y-0 left-0 w-[3px] bg-accent hud-glow-md" />
 						</div>
 						{rows.map((row, index) => {
 							const highlighted = index === highlightedIndex;
@@ -86,12 +86,12 @@ export default function InspectCard({ card, highlightedIndex, onHighlight, onCho
 									onMouseEnter={() => onHighlight(index)}
 									onClick={() => onChoose(index)}
 									className={`hud-enter-rise relative flex w-full items-center gap-3 px-3 text-left transition-colors duration-[120ms] ${highlighted ? 'text-fg-1' : 'text-fg-2 hover:text-fg-1'}`}
-									style={{ height: `${ROW_HEIGHT_REM}rem`, animationDelay: `${index * 40}ms`, borderRadius: 0 }}
+									style={{ height: `${ROW_HEIGHT_REM}rem`, animationDelay: `${index * 40}ms`, borderRadius: 'calc(var(--hud-radius) / 2)' }}
 								>
 									{row.kind === 'take'
 										? <ItemThumb item={row.item} size="sm" className="!h-6 !w-6 !text-[0.6rem]" />
 										: <span className={highlighted ? 'text-accent' : 'text-fg-3'}><PostureGlyph posture={row.posture} /></span>}
-									<span className="flex-1 truncate text-sm tracking-[0.04em]">{row.name}</span>
+									<span className="flex-1 truncate text-sm tracking-[calc(var(--hud-label-tracking)*0.25)]">{row.name}</span>
 									{row.requires && <span className="world-hud-label border border-accent/30 px-1 text-fg-2" title={`Needs the ${row.requires}`}>⚿ {row.requires}</span>}
 									{row.price && <span className="world-hud-label text-accent">{row.price}</span>}
 									{row.availability && (

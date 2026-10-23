@@ -8,6 +8,7 @@ use App\Models\Region;
 use App\Models\User;
 use App\Models\World;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
@@ -141,4 +142,37 @@ it('tells the world which resident poses hold', function () {
         ->assertSuccessful()
         ->assertJsonPath('residents.0.assistant.poses.0.hold', false)
         ->assertJsonPath('residents.0.assistant.poses.1.hold', true);
+});
+
+it('sets the creator password when creating a world, stored hashed and never returned', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson(route('worlds.store'), worldPayload(['creatorPassword' => 'lighthouse keeper']))
+        ->assertCreated()
+        ->assertJsonPath('creatorPasswordSet', true)
+        ->assertJsonMissingPath('creatorPassword')
+        ->assertJsonMissingPath('creator_password');
+
+    $stored = $user->worlds()->first()->getAttributes()['creator_password'];
+    expect($stored)->not->toBe('lighthouse keeper')->and(Hash::check('lighthouse keeper', $stored))->toBeTrue();
+});
+
+it('changes the creator password with the world, keeps it when left empty, and clears it', function () {
+    $user = User::factory()->create();
+    $region = Region::factory()->forUser($user)->create();
+    $world = $region->world;
+    $route = route('worlds.update', $world->id);
+
+    $this->actingAs($user)->patchJson($route, worldPayload(['creatorPassword' => 'a new tide rises']))->assertSuccessful()->assertJsonPath('creatorPasswordSet', true);
+    expect(Hash::check('a new tide rises', $world->fresh()->creator_password))->toBeTrue();
+
+    $this->patchJson($route, worldPayload(['creatorPassword' => null]))->assertSuccessful()->assertJsonPath('creatorPasswordSet', true);
+    expect(Hash::check('a new tide rises', $world->fresh()->creator_password))->toBeTrue();
+
+    $this->patchJson($route, worldPayload(['clearCreatorPassword' => true]))->assertSuccessful()->assertJsonPath('creatorPasswordSet', false);
+    expect($world->fresh()->creator_password)->toBeNull();
+});
+
+it('refuses a creator password that is too short', function () {
+    $this->actingAs(User::factory()->create())->postJson(route('worlds.store'), worldPayload(['creatorPassword' => 'short']))->assertJsonValidationErrors('creatorPassword');
 });

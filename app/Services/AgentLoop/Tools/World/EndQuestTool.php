@@ -2,9 +2,8 @@
 
 namespace App\Services\AgentLoop\Tools\World;
 
-use App\Actions\Quests\EndQuestRun;
+use App\Actions\Creator\EndQuestAsCreator;
 use App\Enums\QuestStatus;
-use RuntimeException;
 
 class EndQuestTool extends CreatorQuestTool
 {
@@ -29,13 +28,7 @@ class EndQuestTool extends CreatorQuestTool
 
     public function handle(array $arguments): array
     {
-        $run = $this->latestRun($this->quest($arguments));
-        if ($run?->status !== QuestStatus::Active) {
-            throw new RuntimeException('That quest isn\'t going on.');
-        }
-
-        app(EndQuestRun::class)->handle($run, ($arguments['outcome'] ?? '') === 'failed' ? QuestStatus::Failed : QuestStatus::Completed, ['by' => 'creator'], byCreator: true);
-        $this->broadcast($run);
+        app(EndQuestAsCreator::class)->handle($this->session, $this->quest($arguments), ($arguments['outcome'] ?? '') === 'failed' ? QuestStatus::Failed : QuestStatus::Completed);
 
         return ['status' => 'ended'];
     }

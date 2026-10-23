@@ -80,3 +80,26 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
+
+[data-theme="grimoire"] {
+  --hud-radius: 18px;
+  --hud-chip-radius: 999px;
+  --hud-corner-marks: 0;
+  --hud-scanlines: 0;
+  --hud-glow: 0;
+  --hud-shadow: 0 20px 50px oklch(25% 0.04 50 / 0.45), inset 0 0 40px oklch(80% 0.04 70 / 0.5);
+  --hud-border-style: 3px double;
+  --hud-panel-opacity: 94%;
+  --hud-label-transform: lowercase;
+  --hud-label-tracking: 0.1em;
+  --hud-label-variant: small-caps;
+  --hud-label-size: 0.85rem;
+  --hud-title-tracking: 0.14em;
+  --hud-title-weight: 600;
+  --hud-primary-fill: 1;
+  --hud-avatar-radius: 50%;
+  --hud-rule-lines: 2;
+  --hud-caret-width: 1.5px;
+  --hud-caret-radius: 1px;
+  --hud-caret-blink: hud-caret-fade 1.6s ease-in-out infinite;
+}

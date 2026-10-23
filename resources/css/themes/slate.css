@@ -60,3 +60,26 @@
   & .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
   & .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
 }
+
+[data-theme="slate"] {
+  --hud-radius: 8px;
+  --hud-chip-radius: 4px;
+  --hud-corner-marks: 0;
+  --hud-scanlines: 0;
+  --hud-glow: 0;
+  --hud-shadow: 0 12px 32px oklch(22% 0.02 240 / 0.28);
+  --hud-border-style: 1px solid;
+  --hud-panel-opacity: 96%;
+  --hud-label-transform: uppercase;
+  --hud-label-tracking: 0.06em;
+  --hud-label-variant: normal;
+  --hud-label-size: 0.64rem;
+  --hud-title-tracking: 0;
+  --hud-title-weight: 600;
+  --hud-primary-fill: 1;
+  --hud-avatar-radius: 4px;
+  --hud-rule-lines: 1;
+  --hud-caret-width: 2px;
+  --hud-caret-radius: 0px;
+  --hud-caret-blink: hud-caret-fade 1s ease-in-out infinite;
+}

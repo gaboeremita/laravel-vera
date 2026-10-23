@@ -282,11 +282,11 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		<div className="flex h-full flex-col border border-line-1 bg-bg-0/90 backdrop-blur-sm">
 			<header className="flex items-center justify-between gap-3 border-b border-line-1 px-4 py-3">
 				<div className="min-w-0">
-					<p className="text-fg-3 text-[0.6rem] tracking-[0.12em]">TALKING WITH</p>
-					<p className="flex items-center gap-2 text-accent text-sm tracking-[0.05em]"><span className="h-2 w-2 shrink-0 rounded-full bg-accent" />{resident.assistant.name}</p>
+					<p className="text-fg-3 text-[0.6rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.75)]">TALKING WITH</p>
+					<p className="flex items-center gap-2 text-accent text-sm tracking-[calc(var(--hud-label-tracking)*0.3125)]"><span className="h-2 w-2 shrink-0 rounded-full bg-accent" />{resident.assistant.name}</p>
 				</div>
 				<div className="flex items-center gap-3">
-					{voiceStatus && <span className="text-accent text-[0.6rem] tracking-[0.12em]">{voiceStatus}</span>}
+					{voiceStatus && <span className="text-accent text-[0.6rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.75)]">{voiceStatus}</span>}
 					{worldSessionId && (
 						<button type="button" onClick={() => setIsGiveOpen((open) => !open)} title={`Give ${resident.assistant.name} credits or items`} aria-pressed={isGiveOpen} className={`cursor-pointer transition-colors ${isGiveOpen ? 'text-accent' : 'text-fg-3 hover:text-fg-1'}`}>
 							<Gift size={16} />
@@ -305,9 +305,9 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 				))}
 				{questOffer && (
 					<button type="button" onClick={() => onOpenQuestOffer?.()} className="hud-enter-rise flex w-full items-center gap-3 border border-accent/50 bg-accent/10 px-3 py-2 text-left cursor-pointer transition-colors hover:bg-accent/20">
-						<span className="h-2 w-2 shrink-0 rotate-45 border border-accent shadow-[0_0_8px_var(--accent)]" />
+						<span className="h-2 w-2 shrink-0 rotate-45 border border-accent hud-glow-sm" />
 						<span className="min-w-0 flex-1">
-							<span className="block text-accent text-[0.6rem] tracking-[0.16em]">A QUEST</span>
+							<span className="block text-accent text-[0.6rem] hud-text tracking-[calc(var(--hud-label-tracking)*1)]">A QUEST</span>
 							<span className="block truncate text-fg-1 text-sm">{questOffer.questTitle}</span>
 						</span>
 					</button>

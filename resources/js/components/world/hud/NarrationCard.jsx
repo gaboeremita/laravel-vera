@@ -34,23 +34,23 @@ export default function NarrationCard({ title, narration, succeeded, changes = [
 				className={`world-hud-panel px-6 py-5 ${leaving ? 'hud-exit-fade' : 'hud-enter-rise'}`}
 			>
 				<div className="flex items-center gap-3">
-					<span className={`h-1.5 w-1.5 rounded-full ${succeeded ? 'bg-accent shadow-[0_0_8px_var(--accent)]' : 'bg-danger shadow-[0_0_8px_var(--color-danger)]'}`} />
+					<span className={`h-1.5 w-1.5 rounded-full ${succeeded ? 'bg-accent hud-glow-sm' : 'bg-danger hud-glow-danger'}`} />
 					<span className="world-hud-label flex-1">{title}</span>
 					<button type="button" onClick={() => setLeaving(true)} aria-label="Close" className="relative z-10 text-fg-3 hover:text-accent transition-colors cursor-pointer">
 						<X size={16} />
 					</button>
 				</div>
-				<span className={`hud-enter-rule mt-3 mb-3 block h-px w-full origin-left bg-gradient-to-r ${succeeded ? 'from-accent via-accent/40' : 'from-danger via-danger/40'} to-transparent`} />
+				<span className={`hud-enter-rule mt-3 mb-3 hud-rule w-full origin-left ${succeeded ? '' : 'hud-rule-danger'}`} />
 				<p className="hud-enter-fade text-fg-1/90 text-sm leading-relaxed whitespace-pre-line" style={{ animationDelay: '120ms' }}>{narration}</p>
 				{changes.length > 0 && (
 					<div className="mt-4 flex flex-wrap gap-2">
 						{changes.map((change) => (
-							<span key={change} className={`border px-2 py-0.5 text-[0.65rem] tracking-[0.12em] ${change.startsWith('+') ? 'border-accent/40 text-accent' : 'border-danger/40 text-danger'}`}>{change}</span>
+							<span key={change} className={`border px-2 py-0.5 text-[0.65rem] hud-text tracking-[calc(var(--hud-label-tracking)*0.75)] ${change.startsWith('+') ? 'border-accent/40 text-accent' : 'border-danger/40 text-danger'}`}>{change}</span>
 						))}
 					</div>
 				)}
 				<div className="mt-5 flex justify-end">
-					<button type="button" onClick={() => setLeaving(true)} className="world-hud-panel relative z-10 flex items-center gap-3 px-5 py-2 text-fg-1 text-[0.7rem] tracking-[0.16em] hover:text-accent cursor-pointer">
+					<button type="button" onClick={() => setLeaving(true)} className="world-hud-panel relative z-10 flex items-center gap-3 px-5 py-2 text-fg-1 text-[0.7rem] hud-text tracking-[calc(var(--hud-label-tracking)*1)] hover:text-accent cursor-pointer">
 						<span className="world-hud-key">ENTER</span>
 						<span>OK</span>
 					</button>

@@ -2,10 +2,7 @@
 
 namespace App\Services\AgentLoop\Tools\World;
 
-use App\Actions\Quests\StartQuestRun;
-use App\Enums\QuestStatus;
-use App\Models\WorldSessionQuest;
-use RuntimeException;
+use App\Actions\Creator\StartQuestAsCreator;
 
 class StartQuestTool extends CreatorQuestTool
 {
@@ -26,17 +23,7 @@ class StartQuestTool extends CreatorQuestTool
 
     public function handle(array $arguments): array
     {
-        $quest = $this->quest($arguments);
-        $run = $this->latestRun($quest);
-        if ($run?->status === QuestStatus::Active) {
-            throw new RuntimeException('That quest is already going on.');
-        }
-        if ($run === null || $run->status->hasEnded()) {
-            $run = $this->session->questRuns()->create(['quest_id' => $quest->id, 'run' => ($run?->run ?? 0) + 1, 'status' => QuestStatus::Available, 'state' => WorldSessionQuest::EMPTY_STATE]);
-        }
-
-        app(StartQuestRun::class)->handle($run, 'creator', byCreator: true);
-        $this->broadcast($run);
+        app(StartQuestAsCreator::class)->handle($this->session, $this->quest($arguments));
 
         return ['status' => 'started'];
     }
