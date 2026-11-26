@@ -4,21 +4,33 @@ import { api } from '../utils/api.js';
 
 const EMPTY_STARTING = { player: { credits: 0, items: [] }, residents: {}, objects: {} };
 
+async function fetchArchiveEntries() {
+	const archivesResponse = await api.get(route('archives.index'));
+	if (!archivesResponse.ok) throw new Error();
+	const archives = await archivesResponse.json();
+	const responses = await Promise.all(archives.map((archive) => api.get(route('archives.show', { id: archive.id }))));
+	if (responses.some((response) => !response.ok)) throw new Error();
+	const detailed = await Promise.all(responses.map((response) => response.json()));
+	return detailed.flatMap((archive) => archive.entries.map((entry) => ({ id: entry.id, title: entry.title, archiveName: archive.name })));
+}
+
 async function fetchConfig(worldId) {
-	const [itemsResponse, startingResponse, factsResponse] = await Promise.all([
+	const [itemsResponse, startingResponse, factsResponse, archiveEntries] = await Promise.all([
 		api.get(route('worlds.items.index', { world: worldId })),
 		api.get(route('worlds.starting-inventories.index', { world: worldId })),
 		api.get(route('worlds.facts.index', { world: worldId })),
+		fetchArchiveEntries(),
 	]);
 	if (!itemsResponse.ok || !startingResponse.ok || !factsResponse.ok) throw new Error();
 	const [items, starting, facts] = await Promise.all([itemsResponse.json(), startingResponse.json(), factsResponse.json()]);
-	return { items, facts, starting: { player: starting.player, residents: { ...starting.residents }, objects: { ...starting.objects } } };
+	return { items, facts, archiveEntries, starting: { player: starting.player, residents: { ...starting.residents }, objects: { ...starting.objects } } };
 }
 
-/** A world's items, facts and starting inventories, for its configuration page. */
+/** A world's items, facts, starting inventories and the user's archive entries, for its configuration page. */
 export default function useWorldInventoryConfig(worldId, addToast) {
 	const [items, setItems] = useState([]);
 	const [facts, setFacts] = useState([]);
+	const [archiveEntries, setArchiveEntries] = useState([]);
 	const [starting, setStarting] = useState(EMPTY_STARTING);
 
 	useEffect(() => {
@@ -29,6 +41,7 @@ export default function useWorldInventoryConfig(worldId, addToast) {
 				if (!active) return;
 				setItems(config.items);
 				setFacts(config.facts);
+				setArchiveEntries(config.archiveEntries);
 				setStarting(config.starting);
 			} catch {
 				addToast('Failed to load items', 'error');
@@ -43,6 +56,7 @@ export default function useWorldInventoryConfig(worldId, addToast) {
 			const config = await fetchConfig(worldId);
 			setItems(config.items);
 			setFacts(config.facts);
+			setArchiveEntries(config.archiveEntries);
 			setStarting(config.starting);
 		} catch {
 			addToast('Failed to load items', 'error');
@@ -59,5 +73,5 @@ export default function useWorldInventoryConfig(worldId, addToast) {
 		return null;
 	}, [worldId, addToast]);
 
-	return { items, facts, reloadItems: reload, starting, saveStarting };
+	return { items, facts, archiveEntries, reloadItems: reload, starting, saveStarting };
 }

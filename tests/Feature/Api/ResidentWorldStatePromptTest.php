@@ -228,12 +228,14 @@ it('tells the resident the pose she holds, why she is doing what she is doing an
         ->toContain("What you are doing now:\nYou have taken 2 steps in Pool terrace.\nYou have taken one step at it.\nWhy: step 2 of 2 of get a drink\nIn your words when you started: *mixes a gin tonic, then takes it out to the lounger*");
 });
 
-it('rejects a resident state naming a spot the world does not have', function () {
+it('leaves a resident standing when their state names a spot the world no longer has', function () {
     $scenario = worldStateScenario();
 
     sendWorldMessage($this, $scenario, [
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
-    ], ['residentState' => ['posture' => 'sitting', 'spotId' => 'moon-chair']])->assertUnprocessable()->assertJsonValidationErrors('residentState.spotId');
+    ], ['residentState' => ['posture' => 'sitting', 'spotId' => 'moon-chair']])->assertSuccessful();
+
+    expect(sentPrompt())->not->toContain('moon-chair');
 });
 
 it('adds nothing for a user who is simply standing', function () {
@@ -247,7 +249,7 @@ it('adds nothing for a user who is simply standing', function () {
     expect(sentPrompt())->toContain('away from you')->not->toContain('away from you, ');
 });
 
-it('rejects a user state naming a spot or activity the world does not have', function (array $userState, string $field) {
+it('rejects a user state naming an activity the world does not have', function (array $userState, string $field) {
     $scenario = worldStateScenario();
 
     sendWorldMessage($this, $scenario, [
@@ -255,7 +257,6 @@ it('rejects a user state naming a spot or activity the world does not have', fun
         'residents' => [$scenario[4]->id => ['x' => 5, 'y' => 0, 'z' => -8]],
     ], ['userState' => $userState])->assertUnprocessable()->assertJsonValidationErrors($field);
 })->with([
-    'unknown spot' => [['posture' => 'sitting', 'spotId' => 'moon-chair'], 'userState.spotId'],
     'activity the spot does not offer' => [['posture' => 'sitting', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'swim'], 'userState.activityId'],
     'activity no place offers' => [['posture' => 'standing', 'activityId' => 'fly'], 'userState.activityId'],
 ]);

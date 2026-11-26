@@ -43,6 +43,16 @@ test('the hips follow the motion unchanged for a VRM centred on the origin', () 
 	assert.deepEqual(hipsValues(clip), [0, 0.98, 0, 0.098, 0.98, 0.196]);
 });
 
+test('a clip loaded while the hips are lowered keeps the rest-pose hips height', () => {
+	const vrm = vrmWithHipsAt([0, 0.98, 0]);
+	vrm.humanoid.getNormalizedBoneNode('hips').position.y = 0.5;
+	vrm.scene.updateWorldMatrix(true, true);
+
+	const clip = retargetBaseClip(baseClip, vrm);
+
+	assert.deepEqual(hipsValues(clip), [0, 0.98, 0, 0.098, 0.98, 0.196]);
+});
+
 test('a VRM 0.x mirrors the motion before adding its rest offset', () => {
 	const clip = retargetBaseClip(baseClip, vrmWithHipsAt([-1.3, 0.98, -0.37], '0'));
 

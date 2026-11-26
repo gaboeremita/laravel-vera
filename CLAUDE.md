@@ -186,8 +186,12 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Linting and Test Verification Cadence
 
-- PHP code must be Pint-compliant and frontend code must be ESLint-compliant, and any Pest-covered behavior touched must have passing tests — verified exactly once, right before pushing or opening a PR. NON-NEGOTIABLE: "the task" is the entire implementation effort, start to finish — every file touched, every fix, every round of the user testing and reporting something still broken, all of it is the same single task. None of that is itself a reason to run any code-checking command. This is not limited to Pint/ESLint/Pest by name — it covers every form of verification, including `php -l`, `node --check`, type checkers, or any other syntax/style/test/correctness check, in any invocation. Do not rationalize a tool as "just a sanity check" or "fundamentally different from what was asked" to justify running it anyway — that reasoning is exactly what's forbidden. Do not run anything in this category until the user says the implementation is done and it's time to push/PR. At that point, run the real gates once — `vendor/bin/pint`, `npm run lint`, `php artisan test` — and fix whatever surfaces in that single pass.
-- Narrow exception: a pure syntax/parse check only (`node --check` on a single JS/JSX file, `php -l` on a single PHP file) — nothing that evaluates style, lint rules, types, or test behavior — may be run immediately after editing that same file, to catch a malformed edit (mismatched braces, stray tokens) before moving on. This does not extend to running it across the whole file tree, to any other tool named above, or to using it as a substitute for the full gates at push/PR time.
+- Check only what you create or modify, right after changing it:
+  - Tests: run every test file you add or change, on its own (`php artisan test --compact tests/Feature/SomeTest.php` or `--filter`, `node --test tests/Unit/Some.test.js`). Writing a test and leaving it unrun is not allowed.
+  - PHP style: `vendor/bin/pint --dirty --format agent`, or Pint on the specific files you changed.
+  - Frontend lint: `npx eslint <files you changed>`.
+  - Syntax: `php -l` or `node --check` on a file you just edited.
+- Never run the whole suite or the whole linter mid-task: no unscoped `php artisan test`, `npm run lint` or `vendor/bin/pint`. Those full gates run once, when the user says it is time to push or open a PR, and everything they surface gets fixed in that pass.
 
 ## Before Taking Action
 

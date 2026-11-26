@@ -7,6 +7,7 @@ use App\Actions\TransferInventory;
 use App\Contracts\AgentTool;
 use App\Models\Inventory;
 use App\Models\InventoryItem;
+use Illuminate\Database\Eloquent\Collection;
 use RuntimeException;
 
 class GiveTool implements AgentTool
@@ -29,15 +30,15 @@ class GiveTool implements AgentTool
     public function description(): string
     {
         if (! $this->withCredits) {
-            return "Hands {$this->receiverName} items you carry, right now, for free. Use it when you decide to give, serve, sell or trade; say what you hand over in your reply as well.";
+            return "Hands {$this->receiverName} items you carry, right now, for free. Items change hands only through this tool: call it in the same reply whenever you give, serve, sell or trade, and say what you hand over in your reply as well.";
         }
 
-        return "Hands {$this->receiverName} credits or items you carry, right now. Use it when you decide to give, pay, reward or trade; say what you hand over in your reply as well.";
+        return "Hands {$this->receiverName} credits or items you carry, right now. Credits and items change hands only through this tool: call it in the same reply whenever you give, pay, sell, reward or trade, including once {$this->receiverName} has paid you, and say what you hand over in your reply as well.";
     }
 
     public function parameters(): array
     {
-        $names = $this->giver->items()->with('item')->get()->map(fn (InventoryItem $held) => $held->item->name)->values()->all();
+        $names = $this->givable()->map(fn (InventoryItem $held) => $held->item->name)->values()->all();
 
         $credits = $this->withCredits ? ['credits' => ['type' => 'integer', 'minimum' => 0, 'description' => 'How many credits to hand over.']] : [];
 
@@ -65,7 +66,7 @@ class GiveTool implements AgentTool
         $credits = $this->withCredits ? max(0, (int) ($arguments['credits'] ?? 0)) : 0;
         $items = [];
         foreach ($arguments['items'] ?? [] as $entry) {
-            $held = $this->giver->items()->with('item')->get()->first(fn (InventoryItem $candidate) => mb_strtolower($candidate->item->name) === mb_strtolower(trim((string) ($entry['item'] ?? ''))));
+            $held = $this->givable()->first(fn (InventoryItem $candidate) => mb_strtolower($candidate->item->name) === mb_strtolower(trim((string) ($entry['item'] ?? ''))));
             if ($held === null) {
                 throw new RuntimeException(sprintf('You carry no "%s".', $entry['item'] ?? ''));
             }
@@ -79,6 +80,17 @@ class GiveTool implements AgentTool
         $this->given[] = ['credits' => $credits, 'items' => $items];
 
         return ['status' => 'given', 'note' => "You handed {$this->receiverName} ".app(DescribeHandover::class)->handle($credits, $items).'.'];
+    }
+
+    /**
+     * What the giver carries that changes hands by gift: an item with an offering
+     * assistant reaches anyone only through their offer.
+     *
+     * @return Collection<int, InventoryItem>
+     */
+    private function givable(): Collection
+    {
+        return $this->giver->items()->whereHas('item', fn ($query) => $query->whereNull('offered_by_assistant_id'))->with('item')->get();
     }
 
     public function timeoutSeconds(): int

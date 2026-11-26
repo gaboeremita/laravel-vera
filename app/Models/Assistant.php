@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Collection;
 
-#[Fillable(['name', 'slug', 'description', 'prompt', 'opening_message', 'archive_id', 'mode', 'agent_config', 'portrait_type', 'kind', 'sentiment_definitions'])]
+#[Fillable(['name', 'slug', 'description', 'prompt', 'opening_message', 'archive_id', 'mode', 'agent_config', 'portrait_type', 'kind', 'sentiment_definitions', 'hovers', 'shimmers'])]
 class Assistant extends Model
 {
     /** @use HasFactory<AssistantFactory> */
@@ -32,6 +32,8 @@ class Assistant extends Model
             'portrait_type' => AssistantPortraitType::class,
             'kind' => AssistantKind::class,
             'sentiment_definitions' => 'array',
+            'hovers' => 'boolean',
+            'shimmers' => 'boolean',
         ];
     }
 

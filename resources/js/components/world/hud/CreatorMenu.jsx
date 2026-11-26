@@ -15,6 +15,7 @@ const TABS = [
 	{ id: 'items', label: 'Items', Component: CreatorItemsTab },
 	{ id: 'world', label: 'World', Component: CreatorWorldTab },
 ];
+const RESIDENTS_TAB_INDEX = TABS.findIndex((tab) => tab.id === 'residents');
 const PASSWORD_CELLS = 8;
 const LIGHT_STEP_MS = 30;
 const WRONG_MS = 500;
@@ -104,10 +105,15 @@ function LockPanel({ onUnlock, onCancel, inputRef }) {
  * unlocked, then the tabs of creator powers with the log of changes made.
  */
 export default function CreatorMenu({ creator, sessionTitle, context, keyHandlerRef }) {
-	const { open, close, unlocked, unlock, overview, log } = creator;
+	const { open, close, unlocked, unlock, overview, log, focusedResidentId } = creator;
 	const [shown, setShown] = useState(open);
 	const [tabIndex, setTabIndex] = useState(0);
 	const [itemsHolder, setItemsHolder] = useState(null);
+	const [seenFocusedResidentId, setSeenFocusedResidentId] = useState(null);
+	if (focusedResidentId !== seenFocusedResidentId) {
+		setSeenFocusedResidentId(focusedResidentId);
+		if (focusedResidentId !== null) setTabIndex(RESIDENTS_TAB_INDEX);
+	}
 	const [unlockedView, setUnlockedView] = useState(unlocked);
 	if (open && !shown) setShown(true);
 	if (!open && unlockedView !== unlocked) setUnlockedView(unlocked);

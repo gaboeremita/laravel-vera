@@ -121,6 +121,13 @@ export function mixamoBaseClip(fbxAsset, clipName = 'mixamo.com') {
 
 const FINGER_BONE = /Thumb|Index|Middle|Ring|Little/;
 
+/** The hips' height above the VRM's root in its current pose, for a VRM without a normalized rest pose. */
+function currentHipsHeight(vrm) {
+	const position = new Vector3();
+	const hipsY = vrm.humanoid?.getNormalizedBoneNode('hips')?.getWorldPosition(position).y;
+	return hipsY === undefined ? null : hipsY - vrm.scene.getWorldPosition(position).y;
+}
+
 /**
  * Fits a base clip to one VRM: its bones' node names, VRM 0.x's mirrored
  * axes and its hips height. Returns null when the VRM's hips can't be found.
@@ -130,18 +137,18 @@ const FINGER_BONE = /Thumb|Index|Middle|Ring|Little/;
  * @returns {import('three').AnimationClip | null}
  */
 export function retargetBaseClip(base, vrm) {
-	const vec3 = new Vector3();
-	const vrmHipsY = vrm.humanoid?.getNormalizedBoneNode('hips')?.getWorldPosition(vec3).y;
-	const vrmRootY = vrm.scene.getWorldPosition(vec3).y;
-	if (!vrmHipsY) {
+	const restHipsPosition = vrm.humanoid?.normalizedRestPose?.hips?.position;
+	const vrmHipsHeight = restHipsPosition?.[1] ?? currentHipsHeight(vrm);
+	if (!vrmHipsHeight) {
 		console.warn('[mixamoRetargeting] failed to calculate hips height scaling — the VRM has no hips');
 		return null;
 	}
 
-	const hipsPositionScale = Math.abs(vrmHipsY - vrmRootY) / base.motionHipsHeight;
+	// The rest pose's hips height, so a clip loaded while the VRM sits or moves is scaled the same as one loaded at rest.
+	const hipsPositionScale = Math.abs(vrmHipsHeight) / base.motionHipsHeight;
 	// Mixamo records the hips around its own origin; a VRM built away from the
 	// origin would otherwise snap there and leave the camera framing empty space.
-	const [restHipsX = 0, , restHipsZ = 0] = vrm.humanoid?.normalizedRestPose?.hips?.position ?? [];
+	const [restHipsX = 0, , restHipsZ = 0] = restHipsPosition ?? [];
 	const restHipsOffset = [restHipsX, 0, restHipsZ];
 	const isVrm0 = vrm.meta?.metaVersion === '0';
 	const tracks = [];

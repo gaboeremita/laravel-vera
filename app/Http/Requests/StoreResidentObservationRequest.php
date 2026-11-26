@@ -18,7 +18,7 @@ class StoreResidentObservationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'line' => ['required', 'string', 'max:500'],
+            'line' => ['required', 'string'],
             'expression' => ['nullable', 'array'],
         ];
     }

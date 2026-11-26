@@ -86,6 +86,8 @@ class ResidentConversationController extends Controller
                 'content' => $message->content,
                 'pose' => $result['pose'] ?? null,
             ],
+            'shimmeringResidentIds' => $worldSession->residentIdsHoldingState(),
+            'fakeShimmeringResidentIds' => $worldSession->residentIdsHoldingFake(),
         ], $result['status'] === 'wait' ? 429 : 200);
     }
 

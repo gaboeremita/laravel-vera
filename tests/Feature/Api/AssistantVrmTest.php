@@ -135,6 +135,43 @@ it('persists portrait_type via PATCH', function () {
     expect($assistant->fresh()->portrait_type)->toBe(AssistantPortraitType::Avatar3D);
 });
 
+it('persists hovers via PATCH and tells the editor, the portrait and the world', function () {
+    [$user, $assistant] = setUpAssistantForVrm();
+
+    $this->actingAs($user)
+        ->patchJson(route('assistants.update', ['id' => $assistant->id]), ['hovers' => true])
+        ->assertStatus(200);
+
+    expect($assistant->fresh()->hovers)->toBeTrue();
+    $this->actingAs($user)->getJson(route('assistants.show', ['id' => $assistant->id]))->assertJsonPath('hovers', true);
+    $this->actingAs($user)->getJson(route('emotions.index', ['assistant' => $assistant->id]))->assertJsonPath('hovers', true);
+    $resident = WorldResident::factory()->create(['assistant_id' => $assistant->id]);
+    expect((new WorldResidentResource($resident->load('assistant.vrm')))->resolve()['assistant']['hovers'])->toBeTrue();
+});
+
+it('persists shimmers via PATCH and tells the editor, the portrait and the world', function () {
+    [$user, $assistant] = setUpAssistantForVrm();
+
+    $this->actingAs($user)
+        ->patchJson(route('assistants.update', ['id' => $assistant->id]), ['shimmers' => true])
+        ->assertStatus(200);
+
+    expect($assistant->fresh()->shimmers)->toBeTrue();
+    $this->actingAs($user)->getJson(route('assistants.show', ['id' => $assistant->id]))->assertJsonPath('shimmers', true);
+    $this->actingAs($user)->getJson(route('emotions.index', ['assistant' => $assistant->id]))->assertJsonPath('shimmers', true);
+    $resident = WorldResident::factory()->create(['assistant_id' => $assistant->id]);
+    expect((new WorldResidentResource($resident->load('assistant.vrm')))->resolve()['assistant']['shimmers'])->toBeTrue();
+});
+
+it('rejects a hovers value that is not a boolean', function () {
+    [$user, $assistant] = setUpAssistantForVrm();
+
+    $this->actingAs($user)
+        ->patchJson(route('assistants.update', ['id' => $assistant->id]), ['hovers' => 'sometimes'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('hovers');
+});
+
 it('creates an avatar3d assistant without emotion images', function () {
     Storage::fake('public');
     $user = User::factory()->create();

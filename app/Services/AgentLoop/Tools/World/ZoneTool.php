@@ -44,9 +44,11 @@ class ZoneTool extends WorldTool
             ));
         }
 
-        $pose = $this->toolbox->poseForActivity($activity, trim((string) ($arguments['pose'] ?? '')));
+        $chosenPose = trim((string) ($arguments['pose'] ?? ''));
+        $pose = $this->toolbox->poseForActivity($activity, $chosenPose);
+        $poseNote = $this->toolbox->unfittingPoseNote($activity, $chosenPose);
         $this->toolbox->choose(['verb' => 'zone', 'target' => null, 'activity' => $activity['id'], 'pose' => $pose]);
 
-        return ['status' => 'started', 'note' => "You start to {$activity['name']}."];
+        return ['status' => 'started', 'note' => "You start to {$activity['name']}.".($poseNote !== null ? " {$poseNote}" : '')];
     }
 }

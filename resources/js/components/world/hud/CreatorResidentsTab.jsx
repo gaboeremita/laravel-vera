@@ -9,7 +9,7 @@ function initials(name) {
 	return name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function Avatar({ resident, large = false }) {
+export function Avatar({ resident, large = false }) {
 	const size = large ? 'h-14 w-14 text-base' : 'h-9 w-9 text-xs';
 	return resident.portraitUrl
 		? <img src={resident.portraitUrl} alt="" className={`hud-avatar ${size} shrink-0 border border-accent/50 object-cover`} />
@@ -38,7 +38,13 @@ function SendPicker({ regions, onSend, onCancel }) {
 
 /** Every resident of the world: where they are, what they think and feel, and the creator's commands over them. */
 export default function CreatorResidentsTab({ overview, creator, context, arrowHandlerRef, openItems }) {
-	const [selectedId, setSelectedId] = useState(overview.residents[0]?.id ?? null);
+	const focusedResidentId = creator.focusedResidentId;
+	const [selectedId, setSelectedId] = useState(focusedResidentId ?? overview.residents[0]?.id ?? null);
+	const [seenFocusedResidentId, setSeenFocusedResidentId] = useState(focusedResidentId);
+	if (focusedResidentId !== seenFocusedResidentId) {
+		setSeenFocusedResidentId(focusedResidentId);
+		if (focusedResidentId !== null) setSelectedId(focusedResidentId);
+	}
 	const [sending, setSending] = useState(false);
 	const [query, setQuery] = useState('');
 	const regionName = (regionId) => overview.regions.find((region) => region.id === regionId)?.name ?? '';

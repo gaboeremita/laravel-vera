@@ -6,6 +6,14 @@ export function modelYaw(metaVersion) {
 	return metaVersion === '0' ? 0 : Math.PI;
 }
 
+/**
+ * The left upper arm's z rotation that lowers a T-posed arm to a relaxed stance; the right arm takes the negative. VRM
+ * 0.x and VRM 1.0 normalized arms turn opposite ways about z, so the sign follows the file's version.
+ */
+export function relaxedArmAngle(metaVersion) {
+	return metaVersion === '0' ? 1.2 : -1.2;
+}
+
 const ANGLE_EPSILON = 1e-9;
 
 /**

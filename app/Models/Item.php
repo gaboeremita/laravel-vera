@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-#[Fillable(['world_id', 'world_session_id', 'made_by_resident_id', 'name', 'description', 'base_price', 'contents', 'use_requirement', 'consumed_on_use', 'releases_credits', 'releases_items', 'sound_id', 'reveals_fact_id'])]
+#[Fillable(['world_id', 'world_session_id', 'made_by_resident_id', 'name', 'description', 'base_price', 'contents', 'use_requirement', 'consumed_on_use', 'releases_credits', 'releases_items', 'sound_id', 'reveals_fact_id', 'state_entry_id', 'offered_by_assistant_id'])]
 class Item extends Model
 {
     /** @use HasFactory<ItemFactory> */
@@ -44,6 +44,16 @@ class Item extends Model
     public function revealsFact(): BelongsTo
     {
         return $this->belongsTo(Fact::class, 'reveals_fact_id');
+    }
+
+    public function stateEntry(): BelongsTo
+    {
+        return $this->belongsTo(ArchiveEntry::class, 'state_entry_id');
+    }
+
+    public function offeredBy(): BelongsTo
+    {
+        return $this->belongsTo(Assistant::class, 'offered_by_assistant_id');
     }
 
     public function cardImage(): MorphOne

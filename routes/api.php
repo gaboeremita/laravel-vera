@@ -178,7 +178,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/worlds/{world}/sessions/{session}/creator/residents/{resident}/state', [CreatorResidentController::class, 'destroyState'])->name('worlds.sessions.creator.residents.state.destroy');
     Route::put('/worlds/{world}/sessions/{session}/creator/residents/{resident}/frozen', [CreatorResidentController::class, 'updateFrozen'])->name('worlds.sessions.creator.residents.frozen.update');
     Route::put('/worlds/{world}/sessions/{session}/creator/residents/{resident}/sentiments', [CreatorResidentController::class, 'updateSentiments'])->name('worlds.sessions.creator.residents.sentiments.update');
+    Route::put('/worlds/{world}/sessions/{session}/creator/residents/{resident}/conversation', [CreatorResidentController::class, 'updateConversation'])->name('worlds.sessions.creator.residents.conversation.update');
     Route::post('/worlds/{world}/sessions/{session}/creator/residents/{resident}/reaction', [CreatorResidentController::class, 'react'])->name('worlds.sessions.creator.residents.reaction');
+    Route::post('/worlds/{world}/sessions/{session}/creator/residents/{resident}/opening', [CreatorResidentController::class, 'opening'])->name('worlds.sessions.creator.residents.opening');
     Route::post('/worlds/{world}/sessions/{session}/creator/quests/{quest}/start', [CreatorQuestController::class, 'start'])->name('worlds.sessions.creator.quests.start');
     Route::post('/worlds/{world}/sessions/{session}/creator/quests/{quest}/end', [CreatorQuestController::class, 'end'])->name('worlds.sessions.creator.quests.end');
     Route::post('/worlds/{world}/sessions/{session}/creator/quests/{quest}/reset', [CreatorQuestController::class, 'reset'])->name('worlds.sessions.creator.quests.reset');

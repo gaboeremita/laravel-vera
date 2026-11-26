@@ -26,9 +26,9 @@ class BuildInventoryPrompt
         if (! $talkingWithUser) {
             $carrying = $items->isEmpty() ? 'You carry no items.' : ltrim($carrying);
 
-            return "{$carrying}\nWhat you carry stays private until you mention or show it. You decide in character what to give, sell, trade or keep. Between you and other residents nothing really costs credits: name a price if it fits the moment and play along with paying, but hand over what you agree on with the give tool for free.";
+            return "{$carrying}\nWhat you carry stays private until you mention or show it. You decide in character what to give, sell, trade or keep. Between you and other residents nothing really costs credits: name a price if it fits the moment and play along with paying, but hand over what you agree on with the give tool for free, in the same reply where you say you hand it over.";
         }
 
-        return "You can pay or give the user any amount of credits the moment calls for.{$carrying}\nWhat you carry stays private until you mention or show it. You decide in character what to give, sell, trade or keep, and at what price; hand things over with the give tool and ask the user for credits or items with the ask_for tool.";
+        return "You can pay or give the user any amount of credits the moment calls for.{$carrying}\nWhat you carry stays private until you mention or show it. You decide in character what to give, sell, trade or keep, and at what price. Credits and items change hands only through your tools: ask the user for credits or items with the ask_for tool, and hand over credits or items with the give tool in the same reply where you say you hand them over. Once the user has paid what you asked, hand over what they paid for with the give tool in that reply.";
     }
 }

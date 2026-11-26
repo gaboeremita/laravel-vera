@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createCrossingTracker, floorAt, zoneAt, zoneChain } from '../../resources/js/components/world/worldLocation.js';
+import { createCrossingTracker, floorAt, zoneAt, zoneChain, zoneTree } from '../../resources/js/components/world/worldLocation.js';
 
 const layout = {
 	floors: [
@@ -64,4 +64,22 @@ test('the crossing tracker reports leaving every zone without announcing it', ()
 	assert.deepEqual(tracker.update(null, 5000), { changed: true, announce: false });
 	const fresh = createCrossingTracker({ debounceMs: 2000 });
 	assert.deepEqual(fresh.update(null, 0), { changed: true, announce: false });
+});
+
+test('the zone tree lists each zone under its parent with its depth, and a zone whose parent is missing at the top', () => {
+	const zones = [
+		{ id: 'vocal-booth', name: 'Vocal booth', parentId: 'studio' },
+		{ id: 'pool-terrace', name: 'Pool terrace', parentId: null },
+		{ id: 'studio', name: 'Music studio', parentId: null },
+		{ id: 'mic-corner', name: 'Mic corner', parentId: 'vocal-booth' },
+		{ id: 'shed', name: 'Shed', parentId: 'garden' },
+	];
+
+	assert.deepEqual(zoneTree(zones).map(({ zone, depth }) => [zone.id, depth]), [
+		['pool-terrace', 0],
+		['studio', 0],
+		['vocal-booth', 1],
+		['mic-corner', 2],
+		['shed', 0],
+	]);
 });

@@ -13,9 +13,11 @@ class WorldToolbox
     public const USER_TARGET = 'user';
 
     /**
-     * @var ?array{verb: string, target: ?string, activity: ?string, line?: string, steps?: array<int, array<string, ?string>>}
+     * Every action she chose this turn, in the order she chose them.
+     *
+     * @var array<int, array{verb: string, target: ?string, activity: ?string, line?: string, steps?: array<int, array<string, ?string>>}>
      */
-    private ?array $chosenAction = null;
+    private array $chosenActions = [];
 
     private ?ActivityGate $activityGate = null;
 
@@ -115,22 +117,27 @@ class WorldToolbox
      */
     public function chosenAction(): ?array
     {
-        return $this->chosenAction;
+        if (count($this->chosenActions) <= 1) {
+            return $this->chosenActions[0] ?? null;
+        }
+
+        $steps = collect($this->chosenActions)
+            ->flatMap(fn (array $action) => $action['verb'] === 'plan' ? $action['steps'] : [[...$action, 'pose' => $action['pose'] ?? null, 'description' => null]])
+            ->values()
+            ->all();
+        $goal = collect($this->chosenActions)->firstWhere('verb', 'plan')['target'] ?? null;
+
+        return ['verb' => 'plan', 'target' => $goal, 'activity' => null, 'steps' => $steps];
     }
 
     /**
+     * Adds an action to the ones she chose this turn; they run one after another.
+     *
      * @param  array{verb: string, target: ?string, activity: ?string, line?: string, steps?: array<int, array<string, ?string>>}  $action
      */
     public function choose(array $action): void
     {
-        if ($this->chosenAction !== null) {
-            throw new RuntimeException(sprintf(
-                'You already chose an action this turn: %s. It stands; one action per turn.',
-                trim("{$this->chosenAction['verb']} {$this->chosenAction['target']}"),
-            ));
-        }
-
-        $this->chosenAction = $action;
+        $this->chosenActions[] = $action;
     }
 
     /**
@@ -198,37 +205,65 @@ class WorldToolbox
      * The pose she plays for an activity: the one she chose from her own
      * library, else the activity's own pose when she has one by that name.
      * It must have a version for the activity's posture, since an activity
-     * never stands her up; a null posture accepts any of her poses.
+     * never stands her up; a chosen pose without one gives way to the
+     * activity's own pose. A null posture accepts any of her poses.
      *
      * @param  array<string, mixed>  $activity
      */
     public function poseForActivity(array $activity, string $chosen, ?string $posture = 'activity'): ?string
     {
-        $posture = $posture === 'activity' ? ($activity['posture'] ?? 'standing') : $posture;
-        $fits = fn (string $name) => $posture === null || in_array($posture, $this->posePostures[$name] ?? [], true);
+        $posture = $this->postureFor($activity, $posture);
 
         if ($chosen !== '') {
             $pose = collect($this->poseNames)->first(fn (string $name) => $this->sameName($name, $chosen));
             if ($pose === null) {
                 throw new RuntimeException(sprintf('You have no pose called "%s". Your poses: %s.', $chosen, implode(', ', $this->poseNames)));
             }
-            if (! $fits($pose)) {
-                $fitting = collect($this->poseNames)->filter($fits)->reject(fn (string $name) => $name === 'default');
-                throw new RuntimeException(sprintf(
-                    'Your pose "%s" has no %s version, and this activity keeps you %s. %s',
-                    $pose,
-                    $posture,
-                    $posture,
-                    $fitting->isEmpty() ? 'Leave the pose out.' : 'Your '.$posture.' poses: '.$fitting->implode(', ').'; or leave the pose out.',
-                ));
+            if ($this->poseFits($pose, $posture)) {
+                return $pose;
             }
-
-            return $pose;
         }
 
         $own = $activity['pose'] ?? null;
 
-        return $own === null ? null : collect($this->poseNames)->first(fn (string $name) => $this->sameName($name, $own) && $fits($name));
+        return $own === null ? null : collect($this->poseNames)->first(fn (string $name) => $this->sameName($name, $own) && $this->poseFits($name, $posture));
+    }
+
+    /**
+     * What to tell her when the pose she chose has no version for the
+     * activity's posture and the activity's own pose plays instead.
+     *
+     * @param  array<string, mixed>  $activity
+     */
+    public function unfittingPoseNote(array $activity, string $chosen, ?string $posture = 'activity'): ?string
+    {
+        $posture = $this->postureFor($activity, $posture);
+        $pose = $chosen === '' ? null : collect($this->poseNames)->first(fn (string $name) => $this->sameName($name, $chosen));
+        if ($pose === null || $this->poseFits($pose, $posture)) {
+            return null;
+        }
+
+        $fitting = collect($this->poseNames)->filter(fn (string $name) => $this->poseFits($name, $posture))->reject(fn (string $name) => $name === 'default');
+
+        return sprintf(
+            'Your pose "%s" has no %s version, so the activity\'s own pose plays.%s',
+            $pose,
+            $posture,
+            $fitting->isEmpty() ? '' : ' Your '.$posture.' poses: '.$fitting->implode(', ').'.',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $activity
+     */
+    private function postureFor(array $activity, ?string $posture): ?string
+    {
+        return $posture === 'activity' ? ($activity['posture'] ?? 'standing') : $posture;
+    }
+
+    private function poseFits(string $name, ?string $posture): bool
+    {
+        return $posture === null || in_array($posture, $this->posePostures[$name] ?? [], true);
     }
 
     /**
@@ -244,6 +279,19 @@ class WorldToolbox
     public function findSpot(string $written): ?array
     {
         return collect($this->spots())->first(fn (array $spot) => $this->sameName($spot['id'], $written));
+    }
+
+    /**
+     * Which spots on a thing are free, for when the one she picked is taken.
+     */
+    public function freeSpotsNote(string $objectId): string
+    {
+        $free = collect($this->spots())
+            ->where('objectId', $objectId)
+            ->reject(fn (array $spot) => in_array($spot['id'], $this->occupiedSpots, true))
+            ->pluck('id');
+
+        return $free->isEmpty() ? 'Every spot there is taken; choose a spot somewhere else.' : 'Free spots there: '.$free->implode(', ').'.';
     }
 
     /**

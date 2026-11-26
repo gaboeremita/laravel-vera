@@ -4,6 +4,7 @@ import { api } from '../utils/api.js';
 import Accordion from './common/Accordion.jsx';
 import ConfirmationModal from './common/ConfirmationModal.jsx';
 import Toggle from './common/Toggle.jsx';
+import ArchiveEntrySelect from './ArchiveEntrySelect.jsx';
 import FactSelect from './FactSelect.jsx';
 import ItemListField from './ItemListField.jsx';
 import ItemThumb from './ItemThumb.jsx';
@@ -12,7 +13,7 @@ import { ImageUploadField } from './WorldImagesEditor.jsx';
 import SoundUploadField from './SoundUploadField.jsx';
 import { FIELD_INPUT, FIELD_LABEL } from '../utils/formFieldStyles.js';
 
-const NEW_ITEM = { name: '', description: '', basePrice: null, contents: '', useRequirement: '', consumedOnUse: false, releasesCredits: 0, releasesItems: [], revealsFactId: null };
+const NEW_ITEM = { name: '', description: '', basePrice: null, contents: '', useRequirement: '', consumedOnUse: false, releasesCredits: 0, releasesItems: [], revealsFactId: null, stateEntryId: null, offeredByAssistantId: null };
 const HINT = 'normal-case text-fg-3';
 
 function toDraft(item) {
@@ -30,12 +31,15 @@ function toPayload(draft) {
 		releasesCredits: draft.releasesCredits,
 		releasesItems: draft.releasesItems,
 		revealsFactId: draft.revealsFactId ?? null,
+		stateEntryId: draft.stateEntryId ?? null,
+		offeredByAssistantId: draft.offeredByAssistantId ?? null,
 	};
 }
 
-function ItemFields({ draft, setDraft, items, facts, itemId }) {
+function ItemFields({ draft, setDraft, items, facts, archiveEntries, residents, itemId }) {
 	const update = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
 	const others = items.filter((item) => item.id !== itemId);
+	const assistants = [...new Map(residents.map((resident) => [resident.assistant.id, resident.assistant])).values()];
 
 	return (
 		<div className="space-y-3">
@@ -91,11 +95,24 @@ function ItemFields({ draft, setDraft, items, facts, itemId }) {
 					<span>Used up when used successfully</span>
 				</label>
 			</div>
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+				<div>
+					<label className={FIELD_LABEL}>Holding it adds entry <span className={HINT}>(joins the prompt of any resident who holds it)</span></label>
+					<ArchiveEntrySelect entries={archiveEntries} value={draft.stateEntryId} onChange={(value) => update('stateEntryId', value)} ariaLabel="Holding it adds entry" />
+				</div>
+				<div>
+					<label className={FIELD_LABEL}>Offered by <span className={HINT}>(only they can pass it on, and only by an offer the other resident accepts)</span></label>
+					<select value={draft.offeredByAssistantId ?? ''} onChange={(event) => update('offeredByAssistantId', event.target.value === '' ? null : Number(event.target.value))} className={FIELD_INPUT} aria-label="Offered by">
+						<option value="">— anyone can give it —</option>
+						{assistants.map((assistant) => <option key={assistant.id} value={assistant.id}>{assistant.name}</option>)}
+					</select>
+				</div>
+			</div>
 		</div>
 	);
 }
 
-function ItemRow({ worldId, item, items, facts, onSaved, onDeleted, addToast }) {
+function ItemRow({ worldId, item, items, facts, archiveEntries, residents, onSaved, onDeleted, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [draft, setDraft] = useState(toDraft(item));
 	const [previous, setPrevious] = useState(item);
@@ -183,7 +200,7 @@ function ItemRow({ worldId, item, items, facts, onSaved, onDeleted, addToast }) 
 					<SoundUploadField sound={itemSound} isUploading={isUploadingSound} onPick={uploadSound} onRemove={removeSound} onError={(message) => addToast(message, 'error')} />
 				</div>
 				<div className="flex-1 min-w-0">
-					<ItemFields draft={draft} setDraft={setDraft} items={items} facts={facts} itemId={item.id} />
+					<ItemFields draft={draft} setDraft={setDraft} items={items} facts={facts} archiveEntries={archiveEntries} residents={residents} itemId={item.id} />
 				</div>
 			</div>
 			<div className="flex justify-end">
@@ -205,7 +222,7 @@ function ItemRow({ worldId, item, items, facts, onSaved, onDeleted, addToast }) 
 	);
 }
 
-function NewItem({ worldId, items, facts, onCreated, onCancel, addToast }) {
+function NewItem({ worldId, items, facts, archiveEntries, residents, onCreated, onCancel, addToast }) {
 	const [draft, setDraft] = useState(NEW_ITEM);
 	const [isSaving, setIsSaving] = useState(false);
 	const [image, setImage] = useState(null);
@@ -243,7 +260,7 @@ function NewItem({ worldId, items, facts, onCreated, onCancel, addToast }) {
 					<SoundUploadField sound={sound} isUploading={false} onPick={(file) => setSound({ file, previewUrl: URL.createObjectURL(file) })} onRemove={() => setSound(null)} onError={(message) => addToast(message, 'error')} />
 				</div>
 				<div className="flex-1 min-w-0">
-					<ItemFields draft={draft} setDraft={setDraft} items={items} facts={facts} itemId={null} />
+					<ItemFields draft={draft} setDraft={setDraft} items={items} facts={facts} archiveEntries={archiveEntries} residents={residents} itemId={null} />
 				</div>
 			</div>
 			<div className="flex justify-end gap-3">
@@ -256,7 +273,7 @@ function NewItem({ worldId, items, facts, onCreated, onCancel, addToast }) {
 	);
 }
 
-export default function ItemsEditor({ worldId, items, facts = [], onItemsChange, addToast }) {
+export default function ItemsEditor({ worldId, items, facts = [], archiveEntries = [], residents = [], onItemsChange, addToast }) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [adding, setAdding] = useState(false);
 
@@ -270,10 +287,10 @@ export default function ItemsEditor({ worldId, items, facts = [], onItemsChange,
 					</div>
 				)}
 				{items.map((item) => (
-					<ItemRow key={item.id} worldId={worldId} item={item} items={items} facts={facts} onSaved={onItemsChange} onDeleted={onItemsChange} addToast={addToast} />
+					<ItemRow key={item.id} worldId={worldId} item={item} items={items} facts={facts} archiveEntries={archiveEntries} residents={residents} onSaved={onItemsChange} onDeleted={onItemsChange} addToast={addToast} />
 				))}
 				{adding ? (
-					<NewItem worldId={worldId} items={items} facts={facts} addToast={addToast} onCancel={() => setAdding(false)} onCreated={async () => { setAdding(false); await onItemsChange(); }} />
+					<NewItem worldId={worldId} items={items} facts={facts} archiveEntries={archiveEntries} residents={residents} addToast={addToast} onCancel={() => setAdding(false)} onCreated={async () => { setAdding(false); await onItemsChange(); }} />
 				) : (
 					<button type="button" onClick={() => setAdding(true)} className="w-full border border-dashed border-line-1 px-3 py-2 text-[0.7rem] tracking-[0.1em] text-fg-3 hover:text-accent hover:border-accent/50 transition-colors cursor-pointer">
 						+ NEW ITEM

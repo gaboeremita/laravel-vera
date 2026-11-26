@@ -79,5 +79,13 @@ it('validates the line', function (array $payload) {
     postObservation($this, $scenario, $payload)->assertUnprocessable()->assertJsonValidationErrors('line');
 })->with([
     'missing' => [[]],
-    'too long' => [['line' => str_repeat('a', 501)]],
 ]);
+
+it('records a line of any length', function () {
+    $scenario = worldStateScenario(fakeReply: false);
+    $line = str_repeat('a', 5000);
+
+    postObservation($this, $scenario, ['line' => $line])->assertCreated();
+
+    expect(sessionConversation($scenario)->messages()->sole()->content)->toBe($line);
+});

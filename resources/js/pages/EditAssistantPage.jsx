@@ -35,6 +35,8 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 	const [selectedArchiveId, setSelectedArchiveId] = useState('');
 	const [mode, setMode] = useState('assistant');
 	const [portraitType, setPortraitType] = useState('image');
+	const [hovers, setHovers] = useState(false);
+	const [shimmers, setShimmers] = useState(false);
 	const [vrmFilename, setVrmFilename] = useState(null);
 	const [isUploadingVrm, setIsUploadingVrm] = useState(false);
 	const [isDeletingVrm, setIsDeletingVrm] = useState(false);
@@ -121,6 +123,8 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				if (data.agent_config?.termRules) setTermRules(data.agent_config.termRules);
 				setSentimentDefinitions(toSentimentRows(data.sentimentDefinitions));
 				setPortraitType(data.portrait_type || 'image');
+				setHovers(Boolean(data.hovers));
+				setShimmers(Boolean(data.shimmers));
 				setVrmFilename(data.vrm_url ? (data.vrm_original_name || 'avatar.vrm') : null);
 				setHasLod(Boolean(data.vrm_lod_url));
 				setCardImagePreview(data.image_url || null);
@@ -156,6 +160,8 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 				archive_id: selectedArchiveId ? Number(selectedArchiveId) : null,
 				mode,
 				portrait_type: portraitType,
+				hovers,
+				shimmers,
 				...(isNpc ? {} : { agent_config: { termRules }, sentimentDefinitions: toSentimentPayload(sentimentDefinitions) }),
 			});
 
@@ -654,6 +660,15 @@ export default function EditAssistantPage({ kind = 'assistant' }) {
 
 					{portraitType === 'avatar3d' && (
 						<>
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase flex items-center gap-2 cursor-pointer w-fit">
+								<input type="checkbox" checked={hovers} onChange={(e) => setHovers(e.target.checked)} className="accent-accent" />
+								Hovers
+							</label>
+							<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase flex items-center gap-2 cursor-pointer w-fit">
+								<input type="checkbox" checked={shimmers} onChange={(e) => setShimmers(e.target.checked)} className="accent-accent" />
+								Shimmers
+							</label>
+
 							<div className="space-y-2">
 								<label className="text-fg-3 text-[0.65rem] tracking-[0.1em] uppercase block">
 									VRM File

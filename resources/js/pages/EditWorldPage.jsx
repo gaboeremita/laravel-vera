@@ -112,7 +112,7 @@ export default function EditWorldPage() {
 							value={value}
 							onChange={setValue}
 							regions={value.regions}
-							itemsEditor={<ItemsEditor worldId={value.id} items={inventoryConfig.items} facts={inventoryConfig.facts} onItemsChange={inventoryConfig.reloadItems} addToast={addToast} />}
+							itemsEditor={<ItemsEditor worldId={value.id} items={inventoryConfig.items} facts={inventoryConfig.facts} archiveEntries={inventoryConfig.archiveEntries} residents={value.residents} onItemsChange={inventoryConfig.reloadItems} addToast={addToast} />}
 							playerInventoryEditor={
 								<StartingInventoryEditor
 									items={inventoryConfig.items}

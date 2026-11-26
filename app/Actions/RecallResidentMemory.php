@@ -68,7 +68,7 @@ class RecallResidentMemory
      */
     private function fromArchive(Assistant $assistant): ?array
     {
-        $entry = $assistant->archive?->entries()->inRandomOrder()->first(['title', 'content']);
+        $entry = $assistant->archive?->entries()->retrievable()->inRandomOrder()->first(['title', 'content']);
 
         return $entry === null ? null : ['from' => "your archive: {$entry->title}", 'memory' => Str::limit((string) $entry->content, self::MEMORY_LENGTH)];
     }

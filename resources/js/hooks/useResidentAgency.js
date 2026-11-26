@@ -121,6 +121,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, regi
 				const positions = latest().getPositions();
 				return decisionPace(ownPace, isFar(positions.residents?.[resident.id], positions.user));
 			};
+			const occupied = () => chatResidentRef.current === resident.id || latest().frozenResidentIds.includes(resident.id) || latest().isBusy?.(resident.id) || latest().isPaused?.();
 			let wait = idleWait('standing', Math.random, paceNow()) + index * STAGGER_MS;
 			while (!cancelled) {
 				await sleep(wait);
@@ -129,7 +130,7 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, regi
 				const userAway = Date.now() - lastInputAt > USER_AWAY_MS;
 				const positions = latest().getPositions();
 				const otherFloor = !onSameFloor(latest().layout, positions.user, positions.residents?.[resident.id]);
-				if (!commands || userAway || otherFloor || document.visibilityState === 'hidden' || chatResidentRef.current === resident.id || latest().frozenResidentIds.includes(resident.id) || latest().isBusy?.(resident.id) || latest().isPaused?.()) {
+				if (!commands || userAway || otherFloor || document.visibilityState === 'hidden' || occupied()) {
 					wait = RECHECK_MS;
 					continue;
 				}
@@ -150,6 +151,12 @@ export function useResidentAgency({ enabled, worldId, sessionId, residents, regi
 				}
 
 				const { decision } = outcome;
+				// A decision takes a while to arrive; whatever made the resident busy in the meantime wins over it.
+				if (occupied()) {
+					await reportOutcome(resident.id, decision.activityId, { outcome: 'interrupted', reason: 'they got busy with something else while deciding' });
+					wait = RECHECK_MS;
+					continue;
+				}
 				running.set(resident.id, decision.activityId);
 				latest().onThought(resident.id, decision.line || null);
 				let result;

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { zoneTree } from '../worldLocation.js';
 import { projectToMap } from '../worldMapProjection.js';
 import { outlineCentroid } from '../zoneLanding.js';
 import { HudButton } from './HudControls.jsx';
@@ -13,21 +14,6 @@ function mapBounds(zones) {
 	const xs = points.map(([x]) => x);
 	const zs = points.map(([, z]) => z);
 	return { minX: Math.min(...xs) - MAP_PADDING, maxX: Math.max(...xs) + MAP_PADDING, minZ: Math.min(...zs) - MAP_PADDING, maxZ: Math.max(...zs) + MAP_PADDING };
-}
-
-/** The zones in nesting order, each with how deep it sits. */
-function zoneTree(zones) {
-	const byParent = new Map();
-	zones.forEach((zone) => byParent.set(zone.parentId ?? null, [...(byParent.get(zone.parentId ?? null) ?? []), zone]));
-	const known = new Set(zones.map((zone) => zone.id));
-	const ordered = [];
-	const walk = (parentId, depth) => (byParent.get(parentId) ?? []).forEach((zone) => {
-		ordered.push({ zone, depth });
-		walk(zone.id, depth + 1);
-	});
-	walk(null, 0);
-	zones.filter((zone) => zone.parentId && !known.has(zone.parentId)).forEach((zone) => ordered.push({ zone, depth: 0 }));
-	return ordered;
 }
 
 function ZoneMap({ zones, residents, playerPosition, highlighted, onHighlight, onPick, pulse }) {

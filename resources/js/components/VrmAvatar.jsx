@@ -1,14 +1,17 @@
 import { useRef, useEffect, useEffectEvent, useCallback, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { AnimationMixer, Box3, BackSide, LoopOnce, LoopRepeat, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3 } from 'three';
+import { AnimationMixer, BackSide, LoopOnce, LoopRepeat, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3 } from 'three';
 import { VRMUtils } from '@pixiv/three-vrm';
 import veraAvatar from '../../images/vera-avatar.png';
 import defaultFloor from '../../images/avatar-background-default-floor.png';
 import defaultSurroundings from '../../images/avatar-background-default-surroundings.png';
 import useAvatarBackground from '../hooks/useAvatarBackground.js';
+import { createHologram, findOrnaments, moveOrnaments } from '../utils/hologram.js';
+import { hoverBob } from '../utils/hover.js';
 import { loadPoseClip } from '../utils/poseClipCache.js';
 import { applyBoneQuaternions, captureBoneQuaternions } from '../utils/boneQuaternions.js';
 import { createVrmLoader } from '../utils/vrmLoader.js';
+import { relaxedArmAngle } from './world/residentMotion.js';
 
 const EXPRESSION_HOLD_SECONDS = 3.5;
 const BACKGROUND_FADE_SECONDS = 0.4;
@@ -53,9 +56,11 @@ const BACKDROP_THETA_START = Math.PI - BACKDROP_THETA_LENGTH / 2;
 // straddling the floor and having its lower half hidden beneath it.
 const BACKDROP_Y = BACKDROP_HEIGHT / 2;
 
-function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimationUrl, poseTriggerId, defaultPoseBlendshapes, defaultPoseAnimationUrl, onLoaded, onError }) {
+function VrmScene({ vrmUrl, hovers, shimmers, emotion, blendshapes, poseBlendshapes, poseAnimationUrl, poseTriggerId, defaultPoseBlendshapes, defaultPoseAnimationUrl, onLoaded, onError }) {
 	const { scene, camera, gl } = useThree();
 	const vrmRef = useRef(null);
+	const ornamentsRef = useRef([]);
+	const hologramRef = useRef(null);
 	const currentWeightsRef = useRef({});
 	const blinkRef = useRef({ phase: 'waiting', phaseElapsed: 0, threshold: 3 });
 	const elapsedRef = useRef(0);
@@ -150,7 +155,7 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 
 			let clip = null;
 			try {
-				clip = await loadPoseClip(url, vrm);
+				clip = await loadPoseClip(url, vrm, { hovering: hovers });
 			} catch (error) {
 				console.error('[VrmAvatar] default pose animation load error:', error);
 			}
@@ -192,7 +197,7 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 				poseBlendRef.current = { active: true, mode: 'in', elapsed: 0, resumingDefault: false };
 			}
 		},
-		[ensureMixer]
+		[ensureMixer, hovers]
 	);
 
 	const notifyLoaded = useEffectEvent(() => onLoaded());
@@ -215,12 +220,15 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 				VRMUtils.rotateVRM0(vrm);
 				vrmRef.current = vrm;
 				scene.add(vrm.scene);
+				ornamentsRef.current = findOrnaments(vrm.scene);
+				hologramRef.current = shimmers ? createHologram(vrm) : null;
 
 				// VRM models load in T-pose; lower the arms to a relaxed stance.
 				const leftUpperArm = vrm.humanoid.getNormalizedBoneNode('leftUpperArm');
 				const rightUpperArm = vrm.humanoid.getNormalizedBoneNode('rightUpperArm');
-				if (leftUpperArm) leftUpperArm.rotation.z = 1.2;
-				if (rightUpperArm) rightUpperArm.rotation.z = -1.2;
+				const armAngle = relaxedArmAngle(vrm.meta?.metaVersion);
+				if (leftUpperArm) leftUpperArm.rotation.z = armAngle;
+				if (rightUpperArm) rightUpperArm.rotation.z = -armAngle;
 
 				// Snapshot this relaxed stance as the pose a triggered animation
 				// blends back to once it finishes, so the body doesn't stay
@@ -235,15 +243,15 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 				// Crop at the tops of the legs with the eyes EYE_LINE_FROM_TOP down
 				// the frame, so every model gets the same composition. The hips
 				// bone sits at the waist on some rigs and at the legs on others,
-				// and the model's bounding box top varies with hair and ornaments.
+				// and the model's bounding box varies with hair and ornaments, so
+				// the frame is centred on the head. A model without eye bones gives
+				// its eye height as the look-at offset from the head bone.
 				// updateMatrixWorld also refreshes each skinned mesh's bind matrix
-				// after rotateVRM0; without it the box of a model built away from
-				// the origin comes out mirrored and the camera frames empty space.
+				// after rotateVRM0, so the bone positions read below are current.
 				vrm.scene.updateMatrixWorld(true);
-				const box = new Box3().setFromObject(vrm.scene);
-				const center = box.getCenter(new Vector3());
+				const center = vrm.humanoid.getNormalizedBoneNode('head').getWorldPosition(new Vector3());
 				const boneY = (boneName) => vrm.humanoid.getNormalizedBoneNode(boneName)?.getWorldPosition(new Vector3()).y;
-				const eyeY = boneY('leftEye') ?? boneY('head');
+				const eyeY = boneY('leftEye') ?? center.y + (vrm.lookAt?.offsetFromHeadBone.y ?? 0);
 				const frameBottom = (boneY('leftUpperLeg') + boneY('rightUpperLeg')) / 2;
 				const frameHeight = (eyeY - frameBottom) / (1 - EYE_LINE_FROM_TOP);
 				const frameCenterY = frameBottom + frameHeight / 2;
@@ -288,13 +296,16 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 			defaultLoopActiveRef.current = false;
 			loadedDefaultUrlRef.current = null;
 
+			hologramRef.current?.dispose();
+			hologramRef.current = null;
+			ornamentsRef.current = [];
 			if (vrmRef.current) {
 				scene.remove(vrmRef.current.scene);
 				VRMUtils.deepDispose(vrmRef.current.scene);
 				vrmRef.current = null;
 			}
 		};
-	}, [vrmUrl, gl, scene, camera]);
+	}, [vrmUrl, gl, scene, camera, shimmers]);
 
 	// Picks up a default-pose animation that starts existing, or changes,
 	// after the VRM has already loaded (the initial-load case is handled
@@ -355,7 +366,7 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 
 			let clip = null;
 			try {
-				clip = await loadPoseClip(poseUrl, vrm);
+				clip = await loadPoseClip(poseUrl, vrm, { hovering: hovers });
 			} catch (error) {
 				console.error('[VrmAvatar] pose animation load error:', error);
 			}
@@ -396,11 +407,12 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 		return () => {
 			cancelled = true;
 		};
-	}, [poseTriggerId, ensureMixer]);
+	}, [poseTriggerId, ensureMixer, hovers]);
 
-	useFrame((_, delta) => {
+	useFrame((state, delta) => {
 		if (!vrmRef.current) return;
 		const vrm = vrmRef.current;
+		vrm.scene.position.y = hovers ? hoverBob(state.clock.elapsedTime) : 0;
 
 		// Hold the expression briefly, then decay back to neutral so she
 		// doesn't stay frozen in the last emotion forever.
@@ -555,6 +567,8 @@ function VrmScene({ vrmUrl, emotion, blendshapes, poseBlendshapes, poseAnimation
 		// frame for the whole hold, the same way it does while the clip is
 		// still actually playing.
 
+		moveOrnaments(ornamentsRef.current, state.clock.elapsedTime);
+		hologramRef.current?.update(state.clock.elapsedTime, delta);
 		vrm.update(delta);
 	});
 
@@ -681,7 +695,7 @@ function AvatarBackgroundScene({ floorUrl, surroundingsUrl }) {
 	);
 }
 
-export default function VrmAvatar({ vrmUrl, emotion, blendshapes = [], poseBlendshapes = [], poseAnimationUrl = null, poseTriggerId = null, defaultPoseBlendshapes = [], defaultPoseAnimationUrl = null, assistantId = null, conversationId = null }) {
+export default function VrmAvatar({ vrmUrl, hovers = false, shimmers = false, emotion, blendshapes = [], poseBlendshapes = [], poseAnimationUrl = null, poseTriggerId = null, defaultPoseBlendshapes = [], defaultPoseAnimationUrl = null, assistantId = null, conversationId = null }) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [loadError, setLoadError] = useState(false);
 	const [syncedUrl, setSyncedUrl] = useState(vrmUrl);
@@ -723,6 +737,8 @@ export default function VrmAvatar({ vrmUrl, emotion, blendshapes = [], poseBlend
 				<AvatarBackgroundScene floorUrl={floorUrl} surroundingsUrl={surroundingsUrl} />
 				<VrmScene
 					vrmUrl={vrmUrl}
+					hovers={hovers}
+					shimmers={shimmers}
 					emotion={emotion}
 					blendshapes={blendshapes}
 					poseBlendshapes={poseBlendshapes}

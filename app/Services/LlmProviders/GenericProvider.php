@@ -94,8 +94,6 @@ class GenericProvider implements LlmProvider
 
         $data = $response->json();
 
-        Log::debug('[GenericProvider] raw response', ['model' => $this->model, 'data' => $data]);
-
         if (isset($data['error'])) {
             Log::error('[GenericProvider] LLM error', ['error' => $data['error']]);
             throw new \RuntimeException('LLM error: '.($data['error']['message'] ?? 'Unknown error'));

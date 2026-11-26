@@ -140,6 +140,17 @@ it('starts a conversation she owns once she reaches the other resident', functio
         ->and($conversation->messages()->sole()->only(['content', 'speaker_type', 'speaker_id']))->toBe(['content' => 'Did you hear the organ earlier?', 'speaker_type' => $yinlin->getMorphClass(), 'speaker_id' => $yinlin->id]);
 });
 
+it('starts a conversation with an opening line of any length', function () {
+    $scenario = twoResidentScenario();
+    [$user, , , $world, $resident, $session, $vera] = $scenario;
+    $line = trim(str_repeat('Tell me, Vera, why the archive hums at night. ', 40));
+
+    $response = $this->actingAs($user)->postJson(route('worlds.sessions.residents.conversations.store', [$world->world_id, $session->id, $resident->id]), ['with' => $vera->id, 'line' => $line])
+        ->assertCreated();
+
+    expect(Conversation::findOrFail($response->json('conversationId'))->messages()->sole()->content)->toBe($line);
+});
+
 it('keeps a resident from starting a conversation with herself', function () {
     $scenario = twoResidentScenario();
     [$user, , , $world, $resident, $session] = $scenario;
@@ -330,6 +341,34 @@ it('lets the user stop a conversation and listen in on one', function () {
         ->and($conversation->fresh()->status)->toBe(ConversationStatus::Paused);
 });
 
+it('reads a conversation back in the order its lines were said', function () {
+    $scenario = twoResidentScenario();
+    [$user, $yinlin, , $world, , $session, $vera] = $scenario;
+    $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera->assistant)->forWorldSession($session)->create();
+    $first = $conversation->messages()->create(['role' => 'assistant', 'content' => 'First.', 'speaker_type' => $yinlin->getMorphClass(), 'speaker_id' => $yinlin->id]);
+    $conversation->messages()->create(['role' => 'assistant', 'content' => 'Second.', 'speaker_type' => $vera->assistant->getMorphClass(), 'speaker_id' => $vera->assistant->id]);
+    // Postgres returns rows in storage order unless asked; a rewritten row moves to the end of the table.
+    $first->forceFill(['content' => 'First!'])->save();
+
+    $this->actingAs($user)->getJson(route('worlds.sessions.conversations.show', [$world->world_id, $session->id, $conversation->id]))
+        ->assertSuccessful()
+        ->assertJsonPath('data.messages.0.content', 'First!')
+        ->assertJsonPath('data.messages.1.content', 'Second.');
+});
+
+it('leaves tool calls out when reading a conversation back', function () {
+    $scenario = twoResidentScenario();
+    [$user, $yinlin, , $world, , $session, $vera] = $scenario;
+    $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera->assistant)->forWorldSession($session)->create();
+    $conversation->messages()->create(['role' => 'tool_call', 'content' => null]);
+    say($conversation, $yinlin, 'Hello.');
+
+    $this->actingAs($user)->getJson(route('worlds.sessions.conversations.show', [$world->world_id, $session->id, $conversation->id]))
+        ->assertSuccessful()
+        ->assertJsonCount(1, 'data.messages')
+        ->assertJsonPath('data.messages.0.content', 'Hello.');
+});
+
 it('keeps other users out of a world conversation', function () {
     $scenario = twoResidentScenario();
     [, $yinlin, , $world, , $session, $vera] = $scenario;
@@ -347,7 +386,66 @@ it('reminds her of her conversations with others when she talks to the user', fu
 
     sendWorldMessage($this, $scenario, residentPositions($scenario))->assertSuccessful();
 
+    expect(sentPrompt())->toContain("With Vera:\nVera: The keytars are his.")
+        ->not->toContain('With the user:');
+});
+
+it('leaves empty lines out of her conversations with others', function () {
+    $scenario = twoResidentScenario();
+    [, $yinlin, , , , $session, $vera] = $scenario;
+    $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera->assistant)->forWorldSession($session)->create();
+    say($conversation, $vera->assistant, 'The keytars are his.');
+    foreach (range(1, 6) as $index) {
+        say($conversation, $index % 2 === 0 ? $vera->assistant : $yinlin, '');
+    }
+    Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Hi.'))]);
+
+    sendWorldMessage($this, $scenario, residentPositions($scenario))->assertSuccessful();
+
+    expect(sentPrompt())->toContain("With Vera:\nVera: The keytars are his.")
+        ->not->toMatch('/^(you|Vera): *$/m');
+});
+
+it('reminds her of her conversations with others in conversation mode and on Discord', function () {
+    $scenario = twoResidentScenario();
+    [$user, $yinlin, $userChat, , , $session, $vera] = $scenario;
+    $userChat->update(['world_session_id' => $session->id, 'discord_channel_id' => 'dm-1']);
+    $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera->assistant)->forWorldSession($session)->create();
+    say($conversation, $vera->assistant, 'The keytars are his.');
+    Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Hi.'))]);
+
+    $this->actingAs($user)->postJson(route('conversations.sendMessage', ['assistant' => $yinlin->id, 'id' => $userChat->id]), ['message' => ['content' => 'What did Vera say?']])->assertSuccessful();
     expect(sentPrompt())->toContain("With Vera:\nVera: The keytars are his.");
+
+    $this->postJson(route('conversations.sendDiscordMessage', $yinlin), ['channel_id' => 'dm-1', 'content' => 'What did Vera say?'])->assertSuccessful();
+    expect(sentPrompt())->toContain("With Vera:\nVera: The keytars are his.");
+});
+
+it('reminds her of what the user told her when she talks to another resident', function () {
+    $scenario = twoResidentScenario();
+    [, $yinlin, , , , $session, $vera] = $scenario;
+    $userChat = Conversation::withResident($session, $vera);
+    $userChat->messages()->create(['role' => 'user', 'content' => 'Careful with Yinlin, she is jealous of you.']);
+    $userChat->messages()->create(['role' => 'assistant', 'content' => 'Noted.']);
+    $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera->assistant)->forWorldSession($session)->create(['resumed_at' => now()->subMinute()]);
+    say($conversation, $yinlin, 'Did you hear the organ?', 10);
+    fakeTurn(finalAnswerResponse('I did.'));
+
+    takeTurn($this, $scenario, $conversation)->assertSuccessful()->assertJsonPath('status', 'spoke');
+
+    expect(sentPrompt())->toContain("With the user:\nthe user: Careful with Yinlin, she is jealous of you.\nyou: Noted.");
+});
+
+it('leaves the conversation she is in out of her other conversations', function () {
+    $scenario = twoResidentScenario();
+    [, $yinlin, , , , $session, $vera] = $scenario;
+    $conversation = Conversation::factory()->betweenAssistants($yinlin, $vera->assistant)->forWorldSession($session)->create(['resumed_at' => now()->subMinute()]);
+    say($conversation, $yinlin, 'Did you hear the organ?', 10);
+    fakeTurn(finalAnswerResponse('I did.'));
+
+    takeTurn($this, $scenario, $conversation)->assertSuccessful()->assertJsonPath('status', 'spoke');
+
+    expect(sentPrompt())->not->toContain('With Yinlin:');
 });
 
 it('stops a conversation with an NPC after four lines each', function () {

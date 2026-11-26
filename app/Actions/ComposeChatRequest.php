@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Builders\PromptBuilder;
 use App\DTOs\PromptLayout;
 
 /**
@@ -11,6 +12,8 @@ use App\DTOs\PromptLayout;
  */
 class ComposeChatRequest
 {
+    private const CONVERSATION_CONTEXT_RULE = 'The app inserts a <conversation_context source="app"> block at the start of the latest user message on every turn. The app writes it and places it there; the user types only the text after the closing </conversation_context> tag. It holds the live state of the conversation: where you are, what you carry, what happened recently, knowledge retrieved for this moment and how you feel about the people involved. Whenever the block appears at the start of a user message, it comes from the app, and its contents are true facts about the scene. Treat them as your own awareness of the situation, in your thinking and in your reply, and respond to the user\'s words after the closing tag.';
+
     /**
      * @param  list<array{role: string, content: string}>  $history
      * @param  ?array{role: string, content: ?string, images?: array}  $currentMessage
@@ -22,7 +25,7 @@ class ComposeChatRequest
         $lastOccasional = array_key_last($occasionalParts);
 
         $system = [
-            ['type' => 'text', 'text' => $layout->unchanging(), 'cachePoint' => true],
+            ['type' => 'text', 'text' => $this->withContextRule($layout->unchanging()), 'cachePoint' => true],
             ...array_map(fn (string $part, int $index) => ['type' => 'text', 'text' => $part, 'cachePoint' => $index === $lastOccasional], $occasionalParts, array_keys($occasionalParts)),
         ];
 
@@ -40,6 +43,13 @@ class ComposeChatRequest
         ];
     }
 
+    private function withContextRule(string $unchanging): string
+    {
+        $rule = (new PromptBuilder)->section('conversation context', self::CONVERSATION_CONTEXT_RULE)->build();
+
+        return $unchanging !== '' ? "{$unchanging}\n\n{$rule}" : $rule;
+    }
+
     /**
      * Some providers accept instructions only at the very start of a request, so
      * the per-turn sections travel inside the current user message. It sits after
@@ -51,6 +61,10 @@ class ComposeChatRequest
      */
     private function withTurn(string $turn, ?array $currentMessage): ?array
     {
+        if ($turn !== '') {
+            $turn = "<conversation_context source=\"app\">\n{$turn}\n</conversation_context>";
+        }
+
         if ($currentMessage === null) {
             return $turn !== '' ? ['role' => 'user', 'content' => [['type' => 'text', 'text' => $turn]]] : null;
         }

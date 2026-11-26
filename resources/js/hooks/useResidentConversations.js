@@ -17,7 +17,7 @@ const PAUSED_RECHECK_MS = 500;
  * it. Both residents are busy for as long as it runs; a paused world holds
  * it mid-way.
  */
-export function useResidentConversations({ enabled, paused = false, voiceEnabled = false, worldId, sessionId, residents, residentCommands, residentPositions, residentVoices, getPositions, getView, onSpeech, addToast }) {
+export function useResidentConversations({ enabled, paused = false, voiceEnabled = false, worldId, sessionId, residents, residentCommands, residentPositions, residentVoices, getPositions, getView, onSpeech, onShimmeringChange, addToast }) {
 	const conversationsRef = useRef(new Map());
 	const [conversations, setConversations] = useState([]);
 	const latestRef = useRef({});
@@ -29,7 +29,7 @@ export function useResidentConversations({ enabled, paused = false, voiceEnabled
 	}, [paused]);
 
 	useEffect(() => {
-		latestRef.current = { residents, getPositions, getView, onSpeech, addToast, voiceEnabled };
+		latestRef.current = { residents, getPositions, getView, onSpeech, onShimmeringChange, addToast, voiceEnabled };
 	});
 
 	const publish = useCallback(() => {
@@ -107,6 +107,7 @@ export function useResidentConversations({ enabled, paused = false, voiceEnabled
 				finish(conversation.id);
 				return;
 			}
+			if (data.shimmeringResidentIds) latestRef.current.onShimmeringChange?.(data.shimmeringResidentIds, data.fakeShimmeringResidentIds);
 			let seconds = 0;
 			if (data.message) {
 				conversation.lines.push({ id: data.message.id, residentId: data.message.residentId, content: data.message.content });

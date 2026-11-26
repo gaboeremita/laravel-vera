@@ -16,7 +16,8 @@ import { askForLine } from './inventoryChanges.js';
 
 export default function WorldChat({ world, resident, onClose, addToast, onPoseTrigger, worldSessionId, getPositions, getResidentPosture, getResidentState, getUserState, getOccupiedSpots, getStackedSpots, onVoiceAudio, onSilentReply, onAction, actionSender: actionSenderRef, inventory, onInventory, onLearnedFacts, onHandoverRequest, questOffer = null, onQuestOffer, onOpenQuestOffer, openingLine = null }) {
 	const [conversationId, setConversationId] = useState(null);
-	const [input, setInput] = useState('');
+	const draftKey = `worldChatDraft:${worldSessionId ?? world.id}:${resident.id}`;
+	const [input, setInput] = useState(() => localStorage.getItem(draftKey) || '');
 	const [pendingImage, setPendingImage] = useState(null);
 	const fileInputRef = useRef(null);
 	const [isTranscribing, setIsTranscribing] = useState(false);
@@ -273,8 +274,16 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 		const image = pendingImage;
 		setInput('');
 		setPendingImage(null);
+		localStorage.removeItem(draftKey);
 		sendMessage(text, { image });
 		inputRef.current?.blur();
+	};
+
+	const handleInputChange = (event) => {
+		const value = event.target.value;
+		setInput(value);
+		if (value.trim()) localStorage.setItem(draftKey, value);
+		else localStorage.removeItem(draftKey);
 	};
 
 	const handleImageSelect = (event) => {
@@ -303,7 +312,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 					<button type="button" onClick={isListening ? stopVoiceMode : startVoiceMode} title={isListening ? 'Turn voice mode off (V)' : 'Turn voice mode on (V)'} className={`cursor-pointer ${isListening ? 'text-accent' : 'text-fg-3 hover:text-fg-1'}`}>
 						{isListening ? <Mic size={16} /> : <MicOff size={16} />}
 					</button>
-					<button type="button" onClick={onClose} className="text-fg-3 text-xs hover:text-fg-1 cursor-pointer">END (C)</button>
+					<button type="button" onClick={onClose} className="text-fg-3 text-xs hover:text-fg-1 cursor-pointer">END (ESC)</button>
 				</div>
 			</header>
 			<GoodsStrip goods={goods} onPick={(item) => queueLine(askForLine(item))} />
@@ -337,7 +346,7 @@ export default function WorldChat({ world, resident, onClose, addToast, onPoseTr
 					ref={inputRef}
 					value={input}
 					onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.blur(); }}
-					onChange={(event) => setInput(event.target.value)}
+					onChange={handleInputChange}
 					placeholder="Enter to type, Esc to keep walking"
 					disabled={!conversationId || isLoading}
 					className="min-w-0 flex-1 bg-bg-1 px-3 py-2 text-sm text-fg-1 outline-none"

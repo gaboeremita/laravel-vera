@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { AnimationClip, Bone, Group, QuaternionKeyframeTrack, VectorKeyframeTrack } from 'three';
 import { mixamoBaseClip, retargetBaseClip } from '../../resources/js/utils/mixamoRetargeting.js';
 import { mixamoBaseClipFor } from '../../resources/js/utils/poseClipCache.js';
-import { shouldLoad, shouldUnload, summarizeResidents, updateVrm, visualDetail } from '../../resources/js/components/world/residentDetail.js';
+import { residentPoint, shouldLoad, shouldUnload, summarizeResidents, updateVrm, visualDetail } from '../../resources/js/components/world/residentDetail.js';
 import { createLineCache, facesPoint, voicesLine } from '../../resources/js/components/world/worldVoice.js';
 import { onSameFloor } from '../../resources/js/components/world/worldLocation.js';
 
@@ -66,6 +66,13 @@ test('residents who move or decide stay loaded anywhere; residents who stay put 
 	assert.equal(shouldUnload({ behavior: 'stationary', distance: 50 }), true);
 	assert.equal(shouldUnload({ behavior: 'stationary', distance: 40 }), false);
 	assert.equal(shouldUnload({ behavior: 'roam', distance: 90 }), false);
+});
+
+test('a resident summoned out of their home region is placed and range-checked where their session puts them', () => {
+	const resident = { position: { x: 0, y: 2.82, z: -42.6 } };
+	assert.deepEqual(residentPoint(resident, { position: { x: 0.1, y: 0, z: 10.1 } }), { x: 0.1, y: 0, z: 10.1 });
+	assert.deepEqual(residentPoint(resident, null), { x: 0, y: 2.82, z: -42.6 });
+	assert.deepEqual(residentPoint({ position: null }, null), { x: 0, y: 0, z: 0 });
 });
 
 test('bodies animate only in view, with hair physics up close and half the frame rate far away', () => {

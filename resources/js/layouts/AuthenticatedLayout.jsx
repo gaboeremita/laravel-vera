@@ -24,7 +24,7 @@ export default function AuthenticatedLayout() {
 	const [hidePortrait, setHidePortrait] = useState(false);
 	const [worldPortraitUrl, setWorldPortraitUrl] = useState(null);
 
-	const { emotionNames, poses, fetchEmotions, getImageUrl, getVideoUrl, getVrmBlendshapes, getPoseBlendshapes, getPoseAnimationUrl, unlocked, portraitType, vrmUrl } = useEmotions();
+	const { emotionNames, poses, fetchEmotions, getImageUrl, getVideoUrl, getVrmBlendshapes, getPoseBlendshapes, getPoseAnimationUrl, unlocked, portraitType, vrmUrl, hovers, shimmers } = useEmotions();
 	const { toasts, addToast, removeToast } = useToast();
 	useVideoGenerationNotices(userId, addToast, navigate);
 
@@ -74,6 +74,8 @@ export default function AuthenticatedLayout() {
 						defaultPoseAnimationUrl={getPoseAnimationUrl('default')}
 						portraitType={portraitType}
 						vrmUrl={vrmUrl}
+						hovers={hovers}
+						shimmers={shimmers}
 						assistantId={activeAssistantId}
 						conversationId={activeConversationId}
 						worldPortraitUrl={worldPortraitUrl}

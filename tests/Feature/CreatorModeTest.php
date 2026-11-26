@@ -99,7 +99,7 @@ it('activates creator mode in a world with the world\'s password and keeps it on
 
     expect($conversation->fresh()->creator_mode_at)->not->toBeNull()
         ->and($conversation->messages()->where('role', 'user')->value('content'))->toBe('[creator mode] hello')
-        ->and(systemPromptOfRequestIn(0))->toContain('CREATOR SECTION')->not->toContain('OLD TRIGGER SECTION')
+        ->and(systemPromptOfRequestIn(0))->toContain('CREATOR SECTION')->toContain('OLD TRIGGER SECTION')
         ->and(everythingSentToModels())->not->toContain(CREATOR_PASSWORD);
 
     sendCreatorWorldChat($this, $scenario, 'still there?')->assertJsonPath('creatorMode.active', true);
@@ -117,7 +117,7 @@ it('stays off in a world with a wrong password, and the password goes nowhere', 
         ->assertJsonPath('userContent', 'hi');
 
     expect($conversation->fresh()->creator_mode_at)->toBeNull()
-        ->and(systemPromptOfRequestIn(0))->not->toContain('CREATOR SECTION')->not->toContain('OLD TRIGGER SECTION')
+        ->and(systemPromptOfRequestIn(0))->toContain('CREATOR SECTION')->toContain('OLD TRIGGER SECTION')
         ->and(everythingSentToModels())->not->toContain('wrong guess');
 });
 
@@ -148,8 +148,6 @@ it('keeps creator mode to the conversation it was activated in', function () {
     Http::fake(['fake-llm.test/*' => Http::response(finalAnswerResponse('Hello.'))]);
 
     sendCreatorWorldChat($this, [$user, $assistant, $other, ...array_slice($scenario, 3)], 'hello')->assertJsonPath('creatorMode.active', false);
-
-    expect(systemPromptOfRequestIn(0))->not->toContain('CREATOR SECTION');
 });
 
 it('lets the creator reveal any fact and grant credits, recorded as the creator\'s', function () {

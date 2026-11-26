@@ -42,6 +42,8 @@ class EmotionController extends Controller
 
         return response()->json([
             'portrait_type' => $assistantModel->portrait_type->value,
+            'hovers' => $assistantModel->hovers,
+            'shimmers' => $assistantModel->shimmers,
             'vrm_url' => $assistantModel->vrm?->url,
             'emotions' => $emotions,
             'poses' => $poses,

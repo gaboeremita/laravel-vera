@@ -8,6 +8,8 @@ export function useEmotions() {
 	const [emotionsLoaded, setEmotionsLoaded] = useState(false);
 	const [portraitType, setPortraitType] = useState('image');
 	const [vrmUrl, setVrmUrl] = useState(null);
+	const [hovers, setHovers] = useState(false);
+	const [shimmers, setShimmers] = useState(false);
 
 	const fetchEmotions = async (assistantId) => {
 		try {
@@ -17,6 +19,8 @@ export function useEmotions() {
 			setPoses(data.poses ?? []);
 			setPortraitType(data.portrait_type ?? 'image');
 			setVrmUrl(data.vrm_url ?? null);
+			setHovers(data.hovers === true);
+			setShimmers(data.shimmers === true);
 			setEmotionsLoaded(true);
 		} catch {
 			// silent fail
@@ -58,5 +62,7 @@ export function useEmotions() {
 		getPoseAnimationUrl,
 		portraitType,
 		vrmUrl,
+		hovers,
+		shimmers,
 	};
 }

@@ -43,7 +43,7 @@ export default function ConversationObserverPanel({ worldId, sessionId, conversa
 				</div>
 				<div className="flex items-center gap-3">
 					{active && <button type="button" onClick={onStop} className="text-danger text-xs hover:text-danger cursor-pointer">STOP</button>}
-					<button type="button" onClick={onClose} className="text-fg-3 text-xs hover:text-fg-1 cursor-pointer">CLOSE (L)</button>
+					<button type="button" onClick={onClose} className="text-fg-3 text-xs hover:text-fg-1 cursor-pointer">CLOSE (L / ESC)</button>
 				</div>
 			</header>
 			<div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4 custom-scrollbar">

@@ -26,8 +26,9 @@ it('puts the unchanging part, then the memory parts, in one system message with 
     $messages = composeWith(new PromptLayout('# IDENTITY'."\n".'Vera.', ["# LONG-TERM MEMORY\nThey met.", "---\n\nThey argued."], ''), [], ['role' => 'user', 'content' => 'Hi.']);
 
     expect($messages[0]['role'])->toBe('system')
-        ->and($messages[0]['content'])->toBe([
-            ['type' => 'text', 'text' => "# IDENTITY\nVera.", 'cachePoint' => true],
+        ->and($messages[0]['content'][0]['text'])->toStartWith("# IDENTITY\nVera.\n\n# CONVERSATION CONTEXT\n")
+        ->and($messages[0]['content'][0]['cachePoint'])->toBeTrue()
+        ->and(array_slice($messages[0]['content'], 1))->toBe([
             ['type' => 'text', 'text' => "# LONG-TERM MEMORY\nThey met.", 'cachePoint' => false],
             ['type' => 'text', 'text' => "---\n\nThey argued.", 'cachePoint' => true],
         ]);
@@ -40,7 +41,14 @@ it('marks only the unchanging part when there is no memory', function () {
         ->and(cachePointCount($messages))->toBe(1);
 });
 
-it('marks the last previous message and puts this turn\'s sections before the user\'s words in the current message', function () {
+it('explains in the unchanging part that the app inserts the conversation context into the user message on every turn', function () {
+    $messages = composeWith(new PromptLayout('U', [], ''), [], ['role' => 'user', 'content' => 'Hi.']);
+
+    expect($messages[0]['content'][0]['text'])->toContain('The app inserts a <conversation_context source="app"> block at the start of the latest user message on every turn.')
+        ->toContain('the user types only the text after the closing </conversation_context> tag');
+});
+
+it('marks the last previous message and puts this turn\'s sections, wrapped as conversation context, before the user\'s words in the current message', function () {
     $history = [['role' => 'user', 'content' => 'Hello.'], ['role' => 'assistant', 'content' => 'Hi!']];
 
     $messages = composeWith(new PromptLayout('U', ['M'], "# CURRENT STATE\nIn the library."), $history, ['role' => 'user', 'content' => 'How are you?', 'images' => ['aW1n']]);
@@ -48,7 +56,7 @@ it('marks the last previous message and puts this turn\'s sections before the us
     expect($messages[1])->toBe(['role' => 'user', 'content' => 'Hello.'])
         ->and($messages[2]['content'])->toBe([['type' => 'text', 'text' => 'Hi!', 'cachePoint' => true]])
         ->and($messages[3]['content'])->toBe([
-            ['type' => 'text', 'text' => "# CURRENT STATE\nIn the library."],
+            ['type' => 'text', 'text' => "<conversation_context source=\"app\">\n# CURRENT STATE\nIn the library.\n</conversation_context>"],
             ['type' => 'text', 'text' => 'How are you?'],
         ])
         ->and($messages[3]['images'])->toBe(['aW1n'])
@@ -66,5 +74,5 @@ it('sends this turn\'s sections as their own user message when nobody has spoken
     $messages = composeWith(new PromptLayout('U', [], "# CURRENT STATE\nAt the bar."), [], null);
 
     expect($messages)->toHaveCount(2)
-        ->and($messages[1])->toBe(['role' => 'user', 'content' => [['type' => 'text', 'text' => "# CURRENT STATE\nAt the bar."]]]);
+        ->and($messages[1])->toBe(['role' => 'user', 'content' => [['type' => 'text', 'text' => "<conversation_context source=\"app\">\n# CURRENT STATE\nAt the bar.\n</conversation_context>"]]]);
 });
