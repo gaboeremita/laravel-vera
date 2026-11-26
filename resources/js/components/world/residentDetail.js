@@ -8,6 +8,12 @@ export function staysLoaded(behavior) {
 	return behavior !== 'stationary';
 }
 
+/** Where the resident is in this region: their session state's position when they have one, otherwise their home position. */
+export function residentPoint(resident, savedState) {
+	const { x = 0, y = 0, z = 0 } = savedState?.position ?? resident.position ?? {};
+	return { x, y, z };
+}
+
 export function shouldLoad({ behavior, distance }) {
 	return staysLoaded(behavior) || distance <= LOAD_DISTANCE;
 }

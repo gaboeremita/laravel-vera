@@ -9,6 +9,7 @@ use App\Actions\BuildConversationHistory;
 use App\Actions\BuildFactsPrompt;
 use App\Actions\BuildInventoryPrompt;
 use App\Actions\BuildQuestsPrompt;
+use App\Actions\BuildResidentWorldPrompt;
 use App\Actions\BuildSentimentsPrompt;
 use App\Actions\ComposeChatRequest;
 use App\Actions\CreatorModeTags;
@@ -113,7 +114,7 @@ class ConversationController extends Controller
             ->conversations()
             ->when($request->filled('worldSessionId'), fn ($query) => $query->where('world_session_id', $request->integer('worldSessionId')))
             ->orderByDesc('updated_at')
-            ->get(['id', 'title', 'updated_at']);
+            ->get(['id', 'title', 'world_session_id', 'updated_at']);
 
         return response()->json($conversations);
     }
@@ -406,7 +407,7 @@ class ConversationController extends Controller
 
         $archive = $assistantModel->archive;
 
-        $excludedSections = ['opening_message', ...$this->creatorSectionsExcluded($conversation, $inWorld)];
+        $excludedSections = ['opening_message'];
 
         if (! empty($validated['voice_mode'])) {
             $excludedSections[] = 'style rules';
@@ -442,14 +443,22 @@ class ConversationController extends Controller
             $voiceModel = (new TtsManager)->resolveVoiceModel($assistantUser);
 
             if ($voiceModel?->provider->prompt) {
-                $director->append('voice provider prompt', $voiceModel->provider->prompt);
+                $providerPrompt = $voiceModel->provider->prompt;
+                $director->append('voice provider prompt', $providerPrompt);
+
+                if (isset($providerPrompt['instructions'])) {
+                    $excludedSections[] = 'voice mode';
+                }
             }
             if ($voiceModel?->prompt) {
                 $director->append('voice model prompt', $voiceModel->prompt);
             }
         }
 
-        app(AppendWorldConversationContext::class)->handle($director, $assistantModel, $region, $validated['positions'] ?? null, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], residentActivity: $residentActivity);
+        app(AppendWorldConversationContext::class)->handle($director, $assistantModel, $region, $validated['positions'] ?? null, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], residentActivity: $residentActivity, current: $conversation);
+        if ($worldSession === null && $conversation->worldSession !== null) {
+            app(AppendWorldConversationContext::class)->appendConversationsWithOthers($director, $assistantModel, $conversation->worldSession, $conversation);
+        }
         app(AppendExpressionTags::class)->handle($director, $assistantModel, $excludedSections, Posture::from($validated['residentPosture'] ?? Posture::Standing->value));
 
         $director->except($excludedSections);
@@ -468,6 +477,19 @@ class ConversationController extends Controller
                 $playerInventory = app(ResolveInventory::class)->forPlayer($worldSession);
                 $residentInventory = app(ResolveInventory::class)->forResident($worldSession, $inventoryResident);
                 $director->addToTurn(TurnSection::CurrentState, 'inventory', app(BuildInventoryPrompt::class)->handle($residentInventory));
+                $spotsPoint = $validated['positions']['residents'][$inventoryResident->id] ?? null;
+                if ($spotsPoint !== null && $region !== null && ! empty($region->layout['zones'])) {
+                    $spotsRegion = $creatorTurn ? $region : app(ApplyResidentZoneAccess::class)->handle($region, $inventoryResident);
+                    $director->addToTurn(TurnSection::CurrentState, 'available activities', app(BuildResidentWorldPrompt::class)->availableActivities(
+                        $spotsRegion,
+                        $assistantModel,
+                        app(ResolveWorldState::class)->locate($spotsRegion->layout, $spotsPoint),
+                        $validated['occupiedSpots'] ?? [],
+                        Posture::from($validated['residentPosture'] ?? Posture::Standing->value),
+                        $validated['positions']['user'] ?? null,
+                        $validated['userState']['spotId'] ?? null,
+                    ));
+                }
             }
         }
         $playerBefore = $playerInventory?->summary();
@@ -706,23 +728,6 @@ class ConversationController extends Controller
         $conversation->update(['creator_mode_at' => $conversation->creator_mode_at ?? now()]);
 
         return self::CREATOR_MODE_ON;
-    }
-
-    /**
-     * In a world the server checks the world's creator password, so the
-     * character never gets the section that used to hold it, and gets the
-     * creator mode section only while creator mode is on in the conversation.
-     * Outside any world the character gets both and judges the trigger itself.
-     *
-     * @return array<int, string>
-     */
-    private function creatorSectionsExcluded(Conversation $conversation, bool $inWorld): array
-    {
-        if (! $inWorld) {
-            return [];
-        }
-
-        return $conversation->creator_mode_at === null ? ['secret trigger', 'creator mode'] : ['secret trigger'];
     }
 
     /**
@@ -1041,7 +1046,7 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation, $conversation->world_session_id !== null)];
+        $excludedSections = ['opening_message', 'voice mode'];
 
         if ($conversation->discord_channel_id) {
             // Discord has no UI to render an emotion/pose tag against — same reasoning as the normal Discord reply flow.
@@ -1080,7 +1085,7 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation, $conversation->world_session_id !== null)];
+        $excludedSections = ['opening_message', 'voice mode'];
 
         if ($conversation->discord_channel_id) {
             // Discord has no UI to render an emotion/pose tag against — same reasoning as the normal Discord reply flow.
@@ -1120,7 +1125,7 @@ class ConversationController extends Controller
     {
         $assistantModel = $assistantUser->assistant;
 
-        $excludedSections = ['opening_message', 'voice mode', ...$this->creatorSectionsExcluded($conversation, $conversation->world_session_id !== null)];
+        $excludedSections = ['opening_message', 'voice mode'];
 
         if ($conversation->discord_channel_id) {
             $excludedSections[] = 'emotion tags';
@@ -1312,6 +1317,9 @@ class ConversationController extends Controller
 
         $director->withLongTermMemory($conversation);
         $director->withDiscordEnvironment($conversation, $assistantUser);
+        if ($conversation->worldSession !== null) {
+            app(AppendWorldConversationContext::class)->appendConversationsWithOthers($director, $assistantModel, $conversation->worldSession, $conversation);
+        }
 
         $llmManager = new LlmManager;
         $supportsTools = (bool) $llmManager->resolveModelForAssistantUser($assistantUser)?->supports_tools;

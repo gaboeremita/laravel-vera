@@ -6,8 +6,6 @@ use RuntimeException;
 
 class PlanTool extends WorldTool
 {
-    private const MAX_STEPS = 5;
-
     private const STEP_ACTIONS = ['go_to', 'use', 'zone', 'pose', 'do', 'stay', 'swim_to_edge', 'wander'];
 
     public function name(): string
@@ -29,7 +27,6 @@ class PlanTool extends WorldTool
                 'steps' => [
                     'type' => 'array',
                     'minItems' => 1,
-                    'maxItems' => self::MAX_STEPS,
                     'items' => [
                         'type' => 'object',
                         'properties' => [
@@ -54,9 +51,6 @@ class PlanTool extends WorldTool
         $steps = $arguments['steps'] ?? [];
         if ($goal === '' || ! is_array($steps) || $steps === []) {
             throw new RuntimeException('plan needs a goal and at least one step.');
-        }
-        if (count($steps) > self::MAX_STEPS) {
-            throw new RuntimeException(sprintf('A plan has at most %d steps.', self::MAX_STEPS));
         }
 
         $location = $this->toolbox->residentZoneChain;
@@ -110,7 +104,7 @@ class PlanTool extends WorldTool
                     throw new RuntimeException(sprintf('"%s" cannot be done at %s. It offers: %s.', $activityId, $spot['id'], collect($spot['activities'])->pluck('id')->implode(', ')));
                 }
                 if (in_array($spot['id'], $this->toolbox->occupiedSpots, true)) {
-                    throw new RuntimeException(sprintf('%s is taken by someone else right now.', $spot['id']));
+                    throw new RuntimeException(sprintf('%s is taken by someone else right now. %s', $spot['id'], $this->toolbox->freeSpotsNote($spot['objectId'])));
                 }
                 $object = $this->toolbox->findObject($spot['objectId']);
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Posture;
+use App\Models\AiModel;
 use App\Models\Archive;
 use App\Models\ArchiveEntry;
 use App\Models\Assistant;
@@ -51,6 +52,21 @@ it('offers her thinking and remembering on top of the world tools', function () 
     /** @var Request $request */
     $request = Http::recorded()[0][0];
     expect(collect($request['tools'])->pluck('function.name')->all())->toContain('think')->toContain('remember');
+});
+
+it('decides at low reasoning effort while her model keeps its own', function () {
+    $scenario = autonomousScenario();
+    $model = AiModel::sole();
+    $model->provider->update(['config_schema' => [['name' => 'reasoning', 'type' => 'object', 'children' => [['name' => 'effort', 'type' => 'enum', 'options' => ['high', 'low']]]]]]);
+    $model->update(['config' => ['reasoning' => ['effort' => 'high']]]);
+    fakeTurn(finalAnswerResponse('(Quiet) *stays put*'));
+
+    requestDecision($this, $scenario)->assertCreated();
+
+    /** @var Request $request */
+    $request = Http::recorded()[0][0];
+    expect($request['reasoning']['effort'])->toBe('low')
+        ->and($model->fresh()->config['reasoning']['effort'])->toBe('high');
 });
 
 it('thinks about something where she is', function () {
@@ -236,7 +252,7 @@ it('asks her own model with her persona, the world, her history and what she can
         ->toContain('You are: sitting')
         ->toContain("Poses:\nRegular: laugh (standing, sitting)\nRestricted: tease (standing)")
         ->toContain('Things to do in this place: Swim [swim] in Pool terrace')
-        ->toContain('pool-lounger-1-seat [pool-lounger-1] at the Pool lounger: Recline [recline] (taken)')
+        ->toMatch('/pool-lounger-1-seat \[pool-lounger-1\] at the Pool lounger: Recline \[recline\] \(taken, \d+\.\d m from the user\)/')
         ->toContain('Read the moment before you choose')
         ->toContain('Let the mood of your last exchange with the user carry into what you do')
         ->not->toContain('leaves you to yourself')
@@ -244,6 +260,24 @@ it('asks her own model with her persona, the world, her history and what she can
         ->not->toContain('walk (')
         ->not->toContain('talk (');
     Http::assertSent(fn (Request $request) => str_starts_with($request->url(), 'https://fake-llm.test/'));
+});
+
+it('marks the spot the user is in as theirs', function () {
+    $scenario = autonomousScenario();
+    ResidentActivity::factory()->finished()->create([
+        'world_session_id' => $scenario[5]->id,
+        'world_resident_id' => $scenario[4]->id,
+        'verb' => 'go_to',
+        'target' => 'pool-terrace',
+    ]);
+    fakeTurn(finalAnswerResponse('(Quiet) *stays where she is*'));
+
+    requestDecision($this, $scenario, [
+        'occupiedSpots' => ['pool-lounger-1-seat'],
+        'userState' => ['posture' => 'reclining', 'spotId' => 'pool-lounger-1-seat', 'activityId' => 'recline'],
+    ])->assertCreated();
+
+    expect(sentPrompt())->toContain('pool-lounger-1-seat [pool-lounger-1] at the Pool lounger: Recline [recline] (the user is here)');
 });
 
 it('tells her what the user is doing when she decides', function () {
@@ -255,13 +289,11 @@ it('tells her what the user is doing when she decides', function () {
     expect(sentPrompt())->toContain(', reclining on the Pool lounger');
 });
 
-it('rejects a decision request whose user state names an unknown spot', function () {
+it('decides with the user standing when their state names a spot the world no longer has', function () {
     $scenario = autonomousScenario();
     fakeTurn(finalAnswerResponse('(Quiet) *stays where she is*'));
 
-    requestDecision($this, $scenario, ['userState' => ['posture' => 'sitting', 'spotId' => 'moon-chair']])
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors('userState.spotId');
+    requestDecision($this, $scenario, ['userState' => ['posture' => 'sitting', 'spotId' => 'moon-chair']])->assertCreated();
 });
 
 it('shows her the last messages of her session conversation when she decides', function () {

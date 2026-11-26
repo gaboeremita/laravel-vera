@@ -26,6 +26,7 @@ class ResolveUserActivity
 
     /**
      * Someone's posture, the object and activity they are busy with, looked up in the world's layout, and the pose they hold.
+     * A spot the layout no longer has, such as one saved before the region was rebuilt, leaves them standing where they are.
      *
      * @param  ?array{posture: string, spotId?: ?string, activityId?: ?string, pose?: ?string}  $userState
      * @param  string  $key  the request field the state came in, for validation messages
@@ -53,7 +54,7 @@ class ResolveUserActivity
             }
 
             if ($spot === null) {
-                throw ValidationException::withMessages(["{$key}.spotId" => 'There is no spot with this id in the world.']);
+                return ['posture' => 'standing', 'object' => null, 'activity' => null, 'pose' => null];
             }
         }
 

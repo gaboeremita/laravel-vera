@@ -35,6 +35,21 @@ export function zoneChain(layout, zone) {
 	return chain.reverse();
 }
 
+/** The zones in nesting order, each with how deep it sits. */
+export function zoneTree(zones) {
+	const byParent = new Map();
+	zones.forEach((zone) => byParent.set(zone.parentId ?? null, [...(byParent.get(zone.parentId ?? null) ?? []), zone]));
+	const known = new Set(zones.map((zone) => zone.id));
+	const ordered = [];
+	const walk = (parentId, depth) => (byParent.get(parentId) ?? []).forEach((zone) => {
+		ordered.push({ zone, depth });
+		walk(zone.id, depth + 1);
+	});
+	walk(null, 0);
+	zones.filter((zone) => zone.parentId && !known.has(zone.parentId)).forEach((zone) => ordered.push({ zone, depth: 0 }));
+	return ordered;
+}
+
 /** The innermost zone containing the point, judged by height range and ground outline. */
 export function zoneAt(layout, point) {
 	const floor = floorAt(layout, point.y);

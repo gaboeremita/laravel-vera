@@ -120,6 +120,7 @@ class PromptDirector
         $embedding = $provider->embed($query);
 
         $entries = ArchiveEntry::query()
+            ->retrievable()
             ->where('archive_id', $archiveId)
             ->whereNotNull('embedding')
             ->whereVectorSimilarTo('embedding', $embedding, minSimilarity: $minSimilarity)

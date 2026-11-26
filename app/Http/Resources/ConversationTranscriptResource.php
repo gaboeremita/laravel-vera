@@ -35,7 +35,7 @@ class ConversationTranscriptResource extends JsonResource
             'updatedAt' => $this->updated_at?->toIso8601String(),
             'messages' => $this->when(
                 $this->relationLoaded('messages'),
-                fn () => $this->messages->map(fn (Message $message) => [
+                fn () => $this->messages->where('role', '!=', 'tool_call')->sortBy('id')->map(fn (Message $message) => [
                     'id' => $message->id,
                     'speaker' => $this->party($this->speakerOf($message)),
                     'content' => $message->content,

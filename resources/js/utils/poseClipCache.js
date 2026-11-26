@@ -1,6 +1,7 @@
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
+import { withHeldLegs } from './hover.js';
 import { mixamoBaseClip, retargetBaseClip } from './mixamoRetargeting.js';
 import { STORES, readCached, writeCached } from './worldCache.js';
 
@@ -34,8 +35,13 @@ export function clearPoseClipCache() {
 	vrmAnimations.clear();
 }
 
-/** A pose's animation clip fitted to one VRM, from a Mixamo FBX or a VRM animation file. */
-export async function loadPoseClip(url, vrm) {
+/** A pose's animation clip fitted to one VRM, from a Mixamo FBX or a VRM animation file; `hovering` holds its legs in their modelled pose. */
+export async function loadPoseClip(url, vrm, { hovering = false } = {}) {
+	const clip = await fittedClip(url, vrm);
+	return clip && hovering ? withHeldLegs(clip, vrm) : clip;
+}
+
+async function fittedClip(url, vrm) {
 	if (url.toLowerCase().endsWith('.fbx')) {
 		const base = await mixamoBaseClipFor(url);
 		return base ? retargetBaseClip(base, vrm) : null;

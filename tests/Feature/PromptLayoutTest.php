@@ -91,8 +91,8 @@ describe('world turns', function () {
 
         expect($secondSystem)->toBe($firstSystem)
             ->and($firstSystem)->toContain('# WORLD AWARENESS')->not->toContain('World awareness:')->not->toContain('World state:')
-            ->and($firstTurn)->toStartWith("# CURRENT STATE\nWorld state:")
-            ->and($secondTurn)->toStartWith("# CURRENT STATE\nWorld state:")
+            ->and($firstTurn)->toStartWith("<conversation_context source=\"app\">\n# CURRENT STATE\nWorld state:")
+            ->and($secondTurn)->toStartWith("<conversation_context source=\"app\">\n# CURRENT STATE\nWorld state:")
             ->and($secondTurn)->not->toBe($firstTurn);
     });
 

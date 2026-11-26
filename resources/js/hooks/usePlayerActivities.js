@@ -73,6 +73,11 @@ export function usePlayerActivities({ world, worldId, sessionId, location, focus
 	const withFloor = (layout?.floors?.length ?? 0) > 1;
 	const [card, setCard] = useState(null);
 	const [highlightedIndex, setHighlightedIndex] = useState(0);
+	const [cardChatResidentId, setCardChatResidentId] = useState(chatResident?.id ?? null);
+	if ((chatResident?.id ?? null) !== cardChatResidentId) {
+		setCardChatResidentId(chatResident?.id ?? null);
+		if (chatResident) setCard(null);
+	}
 	const [activity, setActivity] = useState(null);
 	const [hudEntries, setHudEntries] = useState([]);
 	const [occupancy, setOccupancy] = useState(() => new Map());

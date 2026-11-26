@@ -51,6 +51,9 @@ class ResidentDecisionController extends Controller
     /** How long a resident waits after a conversation with an NPC before she starts another one with an NPC. */
     private const NPC_CONVERSATION_GAP_SECONDS = 300;
 
+    /** A decision is one short line, so the resident's model reasons little over it. */
+    private const REASONING_EFFORT = 'low';
+
     public function store(
         StoreResidentDecisionRequest $request,
         int $world,
@@ -119,8 +122,8 @@ class ResidentDecisionController extends Controller
             : null;
         $busyWithOthers = collect($validated['busyResidents'] ?? [])->mapWithKeys(fn (array $busy) => [(int) $busy['id'] => $busy['talkingWith'] ?? null])->all();
         $director = new PromptDirector($assistant->prompt);
-        app(AppendWorldConversationContext::class)->handle($director, $assistant, $residentRegion, $positions, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], $busyWith, $residentActivity, $busyWithOthers);
-        $director->addToTurn(TurnSection::CurrentState, 'available activities', $buildResidentWorldPrompt->availableActivities($residentRegion, $assistant, $location, $occupiedSpots, $posture));
+        app(AppendWorldConversationContext::class)->handle($director, $assistant, $residentRegion, $positions, $worldSession, $userActivity, $validated['stackedSpots'] ?? [], $busyWith, $residentActivity, $busyWithOthers, $conversation);
+        $director->addToTurn(TurnSection::CurrentState, 'available activities', $buildResidentWorldPrompt->availableActivities($residentRegion, $assistant, $location, $occupiedSpots, $posture, $positions['user'] ?? null, $validated['userState']['spotId'] ?? null));
         $vendors = app(BuildVendorsPrompt::class)->handle($worldSession, $region, $worldResident, $positions);
         if ($vendors !== null) {
             $director->addToTurn(TurnSection::CurrentState, 'for sale nearby', $vendors);
@@ -150,7 +153,7 @@ class ResidentDecisionController extends Controller
         }
 
         try {
-            $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
+            $llm = $aiModel ? $llmManager->fromModel($aiModel->withReasoningEffort(self::REASONING_EFFORT)) : $llmManager->fromConfig();
             $result = (new AgentLoopRunner($llm, $tools))->run(
                 assistant: $assistant,
                 messages: app(ComposeChatRequest::class)->handle($director->build(), [], ['role' => 'user', 'content' => '[A moment passes in the world.]']),
@@ -215,12 +218,22 @@ class ResidentDecisionController extends Controller
         $line = trim($parsed['content']);
         $action = $toolbox->chosenAction();
         $pose = $action === null ? $parsed['pose'] : null;
-        if (($action['verb'] ?? null) === 'talk_to') {
+        $withOpening = function (array $talk) use ($assistant): array {
             $tagParser = app(LlmResponseTagParser::class);
-            $opening = $tagParser->parse($action['line'], $assistant);
-            $action['line'] = $tagParser->stripStrayTags($opening['content']);
-            $action['pose'] = $opening['pose'];
-            $action['expression'] = Message::expressionFrom($opening, ['verb' => 'talk_to', 'target' => $action['target']], $tagParser->strayTags($opening['content']));
+            $opening = $tagParser->parse($talk['line'], $assistant);
+
+            return [
+                ...$talk,
+                'line' => $tagParser->stripStrayTags($opening['content']),
+                'pose' => $opening['pose'],
+                'expression' => Message::expressionFrom($opening, ['verb' => 'talk_to', 'target' => $talk['target']], $tagParser->strayTags($opening['content'])),
+            ];
+        };
+        if (($action['verb'] ?? null) === 'talk_to') {
+            $action = $withOpening($action);
+        }
+        if (isset($action['steps'])) {
+            $action['steps'] = array_map(fn (array $step) => ($step['verb'] ?? null) === 'talk_to' ? $withOpening($step) : $step, $action['steps']);
         }
         $thought = '/^\s*([*_]*)\((.+?)\)\1/su';
         $reason = preg_match($thought, $line, $match) === 1 ? trim($match[2]) : null;

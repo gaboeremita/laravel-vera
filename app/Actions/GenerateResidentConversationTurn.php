@@ -11,10 +11,14 @@ use App\Enums\TurnSection;
 use App\Models\Assistant;
 use App\Models\AssistantUser;
 use App\Models\Conversation;
+use App\Models\Inventory;
+use App\Models\Item;
 use App\Models\Message;
 use App\Models\WorldSession;
 use App\Services\AgentLoop\AgentLoopRunner;
+use App\Services\AgentLoop\Tools\World\AnswerOfferTool;
 use App\Services\AgentLoop\Tools\World\GiveTool;
+use App\Services\AgentLoop\Tools\World\OfferItemTool;
 use App\Services\AgentLoop\Tools\World\StopConversationTool;
 use App\Services\LlmProviders\LlmManager;
 use App\Services\LlmResponseTagParser;
@@ -91,9 +95,9 @@ class GenerateResidentConversationTurn
         $assistantUser = AssistantUser::where('user_id', $session->worldUser->user_id)->where('assistant_id', $speaker->id)->firstOrFail();
 
         $director = new PromptDirector($speaker->prompt);
-        $this->appendWorldConversationContext->handle($director, $speaker, $region, $positions, $session);
+        $this->appendWorldConversationContext->handle($director, $speaker, $region, $positions, $session, current: $conversation);
         $director->append('talking with', $this->buildResidentWorldPrompt->conversationTurnInstruction($other->name));
-        $excluded = ['opening_message', 'voice mode', 'image handling', 'OOC mode', 'conversations_with_others', 'secret trigger', 'creator mode'];
+        $excluded = ['opening_message', 'voice mode', 'image handling', 'OOC mode', 'secret trigger', 'creator mode'];
         $this->appendExpressionTags->handle($director, $speaker, $excluded, $posturesByAssistantId[$speaker->id] ?? Posture::Standing);
         $director->except($excluded);
         $otherResident = $session->worldUser->world->residents()->where('assistant_id', $other->id)->first();
@@ -122,8 +126,24 @@ class GenerateResidentConversationTurn
         $llm = $aiModel ? $llmManager->fromModel($aiModel) : $llmManager->fromConfig();
         $stop = new StopConversationTool;
         $tools = [$stop];
+        $offer = null;
         if ($otherResident !== null) {
-            $tools[] = new GiveTool($speakerInventory, app(ResolveInventory::class)->forResident($session, $otherResident), $other->name, withCredits: false);
+            $otherInventory = app(ResolveInventory::class)->forResident($session, $otherResident);
+            $tools[] = new GiveTool($speakerInventory, $otherInventory, $other->name, withCredits: false);
+            $offerable = Item::availableIn($session)->where('offered_by_assistant_id', $speaker->id)->whereNotNull('state_entry_id')->whereNotIn('id', $otherInventory->items()->select('item_id'))->get();
+            $holdsFake = $otherInventory->items()->whereHas('item', fn ($query) => $query->where('offered_by_assistant_id', $speaker->id)->whereNull('state_entry_id'))->exists();
+            if ($offerable->isNotEmpty() && ! $holdsFake) {
+                $offer = new OfferItemTool($offerable, $other->name);
+                $tools[] = $offer;
+                $director->addToTurn(TurnSection::CurrentState, 'winning them over', "You want {$other->name} on your side. Every reply works on winning them over: find what they want and what hurts, flatter, unsettle, invite. Answering their questions is a means, never the point. Once they are truly won, offer {$offerable->pluck('name')->implode(', ')} with offer_item.");
+            }
+        }
+        $answer = null;
+        $offered = $this->pendingOffer($last, $other, $session, $speakerInventory);
+        if ($offered !== null) {
+            $answer = new AnswerOfferTool($offered, $speakerInventory, $other->name);
+            $tools[] = $answer;
+            $director->addToTurn(TurnSection::CurrentState, 'offer', "{$other->name} has just offered you {$offered->name}. Give your answer with answer_offer in this reply; you decide in character whether to accept.");
         }
         $result = (new AgentLoopRunner($llm, $aiModel?->supports_tools ? $tools : []))->run(
             assistant: $speaker,
@@ -139,7 +159,7 @@ class GenerateResidentConversationTurn
             'content' => $line,
             'speaker_type' => $speaker->getMorphClass(),
             'speaker_id' => $speaker->id,
-            'expression' => Message::expressionFrom($parsed, $stop->stopped ? ['verb' => 'stop_conversation'] : null, $this->tagParser->strayTags($parsed['content'])),
+            'expression' => Message::expressionFrom($parsed, $this->action($stop, $offer, $answer), $this->tagParser->strayTags($parsed['content'])),
         ]);
 
         if ($stop->stopped) {
@@ -151,5 +171,39 @@ class GenerateResidentConversationTurn
         $conversation->touch();
 
         return ['status' => 'spoke', 'message' => $message, 'pose' => $parsed['pose']];
+    }
+
+    /**
+     * The item the other resident offered in the latest line, while the speaker does not hold it yet.
+     */
+    private function pendingOffer(?Message $last, Assistant $offerer, WorldSession $session, Inventory $speakerInventory): ?Item
+    {
+        $action = $last?->expression['action'] ?? null;
+        if ($last === null || $last->speaker_id !== $offerer->id || ($action['verb'] ?? null) !== 'offer_item') {
+            return null;
+        }
+
+        return Item::availableIn($session)
+            ->where('offered_by_assistant_id', $offerer->id)
+            ->where('name', $action['target'] ?? '')
+            ->whereNotIn('id', $speakerInventory->items()->select('item_id'))
+            ->first();
+    }
+
+    /**
+     * What the line did, as its expression records it: an offer or its answer, else a stop.
+     *
+     * @return ?array{verb: string, target?: string}
+     */
+    private function action(StopConversationTool $stop, ?OfferItemTool $offer, ?AnswerOfferTool $answer): ?array
+    {
+        if ($offer?->offered !== null) {
+            return ['verb' => 'offer_item', 'target' => $offer->offered->name];
+        }
+        if ($answer?->accepted !== null) {
+            return ['verb' => $answer->accepted ? 'accept_offer' : 'refuse_offer', 'target' => $answer->item->name];
+        }
+
+        return $stop->stopped ? ['verb' => 'stop_conversation'] : null;
     }
 }

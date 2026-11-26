@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Directors\PromptDirector;
 use App\Enums\TurnSection;
 use App\Models\Assistant;
+use App\Models\Conversation;
 use App\Models\Region;
 use App\Models\WorldSession;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -16,6 +17,7 @@ class AppendWorldConversationContext
         private readonly BuildResidentWorldPrompt $buildResidentWorldPrompt = new BuildResidentWorldPrompt,
         private readonly ResolveSpotStacking $resolveSpotStacking = new ResolveSpotStacking,
         private readonly ApplyResidentZoneAccess $applyResidentZoneAccess = new ApplyResidentZoneAccess,
+        private readonly BuildHeldStatePrompt $buildHeldStatePrompt = new BuildHeldStatePrompt,
     ) {}
 
     /**
@@ -25,8 +27,9 @@ class AppendWorldConversationContext
      * @param  ?string  $userTalkingWith  the name of whoever the user is busy talking with
      * @param  ?array{posture: string, object: ?array, activity: ?array}  $residentActivity
      * @param  array<int, ?int>  $busyResidents  for each resident who is busy, the resident they are talking with or on their way to
+     * @param  ?Conversation  $current  the conversation this turn belongs to, left out of the resident's other conversations
      */
-    public function handle(PromptDirector $director, Assistant $assistant, ?Region $region, ?array $positions = null, ?WorldSession $session = null, ?array $userActivity = null, array $stackedSpots = [], ?string $userTalkingWith = null, ?array $residentActivity = null, array $busyResidents = []): void
+    public function handle(PromptDirector $director, Assistant $assistant, ?Region $region, ?array $positions = null, ?WorldSession $session = null, ?array $userActivity = null, array $stackedSpots = [], ?string $userTalkingWith = null, ?array $residentActivity = null, array $busyResidents = [], ?Conversation $current = null): void
     {
         if ($region === null) {
             return;
@@ -78,6 +81,11 @@ class AppendWorldConversationContext
         }
 
         if ($session !== null) {
+            $heldState = $this->buildHeldStatePrompt->handle(app(ResolveInventory::class)->forResident($session, $resident));
+            if ($heldState !== null) {
+                $director->addToTurn(TurnSection::CurrentState, 'held_state', $heldState);
+            }
+
             $currentActivity = $this->buildResidentWorldPrompt->currentActivity($session, $resident, $residentZone, $residentActivity);
             if ($currentActivity !== null) {
                 $director->addToTurn(TurnSection::CurrentState, 'current_activity', $currentActivity);
@@ -88,10 +96,18 @@ class AppendWorldConversationContext
                 $director->addToTurn(TurnSection::RecentActivity, 'recent_activity', $recentActivity);
             }
 
-            $otherConversations = $this->buildResidentWorldPrompt->conversationsWithOthers($assistant, $session);
-            if ($otherConversations !== null) {
-                $director->addToTurn(TurnSection::RecentActivity, 'conversations_with_others', $otherConversations);
-            }
+            $this->appendConversationsWithOthers($director, $assistant, $session, $current);
+        }
+    }
+
+    /**
+     * The latest lines of the assistant's other conversations in the session, with residents and with the user.
+     */
+    public function appendConversationsWithOthers(PromptDirector $director, Assistant $assistant, WorldSession $session, ?Conversation $current = null): void
+    {
+        $otherConversations = $this->buildResidentWorldPrompt->conversationsWithOthers($assistant, $session, $current);
+        if ($otherConversations !== null) {
+            $director->addToTurn(TurnSection::RecentActivity, 'conversations_with_others', $otherConversations);
         }
     }
 }

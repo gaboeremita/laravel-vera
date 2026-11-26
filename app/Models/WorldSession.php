@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\InventoryHolder;
 use Database\Factories\WorldSessionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -53,6 +54,34 @@ class WorldSession extends Model
     public function inventories(): HasMany
     {
         return $this->hasMany(Inventory::class);
+    }
+
+    /**
+     * The residents who hold an item with a state entry in this session.
+     *
+     * @return array<int, int>
+     */
+    public function residentIdsHoldingState(): array
+    {
+        return $this->inventories()
+            ->where('holder', InventoryHolder::Resident)
+            ->whereHas('items.item', fn ($query) => $query->whereNotNull('state_entry_id'))
+            ->pluck('world_resident_id')
+            ->all();
+    }
+
+    /**
+     * The residents who hold an offered item with no state entry in this session.
+     *
+     * @return array<int, int>
+     */
+    public function residentIdsHoldingFake(): array
+    {
+        return $this->inventories()
+            ->where('holder', InventoryHolder::Resident)
+            ->whereHas('items.item', fn ($query) => $query->whereNotNull('offered_by_assistant_id')->whereNull('state_entry_id'))
+            ->pluck('world_resident_id')
+            ->all();
     }
 
     public function creditTransactions(): HasMany

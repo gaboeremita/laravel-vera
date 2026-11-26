@@ -19,7 +19,7 @@ class StoreResidentConversationRequest extends FormRequest
     {
         return [
             'with' => ['required', 'integer'],
-            'line' => ['required', 'string', 'max:1000'],
+            'line' => ['required', 'string'],
             'expression' => ['nullable', 'array'],
         ];
     }

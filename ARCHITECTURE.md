@@ -931,8 +931,8 @@ The `sendMessage` request accepts an optional `voice_mode: true` flag. When set,
 | `OOC mode` | included | **excluded** | a typed-parenthetical convention; unreachable via a transcribed voice message, no persistent state lost by omitting it |
 | `image handling` | included | **excluded** | voice mode's input path is mic-only; there's no image attachment |
 | `voice mode` | **excluded** | included | see below |
-| `creator mode` | included while creator mode is on | included while creator mode is on | the server checks the creator password and sets `conversations.creator_mode_at`; the section is included in every mode of that conversation once it is set, and excluded otherwise (see [Facts and Reveals](#facts-and-reveals)) |
-| `secret trigger` | **excluded** | **excluded** | the server checks the creator password itself, so the character is never given the section that used to hold it |
+| `creator mode` | included | included | DB-authored; included in every player conversation. Resident-to-resident turns, resident decisions and Discord exclude it |
+| `secret trigger` | included | included | DB-authored; included in every player conversation. Resident-to-resident turns, resident decisions and Discord exclude it |
 | `quests` | included in world sessions | included in world sessions | appended per turn by `BuildQuestsPrompt`, not DB-authored: beat prose, flags to grant, questions to signal, quests to offer and remembered endings (see [Quests](#quests)) |
 
 **`voice mode` is DB-authored content, not hardcoded PHP.** It's just another top-level key in `Assistant->prompt`, edited the same way as `personality` or `style rules` via the Prompt page — no separate settings mechanism. If an assistant hasn't authored one, voice mode simply contributes nothing to the prompt; nothing crashes or falls back to a hardcoded default (this was an explicit design requirement — see the "graceful, not hardcoded" note below).

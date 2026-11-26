@@ -105,16 +105,18 @@ it('gives an unknown place back to her as an error within the same turn', functi
     expect(toolResultSentBack())->toContain('There is no place, thing or spot called \"moon\"');
 });
 
-it('keeps the first action when she tries a second one in the same turn', function () {
+it('runs every action she takes in a turn, one after another', function () {
     $scenario = worldStateScenario(fakeReply: false);
     fakeTurn(
-        toolCallResponse('call_1', 'go_to', ['target' => 'pool-terrace']),
-        toolCallResponse('call_2', 'follow', []),
-        finalAnswerResponse('On my way.'),
+        toolCallResponse('call_1', 'go_to', ['target' => 'user']),
+        toolCallResponse('call_2', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline']),
+        finalAnswerResponse('Coming to sit with you.'),
     );
 
-    sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action.verb', 'go_to');
-    expect(toolResultSentBack(2))->toContain('You already chose an action this turn');
+    sendToolWorldMessage($this, $scenario)->assertSuccessful()
+        ->assertJsonPath('action.verb', 'plan')
+        ->assertJsonPath('action.steps.0', ['verb' => 'go_to', 'target' => 'user', 'activity' => null, 'pose' => null, 'description' => null])
+        ->assertJsonPath('action.steps.1', ['verb' => 'use', 'target' => 'pool-lounger-1-seat', 'activity' => 'recline', 'pose' => null, 'description' => null]);
 });
 
 it('walks her to the thing a spot belongs to when she goes to a spot', function () {
@@ -285,13 +287,14 @@ it('wanders around a place or around where she is', function (array $arguments, 
     'around her' => [[], null],
 ]);
 
-it('rejects a pose with no version for the posture the activity puts her in', function () {
+it('still does the activity when her pose has no version for its posture, and tells her which poses fit', function () {
     $scenario = worldStateScenario(fakeReply: false);
     Pose::factory()->create(['assistant_id' => $scenario[1]->id, 'name' => 'flirty']);
     Pose::factory()->posture(Posture::Reclining)->create(['assistant_id' => $scenario[1]->id, 'name' => 'sunbathe']);
-    fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline', 'pose' => 'flirty']), finalAnswerResponse('Hm.'));
+    fakeTurn(toolCallResponse('call_1', 'use', ['spot' => 'pool-lounger-1-seat', 'activity' => 'recline', 'pose' => 'flirty']), finalAnswerResponse('Ah.'));
 
-    sendToolWorldMessage($this, $scenario)->assertSuccessful()->assertJsonPath('action', null);
+    sendToolWorldMessage($this, $scenario)->assertSuccessful()
+        ->assertJsonPath('action', ['verb' => 'use', 'target' => 'pool-lounger-1-seat', 'activity' => 'recline', 'pose' => null]);
     expect(toolResultSentBack())->toContain('has no reclining version')->toContain('Your reclining poses: sunbathe');
 });
 
@@ -325,5 +328,6 @@ it('tells her a spot someone else holds is taken, from the occupied spots sent w
         ->assertSuccessful()
         ->assertJsonPath('action', null);
 
-    expect(toolResultSentBack())->toContain('pool-lounger-1-seat is taken');
+    expect(toolResultSentBack())->toContain('pool-lounger-1-seat is taken')->toMatch('/Free spots there: |Every spot there is taken/');
+    expect(json_encode(Http::recorded()[0][0]->data()))->toContain('Available activities:\\nYou are: standing');
 });

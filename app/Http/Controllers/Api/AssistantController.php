@@ -126,6 +126,8 @@ class AssistantController extends Controller
             'archive_id' => $assistant->archive_id,
             'mode' => $assistant->mode,
             'portrait_type' => $assistant->portrait_type->value,
+            'hovers' => $assistant->hovers,
+            'shimmers' => $assistant->shimmers,
             'vrm_url' => $assistant->vrm?->url,
             'vrm_original_name' => $assistant->vrm?->original_name,
             'vrm_lod_url' => $assistant->vrm?->lod_url,
@@ -160,6 +162,8 @@ class AssistantController extends Controller
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
             'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
+            'hovers' => ['sometimes', 'boolean'],
+            'shimmers' => ['sometimes', 'boolean'],
             'vrm' => $kind === AssistantKind::WorldNpc
                 ? ['required', 'file', 'extensions:vrm', 'max:51200']
                 : ['sometimes', 'file', 'extensions:vrm', 'max:51200'],
@@ -229,6 +233,8 @@ class AssistantController extends Controller
                 'archive_id' => $validated['archive_id'] ?? null,
                 'mode' => $validated['mode'] ?? AssistantMode::Assistant->value,
                 'portrait_type' => $validated['portrait_type'] ?? AssistantPortraitType::Image->value,
+                'hovers' => $validated['hovers'] ?? false,
+                'shimmers' => $validated['shimmers'] ?? false,
                 'kind' => $kind,
                 'sentiment_definitions' => $this->sentimentDefinitions($validated['sentimentDefinitions'] ?? []),
             ]);
@@ -310,6 +316,8 @@ class AssistantController extends Controller
             'archive_id' => ['nullable', 'integer', 'exists:archives,id'],
             'mode' => ['sometimes', new Enum(AssistantMode::class)],
             'portrait_type' => ['sometimes', new Enum(AssistantPortraitType::class)],
+            'hovers' => ['sometimes', 'boolean'],
+            'shimmers' => ['sometimes', 'boolean'],
             ...$this->termRuleValidation($request, $request->input('prompt') ?? $assistant->prompt ?? []),
             ...UpdateWorldRequest::sentimentDefinitionRules(),
         ]);

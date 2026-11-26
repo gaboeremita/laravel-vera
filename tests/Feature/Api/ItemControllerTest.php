@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\ActivityTerms;
+use App\Models\Archive;
+use App\Models\ArchiveEntry;
+use App\Models\Assistant;
 use App\Models\InventoryItem;
 use App\Models\Item;
 use App\Models\Region;
@@ -89,4 +92,23 @@ it('hides another user\'s world items', function () {
 
     $this->actingAs(User::factory()->create())->getJson(route('worlds.items.index', $region->world_id))->assertForbidden();
     $this->patchJson(route('worlds.items.update', [$region->world_id, $item->id]), itemPayload())->assertForbidden();
+});
+
+it('saves the state entry and offering assistant of an item', function () {
+    [$user, $assistant, , $region] = worldStateScenario();
+    $entry = ArchiveEntry::factory()->create(['archive_id' => Archive::factory()->create(['user_id' => $user->id])->id]);
+
+    $this->actingAs($user)->postJson(route('worlds.items.store', $region->world_id), itemPayload(['stateEntryId' => $entry->id, 'offeredByAssistantId' => $assistant->id]))
+        ->assertCreated()
+        ->assertJsonPath('stateEntryId', $entry->id)
+        ->assertJsonPath('offeredByAssistantId', $assistant->id);
+});
+
+it('refuses a state entry from another user\'s archive and an offering assistant who is not a resident of the world', function () {
+    [$user, , , $region] = worldStateScenario();
+    $foreignEntry = ArchiveEntry::factory()->create();
+    $outsider = Assistant::factory()->create();
+
+    $this->actingAs($user)->postJson(route('worlds.items.store', $region->world_id), itemPayload(['stateEntryId' => $foreignEntry->id, 'offeredByAssistantId' => $outsider->id]))
+        ->assertJsonValidationErrors(['stateEntryId', 'offeredByAssistantId']);
 });

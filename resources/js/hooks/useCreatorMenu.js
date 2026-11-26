@@ -16,7 +16,8 @@ async function readBody(response) {
 /**
  * The Creator menu's state in a world session: whether it is open and
  * unlocked, the overview of the world it shows, and the log of changes made
- * from it. `run` sends one change, logs it and refreshes the overview.
+ * from it. `run` sends one change, logs it and refreshes the overview;
+ * `openResident` opens the menu on the Residents tab with that resident selected.
  */
 export default function useCreatorMenu({ worldId, sessionId, initiallyUnlocked, addToast }) {
 	const [open, setOpen] = useState(false);
@@ -24,6 +25,7 @@ export default function useCreatorMenu({ worldId, sessionId, initiallyUnlocked, 
 	const [overview, setOverview] = useState(null);
 	const [refreshKey, setRefreshKey] = useState(0);
 	const [log, setLog] = useState([]);
+	const [focusedResidentId, setFocusedResidentId] = useState(null);
 	const unlocked = initiallyUnlocked || unlockedHere;
 
 	useEffect(() => {
@@ -45,8 +47,18 @@ export default function useCreatorMenu({ worldId, sessionId, initiallyUnlocked, 
 		};
 	}, [open, unlocked, refreshKey, worldId, sessionId, addToast]);
 
-	const toggle = useCallback(() => setOpen((current) => !current), []);
-	const close = useCallback(() => setOpen(false), []);
+	const toggle = useCallback(() => {
+		setFocusedResidentId(null);
+		setOpen((current) => !current);
+	}, []);
+	const close = useCallback(() => {
+		setFocusedResidentId(null);
+		setOpen(false);
+	}, []);
+	const openResident = useCallback((residentId) => {
+		setFocusedResidentId(residentId);
+		setOpen(true);
+	}, []);
 	const refresh = useCallback(() => setRefreshKey((current) => current + 1), []);
 
 	const unlock = useCallback(async (password) => {
@@ -66,7 +78,7 @@ export default function useCreatorMenu({ worldId, sessionId, initiallyUnlocked, 
 		try {
 			const response = await sendRequest();
 			const body = await readBody(response);
-			if (!response.ok) throw new Error(body.message || `Unable to ${text}`);
+			if (!response.ok) throw new Error(body.message || `Couldn't finish "${text}" (HTTP ${response.status})`);
 			addLogLine(text);
 			refresh();
 			return body;
@@ -76,5 +88,5 @@ export default function useCreatorMenu({ worldId, sessionId, initiallyUnlocked, 
 		}
 	}, [addLogLine, refresh, addToast]);
 
-	return { open, toggle, close, unlocked, unlock, overview, refresh, log, addLogLine, run };
+	return { open, toggle, close, openResident, focusedResidentId, unlocked, unlock, overview, refresh, log, addLogLine, run };
 }

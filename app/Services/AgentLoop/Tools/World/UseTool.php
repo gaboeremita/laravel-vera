@@ -52,11 +52,13 @@ class UseTool extends WorldTool
         }
 
         if (in_array($spot['id'], $this->toolbox->occupiedSpots, true)) {
-            throw new \RuntimeException(sprintf('%s is taken by someone else right now. Choose a free spot.', $spot['id']));
+            throw new \RuntimeException(sprintf('%s is taken by someone else right now. %s', $spot['id'], $this->toolbox->freeSpotsNote($spot['objectId'])));
         }
 
-        $pose = $this->toolbox->poseForActivity($activity, trim((string) ($arguments['pose'] ?? '')));
-        $outcome = $this->toolbox->chosenAction() === null ? $this->toolbox->activityGate()?->use($spot['objectId'], $activity['id']) : null;
+        $chosenPose = trim((string) ($arguments['pose'] ?? ''));
+        $pose = $this->toolbox->poseForActivity($activity, $chosenPose);
+        $poseNote = $this->toolbox->unfittingPoseNote($activity, $chosenPose);
+        $outcome = $this->toolbox->activityGate()?->use($spot['objectId'], $activity['id']);
         if ($outcome !== null && ! $outcome['allowed']) {
             throw new \RuntimeException($outcome['reason'] ?? $outcome['narration'] ?? 'That does not work right now.');
         }
@@ -64,6 +66,6 @@ class UseTool extends WorldTool
 
         $narration = $outcome['narration'] ?? null;
 
-        return ['status' => 'started', 'note' => "You are heading to the {$spot['objectName']} to {$activity['name']}.".($narration !== null ? " {$narration}" : '')];
+        return ['status' => 'started', 'note' => "You are heading to the {$spot['objectName']} to {$activity['name']}.".($narration !== null ? " {$narration}" : '').($poseNote !== null ? " {$poseNote}" : '')];
     }
 }

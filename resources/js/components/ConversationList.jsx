@@ -3,17 +3,7 @@ import { Trash2, Pencil } from "lucide-react";
 import { route } from 'ziggy-js';
 import ConfirmationModal from "./common/ConfirmationModal.jsx";
 import { api } from "../utils/api";
-
-function timeAgo(dateString) {
-	const now = new Date();
-	const date = new Date(dateString);
-	const seconds = Math.floor((now - date) / 1000);
-
-	if (seconds < 60) return "just now";
-	if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-	if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-	return `${Math.floor(seconds / 86400)}d ago`;
-}
+import { timeAgo } from "../utils/timeAgo.js";
 
 export default function ConversationList({ assistantId, conversations, onSelect, onNew, onDelete, onRename }) {
 	const [activeRow, setActiveRow] = useState(0);

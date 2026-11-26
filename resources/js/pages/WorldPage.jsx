@@ -52,9 +52,11 @@ import { areaIn } from '../components/world/zoneAccess.js';
 import useCreatorMenu from '../hooks/useCreatorMenu.js';
 import CreatorMenu from '../components/world/hud/CreatorMenu.jsx';
 import CreatorArrivalFlash from '../components/world/hud/CreatorArrivalFlash.jsx';
+import CreatorResidentMenu from '../components/world/hud/CreatorResidentMenu.jsx';
 import { zoneLanding } from '../components/world/zoneLanding.js';
 import { homeState } from '../components/world/residentHome.js';
-import { zoneAt } from '../components/world/worldLocation.js';
+import { zoneAt, zoneTree } from '../components/world/worldLocation.js';
+import { busyOthers } from '../components/world/busyResidents.js';
 
 const INVITE_MS = 30000;
 const LISTEN_DISTANCE = 12;
@@ -75,12 +77,15 @@ export default function WorldPage() {
 	const [session, setSession] = useState(null);
 	const [status, setStatus] = useState('loading');
 	const [nearbyResident, setNearbyResident] = useState(null);
+	const [pickedResidentId, setPickedResidentId] = useState(null);
 	const [chatResident, setChatResident] = useState(null);
 	const [activePose, setActivePose] = useState(null);
 	const [thoughts, setThoughts] = useState({});
 	const [speech, setSpeech] = useState({});
 	const [invite, setInvite] = useState(null);
 	const [observed, setObserved] = useState(null);
+	const [residentMenu, setResidentMenu] = useState(null);
+	const [movingResident, setMovingResident] = useState(null);
 	const [nearbyConversation, setNearbyConversation] = useState(null);
 	const [paused, setPaused] = useState(false);
 	const [voiceEnabled, setVoiceEnabled] = useState(readVoiceEnabled);
@@ -120,6 +125,8 @@ export default function WorldPage() {
 	const chatResidentRef = useRef(null);
 	const userClaimRef = useRef(null);
 	const residentClaimsRef = useRef(new Map());
+	const creatorTalksRef = useRef(new Map());
+	const creatorWalksRef = useRef(new Set());
 	const latestPosition = useRef(null);
 	const residentPositions = useRef(new Map());
 	const residentVoices = useRef(new Map());
@@ -172,12 +179,10 @@ export default function WorldPage() {
 					const sessions = await sessionsResponse.json();
 					selectedSession = sessions.find((item) => String(item.id) === String(sessionId)) ?? null;
 					if (!selectedSession) throw new Error('World session unavailable');
-					if (selectedSession.regionId === null) {
-						const resumeResponse = await api.post(route('worlds.sessions.resume', { world: worldId, session: sessionId }));
-						const resumed = await resumeResponse.json();
-						if (!resumeResponse.ok) throw new Error(resumed.message || 'World session unavailable');
-						selectedSession = { ...selectedSession, ...resumed };
-					}
+					const resumeResponse = await api.post(route('worlds.sessions.resume', { world: worldId, session: sessionId }));
+					const resumed = await resumeResponse.json();
+					if (!resumeResponse.ok) throw new Error(resumed.message || 'World session unavailable');
+					selectedSession = { ...selectedSession, ...resumed };
 					regionId = selectedSession.regionId;
 				}
 
@@ -317,6 +322,9 @@ export default function WorldPage() {
 
 	const openChat = useCallback((resident) => {
 		setChatResident(resident);
+		setPickedResidentId(null);
+		setObserved(null);
+		setMapExpanded(false);
 		setInvite((current) => (current?.residentId === resident.id ? null : current));
 	}, []);
 	const talkToVendor = useCallback((resident, line) => {
@@ -535,8 +543,9 @@ export default function WorldPage() {
 
 	useEffect(() => {
 		const keyDown = (event) => {
-			if (event.code !== 'KeyM' || isTypingTarget(event.target)) return;
-			setMapExpanded((expanded) => !expanded);
+			if (isTypingTarget(event.target)) return;
+			if (event.code === 'Escape') setMapExpanded(false);
+			else if (event.code === 'KeyM') setMapExpanded((expanded) => !expanded);
 		};
 		window.addEventListener('keydown', keyDown);
 		return () => window.removeEventListener('keydown', keyDown);
@@ -709,6 +718,7 @@ export default function WorldPage() {
 		if (line) setThoughts((current) => ({ ...current, [residentId]: null }));
 	}, []);
 	const getResidentPosition = useCallback((residentId) => residentPositions.current.get(residentId) ?? null, []);
+	const updateShimmering = useCallback((shimmeringResidentIds, fakeShimmeringResidentIds) => setSession((current) => current && ({ ...current, shimmeringResidentIds, fakeShimmeringResidentIds })), []);
 	const residentConversations = useResidentConversations({
 		enabled: status === 'ready',
 		paused,
@@ -722,16 +732,21 @@ export default function WorldPage() {
 		getPositions,
 		getView: () => playerView.current,
 		onSpeech: handleSpeech,
+		onShimmeringChange: updateShimmering,
 		addToast,
 	});
 	const { speak: speakAloud, start: startResidentConversation, stop: stopResidentConversation, isBusy: isInResidentConversation, conversationOf: residentConversationOf } = residentConversations;
 
 	// A resident is busy while she talks with someone, is on her way to talk
-	// to someone, or has someone on the way to talk to her. Claims map the
-	// resident being walked to onto the one walking over.
+	// to someone, has someone on the way to talk to her, or is being carried
+	// by the creator. Claims map the resident being walked to onto the one
+	// walking over.
+	const movingResidentId = movingResident?.resident.id ?? null;
 	const isResidentBusy = useCallback((residentId) => isInResidentConversation(residentId)
+		|| residentId === movingResidentId
+		|| creatorWalksRef.current.has(residentId)
 		|| residentClaimsRef.current.has(residentId)
-		|| [...residentClaimsRef.current.values()].includes(residentId), [isInResidentConversation]);
+		|| [...residentClaimsRef.current.values()].includes(residentId), [isInResidentConversation, movingResidentId]);
 	const claimTarget = useCallback((claimerId, target) => {
 		if (target === 'user') return claimUser(claimerId);
 		const targetId = Number(target);
@@ -859,7 +874,12 @@ export default function WorldPage() {
 
 	useEffect(() => {
 		const keyDown = (event) => {
-			if (event.code !== 'KeyL' || event.repeat || isTypingTarget(event.target)) return;
+			if (event.repeat || isTypingTarget(event.target)) return;
+			if (event.code === 'Escape') {
+				if (observed) setObserved(null);
+				return;
+			}
+			if (event.code !== 'KeyL') return;
 			if (observed) setObserved(null);
 			else if (nearbyConversation && !chatResident) setObserved(nearbyConversation);
 		};
@@ -910,18 +930,18 @@ export default function WorldPage() {
 		const position = residentPositions.current.get(resident.id);
 		return { regionId: region?.id ?? null, zoneName: position && world?.layout ? zoneAt(world?.layout, position)?.name ?? null : null };
 	}, [region?.id, world?.layout]);
-	const reactToMove = useCallback(async (resident, kind, from) => {
-		if (!from?.regionId) return;
+	const reactToMove = useCallback(async (resident, kind, from, pose = null, toZoneId = null) => {
+		if (from && !from.regionId) return;
 		try {
-			const response = await api.post(creatorRoute('residents.reaction', { resident: resident.id }), { kind, fromRegionId: from.regionId, fromZoneName: from.zoneName ?? null });
+			const response = await api.post(creatorRoute('residents.reaction', { resident: resident.id }), { kind, fromRegionId: from?.regionId ?? null, fromZoneName: from?.zoneName ?? null, poseName: pose?.name ?? null, posture: pose?.posture ?? null, toZoneId });
 			const body = await response.json();
 			if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
 			if (!body.line || !residentCommands.current.has(resident.id)) return;
-			if (kind !== 'sent' && kind !== 'sent_home') setInvite({ residentId: resident.id, name: resident.assistant.name, key: Date.now() });
-			await speakAloud(resident.id, body.line, body.expression?.pose ?? null, { toUser: true });
+			if (kind === 'summoned' || kind === 'followed') setInvite({ residentId: resident.id, name: resident.assistant.name, key: Date.now() });
+			await speakAloud(resident.id, body.line, kind === 'posed' || kind === 'walked' ? null : body.expression?.pose ?? null, { toUser: true });
 		} catch (error) {
-			console.error(`[WorldPage] ${resident.assistant.name} could not react to being moved`, error);
-			addToast(`${resident.assistant.name} couldn't react to being moved (${error.message})`, 'error');
+			console.error(`[WorldPage] ${resident.assistant.name} could not react to what the creator did`, error);
+			addToast(`${resident.assistant.name} couldn't react to what you did (${error.message})`, 'error');
 		}
 	}, [creatorRoute, speakAloud, addToast]);
 
@@ -1029,11 +1049,124 @@ export default function WorldPage() {
 	}, [releaseResident, creator, creatorRoute, updateResidentState, region?.id, world?.layout, moveResidentHere, placeOf, reactToMove]);
 
 	const creatorFreeze = useCallback(async (resident, frozen) => {
+		if (frozen) void residentCommands.current.get(resident.id)?.stop();
 		const done = await creator.run(`${frozen ? 'froze' : 'unfroze'} ${resident.assistant.name}`, () => api.put(creatorRoute('residents.frozen.update', { resident: resident.id }), { frozen }));
 		if (!done) return false;
 		setSession((current) => current && ({ ...current, frozenResidentIds: frozen ? [...new Set([...(current.frozenResidentIds ?? []), resident.id])] : (current.frozenResidentIds ?? []).filter((id) => id !== resident.id) }));
+		void reactToMove(resident, frozen ? 'frozen' : 'unfrozen', null);
 		return true;
-	}, [creator, creatorRoute]);
+	}, [creator, creatorRoute, reactToMove]);
+
+	const creatorTalkTo = useCallback(async (resident, other) => {
+		const commands = residentCommands.current.get(resident.id);
+		if (!commands || creatorTalksRef.current.has(resident.id)) return false;
+		const target = String(other.id);
+		if (!claimTarget(resident.id, target)) {
+			addToast(`${other.assistant.name} is busy`, 'error');
+			return false;
+		}
+		creatorTalksRef.current.set(resident.id, other.assistant.name);
+		handleThought(resident.id, `Going to talk to ${other.assistant.name}…`);
+		void (async () => {
+			try {
+				const response = await api.post(route('worlds.sessions.residents.observations.store', { world: worldId, session: sessionId, resident: resident.id }), { line: `*Something moves me to go talk to ${other.assistant.name}*` });
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			} catch (error) {
+				console.error(`[WorldPage] could not note that ${resident.assistant.name} went to talk to ${other.assistant.name}`, error);
+				addToast(`Could not note that ${resident.assistant.name} went to talk to ${other.assistant.name} (${error.message})`, 'error');
+			}
+		})();
+		const conversation = residentConversationOf(resident.id);
+		if (conversation) void stopResidentConversation(conversation.id);
+		await commands.stop();
+		const opening = creator.run(`sent ${resident.assistant.name} to talk to ${other.assistant.name}`, () => api.post(creatorRoute('residents.opening', { resident: resident.id }), { with: other.id }));
+		let openingFailed = false;
+		const result = await executeAction({ verb: 'talk_to', target }, {
+			commands,
+			layout: world?.layout,
+			getFollowTarget,
+			getResidentPosition,
+			onSpeak: async (action) => {
+				const line = await opening;
+				if (!line) {
+					openingFailed = true;
+					return false;
+				}
+				return handleSpeak(resident.id, { ...action, line: line.line, expression: line.expression });
+			},
+			claimTarget: (claimed) => claimTarget(resident.id, claimed),
+			releaseTarget: (claimed) => releaseTarget(resident.id, claimed),
+			fromUser: true,
+			residentId: resident.id,
+			occupiedSpots: occupiedSpots.current,
+		});
+		creatorTalksRef.current.delete(resident.id);
+		if (result.outcome !== 'completed') handleThought(resident.id, null);
+		if (result.outcome === 'failed' && !openingFailed) addToast(`${resident.assistant.name} couldn't talk to ${other.assistant.name}: ${result.reason}`, 'error');
+		return result.outcome === 'completed';
+	}, [claimTarget, releaseTarget, residentConversationOf, stopResidentConversation, creator, creatorRoute, world?.layout, getFollowTarget, getResidentPosition, handleSpeak, handleThought, worldId, sessionId, addToast]);
+	const creatorWalkTo = useCallback(async (resident, zone) => {
+		const commands = residentCommands.current.get(resident.id);
+		if (!commands) {
+			addToast(`${resident.assistant.name} has no body loaded to move`, 'error');
+			return false;
+		}
+		if (creatorWalksRef.current.has(resident.id) || creatorTalksRef.current.has(resident.id)) return false;
+		creatorWalksRef.current.add(resident.id);
+		const from = placeOf(resident);
+		releaseResident(resident);
+		await commands.stop();
+		creator.addLogLine(`sent ${resident.assistant.name} walking to ${zone.name}`);
+		handleThought(resident.id, `Going to ${zone.name}…`);
+		void reactToMove(resident, 'walked', from, null, zone.id);
+		const result = await executeAction({ verb: 'go_to', target: zone.id }, { commands, layout: world?.layout, getFollowTarget, fromUser: true, residentId: resident.id, occupiedSpots: occupiedSpots.current });
+		creatorWalksRef.current.delete(resident.id);
+		handleThought(resident.id, null);
+		if (result.outcome === 'failed') addToast(`${resident.assistant.name} couldn't go to ${zone.name}: ${result.reason}`, 'error');
+		return result.outcome === 'completed';
+	}, [placeOf, releaseResident, creator, handleThought, reactToMove, world?.layout, getFollowTarget, addToast]);
+	const openResidentMenu = useCallback((residentId, point) => {
+		setResidentMenu({ residentId, point, busyWith: busyOthers(getBusyResidents(), residentId), goingToTalkTo: creatorTalksRef.current.get(residentId) ?? null });
+	}, [getBusyResidents]);
+	const clearPickedResident = useCallback(() => setPickedResidentId(null), []);
+	const handleResidentClick = useCallback((residentId, point) => {
+		setPickedResidentId(residentId);
+		if (creator.unlocked) openResidentMenu(residentId, point);
+	}, [creator.unlocked, openResidentMenu]);
+	const loadResidentConversations = useCallback(async (resident) => {
+		const response = await api.get(route('conversations.index', { assistant: resident.assistant.id }));
+		if (!response.ok) throw new Error(`Unable to load conversations with ${resident.assistant.name}`);
+		const conversations = await response.json();
+		return conversations
+			.filter((conversation) => conversation.world_session_id === null || conversation.world_session_id === Number(sessionId))
+			.map((conversation) => ({ id: conversation.id, title: conversation.title, updatedAt: conversation.updated_at, current: conversation.world_session_id !== null }));
+	}, [sessionId]);
+	const switchResidentConversation = useCallback((resident, conversationId) => void creator.run(
+		`switched to another conversation with ${resident.assistant.name}`,
+		() => api.put(creatorRoute('residents.conversation.update', { resident: resident.id }), { conversationId }),
+	), [creator, creatorRoute]);
+	const closeResidentMenu = useCallback(() => setResidentMenu(null), []);
+	const startResidentMove = useCallback((resident) => {
+		if (!residentCommands.current.has(resident.id)) {
+			addToast(`${resident.assistant.name} has no body loaded to move`, 'error');
+			return;
+		}
+		releaseResident(resident);
+		setMovingResident({ resident, regionId: region?.id });
+	}, [releaseResident, region?.id, addToast]);
+	const cancelResidentMove = useCallback(() => setMovingResident(null), []);
+	const placeMovingResident = useCallback(async (position, origin) => {
+		const { resident } = movingResident;
+		setMovingResident(null);
+		const spot = { x: position.x, y: position.y, z: position.z };
+		const done = await creator.run(`moved ${resident.assistant.name}`, () => api.post(creatorRoute('residents.summon', { resident: resident.id }), { position: spot, facing: origin.facing }));
+		if (!done) {
+			residentCommands.current.get(resident.id)?.teleport(origin.position, origin.facing);
+			return;
+		}
+		updateResidentState(resident.id, { regionId: region?.id, position: spot, rotation: { y: origin.facing }, spotId: null, activityId: null, posture: 'standing', exitPosition: null });
+		void reactToMove(resident, 'moved', { regionId: region?.id ?? null, zoneName: world?.layout ? zoneAt(world?.layout, origin.position)?.name ?? null : null });
+	}, [movingResident, creator, creatorRoute, region?.id, world?.layout, updateResidentState, reactToMove]);
 
 	const observedConversation = observed ? residentConversations.conversations.find((conversation) => conversation.id === observed.id) ?? null : null;
 	const residentNames = new Map((world?.residents ?? []).map((resident) => [resident.id, resident.assistant.name]));
@@ -1089,6 +1222,11 @@ export default function WorldPage() {
 	if (player.cardKey && player.cardKey !== lastCardKey) setLastCardKey(player.cardKey);
 	const postureHint = player.activity?.kind === 'resting' ? 'SPACE — GET UP' : movement === 'crouching' ? 'Q — STAND UP' : null;
 
+	const explorationEnabled = status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !learnedOpen && !questLogOpen && !handoverRequest && !player.purchase && !quests.ending && !questOfferOpen && !receivedMadeItem && !creator.open;
+	if (movingResident && (!explorationEnabled || chatResident || movingResident.regionId !== region?.id)) setMovingResident(null);
+	const menuResident = residentMenu ? world?.residents?.find((resident) => resident.id === residentMenu.residentId) ?? null : null;
+	const residentPortrait = (residentId) => creator.overview?.residents?.find((resident) => resident.id === residentId)?.portraitUrl ?? null;
+
 	if (status === 'error') return <div className="flex h-full items-center justify-center bg-bg-0"><button className="button-primary" onClick={exit}>RETURN TO WORLDS</button></div>;
 	if (!world || !isRequestedSessionLoaded) return <div className="flex h-full items-center justify-center bg-bg-0 text-fg-3 text-sm tracking-[0.1em]">LOADING WORLD...</div>;
 
@@ -1116,7 +1254,7 @@ export default function WorldPage() {
 					</div>
 				)}
 				<WorldTrackPlayer trackUrl={world.trackUrl} isActive={status === 'ready' && !paused} voiceUntil={voiceUntil} />
-				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={status === 'ready' && !paused && !pendingPassage && !inventoryOpen && !learnedOpen && !questLogOpen && !handoverRequest && !player.purchase && !quests.ending && !questOfferOpen && !receivedMadeItem && !creator.open} paused={paused || creator.open} showZones={showZones} arrivals={arrivals} onArrivalDone={(key) => setArrivals((current) => current.filter((arrival) => arrival.key !== key))} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} onBlockedByObject={openBlockingObject} />
+				<WorldScene key={`${world.id}:${world.regionId}:${world.environmentUrl}:${sessionId ?? 'default'}`} world={world} initialFacing={arrivalFacing} linkedPassageIds={linkedPassageIds} onEnterPassage={requestPassage} explorationEnabled={explorationEnabled} paused={paused || creator.open} showZones={showZones} arrivals={arrivals} onArrivalDone={(key) => setArrivals((current) => current.filter((arrival) => arrival.key !== key))} onResidentVoice={handleResidentVoice} onReady={handleWorldReady} onError={handleWorldError} onResidentChange={setNearbyResident} onInteract={openChat} activePose={activePose} initialPosition={activeSession?.position} onPlayerPositionChange={handlePlayerPositionChange} residentPositions={residentPositions} residentVoices={residentVoices} activeResidentId={chatResident?.id ?? null} onEndConversation={closeChat} playerView={playerView} offscreenIndicator={offscreenIndicator} onFloorMaps={setFloorMaps} navigation={navigation} residentCommands={residentCommands} occupiedSpots={occupiedSpots} residentStates={activeSession?.residentStates ?? {}} thoughts={thoughts} speech={speech} playerState={playerState} playerCommands={playerCommands} collisionWorldRef={collisionWorldRef} onMovementChange={setMovement} onGetUpIntent={player.getUp} onMoveIntent={player.cancel} onLocationChange={handleLocationChange} focusLabelRef={focusLabelRef} focusedObjectId={focusedObject?.id ?? null} nearbyObjectIds={nearbyObjectIds} onFocusChange={setFocusedObject} onNearbyChange={setNearbyObjectIds} watchedObjectId={player.cardObjectId} onWatchedOutOfReach={player.closeCard} statsRef={performanceStats} residentDetails={residentDetails} shimmeringResidentIds={activeSession?.shimmeringResidentIds} fakeShimmeringResidentIds={activeSession?.fakeShimmeringResidentIds} onBlockedByObject={openBlockingObject} onResidentClick={explorationEnabled && !chatResident && !movingResident ? handleResidentClick : null} pickedResidentId={pickedResidentId} onPickedOutOfRange={clearPickedResident} movingResidentId={movingResidentId} onPlaceResident={placeMovingResident} onCancelResidentMove={cancelResidentMove} />
 				{status === 'ready' && <WorldMap layout={world.layout} floorMaps={floorMaps} playerView={playerView} residents={world.residents} residentPositions={residentPositions} activeResidentId={chatResident?.id ?? null} expanded={mapExpanded} onClose={() => setMapExpanded(false)} header={<div className="flex flex-col items-end gap-1.5"><ControlsLegend hasZones={hasZones} hasInventory={!!sessionId} />{hasZones && readoutText && <LocationReadout text={readoutText} />}{sessionId && <CreditsReadout credits={inventory?.credits} />}{sessionId && <QuestTracker runs={quests.runs} />}{quests.notice && <BeatNotice key={quests.notice.key} notice={quests.notice} onDone={quests.dismissNotice} />}</div>} />}
 				{status === 'ready' && (
 					<>
@@ -1130,6 +1268,8 @@ export default function WorldPage() {
 						<div className="pointer-events-none absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-3">
 							<ActionLine entries={player.hudEntries} onExpire={player.expireEntry} />
 							<PostureHint hint={postureHint} />
+							{movingResident && <PostureHint hint="CLICK — PLACE" />}
+							{movingResident && <PostureHint hint="ESC — CANCEL" />}
 						</div>
 					</>
 				)}
@@ -1146,6 +1286,31 @@ export default function WorldPage() {
 				{pendingPassage && <PassageConfirm fromRegionName={region.name} toRegionName={pendingPassage.toRegionName} onConfirm={() => passageActionsRef.current.confirm()} onCancel={() => passageActionsRef.current.cancel()} />}
 				<PauseOverlay paused={paused} onResume={() => setPaused(false)} onExit={exit} />
 				<CreatorArrivalFlash flashKey={flashKey} />
+				{menuResident && creator.unlocked && explorationEnabled && !chatResident && (
+					<CreatorResidentMenu
+						resident={{ name: menuResident.assistant.name }}
+						others={world.residents.filter((resident) => resident.id !== menuResident.id).map((resident) => ({ resident: { id: resident.id, name: resident.assistant.name, portraitUrl: residentPortrait(resident.id) }, busy: residentMenu.busyWith.has(resident.id), busyWith: world.residents.find((candidate) => candidate.id === residentMenu.busyWith.get(resident.id))?.assistant.name ?? null }))}
+						poses={menuResident.assistant.poses}
+						zones={zoneTree(world.layout?.zones ?? [])}
+						point={residentMenu.point}
+						goingToTalkTo={residentMenu.goingToTalkTo}
+						onTalkTo={(otherId) => void creatorTalkTo(menuResident, world.residents.find((resident) => resident.id === otherId))}
+						loadConversations={() => loadResidentConversations(menuResident)}
+						onSwitchConversation={(conversationId) => switchResidentConversation(menuResident, conversationId)}
+						onPose={(pose) => {
+							addToast(`${menuResident.assistant.name} plays ${pose.name} (${pose.posture})`, 'info');
+							void residentCommands.current.get(menuResident.id)?.pose(pose.name, pose.posture);
+							void reactToMove(menuResident, 'posed', null, { name: pose.name, posture: pose.posture ?? 'standing' });
+						}}
+						onGoTo={(zone) => void creatorWalkTo(menuResident, zone)}
+						onMoveTo={() => startResidentMove(menuResident)}
+						frozen={activeSession?.frozenResidentIds?.includes(menuResident.id) ?? false}
+						onSendHome={() => void creatorSendHome(menuResident)}
+						onFreeze={(frozen) => void creatorFreeze(menuResident, frozen)}
+						onOpenInCreatorMenu={() => creator.openResident(menuResident.id)}
+						onClose={closeResidentMenu}
+					/>
+				)}
 				{sessionId && <CreatorMenu creator={creator} sessionTitle={activeSession?.title ?? ''} context={creatorContext} keyHandlerRef={creatorKeyHandler} />}
 				<div className={`absolute inset-0 z-10 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${status !== 'ready' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
 					{world.cardImageUrl && (

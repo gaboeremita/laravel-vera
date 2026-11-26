@@ -5,13 +5,15 @@ import { VRMUtils } from '@pixiv/three-vrm';
 import { applyBoneQuaternions, captureBoneQuaternions } from '../../utils/boneQuaternions.js';
 import { loadPoseClip } from '../../utils/poseClipCache.js';
 import { CHARACTER_RADIUS, LEAVE_WATER_DEPTH, MAX_MOVEMENT_DELTA, SWIM_DEPTH } from './collisionCheck.js';
-import { facingAngleForMovement, fadesIdleForPose, headingToward, makeClipInPlace, modelYaw, shouldFaceUser, turnTowardsAngle } from './residentMotion.js';
+import { facingAngleForMovement, fadesIdleForPose, headingToward, makeClipInPlace, modelYaw, relaxedArmAngle, shouldFaceUser, turnTowardsAngle } from './residentMotion.js';
 import { defaultPoseFor, findWorldMotionPose, resolvePose } from './worldMotionPoses.js';
 import { inTalkingReach } from './talkingReach.js';
 import { STACK_HEIGHT, claimSpot, releaseSpot, stackTier } from './spotOccupancy.js';
-import { shouldLoad, shouldUnload, updateVrm, visualDetail, wantsLod } from './residentDetail.js';
+import { residentPoint, shouldLoad, shouldUnload, updateVrm, visualDetail, wantsLod } from './residentDetail.js';
 import { isWithinDrawDistance } from './drawDistance.js';
 import { createVrmLoader } from '../../utils/vrmLoader.js';
+import { hoverOffset } from '../../utils/hover.js';
+import { FAKE_SPARKLE_COLOR, SPARKLE_COLOR, createFaintShimmer, createHologram, findOrnaments, moveOrnaments } from '../../utils/hologram.js';
 
 const WALK_SPEED = 0.3;
 const WALK_ACCELERATION = 0.18;
@@ -81,10 +83,13 @@ const VOICE_ROLLOFF = 1.2;
 const MAX_VISUAL_DELTA = 1;
 const VIEW_SPHERE_RADIUS = 1.2;
 
-export default function ResidentController({ resident, layout = null, onVoice, savedState = null, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions, residentVoices, audioListener, inConversation = false, navigation, residentCommands, occupiedSpots, residentDetails = null }) {
+export default function ResidentController({ resident, layout = null, onVoice, savedState = null, playerPosition, paused, activePose, interaction, collisionWorld, residentPositions, residentVoices, audioListener, inConversation = false, navigation, residentCommands, occupiedSpots, residentDetails = null, faintShimmer = false, fakeShimmer = false }) {
 	const { scene, gl } = useThree();
 	const vrm = useRef(null);
 	const bodyRef = useRef(null);
+	const ornamentsRef = useRef([]);
+	const hologramRef = useRef(null);
+	const faintShimmerRef = useRef(null);
 	const mixer = useRef(null);
 	const lastPoseTriggerRef = useRef(null);
 	const restPoseRef = useRef(null);
@@ -114,6 +119,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 	const postureRef = useRef('standing');
 	const spotRef = useRef(null);
 	const placementRef = useRef(null);
+	const carriedRef = useRef(false);
 	const embeddedRef = useRef({ since: null, checkAt: 0, lastClear: null });
 	const faceUserRequested = useRef(false);
 	const faceTargetRef = useRef(null);
@@ -138,7 +144,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 	const waterRef = useRef({ x: null, y: null, z: null, surface: null });
 	const swimmingRef = useRef(false);
 	const restAtEdgeRef = useRef(false);
-	const { x = 0, y = 0, z = 0 } = resident.position ?? {};
+	const { x, y, z } = residentPoint(resident, savedState);
 	const position = useMemo(() => collisionWorld.findSpawn({ x, y, z }), [collisionWorld, x, y, z]);
 	const distance = position ? Math.hypot(playerPosition[0] - position.x, playerPosition[1] - position.y, playerPosition[2] - position.z) : Infinity;
 	const inLoadRange = shouldLoad({ behavior: resident.behavior, distance });
@@ -147,6 +153,8 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 	const [wearingLod, setWearingLod] = useState(() => wantsLod({ hasLod: Boolean(lodUrl), distance, wearingLod: false }));
 	const wearingLodRef = useRef(wearingLod);
 	const bodyUrl = wearingLod && lodUrl ? lodUrl : resident.assistant.vrmUrl;
+	const hovering = resident.assistant.hovers === true;
+	const shimmering = resident.assistant.shimmers === true;
 	const loadedUrlRef = useRef(null);
 	const poseResolveRef = useRef(null);
 	const walkAnimationUrl = findWorldMotionPose(resident.assistant.poses, 'walk')?.animationUrl ?? null;
@@ -174,6 +182,16 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 	}, [position, resident.id]);
 
 	useEffect(() => {
+		if (!loaded || (!faintShimmer && !fakeShimmer) || shimmering || !vrm.current) return;
+		const shimmer = createFaintShimmer(vrm.current, faintShimmer ? SPARKLE_COLOR : FAKE_SPARKLE_COLOR);
+		faintShimmerRef.current = shimmer;
+		return () => {
+			shimmer.dispose();
+			if (faintShimmerRef.current === shimmer) faintShimmerRef.current = null;
+		};
+	}, [loaded, faintShimmer, fakeShimmer, shimmering]);
+
+	useEffect(() => {
 		if (loaded || !position || !inLoadRange || !bodyUrl) return;
 		// Coming back into range she picks up where she was when she was unloaded.
 		const startState = resumeStateRef.current ?? savedState;
@@ -183,6 +201,8 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			if (cancelled) { VRMUtils.deepDispose(gltf.scene); return; }
 			vrm.current = gltf.userData.vrm;
 			vrm.current.scene.rotation.y = modelYaw(vrm.current.meta?.metaVersion);
+			ornamentsRef.current = findOrnaments(vrm.current.scene);
+			hologramRef.current = shimmering ? createHologram(vrm.current) : null;
 			bodyRef.current = new Group();
 			bodyRef.current.add(vrm.current.scene);
 			const start = startState?.position ?? position;
@@ -223,15 +243,16 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			// portrait, otherwise an idle resident stands with arms out.
 			const leftUpperArm = vrm.current.humanoid.getNormalizedBoneNode('leftUpperArm');
 			const rightUpperArm = vrm.current.humanoid.getNormalizedBoneNode('rightUpperArm');
-			if (leftUpperArm) leftUpperArm.rotation.z = 1.2;
-			if (rightUpperArm) rightUpperArm.rotation.z = -1.2;
+			const armAngle = relaxedArmAngle(vrm.current.meta?.metaVersion);
+			if (leftUpperArm) leftUpperArm.rotation.z = armAngle;
+			if (rightUpperArm) rightUpperArm.rotation.z = -armAngle;
 
 			restPoseRef.current = captureBoneQuaternions(vrm.current);
 			loadedUrlRef.current = bodyUrl;
 			setLoaded(true);
 		});
 		return () => { cancelled = true; };
-	}, [inLoadRange, loaded, position, resident.id, bodyUrl, gl, resident.rotation?.y, residentPositions, scene, savedState, occupiedSpots, layout, collisionWorld]);
+	}, [inLoadRange, loaded, position, resident.id, bodyUrl, gl, resident.rotation?.y, residentPositions, scene, savedState, occupiedSpots, layout, collisionWorld, shimmering]);
 
 	// Lets go of her body, remembering where and how she was so the next
 	// body she is loaded into picks up from there. Anything waiting on this
@@ -259,6 +280,9 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 		locomotionPhaseRef.current = { name: 'idle', endsAt: 0, velocity: 0, heading: null };
 		posePlayingRef.current = false;
 		floatOffsetRef.current = 0;
+		hologramRef.current?.dispose();
+		hologramRef.current = null;
+		ornamentsRef.current = [];
 		scene.remove(body);
 		VRMUtils.deepDispose(body);
 		vrm.current = null;
@@ -403,6 +427,19 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				placementRef.current = null;
 				bodyRef.current.position.set(position.x, position.y + floatOffsetRef.current, position.z);
 				bodyRef.current.rotation.y = facing;
+			},
+			carry: () => {
+				const body = bodyRef.current;
+				const origin = {
+					position: spotRef.current?.approach ?? { x: body.position.x, y: body.position.y - floatOffsetRef.current, z: body.position.z },
+					facing: body.rotation.y,
+				};
+				commands.teleport(origin.position, origin.facing);
+				carriedRef.current = true;
+				return origin;
+			},
+			release: () => {
+				carriedRef.current = false;
 			},
 			goTo: async (target, { near = false, towardUser = false } = {}) => {
 				settle('interrupted', 'a new action replaced it');
@@ -555,8 +592,8 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 					}, milliseconds),
 				};
 			}),
-			pose: (name) => interruptible((async () => {
-				await playPoseRef.current?.(name);
+			pose: (name, posture) => interruptible((async () => {
+				await playPoseRef.current?.(name, posture);
 				return completed;
 			})()),
 			// A pose that goes with what she says: it never gets her up from
@@ -610,7 +647,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 
 		void (async () => {
 			try {
-				const loadedClip = await loadPoseClip(walkAnimationUrl, vrm.current);
+				const loadedClip = await loadPoseClip(walkAnimationUrl, vrm.current, { hovering });
 				const clip = loadedClip ? makeClipInPlace(loadedClip) : null;
 				if (cancelled || !clip || !vrm.current) return;
 
@@ -633,15 +670,15 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			walkActionRef.current?.stop();
 			walkActionRef.current = null;
 		};
-	}, [loaded, walkAnimationUrl]);
+	}, [loaded, walkAnimationUrl, hovering]);
 
 	useEffect(() => {
 		if (!loaded || !vrm.current) return undefined;
 		let cancelled = false;
-		const loadTransition = async (url, actionRef, loop = false, hold = false) => {
+		const loadTransition = async (url, actionRef, loop = false, hold = false, standing = true) => {
 			if (!url) return;
 			try {
-				const loadedClip = await loadPoseClip(url, vrm.current);
+				const loadedClip = await loadPoseClip(url, vrm.current, { hovering: hovering && standing });
 				const hipsName = vrm.current?.humanoid.getNormalizedBoneNode('hips')?.name;
 				const hipsTrack = loadedClip?.tracks.find((track) => track.name === `${hipsName}.position`);
 				if (hipsTrack) motionHipsHeightRef.current.set(actionRef, hipsTrack.values[1]);
@@ -665,11 +702,11 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			loadTransition(walkStartAnimationUrl, walkStartActionRef),
 			loadTransition(walkStopAnimationUrl, walkStopActionRef),
 			loadTransition(defaultAnimationUrl, defaultActionRef, true),
-			loadTransition(swimAnimationUrl, swimActionRef, true),
-			loadTransition(swimToEdgeAnimationUrl, swimToEdgeActionRef, false, true),
+			loadTransition(swimAnimationUrl, swimActionRef, true, false, false),
+			loadTransition(swimToEdgeAnimationUrl, swimToEdgeActionRef, false, true, false),
 		]);
 		return () => { cancelled = true; };
-	}, [defaultAnimationUrl, loaded, walkStartAnimationUrl, walkStopAnimationUrl, swimAnimationUrl, swimToEdgeAnimationUrl]);
+	}, [defaultAnimationUrl, loaded, walkStartAnimationUrl, walkStopAnimationUrl, swimAnimationUrl, swimToEdgeAnimationUrl, hovering]);
 
 	// Standing she talks in place like she walks; seated, the clip keeps its
 	// hip translation like the other seated clips.
@@ -680,7 +717,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 		void Promise.all([['standing', talkAnimationUrl], ['sitting', talkSittingAnimationUrl]].map(async ([posture, url]) => {
 			if (!url) return;
 			try {
-				const loadedClip = await loadPoseClip(url, vrm.current);
+				const loadedClip = await loadPoseClip(url, vrm.current, { hovering: hovering && posture === 'standing' });
 				if (cancelled || !loadedClip || !vrm.current) return;
 				const hipsName = vrm.current.humanoid.getNormalizedBoneNode('hips')?.name;
 				const hipsTrack = loadedClip.tracks.find((track) => track.name === `${hipsName}.position`);
@@ -698,7 +735,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			for (const { action } of actions.values()) action.stop();
 			actions.clear();
 		};
-	}, [loaded, talkAnimationUrl, talkSittingAnimationUrl]);
+	}, [loaded, talkAnimationUrl, talkSittingAnimationUrl, hovering]);
 
 	// Resting postures keep their clips' hip translation, which is what
 	// lowers her onto a seat or a bed; only standing locomotion is in place.
@@ -743,9 +780,9 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 		if (!loaded) return undefined;
 		// Resolves with { played } once the pose has finished, so a step can
 		// wait for it before the next one starts.
-		const playPose = async (name) => {
+		const playPose = async (name, posture = postureRef.current) => {
 			const skipped = { played: false };
-			const pose = resolvePose(poses, name, postureRef.current);
+			const pose = resolvePose(poses, name, posture);
 			if (!pose || !vrm.current) return skipped;
 			const token = ++poseTokenRef.current;
 
@@ -763,7 +800,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 
 			posePlayingRef.current = true;
 			walkActionRef.current?.stop();
-			const clip = await loadPoseClip(pose.animationUrl, vrm.current);
+			const clip = await loadPoseClip(pose.animationUrl, vrm.current, { hovering: hovering && pose.posture === 'standing' });
 			if (token !== poseTokenRef.current || !clip || !vrm.current) {
 				if (token === poseTokenRef.current) posePlayingRef.current = false;
 				return skipped;
@@ -829,7 +866,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 		};
 		playPoseRef.current = playPose;
 		return () => { playPoseRef.current = null; };
-	}, [loaded, poses]);
+	}, [loaded, poses, hovering]);
 
 	useEffect(() => {
 		if (!loaded) return;
@@ -919,7 +956,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 		const elapsed = state.clock.elapsedTime;
 		const embedded = embeddedRef.current;
 		const restingPosture = ['sitting', 'lying', 'reclining'].includes(postureRef.current);
-		if (placementRef.current || swimming || restingPosture) embedded.since = null;
+		if (placementRef.current || swimming || restingPosture || carriedRef.current) embedded.since = null;
 		else if (elapsed >= embedded.checkAt) {
 			embedded.checkAt = elapsed + EMBEDDED_CHECK_SECONDS;
 			if (!collisionWorld.isBodyBlocked(currentPosition)) {
@@ -1033,7 +1070,7 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			}
 		}
 		const routeMoving = Boolean(routeRef.current?.moving);
-		const wantsToRoam = !routeRef.current && !spotRef.current && !placementRef.current && resident.behavior === 'roam' && !paused && !inConversation && currentDistance < 30;
+		const wantsToRoam = !routeRef.current && !spotRef.current && !placementRef.current && !carriedRef.current && resident.behavior === 'roam' && !paused && !inConversation && currentDistance < 30;
 		const idleAction = () => talking?.action
 			?? (heldPoseRef.current?.posture === postureRef.current ? heldPoseRef.current.action : null)
 			?? (postureRef.current === 'standing' ? null : postureActionsRef.current.get(postureRef.current))
@@ -1178,9 +1215,10 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 			activateLocomotionAction(moveAction());
 		}
 
-		// In deep water she floats: her root rises so the swimming clip's hips
-		// sit just under the surface, whatever the pool's depth.
-		let floatTarget = 0;
+		// A hovering body drifts above the ground while she stands. In deep
+		// water she floats: her root rises so the swimming clip's hips sit just
+		// under the surface, whatever the pool's depth.
+		let floatTarget = hovering && postureRef.current === 'standing' ? hoverOffset(state.clock.elapsedTime) : 0;
 		if (swimming) {
 			const moving = locomotionActionRef.current === swimActionRef.current && swimActionRef.current !== null;
 			const edgeResting = locomotion.name === 'edge';
@@ -1247,6 +1285,10 @@ export default function ResidentController({ resident, layout = null, onVoice, s
 				currentWeightsRef.current[expr] = lerped;
 				vrm.current.expressionManager?.setValue(expr, lerped);
 			}
+
+			moveOrnaments(ornamentsRef.current, state.clock.elapsedTime);
+			hologramRef.current?.update(state.clock.elapsedTime, visualDelta);
+			faintShimmerRef.current?.update(state.clock.elapsedTime, visualDelta);
 
 			// Springs left still while she was far away would snap on the first
 			// frame back, so they start again from rest.

@@ -22,6 +22,7 @@ class RetrievalService
         $embedding = $this->provider->embed($text);
 
         return ArchiveEntry::query()
+            ->retrievable()
             ->where('archive_id', $archiveId)
             ->whereNotNull('embedding')
             ->whereVectorSimilarTo('embedding', $embedding, minSimilarity: $minSimilarity)

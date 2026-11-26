@@ -23,6 +23,8 @@ class ItemResource extends JsonResource
             'releasesCredits' => $this->releases_credits,
             'releasesItems' => $this->releases_items ?? [],
             'revealsFactId' => $this->reveals_fact_id,
+            'stateEntryId' => $this->state_entry_id,
+            'offeredByAssistantId' => $this->offered_by_assistant_id,
             'cardImageUrl' => $this->whenLoaded('cardImage', fn () => $this->cardImage?->url),
             'soundUrl' => $this->whenLoaded('sound', fn () => $this->sound?->url()),
             'soundHash' => $this->whenLoaded('sound', fn () => $this->sound?->hash),

@@ -45,6 +45,8 @@ class WorldSessionController extends Controller
                 'hasConversations' => $session->conversations_count > 0,
                 'creatorUnlocked' => $session->creator_mode_at !== null,
                 'frozenResidentIds' => $session->frozen_resident_ids ?? [],
+                'shimmeringResidentIds' => $session->residentIdsHoldingState(),
+                'fakeShimmeringResidentIds' => $session->residentIdsHoldingFake(),
                 'updated_at' => $session->updated_at,
                 'residentStates' => $session->residentStates->mapWithKeys(fn (WorldSessionResident $state) => [$state->world_resident_id => [
                     'regionId' => $state->region_id,

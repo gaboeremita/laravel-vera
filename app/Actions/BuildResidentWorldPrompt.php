@@ -167,13 +167,15 @@ class BuildResidentWorldPrompt
 
     /**
      * What she could do right now, for an idle decision: her poses by posture,
-     * the activities of the place she is in, and its spots marked free or taken.
+     * the activities of the place she is in, and its spots marked free, taken
+     * or the user's, with how far each is from the user.
      *
      * @param  array{floor: ?array, zone: ?array, zoneChain: array<int, array>}  $location
      * @param  array<int, string>  $occupiedSpots
+     * @param  ?array{x: float, y: float, z: float}  $userPoint
      * @return array<string, string|array<int, string>>
      */
-    public function availableActivities(Region $region, Assistant $assistant, array $location, array $occupiedSpots, Posture $posture): array
+    public function availableActivities(Region $region, Assistant $assistant, array $location, array $occupiedSpots, Posture $posture, ?array $userPoint = null, ?string $userSpot = null): array
     {
         $available = ['you are' => $posture->value];
 
@@ -201,7 +203,14 @@ class BuildResidentWorldPrompt
                 $object['id'],
                 $object['name'],
                 collect($spot['activities'])->map(fn (array $activity) => "{$activity['name']} [{$activity['id']}]")->implode(', '),
-                in_array($spot['id'], $occupiedSpots, true) ? 'taken' : 'free',
+                implode(', ', array_filter([
+                    match (true) {
+                        $spot['id'] === $userSpot => 'the user is here',
+                        in_array($spot['id'], $occupiedSpots, true) => 'taken',
+                        default => 'free',
+                    },
+                    $userPoint !== null && $spot['id'] !== $userSpot ? sprintf('%s m from the user', number_format(app(ResolveWorldState::class)->distance($spot['position'], $userPoint), 1)) : null,
+                ])),
             )));
         if ($spots->isNotEmpty()) {
             $available['spots in this place'] = $spots->values()->all();
@@ -293,15 +302,19 @@ class BuildResidentWorldPrompt
     }
 
     /**
-     * Her latest conversations with other residents, so she remembers them
-     * when she talks to the user.
+     * The resident's latest conversations in the session, with other residents
+     * and with the user, so they remember them wherever they talk next. The one
+     * they are in right now is left out, since it is already in front of them.
      */
-    public function conversationsWithOthers(Assistant $assistant, WorldSession $session): ?string
+    public function conversationsWithOthers(Assistant $assistant, WorldSession $session, ?Conversation $current = null): ?string
     {
-        $conversations = Conversation::involving($assistant)
-            ->where('world_session_id', $session->id)
-            ->where('owner_type', $assistant->getMorphClass())
-            ->where('counterpart_type', $assistant->getMorphClass())
+        $assistantType = $assistant->getMorphClass();
+        $user = $session->worldUser->user;
+        $conversations = Conversation::where('world_session_id', $session->id)
+            ->where(fn ($query) => $query
+                ->where(fn ($query) => $query->involving($assistant)->where('owner_type', $assistantType)->where('counterpart_type', $assistantType))
+                ->orWhere(fn ($query) => $query->whereMorphedTo('owner', $user)->whereMorphedTo('counterpart', $assistant)))
+            ->when($current !== null, fn ($query) => $query->whereKeyNot($current->id))
             ->latest('updated_at')
             ->limit(self::OTHER_CONVERSATION_LIMIT)
             ->with(['owner', 'counterpart'])
@@ -311,14 +324,21 @@ class BuildResidentWorldPrompt
             return null;
         }
 
-        return $conversations->map(function (Conversation $conversation) use ($assistant): string {
-            $other = $conversation->owner->is($assistant) ? $conversation->counterpart : $conversation->owner;
-            $lines = $conversation->messages()->latest('id')->limit(self::OTHER_CONVERSATION_LINES)->get(['speaker_type', 'speaker_id', 'content'])->reverse()
-                ->map(fn ($message) => ($message->speaker_id === $assistant->id ? 'you: ' : "{$other->name}: ").Str::limit((string) $message->content, self::RECENT_MESSAGE_LENGTH, ''))
+        $excerpts = $conversations->map(function (Conversation $conversation) use ($assistant, $assistantType): ?string {
+            $withUser = $conversation->counterpart_type !== $conversation->owner_type;
+            $otherName = $withUser ? 'the user' : ($conversation->owner->is($assistant) ? $conversation->counterpart : $conversation->owner)->name;
+            $lines = $conversation->messages()->whereIn('role', ['user', 'assistant'])->whereNotNull('content')->where('content', '<>', '')->latest('id')->limit(self::OTHER_CONVERSATION_LINES)->get(['role', 'speaker_type', 'speaker_id', 'content'])->reverse()
+                ->map(function (Message $message) use ($assistant, $assistantType, $withUser, $otherName): string {
+                    $own = $withUser ? $message->role === 'assistant' : $message->speaker_type === $assistantType && $message->speaker_id === $assistant->id;
+
+                    return ($own ? 'you: ' : "{$otherName}: ").Str::limit((string) $message->content, self::RECENT_MESSAGE_LENGTH, '');
+                })
                 ->implode("\n");
 
-            return "With {$other->name}:\n{$lines}";
-        })->implode("\n\n");
+            return $lines === '' ? null : "With {$otherName}:\n{$lines}";
+        })->filter();
+
+        return $excerpts->isEmpty() ? null : $excerpts->implode("\n\n");
     }
 
     /**

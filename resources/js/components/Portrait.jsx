@@ -2,7 +2,7 @@ import {useState} from "react";
 import veraAvatar from "../../images/vera-avatar.png";
 import VrmAvatar from "./VrmAvatar.jsx";
 
-export default function Portrait({ emotion, authenticated, hasAssistant = true, getImageUrl, getVideoUrl, getVrmBlendshapes, poseBlendshapes = [], poseAnimationUrl = null, poseTriggerId = null, poseName = null, defaultPoseBlendshapes = [], defaultPoseAnimationUrl = null, portraitType = 'image', vrmUrl = null, assistantId = null, conversationId = null, worldPortraitUrl = null }) {
+export default function Portrait({ emotion, authenticated, hasAssistant = true, getImageUrl, getVideoUrl, getVrmBlendshapes, poseBlendshapes = [], poseAnimationUrl = null, poseTriggerId = null, poseName = null, defaultPoseBlendshapes = [], defaultPoseAnimationUrl = null, portraitType = 'image', vrmUrl = null, hovers = false, shimmers = false, assistantId = null, conversationId = null, worldPortraitUrl = null }) {
 	const [playingVideo, setPlayingVideo] = useState(false);
 
 	const src = getImageUrl(emotion) || getImageUrl('default');
@@ -71,6 +71,8 @@ export default function Portrait({ emotion, authenticated, hasAssistant = true, 
 				<div className="relative w-full h-full overflow-hidden portrait-bg">
 					<VrmAvatar
 					vrmUrl={vrmUrl}
+					hovers={hovers}
+					shimmers={shimmers}
 					emotion={emotion}
 					blendshapes={getVrmBlendshapes ? getVrmBlendshapes(emotion) : []}
 					poseBlendshapes={poseBlendshapes}

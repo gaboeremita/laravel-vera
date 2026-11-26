@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { facingAngleForMovement, fadesIdleForPose, headingToward, idleWait, makeClipInPlace, modelYaw, shouldFaceUser, speakingSeconds, turnTowardsAngle } from '../../resources/js/components/world/residentMotion.js';
+import { facingAngleForMovement, fadesIdleForPose, headingToward, idleWait, makeClipInPlace, modelYaw, relaxedArmAngle, shouldFaceUser, speakingSeconds, turnTowardsAngle } from '../../resources/js/components/world/residentMotion.js';
 import { findWorldMotionPose } from '../../resources/js/components/world/worldMotionPoses.js';
 
 test('faces the avatar front in its direction of travel', () => {
@@ -75,4 +75,12 @@ test('a model faces -Z inside her body whichever VRM version it was exported as'
 
 	assert.equal(frontOf('0', -1), -1);
 	assert.equal(frontOf('1', 1), -1);
+});
+
+test('the relaxed stance lowers the arms whichever VRM version the model was exported as', () => {
+	// A left upper arm pointing out along its normalized +X: VRM 0.x turns it with the rotation's sign, VRM 1.0 against it.
+	const handHeight = (metaVersion) => (metaVersion === '0' ? -1 : 1) * Math.sin(relaxedArmAngle(metaVersion));
+
+	assert.ok(handHeight('0') < 0);
+	assert.ok(handHeight('1') < 0);
 });
